@@ -1,0 +1,26 @@
+{
+  "name": "nicky-fairy-tales",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI mluvené pohádky pro Nicolase – Claude (příběh) + Gemini Nano Banana (ilustrace) + ElevenLabs (hlas)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.0",
+    "@elevenlabs/elevenlabs-js": "^2.27.0",
+    "@google/genai": "^1.30.0",
+    "next": "^15.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.6.0"
+  }
+}

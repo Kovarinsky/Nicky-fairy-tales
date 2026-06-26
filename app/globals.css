@@ -1,0 +1,166 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: linear-gradient(160deg, #fef6e4 0%, #e8f0fe 100%);
+  color: #2b2b3a;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-bottom: 0.25rem;
+}
+
+.subtitle {
+  color: #6b6b80;
+  margin-bottom: 2rem;
+}
+
+/* ── Formulář ── */
+.form {
+  background: #fff;
+  border-radius: 18px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.07);
+  display: grid;
+  gap: 1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+input,
+textarea {
+  font: inherit;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #d8d8e3;
+  border-radius: 10px;
+  background: #fafaff;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+button {
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  border-radius: 12px;
+  padding: 0.85rem 1.2rem;
+  background: #6c5ce7;
+  color: #fff;
+  transition: transform 0.05s ease, background 0.2s ease;
+}
+
+button:hover:not(:disabled) {
+  background: #5a4bd1;
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.error {
+  background: #ffe0e0;
+  color: #9b1c1c;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  margin-top: 1rem;
+}
+
+.status {
+  text-align: center;
+  color: #6b6b80;
+  margin-top: 1.5rem;
+}
+
+/* ── Knížka ── */
+.book {
+  margin-top: 2rem;
+}
+
+.book-title {
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+
+.page {
+  background: #fff;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+}
+
+.page-image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  background: #eee;
+  display: block;
+}
+
+.page-image.placeholder {
+  display: grid;
+  place-items: center;
+  color: #aaa;
+}
+
+.page-body {
+  padding: 1.25rem;
+}
+
+.page-text {
+  font-size: 1.15rem;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.page-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.page-counter {
+  color: #6b6b80;
+  font-weight: 600;
+}
