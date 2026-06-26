@@ -29,6 +29,11 @@ yarn-error.log*
 /public/stories/
 /data/stories/
 
+# reference/ – fotky dětí a jejich konfigurace se NECOMMITUJÍ (soukromí)
+/reference/*
+!/reference/README.md
+!/reference/characters.example.json
+
 # vercel
 .vercel
 

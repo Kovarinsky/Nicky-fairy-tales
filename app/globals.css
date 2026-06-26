@@ -67,6 +67,39 @@ textarea {
   gap: 1rem;
 }
 
+/* ── výběr postav (chips) ── */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid #d8d8e3;
+  border-radius: 999px;
+  background: #fafaff;
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.chip-on {
+  background: #efe9ff;
+  border-color: #6c5ce7;
+  color: #4a3bc0;
+}
+
+.chip input {
+  width: auto;
+  margin: 0;
+  accent-color: #6c5ce7;
+}
+
 button {
   font: inherit;
   font-weight: 700;

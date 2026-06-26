@@ -27,7 +27,7 @@ function buildSystemPrompt(): string {
     "Pravidla:",
     "- Příběh musí mít jasný začátek, zápletku a hezký, uklidňující konec (vhodné před spaním).",
     "- Žádné násilí, strach ani témata nevhodná pro malé děti.",
-    "- Hlavní hrdina vystupuje ve všech scénách a je popsán konzistentně.",
+    "- Vystupují právě zadané postavy (jménem) a jsou popsány konzistentně.",
     "- Každá scéna má 2–4 věty vyprávění (kratší pro mladší děti).",
     "- Ke každé scéně přidej `imagePrompt` ANGLICKY: popis ilustrace v stylu",
     "  'soft children's storybook illustration, warm colors, cozy'. V image promptu",
@@ -43,13 +43,24 @@ function buildSystemPrompt(): string {
 }
 
 function buildUserPrompt(req: StoryRequest): string {
+  const cast = req.characters
+    .map((c) => `- ${c.name} (${c.description})`)
+    .join("\n");
   return [
     `Téma pohádky: ${req.topic}`,
-    `Hlavní hrdina: ${req.heroName}`,
+    `Postavy, které v pohádce vystupují:`,
+    cast,
+    req.characters.length > 1
+      ? "Obě postavy jsou sourozenci a v příběhu spolu interagují."
+      : "",
     `Věk dítěte: ${req.age} let (tomu přizpůsob slovník a délku vět)`,
     `Počet scén: ${req.sceneCount}`,
     `Jazyk vyprávění: čeština`,
-  ].join("\n");
+    "",
+    "V `imagePrompt` (anglicky) vždy zopakuj vzhled vystupujících postav podle popisu výše.",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /** Vytáhne JSON i kdyby ho model omylem zabalil do code fence. */

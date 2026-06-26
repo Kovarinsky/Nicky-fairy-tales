@@ -63,6 +63,22 @@ npm run test:voice
 Ověří klíč, vypíše dostupné hlasy (i české z Voice Library) s jejich Voice ID a namluví
 krátkou českou ukázku do `voice-sample.mp3`. Vybraný `voice_id` pak vlož do `ELEVENLABS_VOICE_ID`.
 
+## Personalizované postavy (fotky dětí)
+
+Aby hrdinové vypadali jako vaše děti, používají se **referenční fotky** ze složky
+[`reference/`](reference/README.md):
+
+```bash
+cp reference/characters.example.json reference/characters.json
+# vlož fotky (nicolas.jpg, valentyna.jpg) do reference/ a uprav characters.json
+```
+
+Postavy se pak objeví ve formuláři jako zaškrtávátka – vybereš, kdo v pohádce vystupuje,
+a jejich fotky se předají Nano Bananě jako reference.
+
+> 🔒 Fotky ani `characters.json` se **necommitují** (jsou v `.gitignore`). Verzuje se
+> jen `reference/README.md` a `characters.example.json`.
+
 ## Struktura
 
 ```
@@ -70,13 +86,16 @@ app/
   page.tsx              # formulář + listovací knížka (client)
   layout.tsx, globals.css
   api/
+    characters/route.ts # seznam postav pro formulář
     story/route.ts      # Claude → scénář
     scene/route.ts      # Nano Banana + ElevenLabs → obrázek + audio pro 1 scénu
 lib/
   claude.ts             # generování příběhu
-  gemini.ts             # generování ilustrací (konzistence hrdiny)
+  gemini.ts             # generování ilustrací (reference + konzistence)
   elevenlabs.ts         # text-to-speech
+  characters.ts         # načítání postav a referenčních fotek
   types.ts              # sdílené typy
+reference/              # fotky dětí + characters.json (gitignored)
 ```
 
 ## Stav / roadmap
@@ -86,8 +105,8 @@ lib/
 - [x] Generátor ilustrací (Nano Banana)
 - [x] Namluvení (ElevenLabs)
 - [x] Interaktivní knížka (frontend)
+- [x] Personalizované postavy z fotek dětí (reference/)
 - [ ] Ukládání pohádek (teď se média vrací jako data URL, nepřetrvávají)
-- [ ] Referenční obrázek hrdiny pro ještě lepší konzistenci
 - [ ] Nasazení na Vercel
 - [ ] Volba/náhled hlasů přímo v UI
 

@@ -1,13 +1,37 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { StoryScript, RenderedScene } from "@/lib/types";
+
+interface CharacterOption {
+  id: string;
+  name: string;
+}
 
 export default function Home() {
   const [topic, setTopic] = useState("");
-  const [heroName, setHeroName] = useState("Nicolas");
+  const [characters, setCharacters] = useState<CharacterOption[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [age, setAge] = useState(4);
   const [sceneCount, setSceneCount] = useState(6);
+
+  // načti dostupné postavy z reference/characters.json
+  useEffect(() => {
+    fetch("/api/characters")
+      .then((r) => r.json())
+      .then((d) => {
+        const list: CharacterOption[] = d.characters || [];
+        setCharacters(list);
+        setSelectedIds(list.map((c) => c.id)); // defaultně všechny
+      })
+      .catch(() => setCharacters([]));
+  }, []);
+
+  function toggleCharacter(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
@@ -33,7 +57,7 @@ export default function Home() {
       const storyRes = await fetch("/api/story", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, heroName, age, sceneCount }),
+        body: JSON.stringify({ topic, characterIds: selectedIds, age, sceneCount }),
       });
       const script: StoryScript & { error?: string } = await storyRes.json();
       if (!storyRes.ok) throw new Error(script.error || "Nepodařilo se vytvořit příběh.");
@@ -51,6 +75,7 @@ export default function Home() {
           body: JSON.stringify({
             scene: script.scenes[i],
             heroDescription: script.heroDescription,
+            characterIds: selectedIds,
           }),
         });
         const media = await sceneRes.json();
@@ -93,22 +118,36 @@ export default function Home() {
             required
           />
         </div>
-        <div className="row">
+        {characters.length > 0 && (
           <div className="field">
-            <label htmlFor="hero">Jméno hrdiny</label>
-            <input id="hero" value={heroName} onChange={(e) => setHeroName(e.target.value)} />
+            <label>Kdo v pohádce vystupuje?</label>
+            <div className="chips">
+              {characters.map((c) => (
+                <label
+                  key={c.id}
+                  className={`chip ${selectedIds.includes(c.id) ? "chip-on" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(c.id)}
+                    onChange={() => toggleCharacter(c.id)}
+                  />
+                  {c.name}
+                </label>
+              ))}
+            </div>
           </div>
-          <div className="field">
-            <label htmlFor="age">Věk dítěte</label>
-            <input
-              id="age"
-              type="number"
-              min={1}
-              max={12}
-              value={age}
-              onChange={(e) => setAge(Number(e.target.value))}
-            />
-          </div>
+        )}
+        <div className="field">
+          <label htmlFor="age">Věk dítěte</label>
+          <input
+            id="age"
+            type="number"
+            min={1}
+            max={12}
+            value={age}
+            onChange={(e) => setAge(Number(e.target.value))}
+          />
         </div>
         <div className="field">
           <label htmlFor="scenes">Počet stránek: {sceneCount}</label>
@@ -121,7 +160,10 @@ export default function Home() {
             onChange={(e) => setSceneCount(Number(e.target.value))}
           />
         </div>
-        <button type="submit" disabled={loading}>
+        <button
+          type="submit"
+          disabled={loading || (characters.length > 0 && selectedIds.length === 0)}
+        >
           {loading ? "Tvořím pohádku…" : "✨ Vytvořit pohádku"}
         </button>
       </form>

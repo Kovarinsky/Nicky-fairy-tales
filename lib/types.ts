@@ -1,12 +1,24 @@
 // Sdílené typy pro celou pipeline pohádky
 
+/** Postava, kterou lze do pohádky obsadit (s referenční fotkou pro konzistenci) */
+export interface Character {
+  /** Stabilní id, např. "nicolas" */
+  id: string;
+  /** Jméno, jak má vystupovat v příběhu, např. "Nicolásek" */
+  name: string;
+  /** Popis vzhledu (anglicky, pro image prompt), např. "a 5-year-old boy with blond hair" */
+  description: string;
+  /** Název souboru s referenční fotkou ve složce reference/ */
+  referenceFile: string;
+}
+
 /** Vstup od uživatele z formuláře */
 export interface StoryRequest {
   /** Téma / zápletka, např. "Nicolas a draci na hradě" */
   topic: string;
-  /** Jméno hrdiny (default Nicolas) */
-  heroName: string;
-  /** Věk dítěte – ovlivňuje slovník a délku */
+  /** Postavy obsazené do pohádky (alespoň jedna) */
+  characters: Character[];
+  /** Věk cílového dítěte – ovlivňuje slovník a délku */
   age: number;
   /** Kolik scén (stránek) má pohádka mít */
   sceneCount: number;

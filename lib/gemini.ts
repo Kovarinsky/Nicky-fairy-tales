@@ -29,30 +29,35 @@ export interface ImageResult {
 /**
  * Vygeneruje obrázek pro jednu scénu.
  * @param scene scéna se svým imagePrompt
- * @param heroDescription popis hrdiny (drží konzistenci napříč scénami)
- * @param referenceImage volitelný referenční obrázek hrdiny (base64 PNG) pro ještě lepší konzistenci
+ * @param heroDescription popis postav (drží konzistenci napříč scénami)
+ * @param referenceImages volitelné referenční fotky postav (base64) pro podobu skutečným dětem
  */
 export async function generateSceneImage(
   scene: Scene,
   heroDescription: string,
-  referenceImage?: { data: string; mimeType: string }
+  referenceImages: Array<{ data: string; mimeType: string }> = []
 ): Promise<ImageResult> {
   const ai = getClient();
 
+  const hasRefs = referenceImages.length > 0;
   const prompt = [
+    hasRefs
+      ? "Use the children in the reference photo(s) as the basis for the characters — keep their faces and hair recognizable, but render them in the illustration style below."
+      : "",
     scene.imagePrompt,
-    `Main character (keep consistent across all images): ${heroDescription}.`,
+    `Characters (keep consistent across all images): ${heroDescription}.`,
     "Style: soft children's storybook illustration, warm cozy colors, gentle lighting,",
     "friendly and whimsical, no text in the image.",
-  ].join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-  // contents: buď jen text, nebo text + referenční obrázek
-  const parts: Array<Record<string, unknown>> = [{ text: prompt }];
-  if (referenceImage) {
-    parts.unshift({
-      inlineData: { data: referenceImage.data, mimeType: referenceImage.mimeType },
-    });
+  // contents: referenční fotky (pokud jsou) + textový prompt
+  const parts: Array<Record<string, unknown>> = [];
+  for (const ref of referenceImages) {
+    parts.push({ inlineData: { data: ref.data, mimeType: ref.mimeType } });
   }
+  parts.push({ text: prompt });
 
   const response = await ai.models.generateContent({
     model: MODEL,
