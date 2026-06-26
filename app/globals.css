@@ -88,6 +88,13 @@ textarea {
   transition: all 0.15s ease;
 }
 
+/* téma = tlačítko ve stejném vzhledu jako chip */
+.chip-btn {
+  font: inherit;
+  font-weight: 600;
+  color: #2b2b3a;
+}
+
 .chip-on {
   background: #efe9ff;
   border-color: #6c5ce7;

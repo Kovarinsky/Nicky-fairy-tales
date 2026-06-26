@@ -106,6 +106,8 @@ reference/              # fotky dětí + characters.json (gitignored)
 - [x] Namluvení (ElevenLabs)
 - [x] Interaktivní knížka (frontend)
 - [x] Personalizované postavy z fotek dětí (reference/)
+- [x] Výběr tématu/světa (Krteček, Tlapková patrola, Krkonoše, Mickey, …)
+- [x] Grafika ve stylu Walt Disney
 - [ ] Ukládání pohádek (teď se média vrací jako data URL, nepřetrvávají)
 - [ ] Nasazení na Vercel
 - [ ] Volba/náhled hlasů přímo v UI

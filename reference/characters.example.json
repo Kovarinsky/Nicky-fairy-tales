@@ -2,13 +2,13 @@
   {
     "id": "nicolas",
     "name": "Nicolásek",
-    "description": "a cheerful young boy with light blond hair and a bright smile",
+    "description": "a cheerful 6-year-old boy with light blond hair and a bright smile; the big brother, a head taller than his little sister",
     "referenceFile": "nicolas.jpg"
   },
   {
     "id": "valentyna",
     "name": "Valentýnka",
-    "description": "a sweet little girl with blond hair, often wearing a hair bow",
+    "description": "an almost-2-year-old toddler girl with blond hair, often wearing a hair bow; the little sister, noticeably smaller than her big brother",
     "referenceFile": "valentyna.jpg"
   }
 ]

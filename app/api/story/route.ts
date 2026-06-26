@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateStory } from "@/lib/claude";
 import { charactersByIds, loadCharacters } from "@/lib/characters";
+import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -15,8 +16,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     const topic = String(body.topic || "").trim();
-    if (!topic) {
-      return NextResponse.json({ error: "Chybí téma pohádky (topic)." }, { status: 400 });
+    const theme = body.themeId ? themeById(String(body.themeId)) : undefined;
+
+    // Stačí buď zvolené téma, nebo vlastní popis.
+    if (!topic && !theme) {
+      return NextResponse.json(
+        { error: "Vyber téma nebo napiš, o čem má pohádka být." },
+        { status: 400 }
+      );
     }
 
     // Postavy: podle vybraných id; fallback na všechny, jinak obecný hrdina.
@@ -30,6 +37,8 @@ export async function POST(req: NextRequest) {
 
     const request: StoryRequest = {
       topic,
+      themeName: theme?.name,
+      themePrompt: theme?.prompt,
       characters,
       age: Number(body.age) || 4,
       sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), 12),

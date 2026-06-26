@@ -8,14 +8,22 @@ interface CharacterOption {
   name: string;
 }
 
+interface ThemeOption {
+  id: string;
+  name: string;
+  emoji: string;
+}
+
 export default function Home() {
   const [topic, setTopic] = useState("");
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [themes, setThemes] = useState<ThemeOption[]>([]);
+  const [selectedTheme, setSelectedTheme] = useState<string>("");
   const [age, setAge] = useState(4);
   const [sceneCount, setSceneCount] = useState(6);
 
-  // načti dostupné postavy z reference/characters.json
+  // načti postavy a témata
   useEffect(() => {
     fetch("/api/characters")
       .then((r) => r.json())
@@ -25,12 +33,21 @@ export default function Home() {
         setSelectedIds(list.map((c) => c.id)); // defaultně všechny
       })
       .catch(() => setCharacters([]));
+
+    fetch("/api/themes")
+      .then((r) => r.json())
+      .then((d) => setThemes(d.themes || []))
+      .catch(() => setThemes([]));
   }, []);
 
   function toggleCharacter(id: string) {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
+  }
+
+  function pickTheme(id: string) {
+    setSelectedTheme((prev) => (prev === id ? "" : id)); // druhý klik zruší
   }
 
   const [loading, setLoading] = useState(false);
@@ -57,7 +74,13 @@ export default function Home() {
       const storyRes = await fetch("/api/story", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, characterIds: selectedIds, age, sceneCount }),
+        body: JSON.stringify({
+          topic,
+          themeId: selectedTheme,
+          characterIds: selectedIds,
+          age,
+          sceneCount,
+        }),
       });
       const script: StoryScript & { error?: string } = await storyRes.json();
       if (!storyRes.ok) throw new Error(script.error || "Nepodařilo se vytvořit příběh.");
@@ -108,16 +131,6 @@ export default function Home() {
       <p className="subtitle">Vymysli téma a necháme vykouzlit pohádku s obrázky a hlasem.</p>
 
       <form className="form" onSubmit={createStory}>
-        <div className="field">
-          <label htmlFor="topic">O čem má pohádka být?</label>
-          <textarea
-            id="topic"
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder="Např. Nicolas a kouzelný drak, který se bál létat"
-            required
-          />
-        </div>
         {characters.length > 0 && (
           <div className="field">
             <label>Kdo v pohádce vystupuje?</label>
@@ -138,6 +151,35 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {themes.length > 0 && (
+          <div className="field">
+            <label>Vyber téma (svět pohádky)</label>
+            <div className="chips">
+              {themes.map((t) => (
+                <button
+                  type="button"
+                  key={t.id}
+                  className={`chip chip-btn ${selectedTheme === t.id ? "chip-on" : ""}`}
+                  onClick={() => pickTheme(t.id)}
+                >
+                  <span>{t.emoji}</span> {t.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="field">
+          <label htmlFor="topic">Vlastní přání (nepovinné)</label>
+          <textarea
+            id="topic"
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder="Např. ať najdou ztracené koťátko a pomůže jim hodný drak"
+          />
+        </div>
+
         <div className="field">
           <label htmlFor="age">Věk dítěte</label>
           <input
@@ -162,7 +204,11 @@ export default function Home() {
         </div>
         <button
           type="submit"
-          disabled={loading || (characters.length > 0 && selectedIds.length === 0)}
+          disabled={
+            loading ||
+            (characters.length > 0 && selectedIds.length === 0) ||
+            (!selectedTheme && !topic.trim())
+          }
         >
           {loading ? "Tvořím pohádku…" : "✨ Vytvořit pohádku"}
         </button>

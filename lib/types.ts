@@ -14,8 +14,12 @@ export interface Character {
 
 /** Vstup od uživatele z formuláře */
 export interface StoryRequest {
-  /** Téma / zápletka, např. "Nicolas a draci na hradě" */
+  /** Volný popis / zápletka, např. "ztratili klíček od domečku" (může být prázdné) */
   topic: string;
+  /** Volitelné téma/svět (Krteček, Tlapková patrola, …) – nápověda pro vypravěče */
+  themePrompt?: string;
+  /** Název tématu pro kontext (např. "Krkonošské pohádky") */
+  themeName?: string;
   /** Postavy obsazené do pohádky (alespoň jedna) */
   characters: Character[];
   /** Věk cílového dítěte – ovlivňuje slovník a délku */
