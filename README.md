@@ -50,6 +50,18 @@ npm run dev
 
 > Story endpoint (`/api/story`) běží jen na Claude – jde otestovat hned po dodání
 > samotného `ANTHROPIC_API_KEY`, ještě bez Gemini/ElevenLabs.
+>
+> **Pozn. ke Gemini:** obrázkový model (Nano Banana) vyžaduje projekt se **zapnutým
+> billingem** – na free tier má limit 0. ~0,039 $ / obrázek.
+
+### Ověření ElevenLabs hlasu
+
+```bash
+npm run test:voice
+```
+
+Ověří klíč, vypíše dostupné hlasy (i české z Voice Library) s jejich Voice ID a namluví
+krátkou českou ukázku do `voice-sample.mp3`. Vybraný `voice_id` pak vlož do `ELEVENLABS_VOICE_ID`.
 
 ## Struktura
 
