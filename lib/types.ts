@@ -8,8 +8,8 @@ export interface Character {
   name: string;
   /** Popis vzhledu (anglicky, pro image prompt), např. "a 5-year-old boy with blond hair" */
   description: string;
-  /** Název souboru s referenční fotkou ve složce reference/ */
-  referenceFile: string;
+  /** Název souboru s referenční fotkou ve složce reference/ (volitelné) */
+  referenceFile?: string;
 }
 
 /** Vstup od uživatele z formuláře */

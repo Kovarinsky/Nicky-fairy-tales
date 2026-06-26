@@ -14,13 +14,22 @@ interface ThemeOption {
   emoji: string;
 }
 
+// Věk se odvozuje ze zvolených postav – Nicky (6), Valentýnka (2), rodiče nemají vliv
+function getTargetAge(ids: string[]): number {
+  const hasNicky = ids.includes("nicolas");
+  const hasValentyna = ids.includes("valentyna");
+  if (hasNicky && hasValentyna) return 4;
+  if (hasValentyna) return 2;
+  if (hasNicky) return 6;
+  return 6;
+}
+
 export default function Home() {
   const [topic, setTopic] = useState("");
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [themes, setThemes] = useState<ThemeOption[]>([]);
   const [selectedTheme, setSelectedTheme] = useState<string>("");
-  const [age, setAge] = useState(4);
   const [sceneCount, setSceneCount] = useState(6);
 
   // načti postavy a témata
@@ -78,7 +87,7 @@ export default function Home() {
           topic,
           themeId: selectedTheme,
           characterIds: selectedIds,
-          age,
+          age: getTargetAge(selectedIds),
           sceneCount,
         }),
       });
@@ -128,7 +137,7 @@ export default function Home() {
   return (
     <div className="container">
       <h1>📖 Nickyho pohádky</h1>
-      <p className="subtitle">Vymysli téma a necháme vykouzlit pohádku s obrázky a hlasem.</p>
+      <p className="subtitle">Vyber postavy a téma – pohádka s obrázky a tatínkovým hlasem.</p>
 
       <form className="form" onSubmit={createStory}>
         {characters.length > 0 && (
@@ -181,27 +190,17 @@ export default function Home() {
         </div>
 
         <div className="field">
-          <label htmlFor="age">Věk dítěte</label>
-          <input
-            id="age"
-            type="number"
-            min={1}
-            max={12}
-            value={age}
-            onChange={(e) => setAge(Number(e.target.value))}
-          />
-        </div>
-        <div className="field">
           <label htmlFor="scenes">Počet stránek: {sceneCount}</label>
           <input
             id="scenes"
             type="range"
             min={3}
-            max={12}
+            max={10}
             value={sceneCount}
             onChange={(e) => setSceneCount(Number(e.target.value))}
           />
         </div>
+
         <button
           type="submit"
           disabled={

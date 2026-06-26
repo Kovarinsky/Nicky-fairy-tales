@@ -10,5 +10,15 @@
     "name": "Valentýnka",
     "description": "an almost-2-year-old toddler girl with blond hair, often wearing a hair bow; the little sister, noticeably smaller than her big brother",
     "referenceFile": "valentyna.jpg"
+  },
+  {
+    "id": "jan",
+    "name": "Táta Jan",
+    "description": "a tall, warm-hearted 47-year-old Czech dad with a big friendly smile, always ready for adventure with his kids"
+  },
+  {
+    "id": "jana",
+    "name": "Máma Jana",
+    "description": "a kind, nurturing 44-year-old Czech mom with a bright smile and warm eyes, the loving heart of the family"
   }
 ]

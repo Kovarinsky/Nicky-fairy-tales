@@ -51,13 +51,26 @@ async function streamToBuffer(stream: unknown): Promise<Buffer> {
   return Buffer.concat(chunks.map((c) => Buffer.from(c)));
 }
 
+/** Nahradí unicode znaky > 255 jejich ASCII ekvivalenty (ElevenLabs SDK omezení). */
+function sanitizeText(text: string): string {
+  return text
+    .replace(/…/g, "...")
+    .replace(/–/g, "-")
+    .replace(/—/g, "--")
+    .replace(/[""]/g, '"')
+    .replace(/['']/g, "'")
+    .replace(/«|»/g, '"')
+    .replace(/­/g, "")
+    .replace(/​/g, "");
+}
+
 /** Namluví text jedné scény, vrátí MP3 buffer. */
 export async function narrateScene(scene: Scene): Promise<Buffer> {
   const client = getClient();
   const voiceId = getVoiceId();
 
   const audio = await client.textToSpeech.convert(voiceId, {
-    text: scene.narration,
+    text: sanitizeText(scene.narration),
     modelId: MODEL_ID,
     outputFormat: OUTPUT_FORMAT,
   });

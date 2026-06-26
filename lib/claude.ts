@@ -46,16 +46,33 @@ function buildUserPrompt(req: StoryRequest): string {
   const cast = req.characters
     .map((c) => `- ${c.name} (${c.description})`)
     .join("\n");
+
+  const hasNicky = req.characters.some((c) => c.id === "nicolas");
+  const hasValentyna = req.characters.some((c) => c.id === "valentyna");
+  const hasParents = req.characters.some((c) => c.id === "jan" || c.id === "jana");
+
+  const familyContext = [
+    hasNicky && hasValentyna
+      ? "Nicolásek je o celou hlavu vyšší než Valentýnka – jejich rozdíl ve velikosti i věku patří do příběhu."
+      : "",
+    hasNicky && hasValentyna
+      ? "Sourozenci spolu spolupracují a starší bráška pomáhá mladší sestřičce."
+      : "",
+    hasParents && (hasNicky || hasValentyna)
+      ? "Rodiče jsou v příběhu láskyplnou a bezpečnou oporou – pomáhají, ale nechávají děti zažít dobrodružství."
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return [
     req.themeName ? `Svět / téma pohádky: ${req.themeName}` : "",
     req.themePrompt || "",
     req.topic ? `Přání / zápletka od dítěte: ${req.topic}` : "",
     `Postavy, které v pohádce vystupují:`,
     cast,
-    req.characters.length > 1
-      ? "Postavy jsou sourozenci a v příběhu spolu interagují (mladší vzhlíží ke staršímu)."
-      : "",
-    `Věk dítěte: ${req.age} let (tomu přizpůsob slovník a délku vět)`,
+    familyContext,
+    `Věk cílového dítěte: ${req.age} let (tomu přizpůsob slovník a délku vět)`,
     `Počet scén: ${req.sceneCount}`,
     `Jazyk vyprávění: čeština`,
     "",

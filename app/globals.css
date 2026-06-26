@@ -6,9 +6,18 @@
 
 body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  background: linear-gradient(160deg, #fef6e4 0%, #e8f0fe 100%);
   color: #2b2b3a;
   min-height: 100vh;
+  background: #0d1340; /* fallback – SVG FairyBackground překryje */
+}
+
+/* ── Pohádkové SVG pozadí (fixed, celá obrazovka) ── */
+.fairy-bg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
 }
 
 .container {
@@ -20,19 +29,24 @@ body {
 h1 {
   font-size: 2rem;
   margin-bottom: 0.25rem;
+  color: #fff9e7;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
 }
 
 .subtitle {
-  color: #6b6b80;
+  color: rgba(255, 255, 255, 0.82);
   margin-bottom: 2rem;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
 }
 
 /* ── Formulář ── */
 .form {
-  background: #fff;
-  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.90);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 22px;
   padding: 1.5rem;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.07);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.35);
   display: grid;
   gap: 1rem;
 }
@@ -112,15 +126,16 @@ button {
   font-weight: 700;
   cursor: pointer;
   border: none;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 0.85rem 1.2rem;
-  background: #6c5ce7;
+  background: linear-gradient(135deg, #7c4dff 0%, #651fff 100%);
   color: #fff;
-  transition: transform 0.05s ease, background 0.2s ease;
+  transition: transform 0.05s ease, filter 0.2s ease;
+  box-shadow: 0 4px 16px rgba(108, 92, 231, 0.4);
 }
 
 button:hover:not(:disabled) {
-  background: #5a4bd1;
+  filter: brightness(1.12);
 }
 
 button:active:not(:disabled) {
@@ -133,17 +148,20 @@ button:disabled {
 }
 
 .error {
-  background: #ffe0e0;
+  background: rgba(255, 224, 224, 0.92);
   color: #9b1c1c;
   padding: 0.8rem 1rem;
-  border-radius: 10px;
+  border-radius: 12px;
   margin-top: 1rem;
+  backdrop-filter: blur(8px);
 }
 
 .status {
   text-align: center;
-  color: #6b6b80;
+  color: rgba(255, 255, 255, 0.92);
   margin-top: 1.5rem;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+  font-weight: 500;
 }
 
 /* ── Knížka ── */
@@ -154,27 +172,32 @@ button:disabled {
 .book-title {
   text-align: center;
   margin-bottom: 1.25rem;
+  color: #fff9e7;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 
 .page {
-  background: #fff;
-  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.93);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 22px;
   overflow: hidden;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
 
 .page-image {
   width: 100%;
   aspect-ratio: 1 / 1;
   object-fit: cover;
-  background: #eee;
+  background: #e8e0f0;
   display: block;
 }
 
 .page-image.placeholder {
   display: grid;
   place-items: center;
-  color: #aaa;
+  color: #9e8fbf;
+  font-size: 1.5rem;
 }
 
 .page-body {
@@ -201,6 +224,7 @@ button:disabled {
 }
 
 .page-counter {
-  color: #6b6b80;
+  color: rgba(255, 255, 255, 0.92);
   font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
