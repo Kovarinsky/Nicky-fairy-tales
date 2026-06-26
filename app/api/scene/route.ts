@@ -1,12 +1,3 @@
-// POST /api/scene → pro JEDNU scénu vyrobí obrázek (Nano Banana) + audio (ElevenLabs).
-// Tělo: { scene: Scene, heroDescription: string, characterIds?: string[] }
-// Vrací: { imageUrl: dataURL, audioUrl: dataURL }
-//
-// Pokud jsou zadané characterIds, načtou se jejich referenční fotky a obrázek
-// se generuje tak, aby postavy vypadaly jako vaše děti.
-//
-// Pro MVP vracíme média jako data URL (base64) – není potřeba řešit úložiště.
-
 import { NextRequest, NextResponse } from "next/server";
 import { generateSceneImage } from "@/lib/gemini";
 import { narrateScene } from "@/lib/elevenlabs";
@@ -23,17 +14,24 @@ export async function POST(req: NextRequest) {
     const heroDescription = String(body.heroDescription || "");
     const ids: string[] = Array.isArray(body.characterIds) ? body.characterIds : [];
 
-    if (!scene || !scene.narration || !scene.imagePrompt) {
+    if (!scene?.narration || !scene?.imagePrompt) {
       return NextResponse.json({ error: "Neplatná scéna." }, { status: 400 });
     }
 
-    const referenceImages = ids.length
-      ? loadReferenceImages(charactersByIds(ids))
+    // Reference photos from disk (Nicolas, Valentýnka…)
+    const diskImages = ids.length ? loadReferenceImages(charactersByIds(ids)) : [];
+
+    // Custom character photos from browser (sent as base64)
+    const customImages: Array<{ data: string; mimeType: string }> = Array.isArray(
+      body.customCharacterImages
+    )
+      ? body.customCharacterImages
       : [];
 
-    // Obrázek a hlas zároveň – jsou nezávislé.
+    const allRefImages = [...diskImages, ...customImages];
+
     const [image, audio] = await Promise.all([
-      generateSceneImage(scene, heroDescription, referenceImages),
+      generateSceneImage(scene, heroDescription, allRefImages),
       narrateScene(scene),
     ]);
 
