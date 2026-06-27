@@ -50,8 +50,8 @@ body {
   width: auto;
   object-fit: cover;
   object-position: top center;
-  opacity: 0.22;
-  filter: blur(2px) brightness(0.38) saturate(0.2) contrast(1.9);
+  opacity: 0.45;
+  filter: blur(3px) brightness(0.6) saturate(0.3) contrast(1.4);
   image-rendering: pixelated;
 }
 
