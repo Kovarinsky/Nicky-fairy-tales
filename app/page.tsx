@@ -83,7 +83,9 @@ export default function Home() {
   const [slideKey, setSlideKey] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
+  const [musicOn, setMusicOn] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const musicRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     fetch("/api/characters").then(r => r.json()).then(d => {
@@ -94,7 +96,25 @@ export default function Home() {
     fetch("/api/themes").then(r => r.json()).then(d => setThemes(d.themes || [])).catch(() => {});
   }, []);
 
-  // Auto-play audio when page changes (after slide animation)
+  // Ambient music ducking: quiet during narration, full during silence
+  useEffect(() => {
+    const music = musicRef.current;
+    if (!music) return;
+    music.volume = isPlaying ? 0.05 : 0.22;
+  }, [isPlaying]);
+
+  // Music on/off toggle
+  useEffect(() => {
+    const music = musicRef.current;
+    if (!music) return;
+    if (musicOn) {
+      music.play().catch(() => {});
+    } else {
+      music.pause();
+    }
+  }, [musicOn]);
+
+  // Auto-play narration when page changes (after slide animation)
   const currentAudioUrl = scenes[page]?.audioUrl;
   useEffect(() => {
     if (!currentAudioUrl) return;
@@ -382,10 +402,20 @@ export default function Home() {
                 type="button"
                 className={`ctrl-btn ctrl-auto ${autoAdvance ? "ctrl-auto-on" : ""}`}
                 onClick={() => setAutoAdvance(p => !p)}
-                title={autoAdvance ? "Automatické přechody zapnuty" : "Automatické přechody vypnuty"}
+                title={autoAdvance ? "Auto-přechod zapnut" : "Auto-přechod vypnut"}
                 aria-label="Automatické přechody"
               >
                 {autoAdvance ? "🔁" : "🔂"}
+              </button>
+
+              <button
+                type="button"
+                className={`ctrl-btn ctrl-auto ${musicOn ? "ctrl-auto-on" : ""}`}
+                onClick={() => setMusicOn(p => !p)}
+                title={musicOn ? "Hudba zapnuta" : "Hudba vypnuta"}
+                aria-label="Hudba"
+              >
+                {musicOn ? "🎵" : "🔇"}
               </button>
 
               <button
@@ -400,7 +430,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Skrytý audio element */}
+          {/* Skrytý audio element – narrace */}
           {current.audioUrl && (
             <audio
               ref={audioRef}
@@ -411,6 +441,16 @@ export default function Home() {
               onEnded={handleAudioEnded}
             />
           )}
+
+          {/* Ambient hudba */}
+          {/* Přidej soubor /public/music/fairy-bg.mp3 (royalty-free pohádková hudba) */}
+          <audio
+            ref={musicRef}
+            src="/music/fairy-bg.mp3"
+            loop
+            preload="none"
+            style={{ display: "none" }}
+          />
 
           {/* Progress dots */}
           {scenes.length > 1 && (

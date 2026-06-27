@@ -21,13 +21,13 @@ export async function generateSceneImage(
   const hasRefs = referenceImages.length > 0;
   const prompt = [
     hasRefs
-      ? "Use the children in the reference photo(s) as the basis for the characters — keep their faces, hair and the size difference between them recognizable, but render them in the animation style below."
+      ? "Reference photos attached: use the children's faces, hair color, eye color, and the visible height difference between them as the exact basis for the characters in this illustration. Preserve their real facial features faithfully."
       : "",
     scene.imagePrompt,
-    `Characters (keep consistent across all images): ${heroDescription}.`,
-    "Style: classic Walt Disney animated movie style — polished and colorful, expressive",
-    "characters with big friendly eyes, cinematic warm lighting, magical storybook charm.",
-    "No text in the image.",
+    `Character consistency — repeat these exact descriptions in every image: ${heroDescription}`,
+    "Art style: painterly semi-realistic children's book illustration.",
+    "Warm cinematic lighting, rich saturated colors, detailed expressive faces that show the scene's emotion clearly.",
+    "Professional storybook quality. Landscape orientation. No text or letters anywhere in the image.",
   ]
     .filter(Boolean)
     .join(" ");

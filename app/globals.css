@@ -335,9 +335,10 @@ button:disabled {
 .page-image {
   width: 100%;
   aspect-ratio: 4 / 3;
-  object-fit: cover;
-  background: linear-gradient(135deg, #ede9fe, #fce7f3);
+  object-fit: contain;
+  background: linear-gradient(135deg, #2a1a5e 0%, #4a1a6e 50%, #6a1a5e 100%);
   display: block;
+  flex-shrink: 0;
 }
 
 .page-image.placeholder {

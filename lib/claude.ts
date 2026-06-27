@@ -19,24 +19,50 @@ export interface StoryExtras {
 
 function buildSystemPrompt(): string {
   return [
-    "Jsi laskavý vypravěč dětských pohádek. Píšeš česky, srozumitelně a vřele.",
-    "Tvým úkolem je napsat původní pohádku rozdělenou na scény (stránky knížky).",
-    "Pravidla:",
-    "- Příběh musí mít jasný začátek, zápletku a hezký, uklidňující konec (vhodné před spaním).",
-    "- Žádné násilí, strach ani témata nevhodná pro malé děti.",
-    "- Vystupují právě zadané postavy (jménem) a jsou popsány konzistentně.",
-    "- Každá scéna má 2–4 věty vyprávění (kratší pro mladší děti).",
-    "- Ke každé scéně přidej `imagePrompt` ANGLICKY: popis ilustrace v stylu",
-    "  'soft children's storybook illustration, warm colors, cozy'. V image promptu",
-    "  vždy zopakuj vzhled hrdiny, aby byl na všech obrázcích stejný.",
-    "- Pokud jsou přiloženy referenční obrázky nebo PDF, použij je jako inspiraci",
-    "  pro styl, atmosféru nebo detaily příběhu.",
+    "Jsi laskavý, talentovaný vypravěč dětských pohádek. Píšeš česky.",
+    "Tvůj úkol: napsat původní pohádku rozdělenou na scény (stránky knížky).",
     "",
-    "Odpověz POUZE validním JSON objektem (bez ```), přesně v tomto tvaru:",
+    "═══ PRAVIDLA PRO PŘÍBĚH ═══",
+    "- Příběh má jasný začátek, napínavou zápletku a uklidňující, hřejivý konec.",
+    "- Žádné násilí, hrůza ani témata nevhodná pro malé děti.",
+    "- Každá postava je charakterově konzistentní PO CELÝ příběh (povaha se nemění).",
+    "- Postavy v pribehu vzdy vystupuji pod svym jmenem, ne jako 'hrdina' nebo 'divka'.",
+    "",
+    "═══ NARRACE – STYL A EMOCE ═══",
+    "- Každá scéna má 3–5 vět vyprávění.",
+    "- Věty variuj rytmicky: krátké pro napětí a překvapení, delší pro klidné momenty.",
+    "- Každá scéna musí mít JASNOU EMOCI: úžas, radost, napětí, tajemství, útulnost...",
+    "- Používej onomatopoeia a smyslové detaily: 'zašuměl listím', 'vonělo medem', 'zazněl zvoneček'.",
+    "- Pro dramatický efekt využij tři tečky (...) a vykřičník pro radost.",
+    "- Narrace musí znít přirozeně nahlas – jako by ji četl otec nebo maminka.",
+    "- VYHNI SE: suché faktické popisy, opakování stejných slov, fráze bez emocí.",
+    "",
+    "═══ VIZUÁLNÍ KONZISTENCE POSTAV ═══",
+    "- V `heroDescription` (anglicky) popiš KAŽDOU postavu podrobně:",
+    "  barva a styl vlasů, barva očí, výška/postava, oblečení v pohádce, charakteristické rysy.",
+    "- Pokud jsou přiloženy referenční fotografie postav, popisy MUSÍ odpovídat fotografiím.",
+    "- V každém `imagePrompt` zopakuj vizuální popis VŠECH vystupujících postav doslova.",
+    "- Výraz ve tváři musí odpovídat emoci dané scény.",
+    "",
+    "═══ IMAGE PROMPTS ═══",
+    "- Psát ANGLICKY, detailní, filmový popis ilustrace.",
+    "- Styl: 'painterly semi-realistic storybook illustration, warm cinematic lighting,",
+    "  rich colors, expressive faces, detailed background, professional children's book art'.",
+    "- Nikdy nezahrnuj text do obrazu. Scénu zasaď do světa pohádky.",
+    "- Rozložení: vždy na šířku (landscape orientation).",
+    "",
+    "═══ VÝSTUP ═══",
+    "Odpověz POUZE validním JSON (bez ``` nebo jiných znaků okolo), přesně:",
     "{",
     '  "title": string,',
-    '  "heroDescription": string,',
-    '  "scenes": [ { "index": number, "narration": string, "imagePrompt": string } ]',
+    '  "heroDescription": string,   // anglicky, podrobné popisy VŠECH postav',
+    '  "scenes": [',
+    '    {',
+    '      "index": number,',
+    '      "narration": string,     // česky, emotivní, TTS-friendly',
+    '      "imagePrompt": string    // anglicky, detailní, s popisem postav',
+    '    }',
+    "  ]",
     "}",
   ].join("\n");
 }
@@ -51,7 +77,7 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
     })),
   ];
 
-  const cast = allChars.map((c) => `- ${c.name} (${c.description})`).join("\n");
+  const cast = allChars.map((c) => `- ${c.name}: ${c.description}`).join("\n");
 
   const hasNicky = allChars.some((c) => c.id === "nicolas");
   const hasValentyna = allChars.some((c) => c.id === "valentyna");
@@ -59,48 +85,59 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
 
   const familyContext = [
     hasNicky && hasValentyna
-      ? "Nicolasek je o celou hlavu vyssi nez Valentynka – jejich rozdil ve velikosti patri do pribehu."
+      ? "Nicolas je o celou hlavu vyšší než Valentýna – tento výškový rozdíl musí být viditelný na KAŽDÉM obrázku."
       : "",
-    hasNicky && hasValentyna ? "Sourozenci spolu spolupracuji, starsi pomaha mladsim." : "",
+    hasNicky && hasValentyna
+      ? "Sourozenci spolupracují, starší pomáhá mladší – dynamika staršího sourozence je součástí charakteru."
+      : "",
     hasParents && (hasNicky || hasValentyna)
-      ? "Rodice jsou v pribehu laskypnou oporou – pomahaji, ale nechavaji deti zazit dobrodruzstvi."
+      ? "Rodiče jsou láskyplnou oporou – v příběhu pomáhají, ale nechávají děti zažít dobrodružství."
       : "",
   ]
     .filter(Boolean)
     .join(" ");
 
+  const ageNote =
+    req.age <= 3
+      ? "Velmi jednoduché věty (max 8 slov), hodně opakování, uklidňující rytmus."
+      : req.age <= 5
+      ? "Krátké věty, konkrétní obrazy, kouzelné a hravé."
+      : "Věty mohou být delší, příběh může mít mírné napětí a humor.";
+
   const lines = [
-    req.themeName ? `Svet / tema: ${req.themeName}` : "",
+    req.themeName ? `Svět / téma: ${req.themeName}` : "",
     req.themePrompt || "",
-    req.topic ? `Prani / zapletka: ${req.topic}` : "",
+    req.topic ? `Přání / zápletka: ${req.topic}` : "",
     `Postavy:`,
     cast,
     familyContext,
-    `Vek ditete: ${req.age} let`,
-    `Pocet scen: ${req.sceneCount}`,
-    `Jazyk: cestina`,
+    `Věk hlavního publika: ${req.age} let. ${ageNote}`,
+    `Počet scén: ${req.sceneCount}`,
+    `Jazyk vyprávění: čeština`,
     "",
-    "V `imagePrompt` (anglicky) vzdy zopakuj vzhled vystupujicich postav a zasad scenu do zvoleneho sveta.",
+    "DŮLEŽITÉ pro imagePrompty: v každém obrazu zopakuj přesný vizuální popis",
+    "všech postav, které ve scéně vystupují, a zasaď je do prostředí dané scény.",
+    "Výraz tváře musí odpovídat emoci scény (radost, úžas, napětí, klid...).",
   ];
 
   if (extras.inspirationUrlText) {
-    lines.push("", "Dodatecny kontext z webove stranky:", extras.inspirationUrlText);
+    lines.push("", "Doplňující kontext z webové stránky:", extras.inspirationUrlText.slice(0, 1500));
   }
   if (extras.inspirationImages && extras.inspirationImages.length > 0) {
     lines.push(
       "",
-      `Prilozen(y) ${extras.inspirationImages.length} referencni obra(zy/zek) – pouzij jako inspiraci pro atmosferu a vizualni styl.`
+      `Přiložen(y) ${extras.inspirationImages.length} inspirační obrázek/ky – použij pro atmosféru a vizuální styl.`
     );
   }
   if (extras.inspirationPdfBase64) {
-    lines.push("", "Prilozene PDF pouzij jako inspiraci pro obsah nebo styl pribehu.");
+    lines.push("", "Přiložené PDF použij jako inspiraci pro obsah nebo styl příběhu.");
   }
   if (extras.customCharacters && extras.customCharacters.length > 0) {
     const withPhoto = extras.customCharacters.filter((c) => c.photoBase64);
     if (withPhoto.length > 0) {
       lines.push(
         "",
-        `Prilozen(a) ${withPhoto.length} fotka/ky vlastnich postav – zachovej jejich vzhled v pribehu.`
+        `Přiložen(a) ${withPhoto.length} fotka/ky vlastních postav – zachovej jejich přesný vzhled v celém příběhu.`
       );
     }
   }
@@ -215,7 +252,7 @@ export async function generateStory(req: StoryRequest, extras: StoryExtras = {})
 
   const raw = await callAnthropicApi({
     model,
-    max_tokens: 4096,
+    max_tokens: 6000,
     system: buildSystemPrompt(),
     messages: [{ role: "user", content }],
   });
