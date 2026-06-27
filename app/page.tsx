@@ -1,32 +1,17 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import type { StoryScript, RenderedScene } from "@/lib/types";
 
 interface CharOption { id: string; name: string; }
 interface ThemeOption { id: string; name: string; emoji: string; }
-
 interface CustomChar {
-  id: string;
-  name: string;
-  description: string;
-  photoBase64?: string;
-  photoMimeType?: string;
-  previewUrl?: string;
+  id: string; name: string; description: string;
+  photoBase64?: string; photoMimeType?: string; previewUrl?: string;
 }
+interface InspImage { data: string; mimeType: string; previewUrl: string; name: string; }
 
-interface InspImage {
-  data: string;
-  mimeType: string;
-  previewUrl: string;
-  name: string;
-}
-
-// Resize + encode image to JPEG base64 (max 800px for chars, 512px for inspiration)
-async function resizeAndEncode(
-  file: File,
-  maxPx = 800
-): Promise<{ data: string; mimeType: string; previewUrl: string }> {
+async function resizeAndEncode(file: File, maxPx = 800): Promise<{ data: string; mimeType: string; previewUrl: string }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
@@ -35,8 +20,7 @@ async function resizeAndEncode(
       const w = Math.round(img.width * scale);
       const h = Math.round(img.height * scale);
       const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
+      canvas.width = w; canvas.height = h;
       canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
       URL.revokeObjectURL(objectUrl);
       const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
@@ -56,23 +40,19 @@ async function fileToBase64(file: File): Promise<string> {
   });
 }
 
-function getTargetAge(selectedIds: string[]): number {
-  const hasNicky = selectedIds.includes("nicolas");
-  const hasValentyna = selectedIds.includes("valentyna");
-  if (hasNicky && hasValentyna) return 4;
-  if (hasValentyna) return 2;
-  if (hasNicky) return 6;
-  return 6;
+function getTargetAge(ids: string[]): number {
+  const n = ids.includes("nicolas"), v = ids.includes("valentyna");
+  if (n && v) return 4; if (v) return 2; if (n) return 6; return 6;
 }
 
 export default function Home() {
-  // ── Existing characters & themes ──
+  // ── Chars & themes ──
   const [chars, setChars] = useState<CharOption[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [themes, setThemes] = useState<ThemeOption[]>([]);
   const [selectedTheme, setSelectedTheme] = useState("");
 
-  // ── Custom characters ──
+  // ── Custom chars ──
   const [customChars, setCustomChars] = useState<CustomChar[]>([]);
   const [selectedCustomIds, setSelectedCustomIds] = useState<string[]>([]);
   const [addingChar, setAddingChar] = useState(false);
@@ -89,166 +69,138 @@ export default function Home() {
   const [inspPdf, setInspPdf] = useState<{ base64: string; name: string } | null>(null);
   const inspImageRef = useRef<HTMLInputElement>(null);
   const inspPdfRef = useRef<HTMLInputElement>(null);
-
   const [sceneCount, setSceneCount] = useState(6);
 
-  // ── Story state ──
+  // ── Story ──
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [title, setTitle] = useState("");
   const [scenes, setScenes] = useState<RenderedScene[]>([]);
+
+  // ── Reader ──
   const [page, setPage] = useState(0);
+  const [slideKey, setSlideKey] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
-    fetch("/api/characters")
-      .then((r) => r.json())
-      .then((d) => {
-        const list: CharOption[] = d.characters || [];
-        setChars(list);
-        setSelectedIds(list.map((c) => c.id));
-      })
-      .catch(() => {});
-
-    fetch("/api/themes")
-      .then((r) => r.json())
-      .then((d) => setThemes(d.themes || []))
-      .catch(() => {});
+    fetch("/api/characters").then(r => r.json()).then(d => {
+      const list: CharOption[] = d.characters || [];
+      setChars(list);
+      setSelectedIds(list.map(c => c.id));
+    }).catch(() => {});
+    fetch("/api/themes").then(r => r.json()).then(d => setThemes(d.themes || [])).catch(() => {});
   }, []);
 
-  // ── Handlers ──
+  // Auto-play audio when page changes (after slide animation)
+  const currentAudioUrl = scenes[page]?.audioUrl;
+  useEffect(() => {
+    if (!currentAudioUrl) return;
+    const t = setTimeout(() => {
+      audioRef.current?.play().catch(() => {});
+    }, 420);
+    return () => clearTimeout(t);
+  }, [page, currentAudioUrl]);
+
+  // ── Navigation ──
+  const goToPage = useCallback((n: number) => {
+    if (n < 0 || n >= scenes.length) return;
+    audioRef.current?.pause();
+    setIsPlaying(false);
+    setPage(n);
+    setSlideKey(k => k + 1);
+  }, [scenes.length]);
+
+  function handleAudioEnded() {
+    setIsPlaying(false);
+    if (!autoAdvance) return;
+    const next = page + 1;
+    if (next >= scenes.length) return;
+    // Wait 1.2 s then slide to next
+    setTimeout(() => goToPage(next), 1200);
+  }
+
+  function togglePlay() {
+    const a = audioRef.current;
+    if (!a) return;
+    if (isPlaying) { a.pause(); } else { a.play().catch(() => {}); }
+  }
+
+  // ── Form handlers ──
   function toggleChar(id: string) {
-    setSelectedIds((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+    setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   }
-
   function toggleCustomChar(id: string) {
-    setSelectedCustomIds((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+    setSelectedCustomIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   }
-
   async function handleCharPhoto(file: File) {
-    const result = await resizeAndEncode(file, 800).catch(() => null);
-    if (result) setNewCharPhoto(result);
+    const r = await resizeAndEncode(file, 800).catch(() => null);
+    if (r) setNewCharPhoto(r);
   }
-
   function addCustomChar() {
     if (!newCharName.trim()) return;
     const id = `custom_${Date.now()}`;
-    setCustomChars((p) => [
-      ...p,
-      {
-        id,
-        name: newCharName.trim(),
-        description: newCharDesc.trim() || `a character named ${newCharName.trim()}`,
-        photoBase64: newCharPhoto?.data,
-        photoMimeType: newCharPhoto?.mimeType,
-        previewUrl: newCharPhoto?.previewUrl,
-      },
-    ]);
-    setSelectedCustomIds((p) => [...p, id]);
-    setAddingChar(false);
-    setNewCharName("");
-    setNewCharDesc("");
-    setNewCharPhoto(null);
+    setCustomChars(p => [...p, {
+      id, name: newCharName.trim(),
+      description: newCharDesc.trim() || `a character named ${newCharName.trim()}`,
+      photoBase64: newCharPhoto?.data, photoMimeType: newCharPhoto?.mimeType, previewUrl: newCharPhoto?.previewUrl,
+    }]);
+    setSelectedCustomIds(p => [...p, id]);
+    setAddingChar(false); setNewCharName(""); setNewCharDesc(""); setNewCharPhoto(null);
   }
-
   function removeCustomChar(id: string) {
-    setCustomChars((p) => p.filter((c) => c.id !== id));
-    setSelectedCustomIds((p) => p.filter((x) => x !== id));
+    setCustomChars(p => p.filter(c => c.id !== id));
+    setSelectedCustomIds(p => p.filter(x => x !== id));
   }
-
   async function handleInspImage(file: File) {
     if (inspImages.length >= 3) return;
-    const result = await resizeAndEncode(file, 512).catch(() => null);
-    if (result) setInspImages((p) => [...p, { ...result, name: file.name }]);
+    const r = await resizeAndEncode(file, 512).catch(() => null);
+    if (r) setInspImages(p => [...p, { ...r, name: file.name }]);
   }
-
   async function handleInspPdf(file: File) {
-    if (file.size > 3.5 * 1024 * 1024) {
-      alert("PDF je příliš velké (max 3.5 MB). Použij menší soubor.");
-      return;
-    }
-    const base64 = await fileToBase64(file).catch(() => null);
-    if (base64) setInspPdf({ base64, name: file.name });
+    if (file.size > 3.5 * 1024 * 1024) { alert("PDF je příliš velké (max 3.5 MB)."); return; }
+    const b = await fileToBase64(file).catch(() => null);
+    if (b) setInspPdf({ base64: b, name: file.name });
   }
 
   // ── Create story ──
   const allSelectedCount = selectedIds.length + selectedCustomIds.length;
-  const hasInspiration =
-    !!selectedTheme ||
-    !!topic.trim() ||
-    inspImages.length > 0 ||
-    !!inspPdf ||
-    (inspUrlActive && !!inspUrl.trim());
+  const hasInspiration = !!selectedTheme || !!topic.trim() || inspImages.length > 0 || !!inspPdf || (inspUrlActive && !!inspUrl.trim());
 
   async function createStory(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
-    setScenes([]);
-    setTitle("");
-    setPage(0);
-    setLoading(true);
-
+    setError(""); setScenes([]); setTitle(""); setPage(0); setSlideKey(0); setLoading(true);
     try {
       setStatus("✍️ Claude vymýšlí příběh...");
-
-      const selectedCustomObjs = customChars.filter((c) => selectedCustomIds.includes(c.id));
-
+      const selectedCustomObjs = customChars.filter(c => selectedCustomIds.includes(c.id));
       const storyRes = await fetch("/api/story", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          topic,
-          themeId: selectedTheme || undefined,
-          characterIds: selectedIds,
-          age: getTargetAge([...selectedIds, ...selectedCustomIds]),
-          sceneCount,
-          customCharacters: selectedCustomObjs.map((c) => ({
-            id: c.id,
-            name: c.name,
-            description: c.description,
-            photoBase64: c.photoBase64,
-            photoMimeType: c.photoMimeType,
-          })),
+          topic, themeId: selectedTheme || undefined, characterIds: selectedIds,
+          age: getTargetAge([...selectedIds, ...selectedCustomIds]), sceneCount,
+          customCharacters: selectedCustomObjs.map(c => ({ id: c.id, name: c.name, description: c.description, photoBase64: c.photoBase64, photoMimeType: c.photoMimeType })),
           inspirationUrl: inspUrlActive && inspUrl.trim() ? inspUrl.trim() : undefined,
-          inspirationImages: inspImages.map((i) => ({ data: i.data, mimeType: i.mimeType })),
+          inspirationImages: inspImages.map(i => ({ data: i.data, mimeType: i.mimeType })),
           inspirationPdfBase64: inspPdf?.base64 || undefined,
         }),
       });
-
       const script: StoryScript & { error?: string } = await storyRes.json();
       if (!storyRes.ok) throw new Error(script.error || "Nepodařilo se vytvořit příběh.");
-
       setTitle(script.title);
-      setScenes(script.scenes.map((s) => ({ ...s })));
-
-      const customImageRefs = selectedCustomObjs
-        .filter((c) => c.photoBase64 && c.photoMimeType)
-        .map((c) => ({ data: c.photoBase64!, mimeType: c.photoMimeType! }));
-
+      setScenes(script.scenes.map(s => ({ ...s })));
+      const customImageRefs = selectedCustomObjs.filter(c => c.photoBase64 && c.photoMimeType).map(c => ({ data: c.photoBase64!, mimeType: c.photoMimeType! }));
       for (let i = 0; i < script.scenes.length; i++) {
         setStatus(`🎨 Kreslím a namlouvám scénu ${i + 1}/${script.scenes.length}...`);
         const sceneRes = await fetch("/api/scene", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            scene: script.scenes[i],
-            heroDescription: script.heroDescription,
-            characterIds: selectedIds,
-            customCharacterImages: customImageRefs,
-          }),
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scene: script.scenes[i], heroDescription: script.heroDescription, characterIds: selectedIds, customCharacterImages: customImageRefs }),
         });
-
         const media = await sceneRes.json();
         if (!sceneRes.ok) throw new Error(media.error || `Scéna ${i + 1} selhala.`);
-
-        setScenes((prev) => {
-          const next = [...prev];
-          next[i] = { ...next[i], imageUrl: media.imageUrl, audioUrl: media.audioUrl };
-          return next;
-        });
+        setScenes(prev => { const next = [...prev]; next[i] = { ...next[i], imageUrl: media.imageUrl, audioUrl: media.audioUrl }; return next; });
       }
-
       setStatus("✨ Hotovo!");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Něco se pokazilo.");
@@ -259,6 +211,8 @@ export default function Home() {
   }
 
   const current = scenes[page];
+  const hasNext = page < scenes.length - 1;
+  const hasPrev = page > 0;
 
   return (
     <div className="container">
@@ -272,45 +226,20 @@ export default function Home() {
           <div className="field">
             <label>Kdo v pohádce vystupuje?</label>
             <div className="chips">
-              {chars.map((c) => (
+              {chars.map(c => (
                 <label key={c.id} className={`chip ${selectedIds.includes(c.id) ? "chip-on" : ""}`}>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(c.id)}
-                    onChange={() => toggleChar(c.id)}
-                  />
+                  <input type="checkbox" checked={selectedIds.includes(c.id)} onChange={() => toggleChar(c.id)} />
                   {c.name}
                 </label>
               ))}
-
-              {customChars.map((c) => (
-                <div
-                  key={c.id}
-                  className={`chip custom-chip ${selectedCustomIds.includes(c.id) ? "chip-on" : ""}`}
-                >
-                  {c.previewUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={c.previewUrl} alt={c.name} className="chip-avatar" />
-                  )}
-                  <span className="chip-label" onClick={() => toggleCustomChar(c.id)}>
-                    {c.name}
-                  </span>
-                  <button
-                    type="button"
-                    className="chip-remove"
-                    onClick={() => removeCustomChar(c.id)}
-                    title="Odebrat"
-                  >
-                    ×
-                  </button>
+              {customChars.map(c => (
+                <div key={c.id} className={`chip custom-chip ${selectedCustomIds.includes(c.id) ? "chip-on" : ""}`}>
+                  {c.previewUrl && <img src={c.previewUrl} alt={c.name} className="chip-avatar" />}
+                  <span className="chip-label" onClick={() => toggleCustomChar(c.id)}>{c.name}</span>
+                  <button type="button" className="chip-remove" onClick={() => removeCustomChar(c.id)}>×</button>
                 </div>
               ))}
-
-              <button
-                type="button"
-                className={`chip chip-btn ${addingChar ? "chip-on" : ""}`}
-                onClick={() => setAddingChar((p) => !p)}
-              >
+              <button type="button" className={`chip chip-btn ${addingChar ? "chip-on" : ""}`} onClick={() => setAddingChar(p => !p)}>
                 {addingChar ? "✕ Zrušit" : "+ Vlastní postava"}
               </button>
             </div>
@@ -323,65 +252,25 @@ export default function Home() {
             <p className="panel-title">Nová postava</p>
             <div className="field">
               <label>Jméno *</label>
-              <input
-                type="text"
-                value={newCharName}
-                onChange={(e) => setNewCharName(e.target.value)}
-                placeholder="Kubík, Pohádková víla, Dráček..."
-                autoFocus
-              />
+              <input type="text" value={newCharName} onChange={e => setNewCharName(e.target.value)} placeholder="Kubík, Pohádková víla, Dráček..." autoFocus />
             </div>
             <div className="field">
               <label>Popis (nepovinné)</label>
-              <textarea
-                value={newCharDesc}
-                onChange={(e) => setNewCharDesc(e.target.value)}
-                placeholder="Malý hnědý medvídek s červenou mašlí..."
-              />
+              <textarea value={newCharDesc} onChange={e => setNewCharDesc(e.target.value)} placeholder="Malý hnědý medvídek s červenou mašlí..." />
             </div>
             <div className="field">
-              <label>Fotka postavy (nepovinné – pro konzistenci obrázků)</label>
+              <label>Fotka postavy (nepovinné)</label>
               <div className="file-row">
-                <button
-                  type="button"
-                  className="outline-btn"
-                  onClick={() => charPhotoRef.current?.click()}
-                >
+                <button type="button" className="outline-btn" onClick={() => charPhotoRef.current?.click()}>
                   📷 {newCharPhoto ? "Změnit" : "Nahrát fotku"}
                 </button>
-                {newCharPhoto && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={newCharPhoto.previewUrl} alt="náhled" className="mini-preview" />
-                )}
+                {newCharPhoto && <img src={newCharPhoto.previewUrl} alt="náhled" className="mini-preview" />}
               </div>
-              <input
-                ref={charPhotoRef}
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleCharPhoto(f);
-                  e.target.value = "";
-                }}
-              />
+              <input ref={charPhotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) handleCharPhoto(f); e.target.value = ""; }} />
             </div>
             <div className="file-row">
-              <button type="button" onClick={addCustomChar} disabled={!newCharName.trim()}>
-                Přidat postavu
-              </button>
-              <button
-                type="button"
-                className="outline-btn"
-                onClick={() => {
-                  setAddingChar(false);
-                  setNewCharName("");
-                  setNewCharDesc("");
-                  setNewCharPhoto(null);
-                }}
-              >
-                Zrušit
-              </button>
+              <button type="button" onClick={addCustomChar} disabled={!newCharName.trim()}>Přidat postavu</button>
+              <button type="button" className="outline-btn" onClick={() => { setAddingChar(false); setNewCharName(""); setNewCharDesc(""); setNewCharPhoto(null); }}>Zrušit</button>
             </div>
           </div>
         )}
@@ -391,13 +280,8 @@ export default function Home() {
           <div className="field">
             <label>Svět pohádky</label>
             <div className="chips">
-              {themes.map((t) => (
-                <button
-                  type="button"
-                  key={t.id}
-                  className={`chip chip-btn ${selectedTheme === t.id ? "chip-on" : ""}`}
-                  onClick={() => setSelectedTheme((p) => (p === t.id ? "" : t.id))}
-                >
+              {themes.map(t => (
+                <button type="button" key={t.id} className={`chip chip-btn ${selectedTheme === t.id ? "chip-on" : ""}`} onClick={() => setSelectedTheme(p => p === t.id ? "" : t.id)}>
                   <span>{t.emoji}</span> {t.name}
                 </button>
               ))}
@@ -408,110 +292,31 @@ export default function Home() {
         {/* ── Přání & Inspirace ── */}
         <div className="field">
           <label>Přání & inspirace</label>
-          <textarea
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder="Vlastní zápletka nebo přání (nepovinné)..."
-          />
-
-          {/* Tlačítka pro přidání inspirace */}
+          <textarea value={topic} onChange={e => setTopic(e.target.value)} placeholder="Vlastní zápletka nebo přání (nepovinné)..." />
           <div className="insp-row">
-            <button
-              type="button"
-              className={`insp-btn ${inspImages.length > 0 ? "chip-on" : ""}`}
-              onClick={() => inspImageRef.current?.click()}
-              disabled={inspImages.length >= 3}
-              title={inspImages.length >= 3 ? "Maximum 3 fotky" : "Přidat foto jako inspiraci"}
-            >
+            <button type="button" className={`insp-btn ${inspImages.length > 0 ? "chip-on" : ""}`} onClick={() => inspImageRef.current?.click()} disabled={inspImages.length >= 3}>
               📷 Foto{inspImages.length > 0 ? ` (${inspImages.length})` : ""}
             </button>
-
-            <button
-              type="button"
-              className={`insp-btn ${inspUrlActive ? "chip-on" : ""}`}
-              onClick={() => setInspUrlActive((p) => !p)}
-              title="Přidat odkaz na web jako inspiraci"
-            >
-              🔗 Web odkaz
-            </button>
-
-            <button
-              type="button"
-              className={`insp-btn ${inspPdf ? "chip-on" : ""}`}
-              onClick={() => inspPdfRef.current?.click()}
-              title="Přidat PDF jako inspiraci"
-            >
-              📄 PDF{inspPdf ? " ✓" : ""}
-            </button>
+            <button type="button" className={`insp-btn ${inspUrlActive ? "chip-on" : ""}`} onClick={() => setInspUrlActive(p => !p)}>🔗 Web odkaz</button>
+            <button type="button" className={`insp-btn ${inspPdf ? "chip-on" : ""}`} onClick={() => inspPdfRef.current?.click()}>📄 PDF{inspPdf ? " ✓" : ""}</button>
           </div>
-
-          <input
-            ref={inspImageRef}
-            type="file"
-            accept="image/*"
-            multiple
-            style={{ display: "none" }}
-            onChange={async (e) => {
-              const files = Array.from(e.target.files || []);
-              for (const f of files.slice(0, 3 - inspImages.length)) {
-                await handleInspImage(f);
-              }
-              e.target.value = "";
-            }}
-          />
-          <input
-            ref={inspPdfRef}
-            type="file"
-            accept=".pdf,application/pdf"
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) handleInspPdf(f);
-              e.target.value = "";
-            }}
-          />
-
-          {/* URL input */}
-          {inspUrlActive && (
-            <input
-              type="url"
-              value={inspUrl}
-              onChange={(e) => setInspUrl(e.target.value)}
-              placeholder="https://cs.wikipedia.org/wiki/Krteček"
-              className="url-input"
-            />
-          )}
-
-          {/* Náhledy fotek */}
+          <input ref={inspImageRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={async e => { for (const f of Array.from(e.target.files || []).slice(0, 3 - inspImages.length)) await handleInspImage(f); e.target.value = ""; }} />
+          <input ref={inspPdfRef} type="file" accept=".pdf,application/pdf" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) handleInspPdf(f); e.target.value = ""; }} />
+          {inspUrlActive && <input type="url" value={inspUrl} onChange={e => setInspUrl(e.target.value)} placeholder="https://cs.wikipedia.org/wiki/Krteček" className="url-input" />}
           {inspImages.length > 0 && (
             <div className="insp-previews">
               {inspImages.map((img, i) => (
                 <div key={i} className="preview-item">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.previewUrl} alt={img.name} className="preview-thumb" />
-                  <button
-                    type="button"
-                    className="preview-remove"
-                    onClick={() => setInspImages((p) => p.filter((_, j) => j !== i))}
-                  >
-                    ×
-                  </button>
+                  <button type="button" className="preview-remove" onClick={() => setInspImages(p => p.filter((_, j) => j !== i))}>×</button>
                 </div>
               ))}
             </div>
           )}
-
-          {/* PDF indikátor */}
           {inspPdf && (
             <div className="insp-pdf-row">
               <span>📄 {inspPdf.name}</span>
-              <button
-                type="button"
-                className="preview-remove-inline"
-                onClick={() => setInspPdf(null)}
-              >
-                ×
-              </button>
+              <button type="button" className="preview-remove-inline" onClick={() => setInspPdf(null)}>×</button>
             </div>
           )}
         </div>
@@ -519,20 +324,10 @@ export default function Home() {
         {/* ── Počet stránek ── */}
         <div className="field">
           <label>Počet stránek: {sceneCount}</label>
-          <input
-            type="range"
-            min={3}
-            max={10}
-            value={sceneCount}
-            onChange={(e) => setSceneCount(Number(e.target.value))}
-          />
+          <input type="range" min={3} max={10} value={sceneCount} onChange={e => setSceneCount(Number(e.target.value))} />
         </div>
 
-        <button
-          type="submit"
-          className="btn-create"
-          disabled={loading || allSelectedCount === 0 || !hasInspiration}
-        >
+        <button type="submit" className="btn-create" disabled={loading || allSelectedCount === 0 || !hasInspiration}>
           {loading ? "Tvořím pohádku..." : "✨ Vytvořit pohádku"}
         </button>
       </form>
@@ -544,58 +339,93 @@ export default function Home() {
       {current && (
         <div className="book">
           <h2 className="book-title">{title}</h2>
-          <div className="page">
+
+          <div className="book-card" key={slideKey}>
+            {/* Obrázek */}
             {current.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
-                className="page-image"
-                src={current.imageUrl}
-                alt={`Scéna ${page + 1}`}
-              />
+              <img className="page-image" src={current.imageUrl} alt={`Scéna ${page + 1}`} />
             ) : (
               <div className="page-image placeholder">🎨 obrázek se kreslí...</div>
             )}
+
+            {/* Text */}
             <div className="page-body">
               <p className="page-text">{current.narration}</p>
-              <div className="page-controls">
-                {current.audioUrl ? (
-                  <>
-                    <button type="button" onClick={() => audioRef.current?.play()}>
-                      ▶️ Přehrát
-                    </button>
-                    <audio
-                      ref={audioRef}
-                      key={current.audioUrl}
-                      src={current.audioUrl}
-                      controls
-                    />
-                  </>
-                ) : (
-                  <span className="page-counter">🔊 hlas se připravuje...</span>
-                )}
-              </div>
+            </div>
+
+            {/* ── Unified control bar ── */}
+            <div className="book-controls">
+              <button
+                type="button"
+                className="ctrl-btn ctrl-nav"
+                onClick={() => goToPage(page - 1)}
+                disabled={!hasPrev}
+                aria-label="Předchozí strana"
+              >
+                ←
+              </button>
+
+              <button
+                type="button"
+                className={`ctrl-btn ctrl-play ${!current.audioUrl ? "ctrl-loading" : ""}`}
+                onClick={togglePlay}
+                disabled={!current.audioUrl}
+                aria-label={isPlaying ? "Pauza" : "Přehrát"}
+              >
+                {!current.audioUrl ? "⏳" : isPlaying ? "⏸" : "▶"}
+              </button>
+
+              <span className="ctrl-counter">{page + 1} / {scenes.length}</span>
+
+              <button
+                type="button"
+                className={`ctrl-btn ctrl-auto ${autoAdvance ? "ctrl-auto-on" : ""}`}
+                onClick={() => setAutoAdvance(p => !p)}
+                title={autoAdvance ? "Automatické přechody zapnuty" : "Automatické přechody vypnuty"}
+                aria-label="Automatické přechody"
+              >
+                {autoAdvance ? "🔁" : "🔂"}
+              </button>
+
+              <button
+                type="button"
+                className="ctrl-btn ctrl-nav"
+                onClick={() => goToPage(page + 1)}
+                disabled={!hasNext}
+                aria-label="Další strana"
+              >
+                →
+              </button>
             </div>
           </div>
 
-          <div className="nav">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-            >
-              ← Zpět
-            </button>
-            <span className="page-counter">
-              {page + 1} / {scenes.length}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(scenes.length - 1, p + 1))}
-              disabled={page >= scenes.length - 1}
-            >
-              Další →
-            </button>
-          </div>
+          {/* Skrytý audio element */}
+          {current.audioUrl && (
+            <audio
+              ref={audioRef}
+              key={current.audioUrl}
+              src={current.audioUrl}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onEnded={handleAudioEnded}
+            />
+          )}
+
+          {/* Progress dots */}
+          {scenes.length > 1 && (
+            <div className="page-dots">
+              {scenes.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`dot ${i === page ? "dot-active" : ""} ${scenes[i]?.audioUrl ? "dot-ready" : ""}`}
+                  onClick={() => goToPage(i)}
+                  aria-label={`Strana ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
