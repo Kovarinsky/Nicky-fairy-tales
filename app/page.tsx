@@ -205,10 +205,12 @@ export default function Home() {
     setSlideKey(0);
     setDoneCount(0);
 
+    // ElevenLabs allows max 5 concurrent requests; keep to 3 to leave headroom
+    const CONCURRENCY = 3;
     let completed = 0;
-    setStatus(`🎨 Generuji ${scriptScenes.length} scén paralelně...`);
+    setStatus(`🎨 Generuji ${scriptScenes.length} scén...`);
 
-    const promises = scriptScenes.map(async (scene, i) => {
+    const tasks = scriptScenes.map((scene, i) => async () => {
       const res = await fetch("/api/scene", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -230,7 +232,15 @@ export default function Home() {
       });
     });
 
-    await Promise.all(promises);
+    // Rolling worker pool: at most CONCURRENCY tasks running at once
+    let idx = 0;
+    async function worker() {
+      while (idx < tasks.length) {
+        const i = idx++;
+        await tasks[i]();
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, worker));
   }
 
   // ── Create story (full flow) ──────────────────────────────────────────────
