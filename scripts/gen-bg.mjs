@@ -1,36 +1,31 @@
-// Generates pixel-art background from reference photos via Gemini
-// Usage: node scripts/gen-bg.mjs
+// Generates bg-characters.png — Nicky LEFT, Vaja RIGHT, center empty
+// Usage: GEMINI_API_KEY=xxx node scripts/gen-bg.mjs
 import { readFileSync, writeFileSync, mkdirSync, renameSync } from "fs";
 import { request } from "https";
 
-const apiKey = process.env.GEMINI_API_KEY?.trim();
-if (!apiKey) { console.error("Set GEMINI_API_KEY"); process.exit(1); }
+// Read key from env or .env.local fallback
+let apiKey = process.env.GEMINI_API_KEY?.trim();
+if (!apiKey) {
+  try {
+    const env = readFileSync(".env.local", "utf-8");
+    const m = env.match(/^GEMINI_API_KEY\s*=\s*(.+)$/m);
+    if (m) apiKey = m[1].trim().replace(/^["']|["']$/g, "");
+  } catch {}
+}
+if (!apiKey) { console.error("GEMINI_API_KEY not found in env or .env.local"); process.exit(1); }
 
 const model = process.env.GEMINI_IMAGE_MODEL?.trim() || "gemini-3.1-flash-image";
 
-function toBase64(path) {
-  return readFileSync(path).toString("base64");
-}
-
-const nicolasB64  = toBase64("reference/nicolas.jpg");
-const valentynaB64 = toBase64("reference/valentyna.jpg");
-
 const prompt = [
-  "These are reference photos of two real children: a cheerful 6-year-old boy named Nicolas with light blond hair (left photo), and an almost-2-year-old toddler girl named Valentýnka with blond hair (right photo).",
-  "Create a single wide (landscape) pixel art illustration of BOTH children together.",
-  "Style: vibrant retro pixel art / comic book style, 16-bit SNES era look, bold outlines, saturated happy colors.",
-  "The scene: Nicolas and Valentýnka standing side by side, smiling, in a magical fairy-tale setting with stars and a glowing night sky background.",
-  "Nicolas should be clearly taller. Valentýnka should look like a cute tiny toddler.",
-  "Fill the ENTIRE image — make it a full-bleed illustration suitable as a desktop wallpaper.",
-  "No text or letters anywhere in the image.",
-  "Keep the characters recognizable based on the reference photos but stylized as pixel art.",
+  "Wide fairy tale landscape background illustration, 16:9 aspect ratio.",
+  "On the FAR LEFT edge: a tall boy with light blond hair and a bright smile, wearing a blue adventure jacket, standing proud, looking toward the center.",
+  "On the FAR RIGHT edge: a very small toddler girl with blond hair and a pink bow, wearing a pink dress, standing cute, looking toward the center.",
+  "The CENTER of the image is COMPLETELY EMPTY — just the magical background scenery (no characters in the middle).",
+  "Setting: enchanted glowing forest at dusk, fireflies, soft purple and golden sky, giant glowing mushrooms, ancient trees.",
+  "Painterly children's book illustration, warm cinematic lighting, rich saturated colors, dreamlike atmosphere. No text.",
 ].join(" ");
 
-const parts = [
-  { inlineData: { data: nicolasB64,   mimeType: "image/jpeg" } },
-  { inlineData: { data: valentynaB64, mimeType: "image/jpeg" } },
-  { text: prompt },
-];
+const parts = [{ text: prompt }];
 
 const body = JSON.stringify({
   contents: [{ role: "user", parts }],

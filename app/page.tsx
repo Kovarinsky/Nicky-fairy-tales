@@ -27,6 +27,7 @@ interface HistoryEntry {
 
 const HISTORY_KEY = "nicky-story-history";
 const HISTORY_MAX = 10;
+const SETTINGS_KEY = "nicky-settings";
 
 function loadHistory(): HistoryEntry[] {
   try {
@@ -39,6 +40,25 @@ function saveHistory(entry: HistoryEntry) {
     const prev = loadHistory().filter(e => e.id !== entry.id);
     localStorage.setItem(HISTORY_KEY, JSON.stringify([entry, ...prev].slice(0, HISTORY_MAX)));
   } catch { /* localStorage full – silently ignore */ }
+}
+
+interface SavedSettings {
+  selectedVoiceId?: string;
+  sceneCount?: number;
+  selectedTheme?: string;
+  selectedIds?: string[];
+}
+
+function loadSettings(): SavedSettings {
+  try {
+    return JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+  } catch { return {}; }
+}
+
+function saveSettings(s: SavedSettings) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  } catch {}
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -149,16 +169,33 @@ export default function Home() {
 
   // ── Boot ──
   useEffect(() => {
+    const saved = loadSettings();
+    if (saved.sceneCount !== undefined && saved.sceneCount >= 3 && saved.sceneCount <= 12) {
+      setSceneCount(saved.sceneCount);
+    }
     fetch("/api/characters").then(r => r.json()).then(d => {
       const list: CharOption[] = d.characters || [];
       setChars(list);
-      setSelectedIds(list.map(c => c.id));
+      if (saved.selectedIds && saved.selectedIds.length > 0) {
+        const validIds = new Set(list.map(c => c.id));
+        const filtered = saved.selectedIds.filter(id => validIds.has(id));
+        setSelectedIds(filtered.length > 0 ? filtered : list.map(c => c.id));
+      } else {
+        setSelectedIds(list.map(c => c.id));
+      }
     }).catch(() => {});
-    fetch("/api/themes").then(r => r.json()).then(d => setThemes(d.themes || [])).catch(() => {});
+    fetch("/api/themes").then(r => r.json()).then(d => {
+      setThemes(d.themes || []);
+      if (saved.selectedTheme) setSelectedTheme(saved.selectedTheme);
+    }).catch(() => {});
     fetch("/api/voices").then(r => r.json()).then(d => {
       const list: VoiceOption[] = d.voices || [];
       setVoices(list);
-      if (list.length > 0) setSelectedVoiceId(list[0].id);
+      if (saved.selectedVoiceId && list.some(v => v.id === saved.selectedVoiceId)) {
+        setSelectedVoiceId(saved.selectedVoiceId);
+      } else if (list.length > 0) {
+        setSelectedVoiceId(list[0].id);
+      }
     }).catch(() => {});
     setStoryHistory(loadHistory());
   }, []);
@@ -384,6 +421,7 @@ export default function Home() {
         .filter(c => c.photoBase64 && c.photoMimeType)
         .map(c => ({ data: c.photoBase64!, mimeType: c.photoMimeType! }));
 
+      saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds });
       await generateMedia(script.title, script.heroDescription, script.scenes, customImageRefs, selectedVoiceId);
       setStatus("✨ Pohádka je připravena!");
     } catch (err) {
