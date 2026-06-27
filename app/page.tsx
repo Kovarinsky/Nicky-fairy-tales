@@ -6,6 +6,7 @@ import type { StoryScript, RenderedScene, Scene } from "@/lib/types";
 // ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; }
 interface ThemeOption { id: string; name: string; emoji: string; }
+interface VoiceOption { id: string; name: string; emoji: string; description: string; }
 interface CustomChar {
   id: string; name: string; description: string;
   photoBase64?: string; photoMimeType?: string; previewUrl?: string;
@@ -86,6 +87,8 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [themes, setThemes] = useState<ThemeOption[]>([]);
   const [selectedTheme, setSelectedTheme] = useState("");
+  const [voices, setVoices] = useState<VoiceOption[]>([]);
+  const [selectedVoiceId, setSelectedVoiceId] = useState("");
   const [customChars, setCustomChars] = useState<CustomChar[]>([]);
   const [selectedCustomIds, setSelectedCustomIds] = useState<string[]>([]);
   const [addingChar, setAddingChar] = useState(false);
@@ -134,6 +137,11 @@ export default function Home() {
       setSelectedIds(list.map(c => c.id));
     }).catch(() => {});
     fetch("/api/themes").then(r => r.json()).then(d => setThemes(d.themes || [])).catch(() => {});
+    fetch("/api/voices").then(r => r.json()).then(d => {
+      const list: VoiceOption[] = d.voices || [];
+      setVoices(list);
+      if (list.length > 0) setSelectedVoiceId(list[0].id);
+    }).catch(() => {});
     setStoryHistory(loadHistory());
   }, []);
 
@@ -197,7 +205,8 @@ export default function Home() {
     scriptTitle: string,
     heroDescription: string,
     scriptScenes: Scene[],
-    customImageRefs: Array<{ data: string; mimeType: string }>
+    customImageRefs: Array<{ data: string; mimeType: string }>,
+    voiceId: string
   ) {
     setTitle(scriptTitle);
     setScenes(scriptScenes.map(s => ({ ...s })));
@@ -219,6 +228,7 @@ export default function Home() {
           heroDescription,
           characterIds: selectedIds,
           customCharacterImages: customImageRefs,
+          voiceId: voiceId || undefined,
         }),
       });
       const media = await res.json();
@@ -291,7 +301,7 @@ export default function Home() {
         .filter(c => c.photoBase64 && c.photoMimeType)
         .map(c => ({ data: c.photoBase64!, mimeType: c.photoMimeType! }));
 
-      await generateMedia(script.title, script.heroDescription, script.scenes, customImageRefs);
+      await generateMedia(script.title, script.heroDescription, script.scenes, customImageRefs, selectedVoiceId);
       setStatus("✨ Pohádka je připravena!");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Něco se pokazilo.");
@@ -306,7 +316,7 @@ export default function Home() {
     setError(""); setLoading(true);
     setHistoryOpen(false);
     try {
-      await generateMedia(entry.title, entry.heroDescription, entry.scenes, []);
+      await generateMedia(entry.title, entry.heroDescription, entry.scenes, [], selectedVoiceId);
       setStatus("✨ Pohádka je připravena!");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generování selhalo.");
@@ -429,6 +439,22 @@ export default function Home() {
                 <button type="button" key={t.id} className={`chip chip-btn ${selectedTheme === t.id ? "chip-on" : ""}`}
                   onClick={() => setSelectedTheme(p => p === t.id ? "" : t.id)}>
                   <span>{t.emoji}</span> {t.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {voices.length > 1 && (
+          <div className="field">
+            <label>Hlas vypravěče</label>
+            <div className="chips">
+              {voices.map(v => (
+                <button type="button" key={v.id}
+                  className={`chip chip-btn ${selectedVoiceId === v.id ? "chip-on" : ""}`}
+                  onClick={() => setSelectedVoiceId(v.id)}
+                  title={v.description}>
+                  <span>{v.emoji}</span> {v.name}
                 </button>
               ))}
             </div>

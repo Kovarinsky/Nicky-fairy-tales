@@ -15,11 +15,11 @@ function sanitizeText(text: string): string {
   );
 }
 
-export async function narrateScene(scene: Scene): Promise<Buffer> {
+export async function narrateScene(scene: Scene, overrideVoiceId?: string): Promise<Buffer> {
   const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybi ELEVENLABS_API_KEY.");
 
-  const voiceId = process.env.ELEVENLABS_VOICE_ID?.trim();
+  const voiceId = overrideVoiceId?.trim() || process.env.ELEVENLABS_VOICE_ID?.trim();
   if (!voiceId) throw new Error("Chybi ELEVENLABS_VOICE_ID.");
 
   const modelId = (process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2").trim();

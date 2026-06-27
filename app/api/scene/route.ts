@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
     const scene = body.scene as Scene;
     const heroDescription = String(body.heroDescription || "");
     const ids: string[] = Array.isArray(body.characterIds) ? body.characterIds : [];
+    const voiceId: string | undefined = typeof body.voiceId === "string" && body.voiceId ? body.voiceId : undefined;
 
     if (!scene?.narration || !scene?.imagePrompt) {
       return NextResponse.json({ error: "Neplatná scéna." }, { status: 400 });
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
       generateSceneImage(scene, heroDescription, allRefImages).catch((e: Error) => {
         throw new Error(`[Gemini] ${e.message}`);
       }),
-      narrateScene(scene).catch((e: Error) => {
+      narrateScene(scene, voiceId).catch((e: Error) => {
         throw new Error(`[ElevenLabs] ${e.message}`);
       }),
     ]);
