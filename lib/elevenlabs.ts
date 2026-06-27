@@ -4,16 +4,14 @@ import type { Scene } from "./types";
 function sanitizeText(text: string): string {
   return (
     text
-      .replace(/…/g, "...")  // … horizontal ellipsis
-      .replace(/–/g, "-")    // – en dash
-      .replace(/—/g, "--")   // — em dash
-      .replace(/[“”]/g, '"')  // "" curly double quotes
-      .replace(/[‘’]/g, "'")  // '' curly single quotes
-      .replace(/[«»]/g, '"')  // «» guillemets
-      .replace(/­/g, "")     // soft hyphen
-      .replace(/​/g, "")     // zero-width space
-      // strip any remaining non-Latin1 chars (code point > 255)
-      .replace(/[^\x00-\xFF]/g, "")
+      .replace(/…/g, “...”)  // … horizontal ellipsis
+      .replace(/–/g, “-”)    // – en dash
+      .replace(/—/g, “--”)   // — em dash
+      .replace(/[“”]/g, ‘”’)  // “” curly double quotes
+      .replace(/[‘’]/g, “’”)  // ‘’ curly single quotes
+      .replace(/[«»]/g, ‘”’)  // «» guillemets
+      .replace(/­/g, “”)  // soft hyphen
+      .replace(/​/g, “”) // zero-width space
   );
 }
 
