@@ -30,7 +30,7 @@ function buildSystemPrompt(language: "cs" | "en"): string {
       "- Characters are always referred to by their name, never as 'the hero' or 'the girl'.",
       "",
       "═══ NARRATION – STYLE AND EMOTION ═══",
-      "- Each scene has 3–5 sentences of narration.",
+      "- Each scene has 2–4 sentences of narration.",
       "- Vary sentence rhythm: short for tension and surprise, longer for calm moments.",
       "- Every scene must have a CLEAR EMOTION: wonder, joy, tension, mystery, cosiness...",
       "- Use onomatopoeia and sensory details: 'rustled through the leaves', 'smelled of honey', 'a little bell chimed'.",
@@ -88,7 +88,7 @@ function buildSystemPrompt(language: "cs" | "en"): string {
     "- Postavy v pribehu vzdy vystupuji pod svym jmenem, ne jako 'hrdina' nebo 'divka'.",
     "",
     "═══ NARRACE – STYL A EMOCE ═══",
-    "- Každá scéna má 3–5 vět vyprávění.",
+    "- Každá scéna má 2–4 věty vyprávění.",
     "- Věty variuj rytmicky: krátké pro napětí a překvapení, delší pro klidné momenty.",
     "- Každá scéna musí mít JASNOU EMOCI: úžas, radost, napětí, tajemství, útulnost...",
     "- Používej onomatopoeia a smyslové detaily: 'zašuměl listím', 'vonělo medem', 'zazněl zvoneček'.",
@@ -255,10 +255,24 @@ function parseScript(raw: string): StoryScript {
   const cleaned = raw.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
-  if (start === -1 || end === -1)
+  if (start === -1 || end === -1) {
+    // Likely truncated due to max_tokens — give a clear error
+    if (cleaned.length > 100 && !cleaned.includes("}")) {
+      throw new Error("Příběh byl příliš dlouhý — zkus méně stránek nebo kratší popis.");
+    }
     throw new Error("Claude nevrátil JSON. Odpověď: " + raw.slice(0, 200));
-  const parsed = JSON.parse(cleaned.slice(start, end + 1)) as StoryScript;
-  parsed.scenes = (parsed.scenes || []).map((s, i) => ({ ...s, index: i + 1 }));
+  }
+  let parsed: StoryScript;
+  try {
+    parsed = JSON.parse(cleaned.slice(start, end + 1)) as StoryScript;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`Chyba při čtení příběhu (${msg}). Zkus to znovu.`);
+  }
+  if (!parsed.scenes || parsed.scenes.length === 0) {
+    throw new Error("Claude nevrátil žádné scény. Zkus to znovu.");
+  }
+  parsed.scenes = parsed.scenes.map((s, i) => ({ ...s, index: i + 1 }));
   return parsed;
 }
 
@@ -360,7 +374,7 @@ export async function generateStory(req: StoryRequest, extras: StoryExtras = {})
 
   const raw = await callAnthropicApi({
     model,
-    max_tokens: 4000,
+    max_tokens: 5500,
     system: buildSystemPrompt(language),
     messages: [{ role: "user", content }],
   });
