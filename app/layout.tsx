@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Nunito } from "next/font/google";
 import "./globals.css";
+import PhotoBackground from "./PhotoBackground";
 
 const nunito = Nunito({
   subsets: ["latin", "latin-ext"],
@@ -128,17 +129,6 @@ function FairyBackground() {
   );
 }
 
-function PhotoBackground() {
-  // bg-characters.png = full-screen pixelart karikatura Nickyho a Valentýnky
-  // Pokud soubor chybí, pozadí zůstane tmavě modré (#0a0e2e)
-  return (
-    <div className="photo-bg" aria-hidden="true">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/bg-characters.png" alt="" className="photo-bg-img"
-        onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-    </div>
-  );
-}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
