@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateSceneImage } from "@/lib/gemini";
 import { narrateScene } from "@/lib/elevenlabs";
-import { charactersByIds, loadReferenceImages } from "@/lib/characters";
 import type { Scene } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -12,7 +11,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const scene = body.scene as Scene;
     const heroDescription = String(body.heroDescription || "");
-    const ids: string[] = Array.isArray(body.characterIds) ? body.characterIds : [];
     const voiceId: string | undefined = typeof body.voiceId === "string" && body.voiceId ? body.voiceId : undefined;
     const audioOnly: boolean = body.audioOnly === true;
 
@@ -30,20 +28,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Reference photos from disk (Nicolas, Valentýnka…)
-    const diskImages = ids.length ? loadReferenceImages(charactersByIds(ids)) : [];
-
-    // Custom character photos from browser (sent as base64)
-    const customImages: Array<{ data: string; mimeType: string }> = Array.isArray(
-      body.customCharacterImages
-    )
-      ? body.customCharacterImages
-      : [];
-
-    const allRefImages = [...diskImages, ...customImages];
-
     const [imageResult, audio] = await Promise.all([
-      generateSceneImage(scene, heroDescription, allRefImages).catch((e: Error) => {
+      generateSceneImage(scene, heroDescription).catch((e: Error) => {
         console.error(`[Gemini] scene ${scene.index} failed after retries: ${e.message}`);
         return null; // fallback to placeholder
       }),

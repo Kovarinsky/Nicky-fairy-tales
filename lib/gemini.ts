@@ -60,31 +60,23 @@ function callGemini(
 
 export async function generateSceneImage(
   scene: Scene,
-  heroDescription: string,
-  referenceImages: Array<{ data: string; mimeType: string }> = []
+  heroDescription: string
 ): Promise<ImageResult> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
   const model = (process.env.GEMINI_IMAGE_MODEL || MODEL).trim();
 
-  const hasRefs = referenceImages.length > 0;
   const prompt = [
-    hasRefs
-      ? "Reference photos attached: use the children's faces, hair color, eye color, and height difference as exact basis. Preserve their real features faithfully."
-      : "",
     scene.imagePrompt,
-    `Character descriptions: ${heroDescription}`,
-    "Art style: painterly semi-realistic children's book illustration, warm cinematic lighting, rich colors, expressive faces, landscape orientation, no text.",
-  ].filter(Boolean).join(" ");
-
-  const parts: object[] = [];
-  for (const ref of referenceImages) {
-    parts.push({ inlineData: { data: ref.data, mimeType: ref.mimeType } });
-  }
-  parts.push({ text: prompt });
+    `Characters: ${heroDescription}`,
+    "Style: painterly children's book illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation, no text or letters.",
+  ].join(" ");
 
   const bodyBuf = Buffer.from(
-    JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { responseModalities: ["IMAGE", "TEXT"] } }),
+    JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
+    }),
     "utf-8"
   );
 
