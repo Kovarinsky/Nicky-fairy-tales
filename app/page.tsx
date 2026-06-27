@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { StoryScript, RenderedScene, Scene } from "@/lib/types";
+import { AmbientPlayer } from "@/lib/ambient";
 
 // ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; }
@@ -133,7 +134,7 @@ export default function Home() {
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [musicOn, setMusicOn] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const musicRef = useRef<HTMLAudioElement>(null);
+  const ambientRef = useRef<AmbientPlayer | null>(null);
   const pendingPageRef = useRef<number | null>(null);
 
   // History
@@ -158,16 +159,22 @@ export default function Home() {
     setStoryHistory(loadHistory());
   }, []);
 
-  // ── Music ducking ──
+  // ── Ambient music lifecycle ──
   useEffect(() => {
-    const m = musicRef.current; if (!m) return;
-    m.volume = isPlaying ? 0.05 : 0.22;
-  }, [isPlaying]);
+    ambientRef.current = new AmbientPlayer();
+    return () => { ambientRef.current?.destroy(); };
+  }, []);
 
+  // Toggle on/off
   useEffect(() => {
-    const m = musicRef.current; if (!m) return;
-    musicOn ? m.play().catch(() => {}) : m.pause();
+    if (musicOn) ambientRef.current?.start();
+    else ambientRef.current?.stop();
   }, [musicOn]);
+
+  // Ducking: 5% during narration, 22% otherwise
+  useEffect(() => {
+    ambientRef.current?.setVolume(isPlaying ? 0.05 : 0.22);
+  }, [isPlaying]);
 
   // ── Auto-play narration after slide animation ──
   const currentAudioUrl = scenes[page]?.audioUrl;
@@ -611,7 +618,6 @@ export default function Home() {
               onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={handleAudioEnded} />
           )}
 
-          <audio ref={musicRef} src="/music/fairy-bg.mp3" loop preload="none" style={{ display: "none" }} />
 
           {scenes.length > 1 && (
             <div className="page-dots">
