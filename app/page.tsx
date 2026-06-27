@@ -356,7 +356,8 @@ export default function Home() {
             voiceId: voiceId || undefined,
           }),
         });
-        const media = await safeJson<{ imageUrl?: string; audioUrl?: string; error?: string }>(res);
+        const media = await safeJson<{ imageUrl?: string; audioUrl?: string; error?: string; imageDebug?: string }>(res);
+        if (media.imageDebug) console.warn(`[Gemini debug] scene ${i + 1}:`, media.imageDebug);
         if (!res.ok) throw new Error(media.error || `Scéna ${i + 1} selhala.`);
         completed++;
         setDoneCount(completed);

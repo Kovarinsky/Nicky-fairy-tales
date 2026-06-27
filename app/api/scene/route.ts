@@ -28,10 +28,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    let imageDebug = "";
     const [imageResult, audio] = await Promise.all([
       generateSceneImage(scene, heroDescription).catch((e: Error) => {
-        console.error(`[Gemini] scene ${scene.index} failed after retries: ${e.message}`);
-        return null; // fallback to placeholder
+        imageDebug = e.message;
+        console.error(`[Gemini] ${e.message}`);
+        return null; // fallback to SVG placeholder
       }),
       narrateScene(scene, voiceId).catch((e: Error) => {
         throw new Error(`[ElevenLabs] ${e.message}`);
@@ -50,6 +52,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       imageUrl,
       audioUrl: `data:audio/mpeg;base64,${audio.toString("base64")}`,
+      ...(imageDebug ? { imageDebug } : {}),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Neznámá chyba";
