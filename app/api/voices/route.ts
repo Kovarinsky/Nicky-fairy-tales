@@ -4,7 +4,7 @@ import { join } from "path";
 
 export const runtime = "nodejs";
 
-interface VoiceEntry { id: string; name: string; emoji: string; description: string; }
+interface VoiceEntry { id: string; name: string; emoji: string; description: string; language: string; }
 
 export async function GET() {
   try {

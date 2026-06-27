@@ -17,7 +17,66 @@ export interface StoryExtras {
   inspirationUrlText?: string;
 }
 
-function buildSystemPrompt(): string {
+function buildSystemPrompt(language: "cs" | "en"): string {
+  if (language === "en") {
+    return [
+      "You are a kind, talented storyteller for children. You write in English.",
+      "Your task: write an original fairy tale divided into scenes (book pages).",
+      "",
+      "═══ STORY RULES ═══",
+      "- The story has a clear beginning, an engaging plot, and a warm, comforting ending.",
+      "- No violence, horror, or themes unsuitable for young children.",
+      "- Every character stays consistent throughout the story (personality never changes).",
+      "- Characters are always referred to by their name, never as 'the hero' or 'the girl'.",
+      "",
+      "═══ NARRATION – STYLE AND EMOTION ═══",
+      "- Each scene has 3–5 sentences of narration.",
+      "- Vary sentence rhythm: short for tension and surprise, longer for calm moments.",
+      "- Every scene must have a CLEAR EMOTION: wonder, joy, tension, mystery, cosiness...",
+      "- Use onomatopoeia and sensory details: 'rustled through the leaves', 'smelled of honey', 'a little bell chimed'.",
+      "- Use ellipsis (...) for dramatic effect and exclamation marks for joy.",
+      "- Narration must sound natural read aloud — like a parent reading a bedtime story.",
+      "- AVOID: dry factual descriptions, repeated words, emotionless phrases.",
+      "",
+      "═══ VISUAL CHARACTER CONSISTENCY ═══",
+      "- In `heroDescription` (in English) describe EVERY character in detail:",
+      "  hair colour and style, eye colour, height/build, fairy-tale clothing, distinctive features.",
+      "- If reference photos are attached, descriptions MUST match the photos.",
+      "- In every `imagePrompt` repeat the visual description of ALL characters appearing in the scene verbatim.",
+      "- Facial expression must match the emotion of the scene.",
+      "",
+      "═══ IMAGE PROMPTS ═══",
+      "- Write in ENGLISH, detailed, cinematic illustration description.",
+      "- Style: 'painterly semi-realistic storybook illustration, warm cinematic lighting,",
+      "  rich colors, expressive faces, detailed background, professional children's book art'.",
+      "- Never include text in the image. Set the scene in the fairy-tale world.",
+      "- Layout: always landscape orientation.",
+      "",
+      "═══ SOUNDSCAPE ═══",
+      "Every scene has a `soundscape` – choose based on scene mood (REQUIRED):",
+      '  "magic"     — spells, magic, fairies, wonders, enchanted objects',
+      '  "forest"    — nature, forest, meadow, animals, outdoors, garden',
+      '  "night"     — night, stars, moon, sleep, dreams, evening',
+      '  "adventure" — movement, adventure, challenge, danger, rescue',
+      '  "cozy"      — home, food, hugs, safety, family, warmth, story ending',
+      "",
+      "═══ OUTPUT ═══",
+      "Reply with ONLY valid JSON (no ``` or other surrounding characters), exactly:",
+      "{",
+      '  "title": string,',
+      '  "heroDescription": string,   // in English, detailed description of ALL characters',
+      '  "scenes": [',
+      '    {',
+      '      "index": number,',
+      '      "narration": string,     // in English, emotional, TTS-friendly',
+      '      "imagePrompt": string,   // in English, detailed, with character descriptions',
+      '      "soundscape": "magic"|"forest"|"night"|"adventure"|"cozy"',
+      '    }',
+      "  ]",
+      "}",
+    ].join("\n");
+  }
+
   return [
     "Jsi laskavý, talentovaný vypravěč dětských pohádek. Píšeš česky.",
     "Tvůj úkol: napsat původní pohádku rozdělenou na scény (stránky knížky).",
@@ -77,6 +136,9 @@ function buildSystemPrompt(): string {
 }
 
 function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
+  const lang = (req.language === "en" ? "en" : "cs") as "cs" | "en";
+  const en = lang === "en";
+
   const allChars: Character[] = [
     ...req.characters,
     ...(extras.customCharacters || []).map((cc) => ({
@@ -92,42 +154,77 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
   const hasValentyna = allChars.some((c) => c.id === "valentyna");
   const hasParents = allChars.some((c) => c.id === "jan" || c.id === "jana");
 
-  const familyContext = [
-    hasNicky && hasValentyna
-      ? "Nicolas je o celou hlavu vyšší než Valentýna – tento výškový rozdíl musí být viditelný na KAŽDÉM obrázku."
-      : "",
-    hasNicky && hasValentyna
-      ? "Sourozenci spolupracují, starší pomáhá mladší – dynamika staršího sourozence je součástí charakteru."
-      : "",
-    hasParents && (hasNicky || hasValentyna)
-      ? "Rodiče jsou láskyplnou oporou – v příběhu pomáhají, ale nechávají děti zažít dobrodružství."
-      : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const familyContext = en
+    ? [
+        hasNicky && hasValentyna
+          ? "Nicolas is a whole head taller than Valentýnka – this height difference must be visible in EVERY illustration."
+          : "",
+        hasNicky && hasValentyna
+          ? "The siblings cooperate; the older one helps the younger – the older-sibling dynamic is part of the character."
+          : "",
+        hasParents && (hasNicky || hasValentyna)
+          ? "Parents are a loving support – they help in the story but let the children experience the adventure."
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : [
+        hasNicky && hasValentyna
+          ? "Nicolas je o celou hlavu vyšší než Valentýna – tento výškový rozdíl musí být viditelný na KAŽDÉM obrázku."
+          : "",
+        hasNicky && hasValentyna
+          ? "Sourozenci spolupracují, starší pomáhá mladší – dynamika staršího sourozence je součástí charakteru."
+          : "",
+        hasParents && (hasNicky || hasValentyna)
+          ? "Rodiče jsou láskyplnou oporou – v příběhu pomáhají, ale nechávají děti zažít dobrodružství."
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
 
-  const ageNote =
-    req.age <= 3
-      ? "Velmi jednoduché věty (max 8 slov), hodně opakování, uklidňující rytmus."
+  const ageNote = en
+    ? req.age <= 3
+      ? "Very simple sentences (max 8 words), lots of repetition, soothing rhythm."
       : req.age <= 5
-      ? "Krátké věty, konkrétní obrazy, kouzelné a hravé."
-      : "Věty mohou být delší, příběh může mít mírné napětí a humor.";
+      ? "Short sentences, concrete images, magical and playful."
+      : "Sentences may be longer; the story may have mild tension and humour."
+    : req.age <= 3
+    ? "Velmi jednoduché věty (max 8 slov), hodně opakování, uklidňující rytmus."
+    : req.age <= 5
+    ? "Krátké věty, konkrétní obrazy, kouzelné a hravé."
+    : "Věty mohou být delší, příběh může mít mírné napětí a humor.";
 
-  const lines = [
-    req.themeName ? `Svět / téma: ${req.themeName}` : "",
-    req.themePrompt || "",
-    req.topic ? `Přání / zápletka: ${req.topic}` : "",
-    `Postavy:`,
-    cast,
-    familyContext,
-    `Věk hlavního publika: ${req.age} let. ${ageNote}`,
-    `Počet scén: ${req.sceneCount}`,
-    `Jazyk vyprávění: čeština`,
-    "",
-    "DŮLEŽITÉ pro imagePrompty: v každém obrazu zopakuj přesný vizuální popis",
-    "všech postav, které ve scéně vystupují, a zasaď je do prostředí dané scény.",
-    "Výraz tváře musí odpovídat emoci scény (radost, úžas, napětí, klid...).",
-  ];
+  const lines = en
+    ? [
+        req.themeName ? `World / theme: ${req.themeName}` : "",
+        req.themePrompt || "",
+        req.topic ? `Wish / plot: ${req.topic}` : "",
+        `Characters:`,
+        cast,
+        familyContext,
+        `Target audience age: ${req.age} years. ${ageNote}`,
+        `Number of scenes: ${req.sceneCount}`,
+        `Narration language: English`,
+        "",
+        "IMPORTANT for imagePrompts: in every image repeat the exact visual description",
+        "of all characters appearing in the scene and place them in the scene's environment.",
+        "Facial expression must match the scene's emotion (joy, wonder, tension, calm...).",
+      ]
+    : [
+        req.themeName ? `Svět / téma: ${req.themeName}` : "",
+        req.themePrompt || "",
+        req.topic ? `Přání / zápletka: ${req.topic}` : "",
+        `Postavy:`,
+        cast,
+        familyContext,
+        `Věk hlavního publika: ${req.age} let. ${ageNote}`,
+        `Počet scén: ${req.sceneCount}`,
+        `Jazyk vyprávění: čeština`,
+        "",
+        "DŮLEŽITÉ pro imagePrompty: v každém obrazu zopakuj přesný vizuální popis",
+        "všech postav, které ve scéně vystupují, a zasaď je do prostředí dané scény.",
+        "Výraz tváře musí odpovídat emoci scény (radost, úžas, napětí, klid...).",
+      ];
 
   if (extras.inspirationUrlText) {
     lines.push("", "Doplňující kontext z webové stránky:", extras.inspirationUrlText.slice(0, 1500));
@@ -259,10 +356,12 @@ export async function generateStory(req: StoryRequest, extras: StoryExtras = {})
   const content: string | AnthropicPart[] =
     parts.length === 1 && parts[0].type === "text" ? parts[0].text : parts;
 
+  const language = (req.language === "en" ? "en" : "cs") as "cs" | "en";
+
   const raw = await callAnthropicApi({
     model,
     max_tokens: 6000,
-    system: buildSystemPrompt(),
+    system: buildSystemPrompt(language),
     messages: [{ role: "user", content }],
   });
 

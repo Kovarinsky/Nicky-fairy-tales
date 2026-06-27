@@ -75,14 +75,16 @@ export async function POST(req: NextRequest) {
     // Fetch URL content
     const urlText = body.inspirationUrl ? await fetchUrlText(String(body.inspirationUrl)) : "";
 
+    const language = String(body.language || "cs") === "en" ? "en" : "cs";
+
     const storyReq: StoryRequest = {
       topic,
       themeName: theme?.name,
       themePrompt: theme?.prompt,
       characters,
       age: Number(body.age) || 4,
-      sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), 12),
-      language: "cs",
+      sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), 15),
+      language,
     };
 
     const extras: StoryExtras = {

@@ -7,7 +7,7 @@ import { AmbientPlayer } from "@/lib/ambient";
 // ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; }
 interface ThemeOption { id: string; name: string; emoji: string; }
-interface VoiceOption { id: string; name: string; emoji: string; description: string; }
+interface VoiceOption { id: string; name: string; emoji: string; description: string; language: string; }
 interface CustomChar {
   id: string; name: string; description: string;
   photoBase64?: string; photoMimeType?: string; previewUrl?: string;
@@ -347,6 +347,7 @@ export default function Home() {
           characterIds: selectedIds,
           age: getTargetAge([...selectedIds, ...selectedCustomIds]),
           sceneCount,
+          language: voices.find(v => v.id === selectedVoiceId)?.language ?? "cs",
           customCharacters: selectedCustomObjs.map(c => ({
             id: c.id, name: c.name,
             description: c.description,
