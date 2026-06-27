@@ -715,6 +715,40 @@ button:disabled {
   transform: none;
 }
 
+/* ── Fixed mute button ── */
+.mute-fab {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 200;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  color: rgba(255,255,255,0.85);
+  font-size: 1.2rem;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.28);
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  padding: 0;
+}
+
+.mute-fab:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.24);
+  filter: none;
+  transform: scale(1.08);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.28);
+}
+
+.mute-fab.mute-fab-on {
+  border-color: rgba(124, 77, 255, 0.6);
+  background: rgba(124, 77, 255, 0.22);
+}
+
 /* ── Generation progress ── */
 .gen-progress {
   margin-top: 1.5rem;

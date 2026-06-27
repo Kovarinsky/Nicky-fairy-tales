@@ -176,6 +176,26 @@ export default function Home() {
     ambientRef.current?.setVolume(isPlaying ? 0.05 : 0.22);
   }, [isPlaying]);
 
+  // Switch soundscape when page changes
+  useEffect(() => {
+    if (!allScenesReady) return;
+    ambientRef.current?.setScene(scenes[page]?.soundscape);
+  }, [page, allScenesReady, scenes]);
+
+  // Intro fanfare + first soundscape when story first becomes ready
+  const introFiredRef = useRef(false);
+  useEffect(() => {
+    if (!allScenesReady || introFiredRef.current) return;
+    introFiredRef.current = true;
+    ambientRef.current?.playIntro();
+    ambientRef.current?.setScene(scenes[0]?.soundscape);
+  }, [allScenesReady, scenes]);
+
+  // Reset intro flag when new story starts
+  useEffect(() => {
+    if (scenes.length === 0) introFiredRef.current = false;
+  }, [scenes.length]);
+
   // ── Auto-play narration after slide animation ──
   const currentAudioUrl = scenes[page]?.audioUrl;
   useEffect(() => {
@@ -392,6 +412,17 @@ export default function Home() {
 
   return (
     <div className="container">
+      {/* Fixed mute button — always visible */}
+      <button
+        type="button"
+        className={`mute-fab ${musicOn ? "mute-fab-on" : ""}`}
+        onClick={() => setMusicOn(p => !p)}
+        title={musicOn ? "Vypnout hudbu" : "Zapnout hudbu"}
+        aria-label={musicOn ? "Vypnout hudbu" : "Zapnout hudbu"}
+      >
+        {musicOn ? "🎵" : "🔇"}
+      </button>
+
       <h1>📖 Nickyho pohádky</h1>
       <p className="subtitle">Vyber postavy, téma a inspiraci – pohádka s obrázky a tatínkovým hlasem.</p>
 
@@ -604,10 +635,6 @@ export default function Home() {
                 {autoAdvance ? "🔁" : "🔂"}
               </button>
 
-              <button type="button" className={`ctrl-btn ctrl-auto ${musicOn ? "ctrl-auto-on" : ""}`}
-                onClick={() => setMusicOn(p => !p)} title={musicOn ? "Hudba zapnuta" : "Hudba vypnuta"}>
-                {musicOn ? "🎵" : "🔇"}
-              </button>
 
               <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page + 1)} disabled={!hasNext} aria-label="Další">→</button>
             </div>

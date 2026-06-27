@@ -30,6 +30,9 @@ export interface StoryRequest {
   language: string;
 }
 
+/** Zvukový svět scény – řídí procedurální ambient hudbu */
+export type Soundscape = "magic" | "forest" | "night" | "adventure" | "cozy";
+
 /** Jedna scéna = jedna stránka knížky */
 export interface Scene {
   /** Pořadí scény od 1 */
@@ -38,6 +41,8 @@ export interface Scene {
   narration: string;
   /** Anglický prompt pro generování ilustrace (Nano Banana) */
   imagePrompt: string;
+  /** Ambient sound world for this scene */
+  soundscape?: Soundscape;
 }
 
 /** Výstup Claude – hotový scénář */
