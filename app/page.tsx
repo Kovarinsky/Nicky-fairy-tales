@@ -160,6 +160,7 @@ export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const ambientRef = useRef<AmbientPlayer | null>(null);
   const pendingPageRef = useRef<number | null>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
 
   // History
   const [storyHistory, setStoryHistory] = useState<HistoryEntry[]>([]);
@@ -236,6 +237,11 @@ export default function Home() {
   useEffect(() => {
     if (scenes.length === 0) introFiredRef.current = false;
   }, [scenes.length]);
+
+  // Scroll progress into view when loading starts (mobile UX)
+  useEffect(() => {
+    if (loading) setTimeout(() => progressRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+  }, [loading]);
 
   // ── Auto-play narration after slide animation ──
   const currentAudioUrl = scenes[page]?.audioUrl;
@@ -383,6 +389,7 @@ export default function Home() {
       const storyRes = await fetch("/api/story", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(180_000),
         body: JSON.stringify({
           topic, themeId: selectedTheme || undefined,
           characterIds: selectedIds,
@@ -663,33 +670,46 @@ export default function Home() {
       )}
 
       {/* ── GENERATION PROGRESS ── */}
-      {loading && scenes.length > 0 && (
-        <div className="gen-progress">
+      {loading && (
+        <div className="gen-progress" ref={progressRef}>
           <p className="gen-status">{status}</p>
-          <div className="gen-bar-track">
-            <div className="gen-bar-fill" style={{ width: `${(doneCount / totalScenes) * 100}%` }} />
-          </div>
-          <p className="gen-count">{doneCount} / {totalScenes} scén hotovo</p>
-          <div className="gen-cards">
-            {scenes.map((s, i) => {
-              const st = sceneStatuses[i] ?? "waiting";
-              return (
-                <div key={i} className={`gen-card gen-card-${st}`}>
-                  {s.imageUrl
-                    ? <img src={s.imageUrl} alt={`Scéna ${i + 1}`} className="gen-card-img" />
-                    : <div className="gen-card-placeholder">
-                        {st === "generating" && <div className="gen-card-spinner" />}
-                        {st === "error" && <span className="gen-card-icon">⚠️</span>}
-                        {st === "waiting" && <span className="gen-card-icon">⏳</span>}
-                      </div>
-                  }
-                  <span className="gen-card-label">
-                    {st === "generating" ? "🎨" : st === "done" ? "✓" : st === "error" ? "!" : ""} {i + 1}
-                  </span>
+
+          {/* Phase 1: Claude is writing the story — indeterminate shimmer bar */}
+          {scenes.length === 0 && (
+            <div className="gen-bar-track gen-bar-indeterminate" />
+          )}
+
+          {/* Phase 2: scenes generating — deterministic % bar + cards */}
+          {scenes.length > 0 && (
+            <>
+              <div className="gen-bar-track">
+                <div className="gen-bar-fill" style={{ width: `${Math.round((doneCount / totalScenes) * 100)}%` }}>
+                  <span className="gen-bar-pct">{Math.round((doneCount / totalScenes) * 100)}%</span>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+              <p className="gen-count">{doneCount} / {totalScenes} scén hotovo</p>
+              <div className="gen-cards">
+                {scenes.map((s, i) => {
+                  const st = sceneStatuses[i] ?? "waiting";
+                  return (
+                    <div key={i} className={`gen-card gen-card-${st}`}>
+                      {s.imageUrl
+                        ? <img src={s.imageUrl} alt={`Scéna ${i + 1}`} className="gen-card-img" />
+                        : <div className="gen-card-placeholder">
+                            {st === "generating" && <div className="gen-card-spinner" />}
+                            {st === "error" && <span className="gen-card-icon">⚠️</span>}
+                            {st === "waiting" && <span className="gen-card-icon">⏳</span>}
+                          </div>
+                      }
+                      <span className="gen-card-label">
+                        {st === "generating" ? "🎨" : st === "done" ? "✓" : st === "error" ? "!" : ""} {i + 1}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
 
