@@ -587,7 +587,7 @@ export default function Home() {
 
         <div className="field">
           <label>Počet stránek: {sceneCount}</label>
-          <input type="range" min={3} max={15} value={sceneCount} onChange={e => setSceneCount(Number(e.target.value))} />
+          <input type="range" min={3} max={12} value={sceneCount} onChange={e => setSceneCount(Number(e.target.value))} />
         </div>
 
         <button type="submit" className="btn-create" disabled={loading || allSelectedCount === 0 || !hasInspiration}>
