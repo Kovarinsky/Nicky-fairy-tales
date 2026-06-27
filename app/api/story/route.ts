@@ -5,7 +5,7 @@ import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 async function fetchUrlText(url: string): Promise<string> {
   try {

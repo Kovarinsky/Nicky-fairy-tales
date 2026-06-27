@@ -360,7 +360,7 @@ export async function generateStory(req: StoryRequest, extras: StoryExtras = {})
 
   const raw = await callAnthropicApi({
     model,
-    max_tokens: 6000,
+    max_tokens: 4000,
     system: buildSystemPrompt(language),
     messages: [{ role: "user", content }],
   });
