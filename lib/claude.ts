@@ -58,19 +58,10 @@ function buildSystemPrompt(language: "cs" | "en"): string {
       '  "cozy"      — home, food, hugs, safety, family, warmth, story ending',
       "",
       "═══ OUTPUT ═══",
-      "Reply with ONLY valid JSON (no ``` or other surrounding characters), exactly:",
-      "{",
-      '  "title": string,',
-      '  "heroDescription": string,   // in English, detailed description of ALL characters',
-      '  "scenes": [',
-      '    {',
-      '      "index": number,',
-      '      "narration": string,     // in English, emotional, TTS-friendly',
-      '      "imagePrompt": string,   // in English, detailed, with character descriptions',
-      '      "soundscape": "magic"|"forest"|"night"|"adventure"|"cozy"',
-      '    }',
-      "  ]",
-      "}",
+      "Reply with ONLY valid RFC 8259 JSON — no markdown, no code fences, no // comments, no trailing commas.",
+      "Required fields per scene: index (number), narration (string), imagePrompt (string), soundscape (one of the 5 values).",
+      "Compact example structure (fill in real content):",
+      '{"title":"...","heroDescription":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"forest"}]}',
     ].join("\n");
   }
 
@@ -113,19 +104,10 @@ function buildSystemPrompt(language: "cs" | "en"): string {
     '  "cozy"      — domov, jídlo, objetí, bezpečí, rodina, teplo, konec pohádky',
     "",
     "═══ VÝSTUP ═══",
-    "Odpověz POUZE validním JSON (bez ``` nebo jiných znaků okolo), přesně:",
-    "{",
-    '  "title": string,',
-    '  "heroDescription": string,   // anglicky, podrobné popisy VŠECH postav',
-    '  "scenes": [',
-    '    {',
-    '      "index": number,',
-    '      "narration": string,     // česky, emotivní, TTS-friendly',
-    '      "imagePrompt": string,   // anglicky, detailní, s popisem postav',
-    '      "soundscape": "magic"|"forest"|"night"|"adventure"|"cozy"',
-    '    }',
-    "  ]",
-    "}",
+    "Odpověz POUZE validním RFC 8259 JSON — bez markdown, bez ``` obalení, bez // komentářů, bez trailing čárek.",
+    "Povinné pole na každou scénu: index (číslo), narration (string), imagePrompt (string), soundscape (jedna z 5 hodnot).",
+    "Příklad struktury (vyplň reálným obsahem):",
+    '{"title":"...","heroDescription":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"forest"}]}',
   ].join("\n");
 }
 
@@ -245,26 +227,36 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
   return lines.filter(Boolean).join("\n");
 }
 
+function sanitizeJson(s: string): string {
+  // Strip JS-style // line comments (outside strings) — Claude sometimes adds them
+  s = s.replace(/("(?:[^"\\]|\\.)*")|\/\/[^\n]*/g, (m, str) => str ?? "");
+  // Remove trailing commas before } or ]
+  s = s.replace(/,\s*([}\]])/g, "$1");
+  return s;
+}
+
 function parseScript(raw: string): StoryScript {
-  const cleaned = raw.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  // Strip code fences
+  let cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  // Sanitize before finding braces
+  cleaned = sanitizeJson(cleaned);
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
   if (start === -1 || end === -1) {
-    // Likely truncated due to max_tokens — give a clear error
-    if (cleaned.length > 100 && !cleaned.includes("}")) {
-      throw new Error("Příběh byl příliš dlouhý — zkus méně stránek nebo kratší popis.");
+    if (cleaned.length > 200) {
+      throw new Error("Příběh byl příliš dlouhý nebo byl výstup oříznut — zkus méně stránek.");
     }
-    throw new Error("Claude nevrátil JSON. Odpověď: " + raw.slice(0, 200));
+    throw new Error("Claude nevrátil JSON. Začátek odpovědi: " + raw.slice(0, 200));
   }
   let parsed: StoryScript;
   try {
     parsed = JSON.parse(cleaned.slice(start, end + 1)) as StoryScript;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(`Chyba při čtení příběhu (${msg}). Zkus to znovu.`);
+    throw new Error(`Chyba při zpracování příběhu (${msg}) — zkus to znovu.`);
   }
   if (!parsed.scenes || parsed.scenes.length === 0) {
-    throw new Error("Claude nevrátil žádné scény. Zkus to znovu.");
+    throw new Error("Claude nevrátil žádné scény — zkus to znovu.");
   }
   parsed.scenes = parsed.scenes.map((s, i) => ({ ...s, index: i + 1 }));
   return parsed;
