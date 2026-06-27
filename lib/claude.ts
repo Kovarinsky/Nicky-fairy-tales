@@ -1,13 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { request } from "https";
 import type { StoryRequest, StoryScript, Character } from "./types";
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
-
-function getClient(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("Chybí ANTHROPIC_API_KEY.");
-  return new Anthropic({ apiKey });
-}
+const ANTHROPIC_VERSION = "2023-06-01";
 
 export interface StoryExtras {
   customCharacters?: Array<{
@@ -117,22 +112,78 @@ function parseScript(raw: string): StoryScript {
   const cleaned = raw.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
-  if (start === -1 || end === -1) throw new Error("Claude nevrátil JSON. Odpověď: " + raw.slice(0, 200));
+  if (start === -1 || end === -1)
+    throw new Error("Claude nevrátil JSON. Odpověď: " + raw.slice(0, 200));
   const parsed = JSON.parse(cleaned.slice(start, end + 1)) as StoryScript;
   parsed.scenes = (parsed.scenes || []).map((s, i) => ({ ...s, index: i + 1 }));
   return parsed;
 }
 
+type AnthropicPart =
+  | { type: "text"; text: string }
+  | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
+  | { type: "document"; source: { type: "base64"; media_type: "application/pdf"; data: string } };
+
+function callAnthropicApi(body: object): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey) throw new Error("Chybí ANTHROPIC_API_KEY.");
+
+  const bodyStr = JSON.stringify(body);
+  const bodyBuf = Buffer.from(bodyStr, "utf-8");
+
+  return new Promise((resolve, reject) => {
+    const req = request(
+      {
+        hostname: "api.anthropic.com",
+        path: "/v1/messages",
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": ANTHROPIC_VERSION,
+          "content-length": bodyBuf.length,
+        },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          const text = Buffer.concat(chunks).toString("utf-8");
+          if (res.statusCode && res.statusCode >= 400) {
+            reject(new Error(`Anthropic ${res.statusCode}: ${text.slice(0, 400)}`));
+            return;
+          }
+          try {
+            const data = JSON.parse(text) as {
+              content?: Array<{ type: string; text?: string }>;
+              error?: { message?: string };
+            };
+            if (data.error) {
+              reject(new Error(`Anthropic error: ${data.error.message}`));
+              return;
+            }
+            const textBlock = (data.content || []).find((b) => b.type === "text");
+            if (!textBlock?.text) {
+              reject(new Error("Claude nevrátil text. Odpověď: " + text.slice(0, 200)));
+              return;
+            }
+            resolve(textBlock.text);
+          } catch {
+            reject(new Error("Anthropic JSON parse error: " + text.slice(0, 200)));
+          }
+        });
+        res.on("error", reject);
+      }
+    );
+    req.on("error", reject);
+    req.write(bodyBuf);
+    req.end();
+  });
+}
+
 export async function generateStory(req: StoryRequest, extras: StoryExtras = {}): Promise<StoryScript> {
-  const client = getClient();
-
-  // Build multimodal content array
-  type Part =
-    | { type: "text"; text: string }
-    | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
-    | { type: "document"; source: { type: "base64"; media_type: "application/pdf"; data: string } };
-
-  const parts: Part[] = [];
+  const model = (process.env.ANTHROPIC_MODEL || MODEL).trim();
+  const parts: AnthropicPart[] = [];
 
   if (extras.inspirationPdfBase64) {
     parts.push({
@@ -159,16 +210,15 @@ export async function generateStory(req: StoryRequest, extras: StoryExtras = {})
 
   parts.push({ type: "text", text: buildUserPrompt(req, extras) });
 
-  const content = parts.length === 1 && parts[0].type === "text" ? parts[0].text : parts;
+  const content: string | AnthropicPart[] =
+    parts.length === 1 && parts[0].type === "text" ? parts[0].text : parts;
 
-  const message = await client.messages.create({
-    model: MODEL,
+  const raw = await callAnthropicApi({
+    model,
     max_tokens: 4096,
     system: buildSystemPrompt(),
-    messages: [{ role: "user", content: content as Parameters<typeof client.messages.create>[0]["messages"][0]["content"] }],
+    messages: [{ role: "user", content }],
   });
 
-  const textBlock = message.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") throw new Error("Claude nevrátil text.");
-  return parseScript(textBlock.text);
+  return parseScript(raw);
 }
