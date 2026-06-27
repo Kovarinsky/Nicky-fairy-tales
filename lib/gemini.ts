@@ -1,7 +1,7 @@
 import { request } from "https";
 import type { Scene } from "./types";
 
-const MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
+const MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
 
 export interface ImageResult {
   buffer: Buffer;
