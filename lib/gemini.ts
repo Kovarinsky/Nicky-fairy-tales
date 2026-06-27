@@ -58,6 +58,25 @@ function callGemini(
   });
 }
 
+// Gemini refuses to generate images when prompts mention children's exact ages.
+// Strip age markers and replace with neutral size/role descriptors.
+function sanitizePrompt(text: string): string {
+  return text
+    .replace(/\b\d+\s*[-–]\s*year[s]?\s*[-–]\s*old\b/gi, "")   // 6-year-old
+    .replace(/\b\d+\s+years?\s+old\b/gi, "")                     // 6 years old
+    .replace(/\bage[d]?\s*\d+\b/gi, "")                          // age 6, aged 6
+    .replace(/\(\s*\d+[^)]*\)/gi, "")                            // (2 years old), (6 let)
+    .replace(/\btoddler\s+girl\b/gi, "small girl")
+    .replace(/\btoddler\s+boy\b/gi, "small boy")
+    .replace(/\btoddler\b/gi, "small child")
+    .replace(/\binfant\b/gi, "small child")
+    .replace(/\(\s*\)/g, "")
+    .replace(/\s+,/g, ",")                                        // space before comma
+    .replace(/,\s*,/g, ",")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export async function generateSceneImage(
   scene: Scene,
   heroDescription: string
@@ -66,11 +85,11 @@ export async function generateSceneImage(
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
   const model = (process.env.GEMINI_IMAGE_MODEL || MODEL).trim();
 
-  const prompt = [
+  const prompt = sanitizePrompt([
     scene.imagePrompt,
     `Characters: ${heroDescription}`,
     "Style: painterly children's book illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation, no text or letters.",
-  ].join(" ");
+  ].join(" "));
 
   const bodyBuf = Buffer.from(
     JSON.stringify({
