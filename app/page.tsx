@@ -133,6 +133,8 @@ export default function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [musicOn, setMusicOn] = useState(true);
+  const [showCredits, setShowCredits] = useState(false);
+  const [regenAudio, setRegenAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const ambientRef = useRef<AmbientPlayer | null>(null);
   const pendingPageRef = useRef<number | null>(null);
@@ -217,12 +219,48 @@ export default function Home() {
     setIsPlaying(false);
     if (!autoAdvance) return;
     const next = page + 1;
-    if (next >= scenes.length) return;
+    if (next >= scenes.length) {
+      // Last scene — show rolling credits
+      setTimeout(() => setShowCredits(true), 800);
+      return;
+    }
     if (scenes[next]?.imageUrl && scenes[next]?.audioUrl) {
       setTimeout(() => goToPage(next), 1200);
     } else {
-      pendingPageRef.current = next; // wait for generation
+      pendingPageRef.current = next;
     }
+  }
+
+  // ── Voice switch in reader — audio-only regeneration ──────────────────────
+  async function switchVoice(newVoiceId: string) {
+    if (newVoiceId === selectedVoiceId || regenAudio) return;
+    setSelectedVoiceId(newVoiceId);
+    audioRef.current?.pause();
+    setIsPlaying(false);
+    setRegenAudio(true);
+
+    const CONCURRENCY = 3;
+    let idx = 0;
+    const tasks = scenes.map((scene, i) => async () => {
+      const res = await fetch("/api/scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scene, audioOnly: true, voiceId: newVoiceId }),
+      });
+      const data = await safeJson<{ audioUrl?: string; error?: string }>(res);
+      if (!res.ok) return;
+      setScenes(prev => {
+        const next = [...prev];
+        next[i] = { ...next[i], audioUrl: data.audioUrl };
+        return next;
+      });
+    });
+
+    async function worker() {
+      while (idx < tasks.length) { const i = idx++; await tasks[i](); }
+    }
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, worker));
+    setRegenAudio(false);
   }
 
   // Fire pending advance when a scene finishes generating
@@ -548,7 +586,7 @@ export default function Home() {
 
         <div className="field">
           <label>Počet stránek: {sceneCount}</label>
-          <input type="range" min={3} max={10} value={sceneCount} onChange={e => setSceneCount(Number(e.target.value))} />
+          <input type="range" min={3} max={15} value={sceneCount} onChange={e => setSceneCount(Number(e.target.value))} />
         </div>
 
         <button type="submit" className="btn-create" disabled={loading || allSelectedCount === 0 || !hasInspiration}>
@@ -623,9 +661,9 @@ export default function Home() {
             <div className="book-controls">
               <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page - 1)} disabled={!hasPrev} aria-label="Předchozí">←</button>
 
-              <button type="button" className={`ctrl-btn ctrl-play ${!current.audioUrl ? "ctrl-loading" : ""}`}
-                onClick={togglePlay} disabled={!current.audioUrl} aria-label={isPlaying ? "Pauza" : "Přehrát"}>
-                {!current.audioUrl ? "⏳" : isPlaying ? "⏸" : "▶"}
+              <button type="button" className={`ctrl-btn ctrl-play ${!current.audioUrl || regenAudio ? "ctrl-loading" : ""}`}
+                onClick={togglePlay} disabled={!current.audioUrl || regenAudio} aria-label={isPlaying ? "Pauza" : "Přehrát"}>
+                {regenAudio ? "⏳" : !current.audioUrl ? "⏳" : isPlaying ? "⏸" : "▶"}
               </button>
 
               <span className="ctrl-counter">{page + 1} / {scenes.length}</span>
@@ -635,6 +673,20 @@ export default function Home() {
                 {autoAdvance ? "🔁" : "🔂"}
               </button>
 
+              {/* Voice cycle button — only when multiple voices available */}
+              {voices.length > 1 && (
+                <button type="button" className={`ctrl-btn ctrl-auto ${regenAudio ? "ctrl-loading" : "ctrl-auto-on"}`}
+                  onClick={() => {
+                    const idx = voices.findIndex(v => v.id === selectedVoiceId);
+                    const next = voices[(idx + 1) % voices.length];
+                    switchVoice(next.id);
+                  }}
+                  disabled={regenAudio}
+                  title={`Hlas: ${voices.find(v => v.id === selectedVoiceId)?.name ?? "?"} — klikni pro přepnutí`}
+                >
+                  {regenAudio ? "⏳" : (voices.find(v => v.id === selectedVoiceId)?.emoji ?? "🎙️")}
+                </button>
+              )}
 
               <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page + 1)} disabled={!hasNext} aria-label="Další">→</button>
             </div>
@@ -655,6 +707,36 @@ export default function Home() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── ROLLING CREDITS ── */}
+      {showCredits && (
+        <div className="credits-overlay" onClick={() => setShowCredits(false)}>
+          <div className="credits-scroll">
+            <div className="credits-content">
+              <p className="credits-end">✨ Konec ✨</p>
+              <p className="credits-title">{title}</p>
+
+              <p className="credits-section">Příběh</p>
+              <p className="credits-item">Claude Opus — scénář a narrace</p>
+              <p className="credits-item">Google Gemini — ilustrace</p>
+              <p className="credits-item">ElevenLabs — hlas vypravěče</p>
+
+              <p className="credits-section">Hrdinové</p>
+              {scenes.length > 0 && (
+                <p className="credits-item">
+                  Nicolásek &amp; Valentýnka
+                </p>
+              )}
+
+              <p className="credits-section">Vytvořeno s láskou</p>
+              <p className="credits-item">pro Nickyho pohádky</p>
+              <p className="credits-item">© {new Date().getFullYear()}</p>
+
+              <p className="credits-tap">— klikni pro zavření —</p>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -129,12 +129,13 @@ function FairyBackground() {
 }
 
 function PhotoBackground() {
+  // bg-characters.png = full-screen pixelart karikatura Nickyho a Valentýnky
+  // Pokud soubor chybí, pozadí zůstane tmavě modré (#0a0e2e)
   return (
     <div className="photo-bg" aria-hidden="true">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/api/reference/nicolas.jpg" alt="" className="photo-bg-img photo-bg-nicolas" />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/api/reference/valentyna.jpg" alt="" className="photo-bg-img photo-bg-valentyna" />
+      <img src="/bg-characters.png" alt="" className="photo-bg-img"
+        onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
     </div>
   );
 }

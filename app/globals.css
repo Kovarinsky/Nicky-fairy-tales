@@ -24,7 +24,8 @@ body {
   background: #0d1340;
 }
 
-/* ── Foto pozadí – Nicolásek & Valentýnka ── */
+/* ── Pixelart pozadí přes celý screen ── */
+/* Nahrát soubor: public/bg-characters.png (nebo .jpg / .webp / .gif) */
 .photo-bg {
   position: fixed;
   inset: 0;
@@ -42,28 +43,29 @@ body {
   z-index: 2;
   background:
     linear-gradient(180deg,
-      rgba(10, 14, 46, 0.62) 0%,
-      rgba(10, 14, 46, 0.30) 35%,
-      rgba(10, 14, 46, 0.30) 65%,
-      rgba(10, 14, 46, 0.72) 100%
+      rgba(10, 14, 46, 0.55) 0%,
+      rgba(10, 14, 46, 0.22) 30%,
+      rgba(10, 14, 46, 0.22) 70%,
+      rgba(10, 14, 46, 0.65) 100%
     );
 }
 
+/* Full-screen pixelart karikatura */
 .photo-bg-img {
   position: absolute;
-  top: 0;
+  inset: 0;
+  width: 100%;
   height: 100%;
-  width: 52%;
   object-fit: cover;
-  object-position: top center;
-  /* Pixelated-poster effect: scale down → hard-upscale */
+  object-position: center bottom;
+  /* Zachová pixelart ostrost */
   image-rendering: pixelated;
-  opacity: 0.48;
-  filter: blur(1px) brightness(0.55) saturate(0.25) contrast(1.2);
+  image-rendering: crisp-edges;
+  opacity: 0.55;
 }
 
-.photo-bg-nicolas  { left: 0; }
-.photo-bg-valentyna { right: 0; transform: scaleX(-1); }
+/* Skrýt starý split-screen layout */
+.photo-bg-nicolas, .photo-bg-valentyna { display: none; }
 
 /* ── Layout ── */
 .container {
@@ -918,6 +920,81 @@ button:disabled {
   filter: none;
   transform: none;
   box-shadow: none;
+}
+
+/* ── Rolling credits ── */
+@keyframes creditsScroll {
+  from { transform: translateY(100vh); }
+  to   { transform: translateY(-100%); }
+}
+
+.credits-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(5, 5, 24, 0.96);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.credits-scroll {
+  width: 100%;
+  max-width: 480px;
+  animation: creditsScroll 22s linear forwards;
+}
+
+.credits-content {
+  padding: 2rem 2rem 8rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  text-align: center;
+}
+
+.credits-end {
+  font-size: 2.4rem;
+  font-weight: 900;
+  color: #fff;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.5px;
+}
+
+.credits-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #f59e0b;
+  margin-bottom: 1.5rem;
+  font-style: italic;
+}
+
+.credits-section {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255,255,255,0.4);
+  margin-top: 1.5rem;
+  margin-bottom: 0.15rem;
+}
+
+.credits-item {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  line-height: 1.5;
+}
+
+.credits-tap {
+  margin-top: 3rem;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.3);
+  font-weight: 600;
 }
 
 /* ── Responsive ── */

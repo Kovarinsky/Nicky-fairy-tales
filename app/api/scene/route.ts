@@ -14,9 +14,20 @@ export async function POST(req: NextRequest) {
     const heroDescription = String(body.heroDescription || "");
     const ids: string[] = Array.isArray(body.characterIds) ? body.characterIds : [];
     const voiceId: string | undefined = typeof body.voiceId === "string" && body.voiceId ? body.voiceId : undefined;
+    const audioOnly: boolean = body.audioOnly === true;
 
-    if (!scene?.narration || !scene?.imagePrompt) {
+    if (!scene?.narration || (!audioOnly && !scene?.imagePrompt)) {
       return NextResponse.json({ error: "Neplatná scéna." }, { status: 400 });
+    }
+
+    if (audioOnly) {
+      // Audio-only regeneration (voice switch) — skip Gemini
+      const audio = await narrateScene(scene, voiceId).catch((e: Error) => {
+        throw new Error(`[ElevenLabs] ${e.message}`);
+      });
+      return NextResponse.json({
+        audioUrl: `data:audio/mpeg;base64,${audio.toString("base64")}`,
+      });
     }
 
     // Reference photos from disk (Nicolas, Valentýnka…)
