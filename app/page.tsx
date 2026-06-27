@@ -295,7 +295,7 @@ export default function Home() {
     setDoneCount(0);
     setSceneStatuses(scriptScenes.map(() => "waiting"));
 
-    const CONCURRENCY = 3;
+    const CONCURRENCY = 1; // sequential — prevents Gemini rate-limit errors
     let completed = 0;
     setStatus(`🎨 Generuji ${scriptScenes.length} scén...`);
 

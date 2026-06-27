@@ -2,23 +2,23 @@
   {
     "id": "nicolas",
     "name": "Nicolásek",
-    "description": "a cheerful 6-year-old boy with light blond hair and a bright smile; the big brother, a head taller than his little sister",
+    "description": "a cheerful boy with light blond hair and a bright smile; the big brother, a head taller than his little sister",
     "referenceFile": "nicolas.jpg"
   },
   {
     "id": "valentyna",
     "name": "Valentýnka",
-    "description": "an almost-2-year-old toddler girl with blond hair, often wearing a hair bow; the little sister, noticeably smaller than her big brother",
+    "description": "a small toddler girl with blond hair, often wearing a hair bow; the little sister, noticeably smaller than her big brother",
     "referenceFile": "valentyna.jpg"
   },
   {
     "id": "jan",
     "name": "Táta Jan",
-    "description": "a tall, warm-hearted 47-year-old Czech dad with a big friendly smile, always ready for adventure with his kids"
+    "description": "a tall, warm-hearted Czech dad with a big friendly smile, always ready for adventure with his kids"
   },
   {
     "id": "jana",
     "name": "Máma Jana",
-    "description": "a kind, nurturing 44-year-old Czech mom with a bright smile and warm eyes, the loving heart of the family"
+    "description": "a kind, nurturing Czech mom with a bright smile and warm eyes, the loving heart of the family"
   }
 ]

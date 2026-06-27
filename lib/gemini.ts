@@ -66,12 +66,15 @@ function sanitizePrompt(text: string): string {
     .replace(/\b\d+\s+years?\s+old\b/gi, "")                     // 6 years old
     .replace(/\bage[d]?\s*\d+\b/gi, "")                          // age 6, aged 6
     .replace(/\(\s*\d+[^)]*\)/gi, "")                            // (2 years old), (6 let)
+    .replace(/\b\d+let[a-záčďéěíňóřšťúůýž]*\b/gi, "")           // Czech: 6letý, 2letá, 6letého
+    .replace(/\b\d+\s+let\b/gi, "")                              // Czech: 6 let, 2 let
+    .replace(/\b\d+\s+rok[ůuy]?\b/gi, "")                        // Czech: 2 roky, 6 roků
     .replace(/\btoddler\s+girl\b/gi, "small girl")
     .replace(/\btoddler\s+boy\b/gi, "small boy")
     .replace(/\btoddler\b/gi, "small child")
     .replace(/\binfant\b/gi, "small child")
     .replace(/\(\s*\)/g, "")
-    .replace(/\s+,/g, ",")                                        // space before comma
+    .replace(/\s+,/g, ",")
     .replace(/,\s*,/g, ",")
     .replace(/\s{2,}/g, " ")
     .trim();
@@ -99,17 +102,20 @@ export async function generateSceneImage(
     "utf-8"
   );
 
-  const MAX_ATTEMPTS = 3;
+  const MAX_ATTEMPTS = 4;
   let lastErr = new Error("Gemini nevrátil obrázek");
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       return await callGemini(apiKey, model, bodyBuf);
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e));
-      // 4xx = no point retrying (bad request / quota)
-      if (lastErr.message.startsWith("Gemini 4")) break;
-      // Short backoff before retry
-      if (attempt < MAX_ATTEMPTS) await new Promise(r => setTimeout(r, 1200 * attempt));
+      const isRateLimit = lastErr.message.startsWith("Gemini 429");
+      // Hard 4xx (bad request, auth) → no point retrying; 429 rate limit → do retry with long backoff
+      if (lastErr.message.match(/^Gemini 4/) && !isRateLimit) break;
+      if (attempt < MAX_ATTEMPTS) {
+        const delay = isRateLimit ? 12000 * attempt : 1500 * attempt;
+        await new Promise(r => setTimeout(r, delay));
+      }
     }
   }
   const msg = lastErr.message === "NO_IMAGE"
