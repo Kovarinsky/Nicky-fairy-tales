@@ -1,43 +1,22 @@
-// Generování ilustrací pomocí Google Gemini "Nano Banana"
-// (model gemini-2.5-flash-image). Vrací PNG jako Buffer.
-//
-// Konzistence postavy: do každého promptu přidáme `heroDescription` ze scénáře,
-// takže hrdina vypadá na všech stránkách stejně. (Volitelně lze do contents
-// přidat i referenční obrázek – viz pole `referenceImage`.)
-
-import { GoogleGenAI } from "@google/genai";
+import { request } from "https";
 import type { Scene } from "./types";
 
-const MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
-
-function getClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "Chybí GEMINI_API_KEY. Získej ho na https://aistudio.google.com a dej do .env.local."
-    );
-  }
-  return new GoogleGenAI({ apiKey });
-}
+const MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-preview-05-20";
 
 export interface ImageResult {
-  /** Surová PNG data */
   buffer: Buffer;
   mimeType: string;
 }
 
-/**
- * Vygeneruje obrázek pro jednu scénu.
- * @param scene scéna se svým imagePrompt
- * @param heroDescription popis postav (drží konzistenci napříč scénami)
- * @param referenceImages volitelné referenční fotky postav (base64) pro podobu skutečným dětem
- */
 export async function generateSceneImage(
   scene: Scene,
   heroDescription: string,
   referenceImages: Array<{ data: string; mimeType: string }> = []
 ): Promise<ImageResult> {
-  const ai = getClient();
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
+
+  const model = (process.env.GEMINI_IMAGE_MODEL || MODEL).trim();
 
   const hasRefs = referenceImages.length > 0;
   const prompt = [
@@ -53,31 +32,74 @@ export async function generateSceneImage(
     .filter(Boolean)
     .join(" ");
 
-  // contents: referenční fotky (pokud jsou) + textový prompt
-  const parts: Array<Record<string, unknown>> = [];
+  const parts: object[] = [];
   for (const ref of referenceImages) {
     parts.push({ inlineData: { data: ref.data, mimeType: ref.mimeType } });
   }
   parts.push({ text: prompt });
 
-  const response = await ai.models.generateContent({
-    model: MODEL,
+  const body = JSON.stringify({
     contents: [{ role: "user", parts }],
+    generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
   });
+  const bodyBuf = Buffer.from(body, "utf-8");
 
-  // Najdi v odpovědi obrázkovou část
-  const candidates = response.candidates || [];
-  for (const cand of candidates) {
-    for (const part of cand.content?.parts || []) {
-      const inline = (part as { inlineData?: { data?: string; mimeType?: string } }).inlineData;
-      if (inline?.data) {
-        return {
-          buffer: Buffer.from(inline.data, "base64"),
-          mimeType: inline.mimeType || "image/png",
-        };
+  return new Promise((resolve, reject) => {
+    const path = `/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+    const req = request(
+      {
+        hostname: "generativelanguage.googleapis.com",
+        path,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": bodyBuf.length,
+        },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          const text = Buffer.concat(chunks).toString("utf-8");
+
+          if (res.statusCode && res.statusCode >= 400) {
+            reject(new Error(`Gemini ${res.statusCode}: ${text.slice(0, 400)}`));
+            return;
+          }
+
+          let data: {
+            candidates?: Array<{
+              content?: { parts?: Array<{ inlineData?: { data?: string; mimeType?: string } }> };
+            }>;
+          };
+          try {
+            data = JSON.parse(text);
+          } catch {
+            reject(new Error("Gemini JSON parse error: " + text.slice(0, 200)));
+            return;
+          }
+
+          for (const cand of data.candidates || []) {
+            for (const part of cand.content?.parts || []) {
+              if (part.inlineData?.data) {
+                resolve({
+                  buffer: Buffer.from(part.inlineData.data, "base64"),
+                  mimeType: part.inlineData.mimeType || "image/png",
+                });
+                return;
+              }
+            }
+          }
+
+          reject(new Error("Gemini nevrátil obrázek pro scénu " + scene.index));
+        });
+        res.on("error", reject);
       }
-    }
-  }
+    );
 
-  throw new Error("Gemini nevrátil obrázek pro scénu " + scene.index);
+    req.on("error", reject);
+    req.write(bodyBuf);
+    req.end();
+  });
 }

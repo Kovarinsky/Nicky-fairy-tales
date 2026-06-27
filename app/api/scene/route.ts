@@ -31,8 +31,12 @@ export async function POST(req: NextRequest) {
     const allRefImages = [...diskImages, ...customImages];
 
     const [image, audio] = await Promise.all([
-      generateSceneImage(scene, heroDescription, allRefImages),
-      narrateScene(scene),
+      generateSceneImage(scene, heroDescription, allRefImages).catch((e: Error) => {
+        throw new Error(`[Gemini] ${e.message}`);
+      }),
+      narrateScene(scene).catch((e: Error) => {
+        throw new Error(`[ElevenLabs] ${e.message}`);
+      }),
     ]);
 
     return NextResponse.json({
