@@ -42,17 +42,27 @@ export async function POST(req: NextRequest) {
 
     const allRefImages = [...diskImages, ...customImages];
 
-    const [image, audio] = await Promise.all([
+    const [imageResult, audio] = await Promise.all([
       generateSceneImage(scene, heroDescription, allRefImages).catch((e: Error) => {
-        throw new Error(`[Gemini] ${e.message}`);
+        console.error(`[Gemini] scene ${scene.index} failed after retries: ${e.message}`);
+        return null; // fallback to placeholder
       }),
       narrateScene(scene, voiceId).catch((e: Error) => {
         throw new Error(`[ElevenLabs] ${e.message}`);
       }),
     ]);
 
+    // Build image URL — use SVG placeholder if Gemini failed
+    let imageUrl: string;
+    if (imageResult) {
+      imageUrl = `data:${imageResult.mimeType};base64,${imageResult.buffer.toString("base64")}`;
+    } else {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1a1040"/><stop offset="100%" stop-color="#3d1060"/></linearGradient></defs><rect width="800" height="450" fill="url(#g)"/><text x="400" y="190" text-anchor="middle" fill="rgba(255,255,255,0.35)" font-size="72" font-family="serif">✨</text><text x="400" y="270" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="22" font-family="sans-serif">Scéna ${scene.index}</text></svg>`;
+      imageUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+    }
+
     return NextResponse.json({
-      imageUrl: `data:${image.mimeType};base64,${image.buffer.toString("base64")}`,
+      imageUrl,
       audioUrl: `data:audio/mpeg;base64,${audio.toString("base64")}`,
     });
   } catch (err) {

@@ -123,6 +123,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [doneCount, setDoneCount] = useState(0);
   const [status, setStatus] = useState("");
+  type SceneStatus = "waiting" | "generating" | "done" | "error";
+  const [sceneStatuses, setSceneStatuses] = useState<SceneStatus[]>([]);
   const [error, setError] = useState("");
 
   // Story / reader state
@@ -291,42 +293,44 @@ export default function Home() {
     setPage(0);
     setSlideKey(0);
     setDoneCount(0);
+    setSceneStatuses(scriptScenes.map(() => "waiting"));
 
-    // ElevenLabs allows max 5 concurrent requests; keep to 3 to leave headroom
     const CONCURRENCY = 3;
     let completed = 0;
     setStatus(`🎨 Generuji ${scriptScenes.length} scén...`);
 
     const tasks = scriptScenes.map((scene, i) => async () => {
-      const res = await fetch("/api/scene", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          scene,
-          heroDescription,
-          characterIds: selectedIds,
-          customCharacterImages: customImageRefs,
-          voiceId: voiceId || undefined,
-        }),
-      });
-      const media = await safeJson<{ imageUrl?: string; audioUrl?: string; error?: string }>(res);
-      if (!res.ok) throw new Error(media.error || `Scéna ${i + 1} selhala.`);
-      completed++;
-      setDoneCount(completed);
-      setScenes(prev => {
-        const next = [...prev];
-        next[i] = { ...next[i], imageUrl: media.imageUrl, audioUrl: media.audioUrl };
-        return next;
-      });
+      setSceneStatuses(prev => { const n = [...prev]; n[i] = "generating"; return n; });
+      try {
+        const res = await fetch("/api/scene", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            scene,
+            heroDescription,
+            characterIds: selectedIds,
+            customCharacterImages: customImageRefs,
+            voiceId: voiceId || undefined,
+          }),
+        });
+        const media = await safeJson<{ imageUrl?: string; audioUrl?: string; error?: string }>(res);
+        if (!res.ok) throw new Error(media.error || `Scéna ${i + 1} selhala.`);
+        completed++;
+        setDoneCount(completed);
+        setScenes(prev => {
+          const next = [...prev];
+          next[i] = { ...next[i], imageUrl: media.imageUrl, audioUrl: media.audioUrl };
+          return next;
+        });
+        setSceneStatuses(prev => { const n = [...prev]; n[i] = "done"; return n; });
+      } catch {
+        setSceneStatuses(prev => { const n = [...prev]; n[i] = "error"; return n; });
+      }
     });
 
-    // Rolling worker pool: at most CONCURRENCY tasks running at once
     let idx = 0;
     async function worker() {
-      while (idx < tasks.length) {
-        const i = idx++;
-        await tasks[i]();
-      }
+      while (idx < tasks.length) { const i = idx++; await tasks[i](); }
     }
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, worker));
   }
@@ -628,10 +632,25 @@ export default function Home() {
             <div className="gen-bar-fill" style={{ width: `${(doneCount / totalScenes) * 100}%` }} />
           </div>
           <p className="gen-count">{doneCount} / {totalScenes} scén hotovo</p>
-          <div className="gen-dots">
-            {scenes.map((s, i) => (
-              <div key={i} className={`gen-dot ${s.imageUrl ? "gen-dot-done" : "gen-dot-wait"}`} title={`Scéna ${i + 1}`} />
-            ))}
+          <div className="gen-cards">
+            {scenes.map((s, i) => {
+              const st = sceneStatuses[i] ?? "waiting";
+              return (
+                <div key={i} className={`gen-card gen-card-${st}`}>
+                  {s.imageUrl
+                    ? <img src={s.imageUrl} alt={`Scéna ${i + 1}`} className="gen-card-img" />
+                    : <div className="gen-card-placeholder">
+                        {st === "generating" && <div className="gen-card-spinner" />}
+                        {st === "error" && <span className="gen-card-icon">⚠️</span>}
+                        {st === "waiting" && <span className="gen-card-icon">⏳</span>}
+                      </div>
+                  }
+                  <span className="gen-card-label">
+                    {st === "generating" ? "🎨" : st === "done" ? "✓" : st === "error" ? "!" : ""} {i + 1}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
