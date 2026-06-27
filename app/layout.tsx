@@ -143,7 +143,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="cs" className={nunito.className}>
       <body>
-        <FairyBackground />
         <PhotoBackground />
         {children}
       </body>

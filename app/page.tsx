@@ -86,6 +86,8 @@ export default function Home() {
   const [musicOn, setMusicOn] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
   const musicRef = useRef<HTMLAudioElement>(null);
+  // Stores the page we want to advance to once it finishes generating
+  const pendingPageRef = useRef<number | null>(null);
 
   useEffect(() => {
     fetch("/api/characters").then(r => r.json()).then(d => {
@@ -138,9 +140,24 @@ export default function Home() {
     if (!autoAdvance) return;
     const next = page + 1;
     if (next >= scenes.length) return;
-    // Wait 1.2 s then slide to next
-    setTimeout(() => goToPage(next), 1200);
+    if (scenes[next]?.imageUrl && scenes[next]?.audioUrl) {
+      // Next scene is ready — advance after brief pause
+      setTimeout(() => goToPage(next), 1200);
+    } else {
+      // Next scene still generating — park the target, useEffect will fire when ready
+      pendingPageRef.current = next;
+    }
   }
+
+  // When a scene finishes loading, check if we're waiting to advance to it
+  useEffect(() => {
+    const pending = pendingPageRef.current;
+    if (pending === null) return;
+    if (scenes[pending]?.imageUrl && scenes[pending]?.audioUrl) {
+      pendingPageRef.current = null;
+      goToPage(pending);
+    }
+  }, [scenes, goToPage]);
 
   function togglePlay() {
     const a = audioRef.current;
@@ -366,7 +383,10 @@ export default function Home() {
               // eslint-disable-next-line @next/next/no-img-element
               <img className="page-image" src={current.imageUrl} alt={`Scéna ${page + 1}`} />
             ) : (
-              <div className="page-image placeholder">🎨 obrázek se kreslí...</div>
+              <div className="page-image placeholder">
+                <div className="placeholder-spinner" />
+                <span>🎨 Gemini kreslí scénu {page + 1}...</span>
+              </div>
             )}
 
             {/* Text */}
