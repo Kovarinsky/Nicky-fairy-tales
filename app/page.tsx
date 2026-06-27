@@ -530,6 +530,7 @@ export default function Home() {
 
         <button
           type="submit"
+          className="btn-create"
           disabled={loading || allSelectedCount === 0 || !hasInspiration}
         >
           {loading ? "Tvořím pohádku..." : "✨ Vytvořit pohádku"}

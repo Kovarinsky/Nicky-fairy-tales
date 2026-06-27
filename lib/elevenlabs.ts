@@ -4,23 +4,23 @@ import type { Scene } from "./types";
 function sanitizeText(text: string): string {
   return (
     text
-      .replace(/…/g, “...”)  // … horizontal ellipsis
-      .replace(/–/g, “-”)    // – en dash
-      .replace(/—/g, “--”)   // — em dash
-      .replace(/[“”]/g, ‘”’)  // “” curly double quotes
-      .replace(/[‘’]/g, “’”)  // ‘’ curly single quotes
-      .replace(/[«»]/g, ‘”’)  // «» guillemets
-      .replace(/­/g, “”)  // soft hyphen
-      .replace(/​/g, “”) // zero-width space
+      .replace(/…/g, "...")  // horizontal ellipsis
+      .replace(/–/g, "-")    // en dash
+      .replace(/—/g, "--")   // em dash
+      .replace(/[“”]/g, '"')  // curly double quotes
+      .replace(/[‘’]/g, "'")  // curly single quotes
+      .replace(/[«»]/g, '"')  // guillemets
+      .replace(/­/g, "")     // soft hyphen
+      .replace(/​/g, "")     // zero-width space
   );
 }
 
 export async function narrateScene(scene: Scene): Promise<Buffer> {
   const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
-  if (!apiKey) throw new Error("Chybí ELEVENLABS_API_KEY.");
+  if (!apiKey) throw new Error("Chybi ELEVENLABS_API_KEY.");
 
   const voiceId = process.env.ELEVENLABS_VOICE_ID?.trim();
-  if (!voiceId) throw new Error("Chybí ELEVENLABS_VOICE_ID.");
+  if (!voiceId) throw new Error("Chybi ELEVENLABS_VOICE_ID.");
 
   const modelId = (process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2").trim();
 
