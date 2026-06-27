@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import type { StoryScript, RenderedScene } from "@/lib/types";
+import type { StoryScript, RenderedScene, Scene } from "@/lib/types";
 
+// ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; }
 interface ThemeOption { id: string; name: string; emoji: string; }
 interface CustomChar {
@@ -11,14 +12,41 @@ interface CustomChar {
 }
 interface InspImage { data: string; mimeType: string; previewUrl: string; name: string; }
 
+interface HistoryEntry {
+  id: string;
+  title: string;
+  heroDescription: string;
+  createdAt: string;
+  scenes: Scene[];            // script only – no media
+  selectedIds: string[];
+  themeId: string;
+  topic: string;
+}
+
+const HISTORY_KEY = "nicky-story-history";
+const HISTORY_MAX = 10;
+
+function loadHistory(): HistoryEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+  } catch { return []; }
+}
+
+function saveHistory(entry: HistoryEntry) {
+  try {
+    const prev = loadHistory().filter(e => e.id !== entry.id);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify([entry, ...prev].slice(0, HISTORY_MAX)));
+  } catch { /* localStorage full – silently ignore */ }
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 async function resizeAndEncode(file: File, maxPx = 800): Promise<{ data: string; mimeType: string; previewUrl: string }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
     img.onload = () => {
       const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
       const canvas = document.createElement("canvas");
       canvas.width = w; canvas.height = h;
       canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
@@ -45,14 +73,19 @@ function getTargetAge(ids: string[]): number {
   if (n && v) return 4; if (v) return 2; if (n) return 6; return 6;
 }
 
+function fmtDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("cs-CZ", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  } catch { return ""; }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function Home() {
-  // ── Chars & themes ──
+  // Form state
   const [chars, setChars] = useState<CharOption[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [themes, setThemes] = useState<ThemeOption[]>([]);
   const [selectedTheme, setSelectedTheme] = useState("");
-
-  // ── Custom chars ──
   const [customChars, setCustomChars] = useState<CustomChar[]>([]);
   const [selectedCustomIds, setSelectedCustomIds] = useState<string[]>([]);
   const [addingChar, setAddingChar] = useState(false);
@@ -60,8 +93,6 @@ export default function Home() {
   const [newCharDesc, setNewCharDesc] = useState("");
   const [newCharPhoto, setNewCharPhoto] = useState<{ data: string; mimeType: string; previewUrl: string } | null>(null);
   const charPhotoRef = useRef<HTMLInputElement>(null);
-
-  // ── Inspiration ──
   const [topic, setTopic] = useState("");
   const [inspImages, setInspImages] = useState<InspImage[]>([]);
   const [inspUrlActive, setInspUrlActive] = useState(false);
@@ -71,14 +102,15 @@ export default function Home() {
   const inspPdfRef = useRef<HTMLInputElement>(null);
   const [sceneCount, setSceneCount] = useState(6);
 
-  // ── Story ──
+  // Generation state
   const [loading, setLoading] = useState(false);
+  const [doneCount, setDoneCount] = useState(0);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+
+  // Story / reader state
   const [title, setTitle] = useState("");
   const [scenes, setScenes] = useState<RenderedScene[]>([]);
-
-  // ── Reader ──
   const [page, setPage] = useState(0);
   const [slideKey, setSlideKey] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -86,9 +118,15 @@ export default function Home() {
   const [musicOn, setMusicOn] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
   const musicRef = useRef<HTMLAudioElement>(null);
-  // Stores the page we want to advance to once it finishes generating
   const pendingPageRef = useRef<number | null>(null);
 
+  // History
+  const [storyHistory, setStoryHistory] = useState<HistoryEntry[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  const allScenesReady = scenes.length > 0 && scenes.every(s => s.imageUrl && s.audioUrl);
+
+  // ── Boot ──
   useEffect(() => {
     fetch("/api/characters").then(r => r.json()).then(d => {
       const list: CharOption[] = d.characters || [];
@@ -96,35 +134,27 @@ export default function Home() {
       setSelectedIds(list.map(c => c.id));
     }).catch(() => {});
     fetch("/api/themes").then(r => r.json()).then(d => setThemes(d.themes || [])).catch(() => {});
+    setStoryHistory(loadHistory());
   }, []);
 
-  // Ambient music ducking: quiet during narration, full during silence
+  // ── Music ducking ──
   useEffect(() => {
-    const music = musicRef.current;
-    if (!music) return;
-    music.volume = isPlaying ? 0.05 : 0.22;
+    const m = musicRef.current; if (!m) return;
+    m.volume = isPlaying ? 0.05 : 0.22;
   }, [isPlaying]);
 
-  // Music on/off toggle
   useEffect(() => {
-    const music = musicRef.current;
-    if (!music) return;
-    if (musicOn) {
-      music.play().catch(() => {});
-    } else {
-      music.pause();
-    }
+    const m = musicRef.current; if (!m) return;
+    musicOn ? m.play().catch(() => {}) : m.pause();
   }, [musicOn]);
 
-  // Auto-play narration when page changes (after slide animation)
+  // ── Auto-play narration after slide animation ──
   const currentAudioUrl = scenes[page]?.audioUrl;
   useEffect(() => {
-    if (!currentAudioUrl) return;
-    const t = setTimeout(() => {
-      audioRef.current?.play().catch(() => {});
-    }, 420);
+    if (!currentAudioUrl || !allScenesReady) return;
+    const t = setTimeout(() => audioRef.current?.play().catch(() => {}), 420);
     return () => clearTimeout(t);
-  }, [page, currentAudioUrl]);
+  }, [page, currentAudioUrl, allScenesReady]);
 
   // ── Navigation ──
   const goToPage = useCallback((n: number) => {
@@ -141,31 +171,142 @@ export default function Home() {
     const next = page + 1;
     if (next >= scenes.length) return;
     if (scenes[next]?.imageUrl && scenes[next]?.audioUrl) {
-      // Next scene is ready — advance after brief pause
       setTimeout(() => goToPage(next), 1200);
     } else {
-      // Next scene still generating — park the target, useEffect will fire when ready
-      pendingPageRef.current = next;
+      pendingPageRef.current = next; // wait for generation
     }
   }
 
-  // When a scene finishes loading, check if we're waiting to advance to it
+  // Fire pending advance when a scene finishes generating
   useEffect(() => {
-    const pending = pendingPageRef.current;
-    if (pending === null) return;
-    if (scenes[pending]?.imageUrl && scenes[pending]?.audioUrl) {
+    const p = pendingPageRef.current;
+    if (p === null) return;
+    if (scenes[p]?.imageUrl && scenes[p]?.audioUrl) {
       pendingPageRef.current = null;
-      goToPage(pending);
+      goToPage(p);
     }
   }, [scenes, goToPage]);
 
   function togglePlay() {
-    const a = audioRef.current;
-    if (!a) return;
-    if (isPlaying) { a.pause(); } else { a.play().catch(() => {}); }
+    const a = audioRef.current; if (!a) return;
+    isPlaying ? a.pause() : a.play().catch(() => {});
   }
 
-  // ── Form handlers ──
+  // ── Core: generate media for a script ────────────────────────────────────
+  async function generateMedia(
+    scriptTitle: string,
+    heroDescription: string,
+    scriptScenes: Scene[],
+    customImageRefs: Array<{ data: string; mimeType: string }>
+  ) {
+    setTitle(scriptTitle);
+    setScenes(scriptScenes.map(s => ({ ...s })));
+    setPage(0);
+    setSlideKey(0);
+    setDoneCount(0);
+
+    let completed = 0;
+    setStatus(`🎨 Generuji ${scriptScenes.length} scén paralelně...`);
+
+    const promises = scriptScenes.map(async (scene, i) => {
+      const res = await fetch("/api/scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scene,
+          heroDescription,
+          characterIds: selectedIds,
+          customCharacterImages: customImageRefs,
+        }),
+      });
+      const media = await res.json();
+      if (!res.ok) throw new Error(media.error || `Scéna ${i + 1} selhala.`);
+      completed++;
+      setDoneCount(completed);
+      setScenes(prev => {
+        const next = [...prev];
+        next[i] = { ...next[i], imageUrl: media.imageUrl, audioUrl: media.audioUrl };
+        return next;
+      });
+    });
+
+    await Promise.all(promises);
+  }
+
+  // ── Create story (full flow) ──────────────────────────────────────────────
+  async function createStory(e: React.FormEvent) {
+    e.preventDefault();
+    setError(""); setScenes([]); setTitle(""); setPage(0); setLoading(true);
+    try {
+      setStatus("✍️ Claude vymýšlí příběh...");
+      const selectedCustomObjs = customChars.filter(c => selectedCustomIds.includes(c.id));
+
+      const storyRes = await fetch("/api/story", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic, themeId: selectedTheme || undefined,
+          characterIds: selectedIds,
+          age: getTargetAge([...selectedIds, ...selectedCustomIds]),
+          sceneCount,
+          customCharacters: selectedCustomObjs.map(c => ({
+            id: c.id, name: c.name,
+            description: c.description,
+            photoBase64: c.photoBase64,
+            photoMimeType: c.photoMimeType,
+          })),
+          inspirationUrl: inspUrlActive && inspUrl.trim() ? inspUrl.trim() : undefined,
+          inspirationImages: inspImages.map(i => ({ data: i.data, mimeType: i.mimeType })),
+          inspirationPdfBase64: inspPdf?.base64 || undefined,
+        }),
+      });
+      const script: StoryScript & { error?: string } = await storyRes.json();
+      if (!storyRes.ok) throw new Error(script.error || "Nepodařilo se vytvořit příběh.");
+
+      // Save to history immediately (text only, before slow image generation)
+      const entry: HistoryEntry = {
+        id: crypto.randomUUID(),
+        title: script.title,
+        heroDescription: script.heroDescription,
+        createdAt: new Date().toISOString(),
+        scenes: script.scenes,
+        selectedIds,
+        themeId: selectedTheme,
+        topic,
+      };
+      saveHistory(entry);
+      setStoryHistory(loadHistory());
+
+      const customImageRefs = selectedCustomObjs
+        .filter(c => c.photoBase64 && c.photoMimeType)
+        .map(c => ({ data: c.photoBase64!, mimeType: c.photoMimeType! }));
+
+      await generateMedia(script.title, script.heroDescription, script.scenes, customImageRefs);
+      setStatus("✨ Pohádka je připravena!");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Něco se pokazilo.");
+      setStatus("");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Replay from history ───────────────────────────────────────────────────
+  async function replayStory(entry: HistoryEntry) {
+    setError(""); setLoading(true);
+    setHistoryOpen(false);
+    try {
+      await generateMedia(entry.title, entry.heroDescription, entry.scenes, []);
+      setStatus("✨ Pohádka je připravena!");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Generování selhalo.");
+      setStatus("");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Form helpers ─────────────────────────────────────────────────────────
   function toggleChar(id: string) {
     setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   }
@@ -202,63 +343,21 @@ export default function Home() {
     if (b) setInspPdf({ base64: b, name: file.name });
   }
 
-  // ── Create story ──
   const allSelectedCount = selectedIds.length + selectedCustomIds.length;
   const hasInspiration = !!selectedTheme || !!topic.trim() || inspImages.length > 0 || !!inspPdf || (inspUrlActive && !!inspUrl.trim());
-
-  async function createStory(e: React.FormEvent) {
-    e.preventDefault();
-    setError(""); setScenes([]); setTitle(""); setPage(0); setSlideKey(0); setLoading(true);
-    try {
-      setStatus("✍️ Claude vymýšlí příběh...");
-      const selectedCustomObjs = customChars.filter(c => selectedCustomIds.includes(c.id));
-      const storyRes = await fetch("/api/story", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          topic, themeId: selectedTheme || undefined, characterIds: selectedIds,
-          age: getTargetAge([...selectedIds, ...selectedCustomIds]), sceneCount,
-          customCharacters: selectedCustomObjs.map(c => ({ id: c.id, name: c.name, description: c.description, photoBase64: c.photoBase64, photoMimeType: c.photoMimeType })),
-          inspirationUrl: inspUrlActive && inspUrl.trim() ? inspUrl.trim() : undefined,
-          inspirationImages: inspImages.map(i => ({ data: i.data, mimeType: i.mimeType })),
-          inspirationPdfBase64: inspPdf?.base64 || undefined,
-        }),
-      });
-      const script: StoryScript & { error?: string } = await storyRes.json();
-      if (!storyRes.ok) throw new Error(script.error || "Nepodařilo se vytvořit příběh.");
-      setTitle(script.title);
-      setScenes(script.scenes.map(s => ({ ...s })));
-      const customImageRefs = selectedCustomObjs.filter(c => c.photoBase64 && c.photoMimeType).map(c => ({ data: c.photoBase64!, mimeType: c.photoMimeType! }));
-      for (let i = 0; i < script.scenes.length; i++) {
-        setStatus(`🎨 Kreslím a namlouvám scénu ${i + 1}/${script.scenes.length}...`);
-        const sceneRes = await fetch("/api/scene", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scene: script.scenes[i], heroDescription: script.heroDescription, characterIds: selectedIds, customCharacterImages: customImageRefs }),
-        });
-        const media = await sceneRes.json();
-        if (!sceneRes.ok) throw new Error(media.error || `Scéna ${i + 1} selhala.`);
-        setScenes(prev => { const next = [...prev]; next[i] = { ...next[i], imageUrl: media.imageUrl, audioUrl: media.audioUrl }; return next; });
-      }
-      setStatus("✨ Hotovo!");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Něco se pokazilo.");
-      setStatus("");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   const current = scenes[page];
   const hasNext = page < scenes.length - 1;
   const hasPrev = page > 0;
+  const totalScenes = scenes.length;
 
   return (
     <div className="container">
       <h1>📖 Nickyho pohádky</h1>
       <p className="subtitle">Vyber postavy, téma a inspiraci – pohádka s obrázky a tatínkovým hlasem.</p>
 
+      {/* ── FORM ── */}
       <form className="form" onSubmit={createStory}>
 
-        {/* ── Postavy ── */}
         {(chars.length > 0 || customChars.length > 0) && (
           <div className="field">
             <label>Kdo v pohádce vystupuje?</label>
@@ -283,7 +382,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── Přidat vlastní postavu ── */}
         {addingChar && (
           <div className="add-char-panel">
             <p className="panel-title">Nová postava</p>
@@ -303,7 +401,8 @@ export default function Home() {
                 </button>
                 {newCharPhoto && <img src={newCharPhoto.previewUrl} alt="náhled" className="mini-preview" />}
               </div>
-              <input ref={charPhotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) handleCharPhoto(f); e.target.value = ""; }} />
+              <input ref={charPhotoRef} type="file" accept="image/*" style={{ display: "none" }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleCharPhoto(f); e.target.value = ""; }} />
             </div>
             <div className="file-row">
               <button type="button" onClick={addCustomChar} disabled={!newCharName.trim()}>Přidat postavu</button>
@@ -312,13 +411,13 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── Témata ── */}
         {themes.length > 0 && (
           <div className="field">
             <label>Svět pohádky</label>
             <div className="chips">
               {themes.map(t => (
-                <button type="button" key={t.id} className={`chip chip-btn ${selectedTheme === t.id ? "chip-on" : ""}`} onClick={() => setSelectedTheme(p => p === t.id ? "" : t.id)}>
+                <button type="button" key={t.id} className={`chip chip-btn ${selectedTheme === t.id ? "chip-on" : ""}`}
+                  onClick={() => setSelectedTheme(p => p === t.id ? "" : t.id)}>
                   <span>{t.emoji}</span> {t.name}
                 </button>
               ))}
@@ -326,19 +425,21 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── Přání & Inspirace ── */}
         <div className="field">
           <label>Přání & inspirace</label>
           <textarea value={topic} onChange={e => setTopic(e.target.value)} placeholder="Vlastní zápletka nebo přání (nepovinné)..." />
           <div className="insp-row">
-            <button type="button" className={`insp-btn ${inspImages.length > 0 ? "chip-on" : ""}`} onClick={() => inspImageRef.current?.click()} disabled={inspImages.length >= 3}>
+            <button type="button" className={`insp-btn ${inspImages.length > 0 ? "chip-on" : ""}`}
+              onClick={() => inspImageRef.current?.click()} disabled={inspImages.length >= 3}>
               📷 Foto{inspImages.length > 0 ? ` (${inspImages.length})` : ""}
             </button>
             <button type="button" className={`insp-btn ${inspUrlActive ? "chip-on" : ""}`} onClick={() => setInspUrlActive(p => !p)}>🔗 Web odkaz</button>
             <button type="button" className={`insp-btn ${inspPdf ? "chip-on" : ""}`} onClick={() => inspPdfRef.current?.click()}>📄 PDF{inspPdf ? " ✓" : ""}</button>
           </div>
-          <input ref={inspImageRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={async e => { for (const f of Array.from(e.target.files || []).slice(0, 3 - inspImages.length)) await handleInspImage(f); e.target.value = ""; }} />
-          <input ref={inspPdfRef} type="file" accept=".pdf,application/pdf" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) handleInspPdf(f); e.target.value = ""; }} />
+          <input ref={inspImageRef} type="file" accept="image/*" multiple style={{ display: "none" }}
+            onChange={async e => { for (const f of Array.from(e.target.files || []).slice(0, 3 - inspImages.length)) await handleInspImage(f); e.target.value = ""; }} />
+          <input ref={inspPdfRef} type="file" accept=".pdf,application/pdf" style={{ display: "none" }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleInspPdf(f); e.target.value = ""; }} />
           {inspUrlActive && <input type="url" value={inspUrl} onChange={e => setInspUrl(e.target.value)} placeholder="https://cs.wikipedia.org/wiki/Krteček" className="url-input" />}
           {inspImages.length > 0 && (
             <div className="insp-previews">
@@ -358,7 +459,6 @@ export default function Home() {
           )}
         </div>
 
-        {/* ── Počet stránek ── */}
         <div className="field">
           <label>Počet stránek: {sceneCount}</label>
           <input type="range" min={3} max={10} value={sceneCount} onChange={e => setSceneCount(Number(e.target.value))} />
@@ -369,120 +469,107 @@ export default function Home() {
         </button>
       </form>
 
-      {status && <p className="status">{status}</p>}
+      {/* ── HISTORY ── */}
+      {storyHistory.length > 0 && !loading && (
+        <div className="history-box">
+          <button type="button" className="history-toggle" onClick={() => setHistoryOpen(p => !p)}>
+            📚 Poslední pohádky ({storyHistory.length}) {historyOpen ? "▲" : "▼"}
+          </button>
+          {historyOpen && (
+            <div className="history-list">
+              {storyHistory.map(entry => (
+                <div key={entry.id} className="history-item">
+                  <div className="history-meta">
+                    <span className="history-title">{entry.title}</span>
+                    <span className="history-date">{fmtDate(entry.createdAt)}</span>
+                    <span className="history-info">{entry.scenes.length} scén</span>
+                  </div>
+                  <button type="button" className="history-replay" onClick={() => replayStory(entry)} disabled={loading}>
+                    ▶ Přehrát znovu
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── GENERATION PROGRESS ── */}
+      {loading && scenes.length > 0 && (
+        <div className="gen-progress">
+          <p className="gen-status">{status}</p>
+          <div className="gen-bar-track">
+            <div className="gen-bar-fill" style={{ width: `${(doneCount / totalScenes) * 100}%` }} />
+          </div>
+          <p className="gen-count">{doneCount} / {totalScenes} scén hotovo</p>
+          <div className="gen-dots">
+            {scenes.map((s, i) => (
+              <div key={i} className={`gen-dot ${s.imageUrl ? "gen-dot-done" : "gen-dot-wait"}`} title={`Scéna ${i + 1}`} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {status && !loading && <p className="status">{status}</p>}
       {error && <p className="error">⚠️ {error}</p>}
 
-      {/* ── Knížka ── */}
-      {current && (
+      {/* ── BOOK – shown only when ALL scenes are ready ── */}
+      {allScenesReady && current && (
         <div className="book">
           <h2 className="book-title">{title}</h2>
 
           <div className="book-card" key={slideKey}>
-            {/* Obrázek */}
             {current.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img className="page-image" src={current.imageUrl} alt={`Scéna ${page + 1}`} />
             ) : (
               <div className="page-image placeholder">
                 <div className="placeholder-spinner" />
-                <span>🎨 Gemini kreslí scénu {page + 1}...</span>
+                <span>🎨 Generuji scénu {page + 1}...</span>
               </div>
             )}
 
-            {/* Text */}
             <div className="page-body">
               <p className="page-text">{current.narration}</p>
             </div>
 
-            {/* ── Unified control bar ── */}
             <div className="book-controls">
-              <button
-                type="button"
-                className="ctrl-btn ctrl-nav"
-                onClick={() => goToPage(page - 1)}
-                disabled={!hasPrev}
-                aria-label="Předchozí strana"
-              >
-                ←
-              </button>
+              <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page - 1)} disabled={!hasPrev} aria-label="Předchozí">←</button>
 
-              <button
-                type="button"
-                className={`ctrl-btn ctrl-play ${!current.audioUrl ? "ctrl-loading" : ""}`}
-                onClick={togglePlay}
-                disabled={!current.audioUrl}
-                aria-label={isPlaying ? "Pauza" : "Přehrát"}
-              >
+              <button type="button" className={`ctrl-btn ctrl-play ${!current.audioUrl ? "ctrl-loading" : ""}`}
+                onClick={togglePlay} disabled={!current.audioUrl} aria-label={isPlaying ? "Pauza" : "Přehrát"}>
                 {!current.audioUrl ? "⏳" : isPlaying ? "⏸" : "▶"}
               </button>
 
               <span className="ctrl-counter">{page + 1} / {scenes.length}</span>
 
-              <button
-                type="button"
-                className={`ctrl-btn ctrl-auto ${autoAdvance ? "ctrl-auto-on" : ""}`}
-                onClick={() => setAutoAdvance(p => !p)}
-                title={autoAdvance ? "Auto-přechod zapnut" : "Auto-přechod vypnut"}
-                aria-label="Automatické přechody"
-              >
+              <button type="button" className={`ctrl-btn ctrl-auto ${autoAdvance ? "ctrl-auto-on" : ""}`}
+                onClick={() => setAutoAdvance(p => !p)} title={autoAdvance ? "Auto-přechod zapnut" : "Auto-přechod vypnut"}>
                 {autoAdvance ? "🔁" : "🔂"}
               </button>
 
-              <button
-                type="button"
-                className={`ctrl-btn ctrl-auto ${musicOn ? "ctrl-auto-on" : ""}`}
-                onClick={() => setMusicOn(p => !p)}
-                title={musicOn ? "Hudba zapnuta" : "Hudba vypnuta"}
-                aria-label="Hudba"
-              >
+              <button type="button" className={`ctrl-btn ctrl-auto ${musicOn ? "ctrl-auto-on" : ""}`}
+                onClick={() => setMusicOn(p => !p)} title={musicOn ? "Hudba zapnuta" : "Hudba vypnuta"}>
                 {musicOn ? "🎵" : "🔇"}
               </button>
 
-              <button
-                type="button"
-                className="ctrl-btn ctrl-nav"
-                onClick={() => goToPage(page + 1)}
-                disabled={!hasNext}
-                aria-label="Další strana"
-              >
-                →
-              </button>
+              <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page + 1)} disabled={!hasNext} aria-label="Další">→</button>
             </div>
           </div>
 
-          {/* Skrytý audio element – narrace */}
           {current.audioUrl && (
-            <audio
-              ref={audioRef}
-              key={current.audioUrl}
-              src={current.audioUrl}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-              onEnded={handleAudioEnded}
-            />
+            <audio ref={audioRef} key={current.audioUrl} src={current.audioUrl}
+              onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={handleAudioEnded} />
           )}
 
-          {/* Ambient hudba */}
-          {/* Přidej soubor /public/music/fairy-bg.mp3 (royalty-free pohádková hudba) */}
-          <audio
-            ref={musicRef}
-            src="/music/fairy-bg.mp3"
-            loop
-            preload="none"
-            style={{ display: "none" }}
-          />
+          <audio ref={musicRef} src="/music/fairy-bg.mp3" loop preload="none" style={{ display: "none" }} />
 
-          {/* Progress dots */}
           {scenes.length > 1 && (
             <div className="page-dots">
               {scenes.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
+                <button key={i} type="button"
                   className={`dot ${i === page ? "dot-active" : ""} ${scenes[i]?.audioUrl ? "dot-ready" : ""}`}
-                  onClick={() => goToPage(i)}
-                  aria-label={`Strana ${i + 1}`}
-                />
+                  onClick={() => goToPage(i)} aria-label={`Strana ${i + 1}`} />
               ))}
             </div>
           )}
