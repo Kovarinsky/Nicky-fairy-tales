@@ -41,6 +41,19 @@ function saveHistory(entry: HistoryEntry) {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+// Safely parse JSON — if the server returns plain text (Vercel 500, rate-limit page, etc.)
+// give a readable error instead of "Unexpected token 'A'..."
+async function safeJson<T = unknown>(res: Response): Promise<T> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    const preview = text.slice(0, 180).replace(/\s+/g, " ");
+    throw new Error(`Nečekaná odpověď serveru (HTTP ${res.status}): ${preview}`);
+  }
+}
+
 async function resizeAndEncode(file: File, maxPx = 800): Promise<{ data: string; mimeType: string; previewUrl: string }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -231,7 +244,7 @@ export default function Home() {
           voiceId: voiceId || undefined,
         }),
       });
-      const media = await res.json();
+      const media = await safeJson<{ imageUrl?: string; audioUrl?: string; error?: string }>(res);
       if (!res.ok) throw new Error(media.error || `Scéna ${i + 1} selhala.`);
       completed++;
       setDoneCount(completed);
@@ -280,7 +293,7 @@ export default function Home() {
           inspirationPdfBase64: inspPdf?.base64 || undefined,
         }),
       });
-      const script: StoryScript & { error?: string } = await storyRes.json();
+      const script = await safeJson<StoryScript & { error?: string }>(storyRes);
       if (!storyRes.ok) throw new Error(script.error || "Nepodařilo se vytvořit příběh.");
 
       // Save to history immediately (text only, before slow image generation)
