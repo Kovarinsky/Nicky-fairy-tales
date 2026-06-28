@@ -1,7 +1,7 @@
 import { request } from "https";
 import type { StoryRequest, StoryScript, Character } from "./types";
 
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
 const ANTHROPIC_VERSION = "2023-06-01";
 
 export interface StoryExtras {
@@ -57,8 +57,8 @@ function buildSystemPrompt(language: "cs" | "en"): string {
       "",
       "═══ IMAGE PROMPTS ═══",
       "- Write in ENGLISH, concise cinematic description (max 60 words).",
-      "- Reference characters by NAME ONLY — do NOT describe their physical appearance (no size, age, height, or child-like attributes). Gemini safety filters will block any physical description of characters.",
-      "- Focus on: scene action, setting/environment details, mood, lighting, atmosphere, colors.",
+      "- Include: scene action, setting/environment, character names + their exact visual traits from heroDescription (hair, clothing, expression). Copy verbatim per character.",
+      "- No age numbers or age-specific terms (e.g. '6 years old', 'toddler') anywhere in the prompt.",
       "- Style suffix (always add at the end): 'painterly storybook illustration, warm cinematic lighting, rich saturated colors, landscape orientation, no text.'",
       "- No text in image.",
       "",
@@ -117,8 +117,8 @@ function buildSystemPrompt(language: "cs" | "en"): string {
     "",
     "═══ IMAGE PROMPTS ═══",
     "- Psát ANGLICKY, stručný filmový popis (max 60 slov).",
-    "- Postavy uvádět POUZE JMÉNEM — NEPOPISUJ jejich fyzický vzhled (žádná výška, věk, postava, dětské atributy). Gemini safety filter blokuje jakýkoli fyzický popis postav.",
-    "- Soustřeď se na: akci scény, detaily prostředí/scény, náladu, osvětlení, atmosféru, barvy.",
+    "- Zahrň: akci scény, prostředí, jména postav + jejich přesné vizuální rysy z heroDescription (vlasy, oblečení, výraz). Zkopíruj doslova pro každou postavu.",
+    "- Žádné věkové číslice ani věkově specifické výrazy (např. '6 years old', 'toddler') kdekoli v promptu.",
     "- Vždy přidej suffix na konec: 'painterly storybook illustration, warm cinematic lighting, rich saturated colors, landscape orientation, no text.'",
     "- Nikdy text v obrazu.",
     "",
@@ -387,7 +387,7 @@ export async function generateStory(req: StoryRequest, extras: StoryExtras = {})
 
   const raw = await callAnthropicApi({
     model,
-    max_tokens: 7000,
+    max_tokens: 4000,
     system: buildSystemPrompt(language),
     messages: [{ role: "user", content }],
   });

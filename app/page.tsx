@@ -345,7 +345,7 @@ export default function Home() {
     setDoneCount(0);
     setSceneStatuses(scriptScenes.map(() => "waiting"));
 
-    const CONCURRENCY = 1;
+    const CONCURRENCY = 2;
     let completed = 0;
     setStatus(`🎨 Generuji ${scriptScenes.length} scén...`);
 
