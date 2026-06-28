@@ -6,7 +6,7 @@ export interface ImageResult {
   mimeType: string;
 }
 
-const DEFAULT_MODEL = "black-forest-labs/FLUX.1-schnell-Free";
+const DEFAULT_MODEL = "black-forest-labs/FLUX.1-schnell";
 
 function callTogether(apiKey: string, model: string, prompt: string): Promise<ImageResult> {
   const bodyBuf = Buffer.from(
