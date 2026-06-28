@@ -229,6 +229,7 @@ export default function Home() {
   useEffect(() => {
     if (!allScenesReady || introFiredRef.current) return;
     introFiredRef.current = true;
+    isAutoAdvanceRef.current = true; // auto-play narration for the first slide
     ambientRef.current?.playIntro();
     ambientRef.current?.setScene(scenes[0]?.soundscape);
   }, [allScenesReady, scenes]);
@@ -244,9 +245,13 @@ export default function Home() {
   }, [loading]);
 
   // ── Auto-play narration after slide animation ──
+  // Only auto-plays when triggered by audio-end advance or first story load — not manual navigation.
+  const isAutoAdvanceRef = useRef(false);
   const currentAudioUrl = scenes[page]?.audioUrl;
   useEffect(() => {
     if (!currentAudioUrl || !allScenesReady) return;
+    if (!isAutoAdvanceRef.current) return;
+    isAutoAdvanceRef.current = false;
     const t = setTimeout(() => audioRef.current?.play().catch(() => {}), 420);
     return () => clearTimeout(t);
   }, [page, currentAudioUrl, allScenesReady]);
@@ -270,6 +275,7 @@ export default function Home() {
       return;
     }
     if (scenes[next]?.imageUrl && scenes[next]?.audioUrl) {
+      isAutoAdvanceRef.current = true; // allow auto-play on the next slide
       setTimeout(() => goToPage(next), 1200);
     } else {
       pendingPageRef.current = next;
@@ -314,6 +320,7 @@ export default function Home() {
     if (p === null) return;
     if (scenes[p]?.imageUrl && scenes[p]?.audioUrl) {
       pendingPageRef.current = null;
+      isAutoAdvanceRef.current = true; // allow auto-play for pending advance
       goToPage(p);
     }
   }, [scenes, goToPage]);
@@ -338,7 +345,7 @@ export default function Home() {
     setDoneCount(0);
     setSceneStatuses(scriptScenes.map(() => "waiting"));
 
-    const CONCURRENCY = 1; // sequential — prevents Gemini rate-limit errors
+    const CONCURRENCY = 1;
     let completed = 0;
     setStatus(`🎨 Generuji ${scriptScenes.length} scén...`);
 

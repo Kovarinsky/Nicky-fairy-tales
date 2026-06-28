@@ -1,7 +1,7 @@
 import { request } from "https";
 import type { StoryRequest, StoryScript, Character } from "./types";
 
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
+const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const ANTHROPIC_VERSION = "2023-06-01";
 
 export interface StoryExtras {
@@ -57,8 +57,9 @@ function buildSystemPrompt(language: "cs" | "en"): string {
       "",
       "═══ IMAGE PROMPTS ═══",
       "- Write in ENGLISH, concise cinematic description (max 60 words).",
-      "- Include: scene action, setting, character names + 2-3 key visual traits each, emotion.",
-      "- Style suffix (always add): 'painterly storybook illustration, warm lighting, rich colors, landscape.'",
+      "- Reference characters by NAME ONLY — do NOT describe their physical appearance (no size, age, height, or child-like attributes). Gemini safety filters will block any physical description of characters.",
+      "- Focus on: scene action, setting/environment details, mood, lighting, atmosphere, colors.",
+      "- Style suffix (always add at the end): 'painterly storybook illustration, warm cinematic lighting, rich saturated colors, landscape orientation, no text.'",
       "- No text in image.",
       "",
       "═══ SOUNDSCAPE ═══",
@@ -116,8 +117,9 @@ function buildSystemPrompt(language: "cs" | "en"): string {
     "",
     "═══ IMAGE PROMPTS ═══",
     "- Psát ANGLICKY, stručný filmový popis (max 60 slov).",
-    "- Zahrň: akci scény, prostředí, jména postav + 2-3 klíčové vizuální rysy každé, emoci.",
-    "- Vždy přidej suffix: 'painterly storybook illustration, warm lighting, rich colors, landscape.'",
+    "- Postavy uvádět POUZE JMÉNEM — NEPOPISUJ jejich fyzický vzhled (žádná výška, věk, postava, dětské atributy). Gemini safety filter blokuje jakýkoli fyzický popis postav.",
+    "- Soustřeď se na: akci scény, detaily prostředí/scény, náladu, osvětlení, atmosféru, barvy.",
+    "- Vždy přidej suffix na konec: 'painterly storybook illustration, warm cinematic lighting, rich saturated colors, landscape orientation, no text.'",
     "- Nikdy text v obrazu.",
     "",
     "═══ SOUNDSCAPE ═══",

@@ -103,11 +103,10 @@ export async function generateSceneImage(
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
   const model = (process.env.GEMINI_IMAGE_MODEL || MODEL).trim();
 
-  // imagePrompt from Claude already includes character visual traits per scene.
-  // heroDescription is NOT passed to Gemini — it was the source of age-related safety blocks.
+  // imagePrompt from Claude uses character names only — no physical descriptions to avoid safety blocks.
   const rawPrompt = [
     scene.imagePrompt,
-    "Style: painterly children's book illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation, no text or letters.",
+    "Style: painterly storybook illustration, warm cinematic lighting, rich saturated colors, landscape orientation, no text or letters.",
   ].join(" ");
   const prompt = sanitizePrompt(rawPrompt);
   console.log(`[Gemini] scene ${scene.index} prompt (${prompt.length} chars): ${prompt.slice(0, 200)}`);
@@ -129,11 +128,12 @@ export async function generateSceneImage(
       lastErr = e instanceof Error ? e : new Error(String(e));
       console.error(`[Gemini] scene ${scene.index} attempt ${attempt}/${MAX_ATTEMPTS}: ${lastErr.message}`);
       const isRateLimit = lastErr.message.startsWith("Gemini 429");
-      const isBlocked = lastErr.message.startsWith("Gemini BLOCKED") || lastErr.message.startsWith("NO_IMAGE");
-      // Hard 4xx (bad request, auth) or content block → no point retrying
-      if ((lastErr.message.match(/^Gemini 4/) && !isRateLimit) || isBlocked) break;
+      // Only promptFeedback.blockReason is a hard block — NO_IMAGE is transient, always retry
+      const isContentBlocked = lastErr.message.startsWith("Gemini BLOCKED");
+      // Hard 4xx (bad request, auth) or prompt-level content block → no point retrying
+      if ((lastErr.message.match(/^Gemini 4/) && !isRateLimit) || isContentBlocked) break;
       if (attempt < MAX_ATTEMPTS) {
-        const delay = isRateLimit ? 12000 * attempt : 1500 * attempt;
+        const delay = isRateLimit ? 15000 * attempt : 5000 * attempt;
         await new Promise(r => setTimeout(r, delay));
       }
     }
