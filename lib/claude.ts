@@ -61,7 +61,7 @@ function buildSystemPrompt(language: "cs" | "en"): string {
       "- Then describe: scene action, setting, mood, lighting.",
       "- NEVER shorten or paraphrase appearance — copy word for word. A character appearing without their full description is WRONG.",
       "- No age numbers or age-specific terms anywhere.",
-      "- End with: 'Painterly storybook illustration, warm cinematic lighting, rich saturated colors, landscape orientation, no text.'",
+      "- End with: 'Walt Disney animated style, painterly storybook illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation, no text.'",
       "- No text in image.",
       "",
       "═══ SOUNDSCAPE ═══",
@@ -122,7 +122,7 @@ function buildSystemPrompt(language: "cs" | "en"): string {
     "- Pak popiš: akci scény, prostředí, náladu, osvětlení.",
     "- NIKDY nezkracuj ani neformuluj popis jinak — kopíruj slovo od slova. Postava bez plného popisu = CHYBA.",
     "- Žádné věkové číslice ani věkově specifické výrazy.",
-    "- Ukonči: 'Painterly storybook illustration, warm cinematic lighting, rich saturated colors, landscape orientation, no text.'",
+    "- Ukonči: 'Walt Disney animated style, painterly storybook illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation, no text.'",
     "- Nikdy text v obrazu.",
     "",
     "═══ SOUNDSCAPE ═══",
@@ -388,12 +388,19 @@ export async function generateStory(req: StoryRequest, extras: StoryExtras = {})
 
   const language = (req.language === "en" ? "en" : "cs") as "cs" | "en";
 
-  const raw = await callAnthropicApi({
-    model,
-    max_tokens: 4000,
-    system: buildSystemPrompt(language),
-    messages: [{ role: "user", content }],
-  });
-
-  return parseScript(raw);
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const raw = await callAnthropicApi({
+      model,
+      max_tokens: 6000,
+      system: buildSystemPrompt(language),
+      messages: [{ role: "user", content }],
+    });
+    try {
+      return parseScript(raw);
+    } catch (e) {
+      if (attempt === 2) throw e;
+      console.warn(`[Claude] JSON parse failed attempt ${attempt}, retrying: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  throw new Error("Nepodařilo se vygenerovat příběh.");
 }

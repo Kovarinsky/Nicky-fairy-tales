@@ -72,10 +72,15 @@ export async function generateSceneImage(scene: Scene, heroDescription: string):
   const model = (process.env.TOGETHER_IMAGE_MODEL || DEFAULT_MODEL).trim();
 
   // heroDescription first — FLUX gives higher weight to early tokens
+  // Strip any existing style suffix from imagePrompt to avoid duplication
+  const scenePrompt = scene.imagePrompt
+    .replace(/[.,]?\s*[Pp]ainterly storybook illustration[^.]*\./gi, "")
+    .trim();
+
   const prompt = [
     heroDescription ? `Character appearances (keep exactly consistent): ${heroDescription}.` : "",
-    scene.imagePrompt,
-    // Note: imagePrompt already ends with the style suffix from Claude
+    scenePrompt,
+    "Walt Disney animated feature film style, painterly storybook illustration, warm cinematic lighting, rich saturated colors, expressive faces, smooth clean lines, landscape orientation, no text.",
   ]
     .filter(Boolean)
     .join(" ");
