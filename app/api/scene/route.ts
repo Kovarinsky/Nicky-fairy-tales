@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateSceneImage } from "@/lib/together";
+import { generateSceneImage } from "@/lib/gemini";
 import { narrateScene } from "@/lib/elevenlabs";
 import type { Scene } from "@/lib/types";
 
