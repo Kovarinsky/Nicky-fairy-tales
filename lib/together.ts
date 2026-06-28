@@ -71,10 +71,11 @@ export async function generateSceneImage(scene: Scene, heroDescription: string):
   if (!apiKey) throw new Error("Chybí TOGETHER_API_KEY.");
   const model = (process.env.TOGETHER_IMAGE_MODEL || DEFAULT_MODEL).trim();
 
+  // heroDescription first — FLUX gives higher weight to early tokens
   const prompt = [
+    heroDescription ? `Character appearances (keep exactly consistent): ${heroDescription}.` : "",
     scene.imagePrompt,
-    heroDescription ? `Characters: ${heroDescription}` : "",
-    "Painterly storybook illustration, warm cinematic lighting, rich saturated colors, landscape orientation, no text or letters.",
+    // Note: imagePrompt already ends with the style suffix from Claude
   ]
     .filter(Boolean)
     .join(" ");
