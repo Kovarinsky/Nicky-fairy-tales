@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { StoryScript, RenderedScene, Scene } from "@/lib/types";
 import { AmbientPlayer } from "@/lib/ambient";
+import { cacheStory, getCachedStory, evictOldStories } from "@/lib/scene-cache";
+import { APP_VERSION } from "@/lib/version";
 
 // ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; }
@@ -155,6 +157,7 @@ export default function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [musicOn, setMusicOn] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [showCredits, setShowCredits] = useState(false);
   const [regenAudio, setRegenAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -167,11 +170,26 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const allScenesReady = scenes.length > 0 && scenes.every(s => s.imageUrl && s.audioUrl);
+  // bookReady: all images present (SVG fallback always set) — use for UI display and FS trigger
+  const bookReady = scenes.length > 0 && scenes.every(s => s.imageUrl);
+
+  // Reader mode: explicit switch so old story stays in memory when form opens
+  const [viewMode, setViewMode] = useState<"form" | "reader">("form");
+  const readerMode = viewMode === "reader";
+
+  // Background generation state
+  const [bgStatus, setBgStatus] = useState<"idle" | "writing" | "generating" | "done">("idle");
+  const [bgProgress, setBgProgress] = useState({ done: 0, total: 0 });
+  const bgBufferRef = useRef<RenderedScene[]>([]);
+  const bgTitleRef = useRef<string>("");
+
+  // In-memory cache: history entry id → fully rendered scenes (images + audio)
+  const renderedMapRef = useRef<Map<string, RenderedScene[]>>(new Map());
 
   // ── Boot ──
   useEffect(() => {
     const saved = loadSettings();
-    if (saved.sceneCount !== undefined && saved.sceneCount >= 3 && saved.sceneCount <= 12) {
+    if (saved.sceneCount !== undefined && saved.sceneCount >= 3 && saved.sceneCount <= 15) {
       setSceneCount(saved.sceneCount);
     }
     fetch("/api/characters").then(r => r.json()).then(d => {
@@ -220,19 +238,38 @@ export default function Home() {
 
   // Switch soundscape when page changes
   useEffect(() => {
-    if (!allScenesReady) return;
+    if (!bookReady) return;
     ambientRef.current?.setScene(scenes[page]?.soundscape);
-  }, [page, allScenesReady, scenes]);
+  }, [page, bookReady, scenes]);
 
-  // Intro fanfare + first soundscape when story first becomes ready
+  // Fullscreen: sync state only on EXTERNAL exit (Escape key, gesture)
+  // The class is set immediately in toggleFullscreen() for instant CSS response
+  useEffect(() => {
+    const onChange = () => {
+      if (!document.fullscreenElement) {
+        setIsFullscreen(false);
+        document.body.classList.remove("is-fullscreen");
+      }
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.body.classList.remove("is-fullscreen");
+    };
+  }, []);
+
+  // Intro fanfare + fullscreen when reader opens
   const introFiredRef = useRef(false);
   useEffect(() => {
-    if (!allScenesReady || introFiredRef.current) return;
+    if (!bookReady || viewMode !== "reader" || introFiredRef.current) return;
     introFiredRef.current = true;
-    isAutoAdvanceRef.current = true; // auto-play narration for the first slide
     ambientRef.current?.playIntro();
     ambientRef.current?.setScene(scenes[0]?.soundscape);
-  }, [allScenesReady, scenes]);
+    // Set fullscreen state + class IMMEDIATELY (works on iOS too; don't wait for fullscreenchange)
+    setIsFullscreen(true);
+    document.body.classList.add("is-fullscreen");
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  }, [bookReady, viewMode, scenes]);
 
   // Reset intro flag when new story starts
   useEffect(() => {
@@ -249,12 +286,68 @@ export default function Home() {
   const isAutoAdvanceRef = useRef(false);
   const currentAudioUrl = scenes[page]?.audioUrl;
   useEffect(() => {
-    if (!currentAudioUrl || !allScenesReady) return;
+    if (!currentAudioUrl || !bookReady) return;
     if (!isAutoAdvanceRef.current) return;
     isAutoAdvanceRef.current = false;
     const t = setTimeout(() => audioRef.current?.play().catch(() => {}), 420);
     return () => clearTimeout(t);
   }, [page, currentAudioUrl, allScenesReady]);
+
+  // ── Swipe navigation ──
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (!touchStartRef.current) return;
+    const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
+    const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
+    touchStartRef.current = null;
+    // require 30px horizontal movement and horizontal > vertical (2:1 ratio)
+    if (Math.abs(dx) < 30 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    if (dx < 0 && hasNext) goToPage(page + 1);
+    else if (dx > 0 && hasPrev) goToPage(page - 1);
+  }
+
+  // ── Fullscreen ──
+  function toggleFullscreen() {
+    const newFs = !isFullscreen;
+    setIsFullscreen(newFs);
+    document.body.classList.toggle("is-fullscreen", newFs);
+    if (newFs) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  }
+
+  // ── Reset to form (keeps old story in memory for "go back") ──
+  function resetToForm() {
+    audioRef.current?.pause();
+    setIsPlaying(false);
+    setViewMode("form");
+    setIsFullscreen(false);
+    document.body.classList.remove("is-fullscreen");
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  }
+
+  // ── Switch to completed background story ──
+  function switchToBgStory() {
+    audioRef.current?.pause();
+    setIsPlaying(false);
+    const newScenes = [...bgBufferRef.current];
+    const newTitle = bgTitleRef.current;
+    bgBufferRef.current = [];
+    bgTitleRef.current = "";
+    setBgStatus("idle");
+    setBgProgress({ done: 0, total: 0 });
+    introFiredRef.current = false;
+    setTitle(newTitle);
+    setScenes(newScenes);
+    setPage(0);
+    setSlideKey(k => k + 1);
+    setViewMode("reader");
+  }
 
   // ── Navigation ──
   const goToPage = useCallback((n: number) => {
@@ -336,21 +429,32 @@ export default function Home() {
     heroDescription: string,
     scriptScenes: Scene[],
     customImageRefs: Array<{ data: string; mimeType: string }>,
-    voiceId: string
-  ) {
-    setTitle(scriptTitle);
-    setScenes(scriptScenes.map(s => ({ ...s })));
-    setPage(0);
-    setSlideKey(0);
-    setDoneCount(0);
-    setSceneStatuses(scriptScenes.map(() => "waiting"));
+    voiceId: string,
+    background = false
+  ): Promise<RenderedScene[]> {
+    // Local tracking array — returned at end for caching
+    const localScenes: RenderedScene[] = scriptScenes.map(s => ({ ...s }));
+
+    if (background) {
+      bgTitleRef.current = scriptTitle;
+      bgBufferRef.current = localScenes;  // share reference
+      setBgStatus("generating");
+      setBgProgress({ done: 0, total: scriptScenes.length });
+    } else {
+      setTitle(scriptTitle);
+      setScenes([...localScenes]);
+      setPage(0);
+      setSlideKey(0);
+      setDoneCount(0);
+      setSceneStatuses(scriptScenes.map(() => "waiting"));
+      setStatus(`🎨 Generuji ${scriptScenes.length} scén...`);
+    }
 
     const CONCURRENCY = 1;
     let completed = 0;
-    setStatus(`🎨 Generuji ${scriptScenes.length} scén...`);
 
     const tasks = scriptScenes.map((scene, i) => async () => {
-      setSceneStatuses(prev => { const n = [...prev]; n[i] = "generating"; return n; });
+      if (!background) setSceneStatuses(prev => { const n = [...prev]; n[i] = "generating"; return n; });
       try {
         const res = await fetch("/api/scene", {
           method: "POST",
@@ -366,16 +470,17 @@ export default function Home() {
         const media = await safeJson<{ imageUrl?: string; audioUrl?: string; error?: string; imageDebug?: string }>(res);
         if (media.imageDebug) console.warn(`[Gemini debug] scene ${i + 1}:`, media.imageDebug);
         if (!res.ok) throw new Error(media.error || `Scéna ${i + 1} selhala.`);
+        localScenes[i] = { ...localScenes[i], imageUrl: media.imageUrl, audioUrl: media.audioUrl };
         completed++;
-        setDoneCount(completed);
-        setScenes(prev => {
-          const next = [...prev];
-          next[i] = { ...next[i], imageUrl: media.imageUrl, audioUrl: media.audioUrl };
-          return next;
-        });
-        setSceneStatuses(prev => { const n = [...prev]; n[i] = "done"; return n; });
+        if (background) {
+          setBgProgress({ done: completed, total: scriptScenes.length });
+        } else {
+          setDoneCount(completed);
+          setScenes([...localScenes]);
+          setSceneStatuses(prev => { const n = [...prev]; n[i] = "done"; return n; });
+        }
       } catch {
-        setSceneStatuses(prev => { const n = [...prev]; n[i] = "error"; return n; });
+        if (!background) setSceneStatuses(prev => { const n = [...prev]; n[i] = "error"; return n; });
       }
     });
 
@@ -384,12 +489,24 @@ export default function Home() {
       while (idx < tasks.length) { const i = idx++; await tasks[i](); }
     }
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, worker));
+
+    if (background) setBgStatus("done");
+    return localScenes;
   }
 
   // ── Create story (full flow) ──────────────────────────────────────────────
   async function createStory(e: React.FormEvent) {
     e.preventDefault();
-    setError(""); setScenes([]); setTitle(""); setPage(0); setLoading(true);
+    const background = bookReady; // run in bg if current story (images) already visible
+    setError("");
+    if (!background) {
+      setScenes([]); setTitle(""); setPage(0);
+      introFiredRef.current = false;
+    } else {
+      setBgStatus("writing");
+      setBgProgress({ done: 0, total: 0 });
+    }
+    setLoading(true);
     try {
       setStatus("✍️ Claude vymýšlí příběh...");
       const selectedCustomObjs = customChars.filter(c => selectedCustomIds.includes(c.id));
@@ -437,11 +554,19 @@ export default function Home() {
         .map(c => ({ data: c.photoBase64!, mimeType: c.photoMimeType! }));
 
       saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds });
-      await generateMedia(script.title, script.heroDescription, script.scenes, customImageRefs, selectedVoiceId);
-      setStatus("✨ Pohádka je připravena!");
+      const finalScenes = await generateMedia(script.title, script.heroDescription, script.scenes, customImageRefs, selectedVoiceId, background);
+      renderedMapRef.current.set(entry.id, finalScenes);
+      // Cache even if some audio failed — imageUrl always has SVG fallback
+      cacheStory(entry.id, finalScenes).catch(() => {});
+      evictOldStories(loadHistory().map(e => e.id)).catch(() => {});
+      if (!background) {
+        setStatus("✨ Pohádka je připravena!");
+        setViewMode("reader");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Něco se pokazilo.");
       setStatus("");
+      if (background) setBgStatus("idle");
     } finally {
       setLoading(false);
     }
@@ -449,11 +574,55 @@ export default function Home() {
 
   // ── Replay from history ───────────────────────────────────────────────────
   async function replayStory(entry: HistoryEntry) {
+    // Helper: switch to a set of ready scenes without interrupting bg generation
+    function showCached(readyScenes: RenderedScene[]) {
+      audioRef.current?.pause();
+      setIsPlaying(false);
+      introFiredRef.current = false;
+      setTitle(entry.title);
+      setScenes([...readyScenes]);
+      setPage(0);
+      setSlideKey(k => k + 1);
+      setViewMode("reader");
+      setHistoryOpen(false);
+    }
+
+    // 1. Instant restore from in-memory ref (bg generation continues uninterrupted)
+    const memCached = renderedMapRef.current.get(entry.id);
+    if (memCached && memCached.length > 0) {
+      showCached(memCached);
+      return;
+    }
+
+    // 2. Try IndexedDB — survives PWA restart (bg generation continues uninterrupted)
+    const dbCached = await getCachedStory(entry.id);
+    if (dbCached && dbCached.length > 0) {
+      const restored: RenderedScene[] = entry.scenes.map((s, i) => ({
+        ...s,
+        imageUrl: dbCached[i]?.imageUrl,
+        audioUrl: dbCached[i]?.audioUrl,
+      }));
+      renderedMapRef.current.set(entry.id, restored);
+      showCached(restored);
+      return;
+    }
+
+    // 3. Cache miss — full regeneration only when nothing else is running
+    if (loading || bgStatus !== "idle") {
+      // Background gen in progress — can't regenerate now; user sees the toast when it's done
+      setHistoryOpen(false);
+      return;
+    }
     setError(""); setLoading(true);
     setHistoryOpen(false);
+    setScenes([]); setTitle(""); setPage(0);
+    introFiredRef.current = false;
     try {
-      await generateMedia(entry.title, entry.heroDescription, entry.scenes, [], selectedVoiceId);
+      const finalScenes = await generateMedia(entry.title, entry.heroDescription, entry.scenes, [], selectedVoiceId);
+      renderedMapRef.current.set(entry.id, finalScenes);
+      cacheStory(entry.id, finalScenes).catch(() => {});
       setStatus("✨ Pohádka je připravena!");
+      setViewMode("reader");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generování selhalo.");
       setStatus("");
@@ -506,10 +675,47 @@ export default function Home() {
   const hasPrev = page > 0;
   const totalScenes = scenes.length;
 
+  // Inline styles for fullscreen — guaranteed to override any CSS cascade/specificity issue
+  const fsContainer: React.CSSProperties = readerMode && isFullscreen ? {
+    position: 'fixed', inset: '0', maxWidth: '100%', padding: '0',
+    display: 'flex', flexDirection: 'column', overflow: 'hidden',
+  } : {};
+  const fsBook: React.CSSProperties = isFullscreen ? {
+    flex: '1 1 0%', display: 'flex', flexDirection: 'column',
+    margin: '0', overflow: 'hidden', minHeight: '0',
+  } : {};
+  const fsBookCard: React.CSSProperties = isFullscreen ? {
+    flex: '1 1 0', display: 'flex', flexDirection: 'column',
+    borderRadius: '0', margin: '0', overflow: 'hidden',
+    boxShadow: 'none', animation: 'none', minHeight: '0',
+  } : {};
+  // fsImage is unused in fullscreen (image rendered inside wrapper div via absolute positioning)
+  const fsImage: React.CSSProperties = {};
+  const fsBody: React.CSSProperties = isFullscreen ? {
+    flexShrink: 0, maxHeight: '22dvh', overflowY: 'auto',
+    padding: '0.65rem 1rem 0.5rem',
+  } : {};
+  const fsControls: React.CSSProperties = isFullscreen ? {
+    flexShrink: 0, padding: '0.45rem 1rem 0.5rem',
+  } : {};
+  const fsDots: React.CSSProperties = isFullscreen ? {
+    flexShrink: 0, padding: '0.3rem 1rem 0.45rem', marginTop: '0',
+  } : {};
+
   return (
-    <div className="container">
-      <h1>📖 Nickyho pohádky</h1>
+    <div className={readerMode ? "container reader-mode" : "container"} style={fsContainer}>
+
+      {!readerMode && (
+      <>
+      <h1>📖 Nickyho pohádky <span className="version-badge">v{APP_VERSION}</span></h1>
       <p className="subtitle">Vyber postavy, téma a inspiraci – pohádka s obrázky a tatínkovým hlasem.</p>
+
+      {/* ── Vrátit se na starší pohádku ── */}
+      {bookReady && (
+        <button type="button" className="return-btn" onClick={() => setViewMode("reader")}>
+          ↩ Zpět na „{title}"
+        </button>
+      )}
 
       {/* ── FORM ── */}
       <form className="form" onSubmit={createStory}>
@@ -633,7 +839,15 @@ export default function Home() {
 
         <div className="field">
           <label>Počet stránek: {sceneCount}</label>
-          <input type="range" min={3} max={12} value={sceneCount} onChange={e => setSceneCount(Number(e.target.value))} />
+          <input type="range" min={3} max={15} value={sceneCount} onChange={e => setSceneCount(Number(e.target.value))} />
+        </div>
+
+        <div className="field">
+          <label>Hudba</label>
+          <label className={`chip ${musicOn ? "chip-on" : ""}`} style={{display:"flex", justifyContent:"center"}}>
+            <input type="checkbox" checked={musicOn} onChange={() => setMusicOn(p => !p)} />
+            {musicOn ? "🎵 Zapnuta" : "🔇 Vypnuta"}
+          </label>
         </div>
 
         <button type="submit" className="btn-create" disabled={loading || allSelectedCount === 0 || !hasInspiration}>
@@ -642,7 +856,7 @@ export default function Home() {
       </form>
 
       {/* ── HISTORY ── */}
-      {storyHistory.length > 0 && !loading && (
+      {storyHistory.length > 0 && (
         <div className="history-box">
           <button type="button" className="history-toggle" onClick={() => setHistoryOpen(p => !p)}>
             📚 Poslední pohádky ({storyHistory.length}) {historyOpen ? "▲" : "▼"}
@@ -656,7 +870,8 @@ export default function Home() {
                     <span className="history-date">{fmtDate(entry.createdAt)}</span>
                     <span className="history-info">{entry.scenes.length} scén</span>
                   </div>
-                  <button type="button" className="history-replay" onClick={() => replayStory(entry)} disabled={loading}>
+                  <button type="button" className="history-replay" onClick={() => replayStory(entry)}
+                    disabled={loading && bgStatus === "idle"}>
                     ▶ Přehrát znovu
                   </button>
                 </div>
@@ -666,8 +881,11 @@ export default function Home() {
         </div>
       )}
 
-      {/* ── GENERATION PROGRESS ── */}
-      {loading && (
+      </>
+      )}
+
+      {/* ── GENERATION PROGRESS (foreground only) ── */}
+      {loading && bgStatus === "idle" && (
         <div className="gen-progress" ref={progressRef}>
           <p className="gen-status">{status}</p>
 
@@ -710,30 +928,58 @@ export default function Home() {
         </div>
       )}
 
-      {status && !loading && <p className="status">{status}</p>}
-      {error && <p className="error">⚠️ {error}</p>}
+      {!readerMode && status && !loading && <p className="status">{status}</p>}
+      {!readerMode && error && <p className="error">⚠️ {error}</p>}
 
-      {/* ── BOOK – shown only when ALL scenes are ready ── */}
-      {allScenesReady && current && (
-        <div className="book">
-          <h2 className="book-title">{title}</h2>
+      {/* ── BOOK – shown when all scene images are ready (audio may be partial) ── */}
+      {bookReady && current && (
+        <div className="book" style={fsBook}>
+          <button type="button" className="back-btn"
+            style={isFullscreen ? { display: 'none' } : undefined}
+            onClick={resetToForm}>
+            ← Nová pohádka
+          </button>
+          <h2 className="book-title"
+            style={isFullscreen ? { flexShrink: 0, fontSize: '1rem', marginBottom: '0', padding: '0.4rem 1rem 0.3rem' } : undefined}>
+            {title}
+          </h2>
 
-          <div className="book-card" key={slideKey}>
-            {current.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className="page-image" src={current.imageUrl} alt={`Scéna ${page + 1}`} />
-            ) : (
-              <div className="page-image placeholder">
-                <div className="placeholder-spinner" />
-                <span>🎨 Generuji scénu {page + 1}...</span>
+          <div className="book-card" key={slideKey} style={fsBookCard}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            {isFullscreen ? (
+              // Wrapper fills the flex column space; image uses position:absolute inset:0
+              // so its size derives from the wrapper's rendered box, not percentage resolution.
+              <div style={{ flex: '1 1 0', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+                {current.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={current.imageUrl} alt={`Scéna ${page + 1}`}
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', background: 'linear-gradient(135deg,#1a0a3e 0%,#2d0d52 50%,#1a0a3e 100%)', color: 'rgba(255,255,255,0.7)', fontSize: '1rem', fontWeight: 700 }}>
+                    <div className="placeholder-spinner" />
+                    <span>🎨 Generuji scénu {page + 1}...</span>
+                  </div>
+                )}
               </div>
+            ) : (
+              current.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="page-image" src={current.imageUrl} alt={`Scéna ${page + 1}`} />
+              ) : (
+                <div className="page-image placeholder">
+                  <div className="placeholder-spinner" />
+                  <span>🎨 Generuji scénu {page + 1}...</span>
+                </div>
+              )
             )}
 
-            <div className="page-body">
+            <div className="page-body" style={fsBody}>
               <p className="page-text">{current.narration}</p>
             </div>
 
-            <div className="book-controls">
+            <div className="book-controls" style={fsControls}>
               <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page - 1)} disabled={!hasPrev} aria-label="Předchozí">←</button>
 
               <button type="button" className={`ctrl-btn ctrl-play ${!current.audioUrl || regenAudio ? "ctrl-loading" : ""}`}
@@ -771,29 +1017,52 @@ export default function Home() {
                 {musicOn ? "🎵" : "🔇"}
               </button>
 
+              <button type="button" className={`ctrl-btn ctrl-fullscreen ${isFullscreen ? "ctrl-fullscreen-on" : ""}`}
+                onClick={toggleFullscreen}
+                title={isFullscreen ? "Ukoncit fullscreen" : "Fullscreen"}
+                aria-label={isFullscreen ? "Ukoncit fullscreen" : "Fullscreen"}
+              >
+                {isFullscreen ? "⊡" : "⛶"}
+              </button>
+
               <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page + 1)} disabled={!hasNext} aria-label="Další">→</button>
             </div>
+
+            {scenes.length > 1 && (
+              <div className="page-dots" style={fsDots}>
+                {scenes.map((_, i) => (
+                  <button key={i} type="button"
+                    className={`dot ${i === page ? "dot-active" : ""} ${scenes[i]?.audioUrl ? "dot-ready" : ""}`}
+                    onClick={() => goToPage(i)} aria-label={`Strana ${i + 1}`} />
+                ))}
+              </div>
+            )}
           </div>
 
           {current.audioUrl && (
             <audio ref={audioRef} key={current.audioUrl} src={current.audioUrl}
               onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={handleAudioEnded} />
           )}
-
-
-          {scenes.length > 1 && (
-            <div className="page-dots">
-              {scenes.map((_, i) => (
-                <button key={i} type="button"
-                  className={`dot ${i === page ? "dot-active" : ""} ${scenes[i]?.audioUrl ? "dot-ready" : ""}`}
-                  onClick={() => goToPage(i)} aria-label={`Strana ${i + 1}`} />
-              ))}
-            </div>
-          )}
         </div>
       )}
 
       {/* ── ROLLING CREDITS ── */}
+      {/* ── BACKGROUND GENERATION TOAST ── */}
+      {bgStatus !== "idle" && (
+        <div className="bg-toast">
+          {bgStatus === "writing" && <span>✍️ Píšu novou pohádku...</span>}
+          {bgStatus === "generating" && (
+            <span>🎨 {bgProgress.done} / {bgProgress.total} scén</span>
+          )}
+          {bgStatus === "done" && (
+            <>
+              <span>✨ Nová pohádka je hotová!</span>
+              <button type="button" className="bg-toast-btn" onClick={switchToBgStory}>▶ Otevřít</button>
+            </>
+          )}
+        </div>
+      )}
+
       {showCredits && (
         <div className="credits-overlay" onClick={() => setShowCredits(false)}>
           <div className="credits-scroll">
