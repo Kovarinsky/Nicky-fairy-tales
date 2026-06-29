@@ -681,8 +681,9 @@ export default function Home() {
     display: 'flex', flexDirection: 'column', overflow: 'hidden',
   } : {};
   const fsBook: React.CSSProperties = isFullscreen ? {
-    flex: '1 1 0%', display: 'flex', flexDirection: 'column',
-    margin: '0', overflow: 'hidden', minHeight: '0',
+    position: 'fixed', inset: '0', zIndex: 10,
+    display: 'flex', flexDirection: 'column',
+    margin: '0', overflow: 'hidden',
   } : {};
   const fsBookCard: React.CSSProperties = isFullscreen ? {
     flex: '1 1 0', display: 'flex', flexDirection: 'column',
