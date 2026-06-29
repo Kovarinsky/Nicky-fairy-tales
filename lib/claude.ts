@@ -1,4 +1,3 @@
-import { request } from "https";
 import type { StoryRequest, StoryScript, Character } from "./types";
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
@@ -39,10 +38,10 @@ function buildSystemPrompt(language: "cs" | "en"): string {
       "- AVOID: dry factual descriptions, repeated words, emotionless phrases.",
       "",
       "═══ CHARACTER APPEARANCE (heroDescription) ═══",
-      "- Write heroDescription in ENGLISH as one entry per character: 'Name: [hair style+color], [eye color], [exact clothing with colors], [unique features], [relative size].'",
+      "- Write heroDescription in ENGLISH as one entry per character: 'Name: [hair style+color], [eye color], [exact clothing with colors], [unique features].'",
       "- Separate characters with ' | '",
       "- Be extremely specific — not 'blond hair' but 'straight light-blond hair'; not 'red shirt' but 'white T-shirt with two red horizontal stripes'.",
-      "- Include relative sizes: 'Valentýna is roughly half Nicolas's height'.",
+      "- DO NOT include any height, size, age, or size-comparison words — only hair, eyes, clothing, accessories, facial features.",
       "- If reference photos are attached, describe what you SEE in the photo exactly.",
       "- These descriptions NEVER change across scenes.",
       "",
@@ -100,10 +99,10 @@ function buildSystemPrompt(language: "cs" | "en"): string {
     "- VYHNI SE: suché faktické popisy, opakování stejných slov, fráze bez emocí.",
     "",
     "═══ POPIS POSTAV (heroDescription) ═══",
-    "- heroDescription piš ANGLICKY, jeden záznam na postavu: 'Name: [styl+barva vlasů], [barva očí], [přesné oblečení s barvami], [jedinečné rysy], [relativní výška].'",
+    "- heroDescription piš ANGLICKY, jeden záznam na postavu: 'Name: [styl+barva vlasů], [barva očí], [přesné oblečení s barvami], [jedinečné rysy].'",
     "- Odděluj postavy pomocí ' | '",
     "- Buď maximálně konkrétní — ne 'blond hair' ale 'straight light-blond hair'; ne 'red shirt' ale 'white T-shirt with two red horizontal stripes'.",
-    "- Zahrň relativní výšky: 'Valentýna is roughly half Nicolas's height'.",
+    "- NEZAHRNUJ výšku, věk, velikost ani srovnání výšek — jen vlasy, oči, oblečení, doplňky, výraz tváře.",
     "- Pokud jsou přiloženy referenční fotografie, popiš přesně co vidíš na fotce.",
     "- Tyto popisy se NIKDY nemění napříč scénami.",
     "",
@@ -163,7 +162,7 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
   const familyContext = en
     ? [
         hasNicky && hasValentyna
-          ? "Nicolas is a whole head taller than Valentýnka – this height difference must be visible in EVERY illustration."
+          ? "Nicolas is Valentýna's older brother and is visibly taller than her — consistently across all illustrations."
           : "",
         hasNicky && hasValentyna
           ? "The siblings cooperate; the older one helps the younger – the older-sibling dynamic is part of the character."
@@ -176,7 +175,7 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
         .join(" ")
     : [
         hasNicky && hasValentyna
-          ? "Nicolas je o celou hlavu vyšší než Valentýna – tento výškový rozdíl musí být viditelný na KAŽDÉM obrázku."
+          ? "Nicolas je Valentýnin starší bratr a je viditelně vyšší — konzistentně na všech obrázcích."
           : "",
         hasNicky && hasValentyna
           ? "Sourozenci spolupracují, starší pomáhá mladší – dynamika staršího sourozence je součástí charakteru."
@@ -297,65 +296,39 @@ type AnthropicPart =
   | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
   | { type: "document"; source: { type: "base64"; media_type: "application/pdf"; data: string } };
 
+// Strip non-printable chars from env vars — belt-and-suspenders before setting HTTP headers
 function sanitizeApiKey(key: string | undefined): string {
   return (key || "").replace(/[^\x20-\x7E]/g, "").trim();
 }
 
-function callAnthropicApi(body: object): Promise<string> {
+async function callAnthropicApi(body: object): Promise<string> {
   const apiKey = sanitizeApiKey(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) throw new Error("Chybí ANTHROPIC_API_KEY.");
 
-  const bodyStr = JSON.stringify(body);
-  const bodyBuf = Buffer.from(bodyStr, "utf-8");
-
-  return new Promise((resolve, reject) => {
-    const req = request(
-      {
-        hostname: "api.anthropic.com",
-        path: "/v1/messages",
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": ANTHROPIC_VERSION,
-          "content-length": bodyBuf.length,
-        },
-      },
-      (res) => {
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk: Buffer) => chunks.push(chunk));
-        res.on("end", () => {
-          const text = Buffer.concat(chunks).toString("utf-8");
-          if (res.statusCode && res.statusCode >= 400) {
-            reject(new Error(`Anthropic ${res.statusCode}: ${text.slice(0, 400)}`));
-            return;
-          }
-          try {
-            const data = JSON.parse(text) as {
-              content?: Array<{ type: string; text?: string }>;
-              error?: { message?: string };
-            };
-            if (data.error) {
-              reject(new Error(`Anthropic error: ${data.error.message}`));
-              return;
-            }
-            const textBlock = (data.content || []).find((b) => b.type === "text");
-            if (!textBlock?.text) {
-              reject(new Error("Claude nevrátil text. Odpověď: " + text.slice(0, 200)));
-              return;
-            }
-            resolve(textBlock.text);
-          } catch {
-            reject(new Error("Anthropic JSON parse error: " + text.slice(0, 200)));
-          }
-        });
-        res.on("error", reject);
-      }
-    );
-    req.on("error", reject);
-    req.write(bodyBuf);
-    req.end();
+  // Use native fetch (Node 18+) — avoids node:https header-char validation quirks
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": ANTHROPIC_VERSION,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(110_000),
   });
+
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Anthropic ${res.status}: ${text.slice(0, 400)}`);
+
+  let data: { content?: Array<{ type: string; text?: string }>; error?: { message?: string } };
+  try { data = JSON.parse(text); }
+  catch { throw new Error("Anthropic JSON parse error: " + text.slice(0, 200)); }
+
+  if (data.error) throw new Error(`Anthropic error: ${data.error.message}`);
+
+  const textBlock = (data.content || []).find((b) => b.type === "text");
+  if (!textBlock?.text) throw new Error("Claude nevrátil text. Odpověď: " + text.slice(0, 200));
+  return textBlock.text;
 }
 
 export async function generateStory(req: StoryRequest, extras: StoryExtras = {}): Promise<StoryScript> {

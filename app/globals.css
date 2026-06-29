@@ -1084,65 +1084,190 @@ button:disabled {
   font-weight: 600;
 }
 
-/* ── Responsive ── */
+/* ── Responsive / Mobile App Layout ── */
 @media (max-width: 600px) {
-  /* Layout */
-  .container { padding: 1.25rem 0.85rem 5rem; }
-  h1 { font-size: 1.9rem; }
-  .subtitle { font-size: 0.95rem; margin-bottom: 1.25rem; }
+  /* ─ Global layout: edge-to-edge, full-height ─ */
+  html, body { overflow-x: hidden; }
 
-  /* Form */
-  .form { padding: 1.1rem; gap: 1.1rem; border-radius: var(--radius-lg); }
-  .form-section { gap: 0.6rem; }
-  input, textarea { font-size: 0.9rem; padding: 0.65rem 0.85rem; }
-  .chips { gap: 0.35rem; }
-  .chip { padding: 0.45rem 0.8rem; font-size: 0.82rem; }
-  .btn-create { font-size: 1rem; padding: 0.95rem 1.5rem; }
-
-  /* Background */
-  .photo-bg-img { height: 65vh; }
-
-  /* Book */
-  .book { margin-top: 1.5rem; }
-  .book-title { font-size: 1.35rem; margin-bottom: 0.85rem; }
-  .book-card { border-radius: var(--radius-lg); }
-
-  /* Image — 16:9 matches Gemini output, shorter than 4:3 on narrow screens */
-  .page-image { aspect-ratio: 16 / 9; }
-
-  /* Narration text */
-  .page-body { padding: 1rem 1rem 0.75rem; }
-  .page-text { font-size: 1rem; line-height: 1.7; }
-
-  /* Controls bar */
-  .book-controls {
-    padding: 0.65rem 0.75rem 0.75rem;
-    gap: 0.35rem;
+  .container {
+    padding: 0 0 82px;   /* bottom room for fixed CTA */
+    max-width: 100%;
   }
-  .ctrl-nav { width: 44px; height: 44px; font-size: 1.1rem; }
-  .ctrl-play { width: 54px; height: 54px; font-size: 1.35rem; }
-  .ctrl-auto { width: 34px; height: 34px; font-size: 0.88rem; }
-  .ctrl-counter { font-size: 0.85rem; min-width: 2.4rem; }
 
-  /* Progress dots */
-  .page-dots { gap: 0.35rem; margin-top: 0.75rem; }
-  .dot { width: 8px; height: 8px; }
+  /* ─ Header: compact app bar ─ */
+  h1 {
+    font-size: 1.55rem;
+    text-align: left;
+    padding: 0.9rem 1rem 0.15rem;
+    letter-spacing: -0.3px;
+  }
+  .subtitle {
+    font-size: 0.82rem;
+    text-align: left;
+    padding: 0 1rem;
+    margin-bottom: 0.85rem;
+  }
 
-  /* Generation progress cards */
-  .gen-progress { padding: 1rem 1rem; }
-  .gen-cards { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 0.4rem; }
+  /* ─ Background ─ */
+  .photo-bg-img { height: 70vh; }
 
-  /* History */
+  /* ─ Form: transparent, sections become individual cards ─ */
+  .form {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0 0.65rem;
+    gap: 0.6rem;
+  }
+
+  /* Each field wrapped in its own frosted card */
+  .field {
+    background: rgba(255, 255, 255, 0.11);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 18px;
+    padding: 0.85rem 0.9rem 0.9rem;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  label {
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.4rem;
+    display: block;
+  }
+
+  /* Dark transparent inputs */
+  input:not([type="range"]):not([type="checkbox"]):not([type="file"]),
+  textarea {
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.22);
+    font-size: 0.95rem;
+    padding: 0.6rem 0.75rem;
+  }
+  input:not([type="range"]):not([type="checkbox"]):not([type="file"])::placeholder,
+  textarea::placeholder { color: rgba(255, 255, 255, 0.38); }
+  input:not([type="range"]):not([type="checkbox"]):not([type="file"]):focus,
+  textarea:focus {
+    border-color: var(--purple);
+    background: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 0 3px rgba(124, 77, 255, 0.22);
+  }
+  textarea { min-height: 64px; }
+
+  /* ─ Chips: 2-column keyboard grid ─ */
+  .chips {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem;
+  }
+
+  .chip, .chip-btn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+    padding: 0.7rem 0.4rem;
+    font-size: 0.85rem;
+    border-radius: 14px;
+    min-height: 46px;
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.22);
+    color: rgba(255, 255, 255, 0.9);
+  }
+  .chip-on {
+    background: rgba(124, 77, 255, 0.38);
+    border-color: var(--purple);
+    color: #fff;
+  }
+  /* Chips with checkbox: hide the checkbox visually on mobile */
+  .chip input[type="checkbox"] { display: none; }
+
+  /* ─ CTA button: fixed at bottom like keyboard Enter ─ */
+  .btn-create {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 300;
+    border-radius: 0 !important;
+    padding: 1rem 1.5rem !important;
+    font-size: 1.05rem !important;
+    /* Safe area inset for iPhones with home bar */
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom)) !important;
+  }
+
+  /* ─ Outline button (Vlastní postava, etc.) ─ */
+  .outline-btn {
+    background: rgba(124, 77, 255, 0.15);
+    border-color: rgba(124, 77, 255, 0.5);
+    color: #d0c3ff;
+  }
+
+  /* ─ Custom char panel ─ */
+  .add-char-panel {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.15);
+    padding: 0.9rem;
+    border-radius: 16px;
+  }
+  .panel-title { color: rgba(255, 255, 255, 0.9); }
+
+  /* ─ Inspiration buttons ─ */
+  .insp-btn { font-size: 0.82rem; padding: 0.42rem 0.8rem; }
+  .preview-thumb { width: 56px; height: 56px; }
+
+  /* ─ Mute FAB ─ */
+  .mute-fab { width: 40px; height: 40px; font-size: 1rem; top: 0.65rem; right: 0.65rem; }
+
+  /* ─ Generation progress ─ */
+  .gen-progress {
+    margin: 0.6rem 0.65rem 0;
+    padding: 1rem;
+    border-radius: 18px;
+  }
+  .gen-cards {
+    grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+    gap: 0.4rem;
+  }
+
+  /* ─ History ─ */
+  .history-box { margin: 0.6rem 0.65rem 0; border-radius: 18px; }
   .history-item { gap: 0.5rem; padding: 0.6rem 0.85rem; }
   .history-replay { padding: 0.35rem 0.7rem; font-size: 0.78rem; }
 
-  /* Mute FAB */
-  .mute-fab { width: 42px; height: 42px; font-size: 1.1rem; top: 0.75rem; right: 0.75rem; }
+  /* ─ Status / Error ─ */
+  .status { font-size: 0.9rem; margin-top: 1rem; }
+  .error { margin: 0.5rem 0.65rem 0; border-radius: 14px; }
 
-  /* Custom character panel */
-  .add-char-panel { padding: 1rem; }
-  .preview-thumb { width: 56px; height: 56px; }
+  /* ─ Book: full-width, edge-to-edge ─ */
+  .book { margin: 0.75rem 0 0; }
+  .book-title {
+    font-size: 1.3rem;
+    margin-bottom: 0.65rem;
+    padding: 0 0.65rem;
+  }
+  .book-card { border-radius: 20px; margin: 0 0.65rem; }
 
-  /* Inspiration */
-  .insp-btn { font-size: 0.8rem; padding: 0.4rem 0.75rem; }
+  /* 16:9 matches Gemini landscape output — no letterboxing */
+  .page-image { aspect-ratio: 16 / 9; }
+
+  .page-body { padding: 0.9rem 1rem 0.7rem; }
+  .page-text { font-size: 1rem; line-height: 1.7; }
+
+  /* Controls bar */
+  .book-controls { padding: 0.6rem 0.7rem 0.7rem; gap: 0.3rem; }
+  .ctrl-nav { width: 44px; height: 44px; font-size: 1.1rem; }
+  .ctrl-play { width: 54px; height: 54px; font-size: 1.35rem; }
+  .ctrl-auto { width: 34px; height: 34px; font-size: 0.88rem; }
+  .ctrl-counter { font-size: 0.82rem; min-width: 2.2rem; }
+
+  /* Progress dots */
+  .page-dots { gap: 0.3rem; margin-top: 0.65rem; }
+  .dot { width: 8px; height: 8px; }
 }
