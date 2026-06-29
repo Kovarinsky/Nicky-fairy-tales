@@ -1284,7 +1284,6 @@ body.is-fullscreen {
 }
 
 .is-fullscreen .book-card {
-  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   border-radius: 0;
@@ -1292,7 +1291,6 @@ body.is-fullscreen {
   overflow: hidden;
   box-shadow: none;
   animation: none;
-  min-height: 0;
 }
 
 /* .page-image class is not applied in fullscreen (wrapper div pattern) — rule kept as fallback */

@@ -30,6 +30,7 @@ interface HistoryEntry {
 const HISTORY_KEY = "nicky-story-history";
 const HISTORY_MAX = 10;
 const SETTINGS_KEY = "nicky-settings";
+const DRAFT_KEY = "nicky-story-draft";
 
 function loadHistory(): HistoryEntry[] {
   try {
@@ -217,7 +218,35 @@ export default function Home() {
       }
     }).catch(() => {});
     setStoryHistory(loadHistory());
+
+    // Restore story interrupted by window switch
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (draft?.scenes?.length > 0 && draft.title) {
+          setTitle(draft.title);
+          setScenes(draft.scenes);
+          setPage(draft.page ?? 0);
+          setViewMode("reader");
+        }
+        localStorage.removeItem(DRAFT_KEY);
+      }
+    } catch {}
   }, []);
+
+  // ── Save draft on window switch (Android background kill) ──
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.hidden && scenes.length > 0 && viewMode === "reader") {
+        try {
+          localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, scenes, page }));
+        } catch {}
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [scenes, title, page, viewMode]);
 
   // ── Ambient music lifecycle ──
   useEffect(() => {
@@ -329,6 +358,7 @@ export default function Home() {
     setIsFullscreen(false);
     document.body.classList.remove("is-fullscreen");
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
   }
 
   // ── Switch to completed background story ──
@@ -686,12 +716,10 @@ export default function Home() {
     margin: '0', overflow: 'hidden',
   } : {};
   const fsBookCard: React.CSSProperties = isFullscreen ? {
-    flex: '1 1 0', display: 'flex', flexDirection: 'column',
+    display: 'flex', flexDirection: 'column',
     borderRadius: '0', margin: '0', overflow: 'hidden',
-    boxShadow: 'none', animation: 'none', minHeight: '0',
+    boxShadow: 'none', animation: 'none',
   } : {};
-  // fsImage is unused in fullscreen (image rendered inside wrapper div via absolute positioning)
-  const fsImage: React.CSSProperties = {};
   const fsBody: React.CSSProperties = isFullscreen ? {
     flexShrink: 0, maxHeight: '22dvh', overflowY: 'auto',
     padding: '0.65rem 1rem 0.5rem',
@@ -950,20 +978,17 @@ export default function Home() {
             onTouchEnd={handleTouchEnd}
           >
             {isFullscreen ? (
-              // Wrapper fills the flex column space; image uses position:absolute inset:0
-              // so its size derives from the wrapper's rendered box, not percentage resolution.
-              <div style={{ flex: '1 1 0', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
-                {current.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={current.imageUrl} alt={`Scéna ${page + 1}`}
-                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                ) : (
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', background: 'linear-gradient(135deg,#1a0a3e 0%,#2d0d52 50%,#1a0a3e 100%)', color: 'rgba(255,255,255,0.7)', fontSize: '1rem', fontWeight: 700 }}>
-                    <div className="placeholder-spinner" />
-                    <span>🎨 Generuji scénu {page + 1}...</span>
-                  </div>
-                )}
-              </div>
+              // Explicit 65dvh height bypasses flex chain — no dependency on parent having definite height
+              current.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={current.imageUrl} alt={`Scéna ${page + 1}`}
+                  style={{ width: '100%', height: '65dvh', objectFit: 'cover', display: 'block', flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: '100%', height: '65dvh', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', background: 'linear-gradient(135deg,#1a0a3e 0%,#2d0d52 50%,#1a0a3e 100%)', color: 'rgba(255,255,255,0.7)', fontSize: '1rem', fontWeight: 700 }}>
+                  <div className="placeholder-spinner" />
+                  <span>🎨 Generuji scénu {page + 1}...</span>
+                </div>
+              )
             ) : (
               current.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
