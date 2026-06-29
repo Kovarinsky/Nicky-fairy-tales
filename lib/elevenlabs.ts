@@ -1,6 +1,11 @@
 import { request } from "https";
 import type { Scene } from "./types";
 
+// Strip non-printable / non-ASCII chars that Node.js rejects in HTTP header values (ERR_INVALID_CHAR)
+function sanitizeApiKey(key: string | undefined): string {
+  return (key || "").replace(/[^\x20-\x7E]/g, "").trim();
+}
+
 function sanitizeText(text: string): string {
   return (
     text
@@ -16,13 +21,13 @@ function sanitizeText(text: string): string {
 }
 
 export async function narrateScene(scene: Scene, overrideVoiceId?: string): Promise<Buffer> {
-  const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
-  if (!apiKey) throw new Error("Chybi ELEVENLABS_API_KEY.");
+  const apiKey = sanitizeApiKey(process.env.ELEVENLABS_API_KEY);
+  if (!apiKey) throw new Error("Chybí ELEVENLABS_API_KEY.");
 
-  const voiceId = overrideVoiceId?.trim() || process.env.ELEVENLABS_VOICE_ID?.trim();
-  if (!voiceId) throw new Error("Chybi ELEVENLABS_VOICE_ID.");
+  const voiceId = sanitizeApiKey(overrideVoiceId || process.env.ELEVENLABS_VOICE_ID);
+  if (!voiceId) throw new Error("Chybí ELEVENLABS_VOICE_ID.");
 
-  const modelId = (process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2").trim();
+  const modelId = sanitizeApiKey(process.env.ELEVENLABS_MODEL_ID) || "eleven_multilingual_v2";
 
   const bodyStr = JSON.stringify({
     text: sanitizeText(scene.narration),

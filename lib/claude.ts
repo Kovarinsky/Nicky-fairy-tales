@@ -297,8 +297,12 @@ type AnthropicPart =
   | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
   | { type: "document"; source: { type: "base64"; media_type: "application/pdf"; data: string } };
 
+function sanitizeApiKey(key: string | undefined): string {
+  return (key || "").replace(/[^\x20-\x7E]/g, "").trim();
+}
+
 function callAnthropicApi(body: object): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  const apiKey = sanitizeApiKey(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) throw new Error("Chybí ANTHROPIC_API_KEY.");
 
   const bodyStr = JSON.stringify(body);

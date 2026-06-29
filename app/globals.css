@@ -1086,10 +1086,63 @@ button:disabled {
 
 /* ── Responsive ── */
 @media (max-width: 600px) {
-  .container { padding: 1.5rem 1rem 4rem; }
-  h1 { font-size: 2rem; }
-  .form { padding: 1.25rem; gap: 1.25rem; }
-  .page-text { font-size: 1.05rem; }
-  .page-body { padding: 1.1rem; }
+  /* Layout */
+  .container { padding: 1.25rem 0.85rem 5rem; }
+  h1 { font-size: 1.9rem; }
+  .subtitle { font-size: 0.95rem; margin-bottom: 1.25rem; }
+
+  /* Form */
+  .form { padding: 1.1rem; gap: 1.1rem; border-radius: var(--radius-lg); }
+  .form-section { gap: 0.6rem; }
+  input, textarea { font-size: 0.9rem; padding: 0.65rem 0.85rem; }
+  .chips { gap: 0.35rem; }
+  .chip { padding: 0.45rem 0.8rem; font-size: 0.82rem; }
+  .btn-create { font-size: 1rem; padding: 0.95rem 1.5rem; }
+
+  /* Background */
   .photo-bg-img { height: 65vh; }
+
+  /* Book */
+  .book { margin-top: 1.5rem; }
+  .book-title { font-size: 1.35rem; margin-bottom: 0.85rem; }
+  .book-card { border-radius: var(--radius-lg); }
+
+  /* Image — 16:9 matches Gemini output, shorter than 4:3 on narrow screens */
+  .page-image { aspect-ratio: 16 / 9; }
+
+  /* Narration text */
+  .page-body { padding: 1rem 1rem 0.75rem; }
+  .page-text { font-size: 1rem; line-height: 1.7; }
+
+  /* Controls bar */
+  .book-controls {
+    padding: 0.65rem 0.75rem 0.75rem;
+    gap: 0.35rem;
+  }
+  .ctrl-nav { width: 44px; height: 44px; font-size: 1.1rem; }
+  .ctrl-play { width: 54px; height: 54px; font-size: 1.35rem; }
+  .ctrl-auto { width: 34px; height: 34px; font-size: 0.88rem; }
+  .ctrl-counter { font-size: 0.85rem; min-width: 2.4rem; }
+
+  /* Progress dots */
+  .page-dots { gap: 0.35rem; margin-top: 0.75rem; }
+  .dot { width: 8px; height: 8px; }
+
+  /* Generation progress cards */
+  .gen-progress { padding: 1rem 1rem; }
+  .gen-cards { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 0.4rem; }
+
+  /* History */
+  .history-item { gap: 0.5rem; padding: 0.6rem 0.85rem; }
+  .history-replay { padding: 0.35rem 0.7rem; font-size: 0.78rem; }
+
+  /* Mute FAB */
+  .mute-fab { width: 42px; height: 42px; font-size: 1.1rem; top: 0.75rem; right: 0.75rem; }
+
+  /* Custom character panel */
+  .add-char-panel { padding: 1rem; }
+  .preview-thumb { width: 56px; height: 56px; }
+
+  /* Inspiration */
+  .insp-btn { font-size: 0.8rem; padding: 0.4rem 0.75rem; }
 }
