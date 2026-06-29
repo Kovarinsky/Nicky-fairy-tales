@@ -508,17 +508,6 @@ export default function Home() {
 
   return (
     <div className="container">
-      {/* Fixed mute button — always visible */}
-      <button
-        type="button"
-        className={`mute-fab ${musicOn ? "mute-fab-on" : ""}`}
-        onClick={() => setMusicOn(p => !p)}
-        title={musicOn ? "Vypnout hudbu" : "Zapnout hudbu"}
-        aria-label={musicOn ? "Vypnout hudbu" : "Zapnout hudbu"}
-      >
-        {musicOn ? "🎵" : "🔇"}
-      </button>
-
       <h1>📖 Nickyho pohádky</h1>
       <p className="subtitle">Vyber postavy, téma a inspiraci – pohádka s obrázky a tatínkovým hlasem.</p>
 
@@ -773,6 +762,14 @@ export default function Home() {
                   {regenAudio ? "⏳" : (voices.find(v => v.id === selectedVoiceId)?.emoji ?? "🎙️")}
                 </button>
               )}
+
+              <button type="button" className={`ctrl-btn ctrl-mute ${musicOn ? "ctrl-mute-on" : ""}`}
+                onClick={() => setMusicOn(p => !p)}
+                title={musicOn ? "Vypnout hudbu" : "Zapnout hudbu"}
+                aria-label={musicOn ? "Vypnout hudbu" : "Zapnout hudbu"}
+              >
+                {musicOn ? "🎵" : "🔇"}
+              </button>
 
               <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page + 1)} disabled={!hasNext} aria-label="Další">→</button>
             </div>
