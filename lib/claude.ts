@@ -55,11 +55,12 @@ function buildSystemPrompt(language: "cs" | "en"): string {
       "- Emotional arc: wonder → tension → hope → surprise → earned resolution.",
       "",
       "═══ IMAGE PROMPTS ═══",
-      "- Write in ENGLISH, max 80 words.",
-      "- For EACH character appearing in the scene, write their name followed by their appearance in parentheses, COPY VERBATIM from heroDescription — example: 'Nicolas (straight light-blond hair, white T-shirt with two red horizontal stripes, blue denim shorts, white sneakers)'.",
+      "- Write in ENGLISH, max 90 words.",
+      "- For EACH character in the scene: write 'Name (FULL appearance copied verbatim from heroDescription)'. Copy EVERY word — hair style, hair color, eye color, every clothing item with exact colors, accessories. NOTHING omitted or abbreviated.",
       "- Then describe: scene action, setting, mood, lighting.",
-      "- NEVER shorten or paraphrase appearance — copy word for word. A character appearing without their full description is WRONG.",
-      "- No age numbers or age-specific terms anywhere.",
+      "- After the scene description, end with: 'Only [list character names in this scene] are present — no other people, strangers, or background human figures.'",
+      "- Consistency is NON-NEGOTIABLE: if heroDescription says 'straight light-blond hair', every imagePrompt for that character must say 'straight light-blond hair'. NEVER write 'blond' or 'light hair' — copy exactly.",
+      "- No age numbers or age-specific terms.",
       "- End with: 'Walt Disney animated style, painterly storybook illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation, no text.'",
       "- No text in image.",
       "",
@@ -116,10 +117,11 @@ function buildSystemPrompt(language: "cs" | "en"): string {
     "- Emoční oblouk: úžas → napětí → naděje → překvapení → zasloužené rozuzlení.",
     "",
     "═══ IMAGE PROMPTS ═══",
-    "- Psát ANGLICKY, max 80 slov.",
-    "- Pro KAŽDOU postavu ve scéně napiš jméno a za ním v závorce popis zkopírovaný DOSLOVA z heroDescription — příklad: 'Nicolas (straight light-blond hair, white T-shirt with two red horizontal stripes, blue denim shorts, white sneakers)'.",
+    "- Psát ANGLICKY, max 90 slov.",
+    "- Pro KAŽDOU postavu ve scéně: napiš 'Jméno (PLNÝ popis zkopírovaný DOSLOVA z heroDescription)'. Kopíruj KAŽDÉ slovo — styl vlasů, barvu vlasů, barvu očí, každý kus oblečení s přesnými barvami, doplňky. Nic nevynechávej ani nezkracuj.",
     "- Pak popiš: akci scény, prostředí, náladu, osvětlení.",
-    "- NIKDY nezkracuj ani neformuluj popis jinak — kopíruj slovo od slova. Postava bez plného popisu = CHYBA.",
+    "- Po popisu scény přidej: 'Only [seznam jmen postav v této scéně] are present — no other people, strangers, or background human figures.'",
+    "- Konzistence je BEZPODMÍNEČNÁ: pokud heroDescription říká 'straight light-blond hair', každý imagePrompt pro tu postavu musí říkat 'straight light-blond hair'. NIKDY nepiš jen 'blond' — kopíruj přesně.",
     "- Žádné věkové číslice ani věkově specifické výrazy.",
     "- Ukonči: 'Walt Disney animated style, painterly storybook illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation, no text.'",
     "- Nikdy text v obrazu.",
@@ -314,7 +316,7 @@ async function callAnthropicApi(body: object): Promise<string> {
       "anthropic-version": ANTHROPIC_VERSION,
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(110_000),
+    signal: AbortSignal.timeout(250_000),
   });
 
   const text = await res.text();
@@ -368,7 +370,7 @@ export async function generateStory(req: StoryRequest, extras: StoryExtras = {})
   for (let attempt = 1; attempt <= 2; attempt++) {
     const raw = await callAnthropicApi({
       model,
-      max_tokens: 6000,
+      max_tokens: 8192,
       system: buildSystemPrompt(language),
       messages: [{ role: "user", content }],
     });

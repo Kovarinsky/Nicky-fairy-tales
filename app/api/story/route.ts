@@ -5,7 +5,7 @@ import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 async function fetchUrlText(url: string): Promise<string> {
   try {
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       themePrompt: theme?.prompt,
       characters,
       age: Number(body.age) || 4,
-      sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), 12),
+      sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), 15),
       language,
     };
 

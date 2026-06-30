@@ -51,6 +51,7 @@ async function sanitizeWithGemini(apiKey: string, rawPrompt: string): Promise<st
             "- Remove all age numbers: '6-year-old', '6 years old', 'toddler', 'infant', Czech: 'letý', 'let', 'roků'",
             "- Remove size comparisons that imply child age: 'half the height of', 'noticeably smaller than', 'roughly half'",
             "- Replace 'small girl' → 'girl', 'small boy' → 'boy', 'little sister' → 'sister', 'little brother' → 'brother'",
+            "- Replace any element that would show readable text in the image (signs with writing, open books showing text, newspapers with headlines, shop labels, posters with words, billboards) with a purely visual alternative (e.g. 'a colorful sign' instead of 'a sign saying Welcome', 'a closed storybook' instead of 'a book with text')",
             "- Keep ALL character names, hair color/style, eye color, clothing colors and types, scene action, and the style suffix UNCHANGED",
             "- Output ONLY the rewritten prompt — no explanation, no quotes, no markdown",
             "",
@@ -154,11 +155,22 @@ export async function generateSceneImage(scene: Scene, heroDescription: string):
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
   const model = (process.env.GEMINI_IMAGE_MODEL || IMAGE_MODEL).trim();
 
-  // Build raw prompt: character reference first (higher attention), then scene, then style
+  // Build raw prompt: strict character rules first (highest attention), then scene, then style
+  const charBlock = heroDescription
+    ? [
+        `MANDATORY CHARACTER APPEARANCE — copy these EXACTLY in every scene, never change anything:`,
+        heroDescription,
+        `Rules: (1) Hair color/style is FIXED — if described as light-blond, it stays light-blond in every single scene.`,
+        `(2) Clothing colors and types are FIXED — same shirt, same trousers, same shoes every scene.`,
+        `(3) ONLY the named characters above appear in this scene — absolutely no additional people, strangers, or background human figures.`,
+        `(4) Do NOT add characters not listed. Do NOT swap or blend character appearances.`,
+      ].join(" ")
+    : "";
+
   const rawPrompt = [
-    heroDescription ? `Character appearances (keep exactly consistent): ${heroDescription}.` : "",
+    charBlock,
     scene.imagePrompt,
-    "Walt Disney animated style, painterly storybook illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation, no text.",
+    "Walt Disney animated style, painterly storybook illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. Absolutely no text, letters, words, signs, labels, captions, subtitles, or writing of any kind anywhere in the image.",
   ].filter(Boolean).join(" ");
 
   // Gemini sanitizes its own prompt — eliminates content filter guesswork
