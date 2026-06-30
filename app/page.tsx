@@ -64,6 +64,12 @@ function saveSettings(s: SavedSettings) {
   } catch {}
 }
 
+function estimateStorySize(sceneCount: number): string {
+  // ~400 KB per scene stored as base64 (220 KB JPEG image + 60 KB MP3 audio, ×1.33 base64)
+  const mb = Math.round(sceneCount * 0.4 * 10) / 10;
+  return `~${mb} MB`;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 // Safely parse JSON — if the server returns plain text (Vercel 500, rate-limit page, etc.)
@@ -879,60 +885,19 @@ export default function Home() {
           </label>
         </div>
 
-        <button type="submit" className="btn-create" disabled={loading || allSelectedCount === 0 || !hasInspiration}>
-          {loading ? "Tvořím pohádku..." : "✨ Vytvořit pohádku"}
-        </button>
-      </form>
-
-      {/* ── HISTORY ── */}
-      {storyHistory.length > 0 && (
-        <div className="history-box">
-          <button type="button" className="history-toggle" onClick={() => setHistoryOpen(p => !p)}>
-            📚 Poslední pohádky ({storyHistory.length}) {historyOpen ? "▲" : "▼"}
-          </button>
-          {historyOpen && (
-            <div className="history-list">
-              {storyHistory.map(entry => (
-                <div key={entry.id} className="history-item">
-                  <div className="history-meta">
-                    <span className="history-title">{entry.title}</span>
-                    <span className="history-date">{fmtDate(entry.createdAt)}</span>
-                    <span className="history-info">{entry.scenes.length} scén</span>
+        {loading && bgStatus === "idle" ? (
+          <div className="btn-progress" ref={progressRef}>
+            <div className="btn-progress-label">{status}</div>
+            <div className="btn-progress-track">
+              {scenes.length === 0
+                ? <div className="btn-progress-shimmer" />
+                : <div className="btn-progress-fill" style={{ width: `${Math.round((doneCount / totalScenes) * 100)}%` }}>
+                    <span className="btn-progress-pct">{Math.round((doneCount / totalScenes) * 100)}%</span>
                   </div>
-                  <button type="button" className="history-replay" onClick={() => replayStory(entry)}
-                    disabled={loading && bgStatus === "idle"}>
-                    ▶ Přehrát znovu
-                  </button>
-                </div>
-              ))}
+              }
             </div>
-          )}
-        </div>
-      )}
-
-      </>
-      )}
-
-      {/* ── GENERATION PROGRESS (foreground only) ── */}
-      {loading && bgStatus === "idle" && (
-        <div className="gen-progress" ref={progressRef}>
-          <p className="gen-status">{status}</p>
-
-          {/* Phase 1: Claude is writing the story — indeterminate shimmer bar */}
-          {scenes.length === 0 && (
-            <div className="gen-bar-track gen-bar-indeterminate" />
-          )}
-
-          {/* Phase 2: scenes generating — deterministic % bar + cards */}
-          {scenes.length > 0 && (
-            <>
-              <div className="gen-bar-track">
-                <div className="gen-bar-fill" style={{ width: `${Math.round((doneCount / totalScenes) * 100)}%` }}>
-                  <span className="gen-bar-pct">{Math.round((doneCount / totalScenes) * 100)}%</span>
-                </div>
-              </div>
-              <p className="gen-count">{doneCount} / {totalScenes} scén hotovo</p>
-              <div className="gen-cards">
+            {scenes.length > 0 && (
+              <div className="gen-cards" style={{ marginTop: '0.7rem' }}>
                 {scenes.map((s, i) => {
                   const st = sceneStatuses[i] ?? "waiting";
                   return (
@@ -946,16 +911,53 @@ export default function Home() {
                           </div>
                       }
                       <span className="gen-card-label">
-                        {st === "generating" ? "🎨" : st === "done" ? "✓" : st === "error" ? "!" : ""} {i + 1}
+                        {st === "done" ? "✓" : st === "error" ? "!" : st === "generating" ? "🎨" : ""} {i + 1}
                       </span>
                     </div>
                   );
                 })}
               </div>
-            </>
+            )}
+          </div>
+        ) : (
+          <button type="submit" className="btn-create" disabled={loading || allSelectedCount === 0 || !hasInspiration}>
+            ✨ Vytvořit pohádku
+          </button>
+        )}
+      </form>
+
+      {/* ── HISTORY ── */}
+      {storyHistory.length > 0 && (
+        <div className="history-box">
+          <button type="button" className="history-toggle" onClick={() => setHistoryOpen(p => !p)}>
+            📚 Poslední pohádky ({storyHistory.length}) {historyOpen ? "▲" : "▼"}
+          </button>
+          {historyOpen && (
+            <div className="history-list">
+              {storyHistory.map(entry => (
+                <button key={entry.id} type="button" className="history-item"
+                  onClick={() => replayStory(entry)}
+                  disabled={loading && bgStatus === "idle"}>
+                  <div className="history-item-body">
+                    <span className="history-title">{entry.title}</span>
+                    <div className="history-badges">
+                      <span className="history-badge badge-offline">📥 offline</span>
+                      <span className="history-badge badge-size">{estimateStorySize(entry.scenes.length)}</span>
+                      <span className="history-badge badge-scenes">{entry.scenes.length} scén</span>
+                    </div>
+                    <span className="history-date">{fmtDate(entry.createdAt)}</span>
+                  </div>
+                  <span className="history-play-btn">▶</span>
+                </button>
+              ))}
+            </div>
           )}
         </div>
       )}
+
+      </>
+      )}
+
 
       {!readerMode && status && !loading && <p className="status">{status}</p>}
       {!readerMode && error && <p className="error">⚠️ {error}</p>}
