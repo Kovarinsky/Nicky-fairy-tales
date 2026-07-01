@@ -772,8 +772,8 @@ export default function Home() {
 
       {/* ── Vrátit se na starší pohádku ── */}
       {bookReady && (
-        <button type="button" className="return-btn" onClick={() => setViewMode("reader")}>
-          ↩ Zpět na „{title}"
+        <button type="button" className="btn-return-story" onClick={() => setViewMode("reader")}>
+          ▶ Zpět na „{title}"
         </button>
       )}
 
@@ -921,28 +921,26 @@ export default function Home() {
                   </div>
               }
             </div>
-            {scenes.length > 0 && (
-              <div className="gen-cards" style={{ marginTop: '0.7rem' }}>
-                {scenes.map((s, i) => {
-                  const st = sceneStatuses[i] ?? "waiting";
-                  return (
-                    <div key={i} className={`gen-card gen-card-${st}`}>
-                      {s.imageUrl
-                        ? <img src={s.imageUrl} alt={`Scéna ${i + 1}`} className="gen-card-img" />
-                        : <div className="gen-card-placeholder">
-                            {st === "generating" && <div className="gen-card-spinner" />}
-                            {st === "error" && <span className="gen-card-icon">⚠️</span>}
-                            {st === "waiting" && <span className="gen-card-icon">⏳</span>}
-                          </div>
-                      }
-                      <span className="gen-card-label">
-                        {st === "done" ? "✓" : st === "error" ? "!" : st === "generating" ? "🎨" : ""} {i + 1}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <div className="gen-cards" style={{ marginTop: '0.7rem' }}>
+              {(scenes.length > 0 ? scenes : Array(sceneCount).fill(null)).map((s, i) => {
+                const st = s ? (sceneStatuses[i] ?? "waiting") : "waiting";
+                return (
+                  <div key={i} className={`gen-card gen-card-${st}`}>
+                    {s?.imageUrl
+                      ? <img src={s.imageUrl} alt={`Scéna ${i + 1}`} className="gen-card-img" />
+                      : <div className="gen-card-placeholder">
+                          {st === "generating" && <div className="gen-card-spinner" />}
+                          {st === "error" && <span className="gen-card-icon">⚠️</span>}
+                          {st === "waiting" && <span className="gen-card-icon">⏳</span>}
+                        </div>
+                    }
+                    <span className="gen-card-label">
+                      {st === "done" ? "✓" : st === "error" ? "!" : st === "generating" ? "🎨" : ""} {i + 1}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ) : (
           <button type="submit" className="btn-create" disabled={loading || allSelectedCount === 0 || !hasInspiration}>
@@ -1077,6 +1075,14 @@ export default function Home() {
                 aria-label={isFullscreen ? "Ukoncit fullscreen" : "Fullscreen"}
               >
                 {isFullscreen ? "⊡" : "⛶"}
+              </button>
+
+              <button type="button" className="ctrl-btn ctrl-home"
+                onClick={resetToForm}
+                title="Hlavní stránka"
+                aria-label="Hlavní stránka"
+              >
+                🏠
               </button>
 
               <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page + 1)} disabled={!hasNext} aria-label="Další">→</button>
