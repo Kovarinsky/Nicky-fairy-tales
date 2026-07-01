@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
     }
 
     let imageDebug = "";
+    let audioDebug = "";
     const [imageResult, audio] = await Promise.all([
       generateSceneImage(scene, heroDescription).catch((e: Error) => {
         imageDebug = e.message;
@@ -36,7 +37,9 @@ export async function POST(req: NextRequest) {
         return null; // fallback to SVG placeholder
       }),
       narrateScene(scene, voiceId).catch((e: Error) => {
-        throw new Error(`[ElevenLabs] ${e.message}`);
+        audioDebug = e.message;
+        console.error(`[ElevenLabs] ${e.message}`);
+        return null; // audio is optional — book works without it
       }),
     ]);
 
@@ -51,8 +54,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       imageUrl,
-      audioUrl: `data:audio/mpeg;base64,${audio.toString("base64")}`,
+      ...(audio ? { audioUrl: `data:audio/mpeg;base64,${audio.toString("base64")}` } : {}),
       ...(imageDebug ? { imageDebug } : {}),
+      ...(audioDebug ? { audioDebug } : {}),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Neznámá chyba";

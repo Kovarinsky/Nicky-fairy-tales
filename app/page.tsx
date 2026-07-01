@@ -722,7 +722,9 @@ export default function Home() {
     margin: '0', overflow: 'hidden',
   } : {};
   const fsBookCard: React.CSSProperties = isFullscreen ? {
-    display: 'flex', flexDirection: 'column',
+    display: 'grid',
+    gridTemplateRows: '1fr auto auto auto', // image expands, body/controls/dots take natural height
+    flex: '1 1 0', minHeight: '0',
     borderRadius: '0', margin: '0', overflow: 'hidden',
     boxShadow: 'none', animation: 'none',
   } : {};
@@ -980,13 +982,13 @@ export default function Home() {
             onTouchEnd={handleTouchEnd}
           >
             {isFullscreen ? (
-              // Explicit 65dvh height bypasses flex chain — no dependency on parent having definite height
+              // flex: 1 1 0 + min-height: 0 lets the image fill remaining space after title/text/controls/dots
               current.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={current.imageUrl} alt={`Scéna ${page + 1}`}
-                  style={{ width: '100%', height: '65dvh', objectFit: 'cover', display: 'block', flexShrink: 0 }} />
+                  style={{ width: '100%', height: '100%', minHeight: '0', objectFit: 'cover', display: 'block' }} />
               ) : (
-                <div style={{ width: '100%', height: '65dvh', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', background: 'linear-gradient(135deg,#1a0a3e 0%,#2d0d52 50%,#1a0a3e 100%)', color: 'rgba(255,255,255,0.7)', fontSize: '1rem', fontWeight: 700 }}>
+                <div style={{ width: '100%', height: '100%', minHeight: '0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', background: 'linear-gradient(135deg,#1a0a3e 0%,#2d0d52 50%,#1a0a3e 100%)', color: 'rgba(255,255,255,0.7)', fontSize: '1rem', fontWeight: 700 }}>
                   <div className="placeholder-spinner" />
                   <span>🎨 Generuji scénu {page + 1}...</span>
                 </div>
