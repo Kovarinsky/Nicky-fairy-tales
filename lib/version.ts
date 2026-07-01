@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.8";
+export const APP_VERSION = "2.9";
 
 // Changelog (newest first)
+// 2.9 - Reader mode: viewport-filling layout (CSS Grid 1fr na book-card), image vyplní zbývající výšku
 // 2.8 - Fullscreen: tap-to-show ovládání (controls skryty, zobrazí se na klik/tap na 3s, pak zmizí)
 // 2.7 - Fullscreen: CSS Grid (1fr auto auto auto) na book-card → controls vždy viditelné; 16:9 aspect-ratio v reader; audio optional
 // 2.6 - Historie: výrazné karty s offline/size/scény badge, tlačítko → oranžový % bar + ikonky scén
