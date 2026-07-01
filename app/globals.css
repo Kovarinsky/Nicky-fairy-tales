@@ -405,22 +405,20 @@ button:disabled {
   box-shadow: 0 2px 8px rgba(249, 115, 22, 0.4);
 }
 
-/* ── Reader mode — maximální plocha pro knížku ── */
+/* ── Reader mode — book vyplní viewport, formulář skryt, karta zachová styling ── */
 .container.reader-mode {
-  max-width: 100%;
-  padding: 0;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  padding-bottom: 0;
 }
 
 .reader-mode .photo-bg-img {
   display: none;
 }
 
-/* Skryjeme back-btn v reader modu — nahradí ho 🏠 v ovládacím panelu */
 .reader-mode .back-btn {
-  display: none;
+  display: block;
 }
 
 .back-btn {
@@ -495,44 +493,29 @@ button:disabled {
 }
 
 .reader-mode .book {
-  margin-top: 0;
-  flex: 1 1 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  margin-top: 0.5rem;
   min-height: 0;
 }
 
 .reader-mode .book-title {
-  flex-shrink: 0;
-  font-size: 0.82rem;
-  font-weight: 700;
-  margin: 0;
-  padding: 0.5rem 1rem 0.4rem;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: rgba(255, 255, 255, 0.75);
-  text-shadow: none;
-  letter-spacing: 0;
-  background: rgba(0, 0, 0, 0.25);
+  font-size: 1rem;
+  margin-bottom: 0.4rem;
 }
 
-
-/* Book-card fills remaining space with grid: image gets 1fr, rest auto */
+/* Card fills remaining flex space; grid: image 1fr, body auto, controls auto */
 .reader-mode .book-card {
-  flex: 1 1 0;
+  flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-rows: 1fr auto auto auto;
+  grid-template-rows: 1fr auto auto;
   grid-template-columns: minmax(0, 1fr);
-  border-radius: 0;
-  margin: 0;
-  box-shadow: none;
   animation: none;
 }
 
-/* Image fills 1fr row without fixed aspect-ratio */
+/* Image fills 1fr row */
 .reader-mode .page-image {
   width: 100%;
   height: 100%;
@@ -729,13 +712,26 @@ button:disabled {
 }
 
 /* ── Progress dots (inside book-card, light background) ── */
+/* Nav row: ← [dots] → — lives outside .book-card to avoid overflow:hidden clipping */
+.book-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.5rem 0.75rem;
+  gap: 0.5rem;
+}
+
+.book-nav .ctrl-nav {
+  flex-shrink: 0;
+}
+
 .page-dots {
   display: flex;
   justify-content: center;
+  align-items: center;
   gap: 0.45rem;
-  padding: 0.55rem 1rem 0.7rem;
+  flex: 1;
   flex-wrap: wrap;
-  background: rgba(248, 247, 255, 0.7);
 }
 
 .dot {
@@ -1396,7 +1392,7 @@ button:disabled {
 
   h1 { font-size: 1.55rem; text-align: left; padding: 0.7rem 0.85rem 0.1rem; }
   .subtitle { font-size: 0.82rem; text-align: left; padding: 0 0.85rem; margin-bottom: 0.6rem; }
-  .container.reader-mode { padding-top: 0.4rem; }
+  .container.reader-mode { padding-top: 0.4rem; padding-bottom: 0; }
   .back-btn { padding: 0.3rem 0.65rem; }
 
   .photo-bg-img { height: 70vh; }
@@ -1433,6 +1429,7 @@ button:disabled {
   .ctrl-auto, .ctrl-mute, .ctrl-home { width: 32px; height: 32px; font-size: 0.85rem; }
   .ctrl-counter { font-size: 0.8rem; min-width: 2rem; }
 
-  .page-dots { gap: 0.28rem; margin-top: 0.6rem; }
+  .book-nav { padding: 0.25rem 0.65rem 0.5rem; }
+  .page-dots { gap: 0.28rem; }
   .dot { width: 7px; height: 7px; }
 }

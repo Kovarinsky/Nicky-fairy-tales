@@ -236,6 +236,7 @@ export default function Home() {
           setTitle(draft.title);
           setScenes(draft.scenes);
           setPage(draft.page ?? 0);
+          setViewMode("reader");
         }
         localStorage.removeItem(DRAFT_KEY);
       }
@@ -357,6 +358,7 @@ export default function Home() {
     setScenes(newScenes);
     setPage(0);
     setSlideKey(k => k + 1);
+    setViewMode("reader");
   }
 
   // ── Navigation ──
@@ -572,6 +574,7 @@ export default function Home() {
       evictOldStories(loadHistory().map(e => e.id)).catch(() => {});
       if (!background) {
         setStatus("✨ Pohádka je připravena!");
+        setViewMode("reader");
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Něco se pokazilo.";
@@ -595,6 +598,7 @@ export default function Home() {
       setScenes([...readyScenes]);
       setPage(0);
       setSlideKey(k => k + 1);
+      setViewMode("reader");
       setHistoryOpen(false);
     }
 
@@ -633,6 +637,7 @@ export default function Home() {
       renderedMapRef.current.set(entry.id, finalScenes);
       cacheStory(entry.id, finalScenes).catch(() => {});
       setStatus("✨ Pohádka je připravena!");
+      setViewMode("reader");
     } catch (err) {
       const msg2 = err instanceof Error ? err.message : "Generování selhalo.";
       setError(msg2 === "Failed to fetch" || msg2.includes("AbortError") ? "FETCH_ABORT" : msg2);
@@ -953,8 +958,6 @@ export default function Home() {
             </div>
 
             <div className="book-controls">
-              <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page - 1)} disabled={!hasPrev} aria-label="Předchozí">←</button>
-
               <button type="button" className={`ctrl-btn ctrl-play ${!current.audioUrl || regenAudio ? "ctrl-loading" : ""}`}
                 onClick={togglePlay} disabled={!current.audioUrl || regenAudio} aria-label={isPlaying ? "Pauza" : "Přehrát"}>
                 {regenAudio ? "⏳" : !current.audioUrl ? "⏳" : isPlaying ? "⏸" : "▶"}
@@ -997,19 +1000,20 @@ export default function Home() {
               >
                 🏠
               </button>
-
-              <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page + 1)} disabled={!hasNext} aria-label="Další">→</button>
             </div>
+          </div>
 
-            {scenes.length > 1 && (
-              <div className="page-dots">
-                {scenes.map((_, i) => (
-                  <button key={i} type="button"
-                    className={`dot ${i === page ? "dot-active" : ""} ${scenes[i]?.audioUrl ? "dot-ready" : ""}`}
-                    onClick={() => goToPage(i)} aria-label={`Strana ${i + 1}`} />
-                ))}
-              </div>
-            )}
+          {/* Nav arrows + dots outside the card — no overflow clipping */}
+          <div className="book-nav">
+            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page - 1)} disabled={!hasPrev} aria-label="Předchozí">←</button>
+            <div className="page-dots">
+              {scenes.map((_, i) => (
+                <button key={i} type="button"
+                  className={`dot ${i === page ? "dot-active" : ""} ${scenes[i]?.audioUrl ? "dot-ready" : ""}`}
+                  onClick={() => goToPage(i)} aria-label={`Strana ${i + 1}`} />
+              ))}
+            </div>
+            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page + 1)} disabled={!hasNext} aria-label="Další">→</button>
           </div>
 
           {current.audioUrl && (

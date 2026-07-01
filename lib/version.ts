@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.18";
+export const APP_VERSION = "2.19";
 
 // Changelog (newest first)
+// 2.19 - Reader mode: book vyplní viewport bez edge-to-edge; šipky ← → přesunuty pod kartu (žádné ořezání)
 // 2.18 - Detekce přerušeného spojení (přepnutí appky): česká hláška + tlačítko Zkusit znovu; timeout 90s na scene fetch
 // 2.17 - Odstraněn reader mode (žádný fullscreen); pohádka se zobrazí pod formulářem s auto-scroll; popis kroků generování
 // 2.16 - Odstraněno expand-on-play (CSS position:fixed overlay při ▶); čistý reader mód bez přepínání
