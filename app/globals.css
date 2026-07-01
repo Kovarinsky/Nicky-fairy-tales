@@ -382,17 +382,21 @@ button:disabled {
   border-left: 3px solid #ef4444;
 }
 
-/* ── Reader mode — celá obrazovka pro knížku ── */
+/* ── Reader mode — maximální plocha pro knížku ── */
 .container.reader-mode {
-  max-width: 860px;
-  padding-top: 0.75rem;
-  padding-bottom: 0;
+  max-width: 100%;
+  padding: 0;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
 
 .reader-mode .photo-bg-img {
+  display: none;
+}
+
+/* Skryjeme back-btn v reader modu — nahradí ho 🏠 v ovládacím panelu */
+.reader-mode .back-btn {
   display: none;
 }
 
@@ -475,6 +479,22 @@ button:disabled {
   min-height: 0;
 }
 
+.reader-mode .book-title {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin: 0;
+  padding: 0.5rem 1rem 0.4rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: none;
+  letter-spacing: 0;
+  background: rgba(0, 0, 0, 0.25);
+}
+
 /* Book-card fills remaining space with grid: image gets 1fr, rest auto */
 .reader-mode .book-card {
   flex: 1 1 0;
@@ -482,6 +502,10 @@ button:disabled {
   display: grid;
   grid-template-rows: 1fr auto auto auto;
   grid-template-columns: minmax(0, 1fr);
+  border-radius: 0;
+  margin: 0;
+  box-shadow: none;
+  animation: none;
 }
 
 /* Image fills 1fr row without fixed aspect-ratio */
@@ -1331,84 +1355,6 @@ button:disabled {
   font-weight: 600;
 }
 
-/* ── Fullscreen layout: image fills entire display ── */
-body.is-fullscreen {
-  overflow: hidden;
-}
-
-.is-fullscreen .container.reader-mode {
-  max-width: 100%;
-  padding: 0;
-  position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.is-fullscreen .book {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  overflow: hidden;
-}
-
-.is-fullscreen .back-btn {
-  display: none;
-}
-
-.is-fullscreen .book-title {
-  flex-shrink: 0;
-  font-size: 1rem;
-  margin-bottom: 0;
-  padding: 0.4rem 1rem 0.3rem;
-}
-
-.is-fullscreen .book-card {
-  display: flex;
-  flex-direction: column;
-  border-radius: 0;
-  margin: 0;
-  overflow: hidden;
-  box-shadow: none;
-  animation: none;
-}
-
-/* .page-image class is not applied in fullscreen (wrapper div pattern) — rule kept as fallback */
-.is-fullscreen .page-image {
-  flex: 1 1 0;
-  width: 100%;
-  min-height: 0;
-  aspect-ratio: auto !important;
-  object-fit: cover;
-  display: block;
-}
-
-.is-fullscreen .page-body {
-  flex-shrink: 0;
-  max-height: 22dvh;
-  overflow-y: auto;
-  padding: 0.65rem 1rem 0.5rem;
-}
-
-.is-fullscreen .page-text {
-  font-size: 0.97rem;
-  line-height: 1.6;
-}
-
-.is-fullscreen .book-controls {
-  flex-shrink: 0;
-  padding: 0.45rem 1rem 0.5rem;
-}
-
-.is-fullscreen .page-dots {
-  flex-shrink: 0;
-  padding: 0.3rem 1rem 0.45rem;
-  margin-top: 0;
-}
 
 /* ── Mobile-only overrides (edge-to-edge, smaller fonts) ── */
 @media (max-width: 600px) {

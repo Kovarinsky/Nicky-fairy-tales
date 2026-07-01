@@ -155,21 +155,24 @@ export async function generateSceneImage(scene: Scene, heroDescription: string):
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
   const model = (process.env.GEMINI_IMAGE_MODEL || IMAGE_MODEL).trim();
 
-  // Build raw prompt: strict character rules first (highest attention), then scene, then style
-  const charBlock = heroDescription
+  // Build raw prompt: character lock bookends the scene (start + end = highest model attention)
+  const charLockOpen = heroDescription
     ? [
-        `MANDATORY CHARACTER APPEARANCE — copy these EXACTLY in every scene, never change anything:`,
+        `⚠ APPEARANCE LOCK — IMMUTABLE across every image in this story:`,
         heroDescription,
-        `Rules: (1) Hair color/style is FIXED — if described as light-blond, it stays light-blond in every single scene.`,
-        `(2) Clothing colors and types are FIXED — same shirt, same trousers, same shoes every scene.`,
-        `(3) ONLY the named characters above appear in this scene — absolutely no additional people, strangers, or background human figures.`,
-        `(4) Do NOT add characters not listed. Do NOT swap or blend character appearances.`,
+        `Every named character MUST look IDENTICAL to this description: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes. These are LOCKED — do NOT change anything between scenes.`,
+        `ONLY the characters named in the scene are visible — zero additional people, strangers, or background human figures.`,
       ].join(" ")
     : "";
 
+  const charLockClose = heroDescription
+    ? `⚠ CONSISTENCY REMINDER: match hair, eyes, clothing EXACTLY as stated above — do NOT alter any detail.`
+    : "";
+
   const rawPrompt = [
-    charBlock,
+    charLockOpen,
     scene.imagePrompt,
+    charLockClose,
     "Walt Disney animated style, painterly storybook illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. Absolutely no text, letters, words, signs, labels, captions, subtitles, or writing of any kind anywhere in the image.",
   ].filter(Boolean).join(" ");
 

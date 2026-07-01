@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.13";
+export const APP_VERSION = "2.14";
 
 // Changelog (newest first)
+// 2.14 - Reader: max screen (edge-to-edge, skrytý back-btn, kompaktní titulek); konzistence postav: APPEARANCE LOCK v Gemini i Claude
 // 2.13 - Tlačítko Vytvořit pohádku: animovaný progress fill + %; gen-cards pod tlačítkem; odstraněno Zpět na pohádku
 // 2.12 - Odstraněn fullscreen mód; oranžové šipky ← → pro navigaci scén
 // 2.11 - Gen-cards od začátku načítání; oranžové tlačítko 🏠 v ovládání; oranžové tlačítko Zpět na pohádku
