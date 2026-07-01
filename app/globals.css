@@ -495,46 +495,6 @@ button:disabled {
   background: rgba(0, 0, 0, 0.25);
 }
 
-/* ── Expanded mode: book overlay, triggered by play button ── */
-body.book-expanded {
-  overflow: hidden;
-}
-
-/* book-title a book-card v expanded režimu — stejné jako v reader-mode */
-.book-expanded .book-title {
-  flex-shrink: 0;
-  font-size: 0.82rem;
-  font-weight: 700;
-  margin: 0;
-  padding: 0.5rem 1rem 0.4rem;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: rgba(255, 255, 255, 0.75);
-  background: rgba(0, 0, 0, 0.25);
-  text-shadow: none;
-}
-
-.book-expanded .book-card {
-  flex: 1 1 0;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: 1fr auto auto auto;
-  grid-template-columns: minmax(0, 1fr);
-  border-radius: 0;
-  margin: 0;
-  box-shadow: none;
-  animation: none;
-}
-
-.book-expanded .page-image {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  aspect-ratio: auto;
-  object-fit: cover;
-}
 
 /* Book-card fills remaining space with grid: image gets 1fr, rest auto */
 .reader-mode .book-card {

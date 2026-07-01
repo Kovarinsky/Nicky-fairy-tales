@@ -162,7 +162,6 @@ export default function Home() {
   const [page, setPage] = useState(0);
   const [slideKey, setSlideKey] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [expanded, setExpanded] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [musicOn, setMusicOn] = useState(true);
   const [showCredits, setShowCredits] = useState(false);
@@ -291,15 +290,6 @@ export default function Home() {
     if (scenes.length === 0) introFiredRef.current = false;
   }, [scenes.length]);
 
-  // Sync body class for expanded mode; auto-collapse when leaving reader
-  useEffect(() => {
-    document.body.classList.toggle("book-expanded", expanded);
-    return () => document.body.classList.remove("book-expanded");
-  }, [expanded]);
-  useEffect(() => {
-    if (!readerMode) setExpanded(false);
-  }, [readerMode]);
-
   // Scroll progress into view when loading starts (mobile UX)
   useEffect(() => {
     if (loading) setTimeout(() => progressRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
@@ -337,7 +327,6 @@ export default function Home() {
   function resetToForm() {
     audioRef.current?.pause();
     setIsPlaying(false);
-    setExpanded(false);
     setViewMode("form");
     try { localStorage.removeItem(DRAFT_KEY); } catch {}
   }
@@ -431,12 +420,7 @@ export default function Home() {
 
   function togglePlay() {
     const a = audioRef.current; if (!a) return;
-    if (isPlaying) {
-      a.pause();
-    } else {
-      setExpanded(true);
-      a.play().catch(() => {});
-    }
+    isPlaying ? a.pause() : a.play().catch(() => {});
   }
 
   // ── Core: generate media for a script ────────────────────────────────────
@@ -917,12 +901,7 @@ export default function Home() {
 
       {/* ── BOOK – shown when all scene images are ready (audio may be partial) ── */}
       {bookReady && current && (
-        <div className="book" style={expanded ? {
-          position: 'fixed', inset: '0', zIndex: 50,
-          display: 'flex', flexDirection: 'column',
-          margin: '0', overflow: 'hidden',
-          background: 'var(--bg-body, #0a0520)',
-        } : undefined}>
+        <div className="book">
           <button type="button" className="back-btn" onClick={resetToForm}>
             ← Nová pohádka
           </button>
