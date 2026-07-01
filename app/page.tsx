@@ -164,9 +164,6 @@ export default function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [musicOn, setMusicOn] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showControls, setShowControls] = useState(false);
-  const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showCredits, setShowCredits] = useState(false);
   const [regenAudio, setRegenAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -279,36 +276,13 @@ export default function Home() {
     ambientRef.current?.setScene(scenes[page]?.soundscape);
   }, [page, bookReady, scenes]);
 
-  // Fullscreen: sync state only on EXTERNAL exit (Escape key, gesture)
-  // The class is set immediately in toggleFullscreen() for instant CSS response
-  useEffect(() => {
-    const onChange = () => {
-      if (!document.fullscreenElement) {
-        setIsFullscreen(false);
-        setShowControls(false);
-        if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
-        document.body.classList.remove("is-fullscreen");
-      }
-    };
-    document.addEventListener("fullscreenchange", onChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", onChange);
-      document.body.classList.remove("is-fullscreen");
-    };
-  }, []);
-
-  // Intro fanfare + fullscreen when reader opens
+  // Intro fanfare when reader opens
   const introFiredRef = useRef(false);
   useEffect(() => {
     if (!bookReady || viewMode !== "reader" || introFiredRef.current) return;
     introFiredRef.current = true;
     ambientRef.current?.playIntro();
     ambientRef.current?.setScene(scenes[0]?.soundscape);
-    // Set fullscreen state + class IMMEDIATELY (works on iOS too; don't wait for fullscreenchange)
-    setIsFullscreen(true);
-    setShowControls(false);
-    document.body.classList.add("is-fullscreen");
-    document.documentElement.requestFullscreen?.().catch(() => {});
   }, [bookReady, viewMode, scenes]);
 
   // Reset intro flag when new story starts
@@ -349,36 +323,11 @@ export default function Home() {
     else if (dx > 0 && hasPrev) goToPage(page - 1);
   }
 
-  // ── Fullscreen ──
-  function toggleFullscreen() {
-    const newFs = !isFullscreen;
-    setIsFullscreen(newFs);
-    setShowControls(false);
-    if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
-    document.body.classList.toggle("is-fullscreen", newFs);
-    if (newFs) {
-      document.documentElement.requestFullscreen?.().catch(() => {});
-    } else {
-      document.exitFullscreen?.().catch(() => {});
-    }
-  }
-
-  // ── Tap to show/hide controls in fullscreen ──
-  function handleBookTap() {
-    if (!isFullscreen) return;
-    if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
-    setShowControls(true);
-    hideControlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
-  }
-
   // ── Reset to form (keeps old story in memory for "go back") ──
   function resetToForm() {
     audioRef.current?.pause();
     setIsPlaying(false);
     setViewMode("form");
-    setIsFullscreen(false);
-    document.body.classList.remove("is-fullscreen");
-    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     try { localStorage.removeItem(DRAFT_KEY); } catch {}
   }
 
@@ -726,44 +675,8 @@ export default function Home() {
   const hasPrev = page > 0;
   const totalScenes = scenes.length;
 
-  // Inline styles for fullscreen — guaranteed to override any CSS cascade/specificity issue
-  const fsContainer: React.CSSProperties = readerMode && isFullscreen ? {
-    position: 'fixed', inset: '0', maxWidth: '100%', padding: '0',
-    display: 'flex', flexDirection: 'column', overflow: 'hidden',
-  } : {};
-  const fsBook: React.CSSProperties = isFullscreen ? {
-    position: 'fixed', inset: '0', zIndex: 10,
-    display: 'flex', flexDirection: 'column',
-    margin: '0', overflow: 'hidden',
-  } : {};
-  const fsBookCard: React.CSSProperties = isFullscreen ? {
-    display: 'grid',
-    gridTemplateRows: 'auto 1fr auto auto', // image=16:9 fixed, body fills rest, controls/dots auto
-    gridTemplateColumns: 'minmax(0, 1fr)',
-    flex: '1 1 0', minHeight: '0',
-    borderRadius: '0', margin: '0', overflow: 'hidden',
-    boxShadow: 'none', animation: 'none',
-  } : {};
-  const fsBody: React.CSSProperties = isFullscreen ? {
-    minHeight: 0, overflowY: 'auto',
-    padding: '0.75rem 1.1rem 0.5rem',
-    display: 'flex', flexDirection: 'column', justifyContent: 'center',
-  } : {};
-  const fsControls: React.CSSProperties = isFullscreen ? {
-    flexShrink: 0, padding: '0.45rem 1rem 0.5rem',
-    opacity: showControls ? 1 : 0,
-    pointerEvents: showControls ? 'auto' : 'none',
-    transition: 'opacity 0.3s ease',
-  } : {};
-  const fsDots: React.CSSProperties = isFullscreen ? {
-    flexShrink: 0, padding: '0.3rem 1rem 0.45rem', marginTop: '0',
-    opacity: showControls ? 1 : 0,
-    pointerEvents: showControls ? 'auto' : 'none',
-    transition: 'opacity 0.3s ease',
-  } : {};
-
   return (
-    <div className={readerMode ? "container reader-mode" : "container"} style={fsContainer}>
+    <div className={readerMode ? "container reader-mode" : "container"}>
 
       {!readerMode && (
       <>
@@ -987,51 +900,31 @@ export default function Home() {
 
       {/* ── BOOK – shown when all scene images are ready (audio may be partial) ── */}
       {bookReady && current && (
-        <div className="book" style={fsBook}>
-          <button type="button" className="back-btn"
-            style={isFullscreen ? { display: 'none' } : undefined}
-            onClick={resetToForm}>
+        <div className="book">
+          <button type="button" className="back-btn" onClick={resetToForm}>
             ← Nová pohádka
           </button>
-          <h2 className="book-title"
-            style={isFullscreen ? { flexShrink: 0, fontSize: '1rem', marginBottom: '0', padding: '0.4rem 1rem 0.3rem' } : undefined}>
-            {title}
-          </h2>
+          <h2 className="book-title">{title}</h2>
 
-          <div className="book-card" key={slideKey} style={fsBookCard}
+          <div className="book-card" key={slideKey}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            onClick={handleBookTap}
           >
-            {isFullscreen ? (
-              // flex: 1 1 0 + min-height: 0 lets the image fill remaining space after title/text/controls/dots
-              current.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={current.imageUrl} alt={`Scéna ${page + 1}`}
-                  style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block', flexShrink: 0 }} />
-              ) : (
-                <div style={{ width: '100%', aspectRatio: '16/9', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', background: 'linear-gradient(135deg,#1a0a3e 0%,#2d0d52 50%,#1a0a3e 100%)', color: 'rgba(255,255,255,0.7)', fontSize: '1rem', fontWeight: 700 }}>
-                  <div className="placeholder-spinner" />
-                  <span>🎨 Generuji scénu {page + 1}...</span>
-                </div>
-              )
+            {current.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="page-image" src={current.imageUrl} alt={`Scéna ${page + 1}`} />
             ) : (
-              current.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img className="page-image" src={current.imageUrl} alt={`Scéna ${page + 1}`} />
-              ) : (
-                <div className="page-image placeholder">
-                  <div className="placeholder-spinner" />
-                  <span>🎨 Generuji scénu {page + 1}...</span>
-                </div>
-              )
+              <div className="page-image placeholder">
+                <div className="placeholder-spinner" />
+                <span>🎨 Generuji scénu {page + 1}...</span>
+              </div>
             )}
 
-            <div className="page-body" style={fsBody}>
+            <div className="page-body">
               <p className="page-text">{current.narration}</p>
             </div>
 
-            <div className="book-controls" style={fsControls}>
+            <div className="book-controls">
               <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page - 1)} disabled={!hasPrev} aria-label="Předchozí">←</button>
 
               <button type="button" className={`ctrl-btn ctrl-play ${!current.audioUrl || regenAudio ? "ctrl-loading" : ""}`}
@@ -1069,14 +962,6 @@ export default function Home() {
                 {musicOn ? "🎵" : "🔇"}
               </button>
 
-              <button type="button" className={`ctrl-btn ctrl-fullscreen ${isFullscreen ? "ctrl-fullscreen-on" : ""}`}
-                onClick={toggleFullscreen}
-                title={isFullscreen ? "Ukoncit fullscreen" : "Fullscreen"}
-                aria-label={isFullscreen ? "Ukoncit fullscreen" : "Fullscreen"}
-              >
-                {isFullscreen ? "⊡" : "⛶"}
-              </button>
-
               <button type="button" className="ctrl-btn ctrl-home"
                 onClick={resetToForm}
                 title="Hlavní stránka"
@@ -1089,7 +974,7 @@ export default function Home() {
             </div>
 
             {scenes.length > 1 && (
-              <div className="page-dots" style={fsDots}>
+              <div className="page-dots">
                 {scenes.map((_, i) => (
                   <button key={i} type="button"
                     className={`dot ${i === page ? "dot-active" : ""} ${scenes[i]?.audioUrl ? "dot-ready" : ""}`}

@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.11";
+export const APP_VERSION = "2.12";
 
 // Changelog (newest first)
+// 2.12 - Odstraněn fullscreen mód; oranžové šipky ← → pro navigaci scén
 // 2.11 - Gen-cards od začátku načítání; oranžové tlačítko 🏠 v ovládání; oranžové tlačítko Zpět na pohádku
 // 2.10 - Fullscreen: image 16:9 (no crop), text pod ním; fix text overflow; témata: Pokémon + Sonic
 // 2.9 - Reader mode: viewport-filling layout (CSS Grid 1fr na book-card), image vyplní zbývající výšku
