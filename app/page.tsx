@@ -165,6 +165,8 @@ export default function Home() {
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [musicOn, setMusicOn] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showControls, setShowControls] = useState(false);
+  const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showCredits, setShowCredits] = useState(false);
   const [regenAudio, setRegenAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -283,6 +285,8 @@ export default function Home() {
     const onChange = () => {
       if (!document.fullscreenElement) {
         setIsFullscreen(false);
+        setShowControls(false);
+        if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
         document.body.classList.remove("is-fullscreen");
       }
     };
@@ -302,6 +306,7 @@ export default function Home() {
     ambientRef.current?.setScene(scenes[0]?.soundscape);
     // Set fullscreen state + class IMMEDIATELY (works on iOS too; don't wait for fullscreenchange)
     setIsFullscreen(true);
+    setShowControls(false);
     document.body.classList.add("is-fullscreen");
     document.documentElement.requestFullscreen?.().catch(() => {});
   }, [bookReady, viewMode, scenes]);
@@ -348,12 +353,22 @@ export default function Home() {
   function toggleFullscreen() {
     const newFs = !isFullscreen;
     setIsFullscreen(newFs);
+    setShowControls(false);
+    if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
     document.body.classList.toggle("is-fullscreen", newFs);
     if (newFs) {
       document.documentElement.requestFullscreen?.().catch(() => {});
     } else {
       document.exitFullscreen?.().catch(() => {});
     }
+  }
+
+  // ── Tap to show/hide controls in fullscreen ──
+  function handleBookTap() {
+    if (!isFullscreen) return;
+    if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
+    setShowControls(true);
+    hideControlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
   }
 
   // ── Reset to form (keeps old story in memory for "go back") ──
@@ -722,7 +737,9 @@ export default function Home() {
     margin: '0', overflow: 'hidden',
   } : {};
   const fsBookCard: React.CSSProperties = isFullscreen ? {
-    display: 'flex', flexDirection: 'column',
+    display: 'grid',
+    gridTemplateRows: '1fr auto auto auto', // image expands, body/controls/dots take natural height
+    flex: '1 1 0', minHeight: '0',
     borderRadius: '0', margin: '0', overflow: 'hidden',
     boxShadow: 'none', animation: 'none',
   } : {};
@@ -732,9 +749,15 @@ export default function Home() {
   } : {};
   const fsControls: React.CSSProperties = isFullscreen ? {
     flexShrink: 0, padding: '0.45rem 1rem 0.5rem',
+    opacity: showControls ? 1 : 0,
+    pointerEvents: showControls ? 'auto' : 'none',
+    transition: 'opacity 0.3s ease',
   } : {};
   const fsDots: React.CSSProperties = isFullscreen ? {
     flexShrink: 0, padding: '0.3rem 1rem 0.45rem', marginTop: '0',
+    opacity: showControls ? 1 : 0,
+    pointerEvents: showControls ? 'auto' : 'none',
+    transition: 'opacity 0.3s ease',
   } : {};
 
   return (
@@ -978,15 +1001,16 @@ export default function Home() {
           <div className="book-card" key={slideKey} style={fsBookCard}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
+            onClick={handleBookTap}
           >
             {isFullscreen ? (
-              // Explicit 65dvh height bypasses flex chain — no dependency on parent having definite height
+              // flex: 1 1 0 + min-height: 0 lets the image fill remaining space after title/text/controls/dots
               current.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={current.imageUrl} alt={`Scéna ${page + 1}`}
-                  style={{ width: '100%', height: '65dvh', objectFit: 'cover', display: 'block', flexShrink: 0 }} />
+                  style={{ width: '100%', height: '100%', minHeight: '0', objectFit: 'cover', display: 'block' }} />
               ) : (
-                <div style={{ width: '100%', height: '65dvh', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', background: 'linear-gradient(135deg,#1a0a3e 0%,#2d0d52 50%,#1a0a3e 100%)', color: 'rgba(255,255,255,0.7)', fontSize: '1rem', fontWeight: 700 }}>
+                <div style={{ width: '100%', height: '100%', minHeight: '0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', background: 'linear-gradient(135deg,#1a0a3e 0%,#2d0d52 50%,#1a0a3e 100%)', color: 'rgba(255,255,255,0.7)', fontSize: '1rem', fontWeight: 700 }}>
                   <div className="placeholder-spinner" />
                   <span>🎨 Generuji scénu {page + 1}...</span>
                 </div>
