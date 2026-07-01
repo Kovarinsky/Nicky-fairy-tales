@@ -170,6 +170,8 @@ export default function Home() {
   const ambientRef = useRef<AmbientPlayer | null>(null);
   const pendingPageRef = useRef<number | null>(null);
   const progressRef = useRef<HTMLDivElement>(null);
+  const bookRef = useRef<HTMLDivElement>(null);
+  const bookScrolledRef = useRef(false);
 
   // History
   const [storyHistory, setStoryHistory] = useState<HistoryEntry[]>([]);
@@ -233,7 +235,6 @@ export default function Home() {
           setTitle(draft.title);
           setScenes(draft.scenes);
           setPage(draft.page ?? 0);
-          setViewMode("reader");
         }
         localStorage.removeItem(DRAFT_KEY);
       }
@@ -243,7 +244,7 @@ export default function Home() {
   // ── Save draft on window switch (Android background kill) ──
   useEffect(() => {
     function onVisibilityChange() {
-      if (document.hidden && scenes.length > 0 && viewMode === "reader") {
+      if (document.hidden && scenes.length > 0) {
         try {
           localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, scenes, page }));
         } catch {}
@@ -279,7 +280,7 @@ export default function Home() {
   // Intro fanfare when reader opens
   const introFiredRef = useRef(false);
   useEffect(() => {
-    if (!bookReady || viewMode !== "reader" || introFiredRef.current) return;
+    if (!bookReady || introFiredRef.current) return;
     introFiredRef.current = true;
     ambientRef.current?.playIntro();
     ambientRef.current?.setScene(scenes[0]?.soundscape);
@@ -294,6 +295,15 @@ export default function Home() {
   useEffect(() => {
     if (loading) setTimeout(() => progressRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
   }, [loading]);
+
+  // Scroll to book section when it first becomes ready
+  useEffect(() => {
+    if (bookReady && !bookScrolledRef.current) {
+      bookScrolledRef.current = true;
+      setTimeout(() => bookRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+    }
+    if (!bookReady) bookScrolledRef.current = false;
+  }, [bookReady]);
 
   // ── Auto-play narration after slide animation ──
   // Only auto-plays when triggered by audio-end advance or first story load — not manual navigation.
@@ -346,7 +356,6 @@ export default function Home() {
     setScenes(newScenes);
     setPage(0);
     setSlideKey(k => k + 1);
-    setViewMode("reader");
   }
 
   // ── Navigation ──
@@ -561,7 +570,6 @@ export default function Home() {
       evictOldStories(loadHistory().map(e => e.id)).catch(() => {});
       if (!background) {
         setStatus("✨ Pohádka je připravena!");
-        setViewMode("reader");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Něco se pokazilo.");
@@ -583,7 +591,6 @@ export default function Home() {
       setScenes([...readyScenes]);
       setPage(0);
       setSlideKey(k => k + 1);
-      setViewMode("reader");
       setHistoryOpen(false);
     }
 
@@ -622,7 +629,6 @@ export default function Home() {
       renderedMapRef.current.set(entry.id, finalScenes);
       cacheStory(entry.id, finalScenes).catch(() => {});
       setStatus("✨ Pohádka je připravena!");
-      setViewMode("reader");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generování selhalo.");
       setStatus("");
@@ -833,11 +839,18 @@ export default function Home() {
                 {isGenerating ? (
                   showShimmer
                     ? <span className="btn-create-label">✍️ Píšu příběh...</span>
-                    : <span className="btn-create-label">🎨 {progressPct}%</span>
+                    : <span className="btn-create-label">🎨 {doneCount}/{totalScenes} scén ({progressPct}%)</span>
                 ) : "✨ Vytvořit pohádku"}
               </button>
               {isGenerating && (
-                <div className="gen-cards" style={{ marginTop: '0.75rem' }}>
+                <p className="gen-step-hint">
+                  {showShimmer
+                    ? '📝 Krok 1/2 — Claude vymýšlí příběh… (~1 min)'
+                    : `🖼️ Krok 2/2 — Kreslím scénu ${doneCount + 1} / ${totalScenes}${totalScenes > 0 ? ` • zbývá ~${Math.max(1, Math.ceil((totalScenes - doneCount) * 18 / 60))} min` : ''}`}
+                </p>
+              )}
+              {isGenerating && (
+                <div className="gen-cards" style={{ marginTop: '0.25rem' }}>
                   {(scenes.length > 0 ? scenes : Array(sceneCount).fill(null)).map((s, i) => {
                     const st = s ? (sceneStatuses[i] ?? "waiting") : "waiting";
                     return (
@@ -901,7 +914,7 @@ export default function Home() {
 
       {/* ── BOOK – shown when all scene images are ready (audio may be partial) ── */}
       {bookReady && current && (
-        <div className="book">
+        <div className="book" ref={bookRef}>
           <button type="button" className="back-btn" onClick={resetToForm}>
             ← Nová pohádka
           </button>

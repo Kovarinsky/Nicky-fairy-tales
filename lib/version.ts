@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.16";
+export const APP_VERSION = "2.17";
 
 // Changelog (newest first)
+// 2.17 - Odstraněn reader mode (žádný fullscreen); pohádka se zobrazí pod formulářem s auto-scroll; popis kroků generování
 // 2.16 - Odstraněno expand-on-play (CSS position:fixed overlay při ▶); čistý reader mód bez přepínání
 // 2.15 - Expand on play: ▶ roztáhne book přes celý viewport (CSS position:fixed, bez native fullscreen)
 // 2.14 - Reader: max screen (edge-to-edge, skrytý back-btn, kompaktní titulek); konzistence postav: APPEARANCE LOCK v Gemini i Claude
