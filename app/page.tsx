@@ -738,14 +738,16 @@ export default function Home() {
   } : {};
   const fsBookCard: React.CSSProperties = isFullscreen ? {
     display: 'grid',
-    gridTemplateRows: '1fr auto auto auto', // image expands, body/controls/dots take natural height
+    gridTemplateRows: 'auto 1fr auto auto', // image=16:9 fixed, body fills rest, controls/dots auto
+    gridTemplateColumns: 'minmax(0, 1fr)',
     flex: '1 1 0', minHeight: '0',
     borderRadius: '0', margin: '0', overflow: 'hidden',
     boxShadow: 'none', animation: 'none',
   } : {};
   const fsBody: React.CSSProperties = isFullscreen ? {
-    flexShrink: 0, maxHeight: '22dvh', overflowY: 'auto',
-    padding: '0.65rem 1rem 0.5rem',
+    minHeight: 0, overflowY: 'auto',
+    padding: '0.75rem 1.1rem 0.5rem',
+    display: 'flex', flexDirection: 'column', justifyContent: 'center',
   } : {};
   const fsControls: React.CSSProperties = isFullscreen ? {
     flexShrink: 0, padding: '0.45rem 1rem 0.5rem',
@@ -1008,9 +1010,9 @@ export default function Home() {
               current.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={current.imageUrl} alt={`Scéna ${page + 1}`}
-                  style={{ width: '100%', height: '100%', minHeight: '0', objectFit: 'cover', display: 'block' }} />
+                  style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block', flexShrink: 0 }} />
               ) : (
-                <div style={{ width: '100%', height: '100%', minHeight: '0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', background: 'linear-gradient(135deg,#1a0a3e 0%,#2d0d52 50%,#1a0a3e 100%)', color: 'rgba(255,255,255,0.7)', fontSize: '1rem', fontWeight: 700 }}>
+                <div style={{ width: '100%', aspectRatio: '16/9', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', background: 'linear-gradient(135deg,#1a0a3e 0%,#2d0d52 50%,#1a0a3e 100%)', color: 'rgba(255,255,255,0.7)', fontSize: '1rem', fontWeight: 700 }}>
                   <div className="placeholder-spinner" />
                   <span>🎨 Generuji scénu {page + 1}...</span>
                 </div>

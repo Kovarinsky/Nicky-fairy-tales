@@ -53,11 +53,18 @@ export const THEMES: Theme[] = [
       "Zasaď příběh do vesmíru – rakety, planety, hodní mimozemšťané a hvězdy. Dobrodružné a zvídavé.",
   },
   {
-    id: "princezny",
-    name: "Princezny a draci",
-    emoji: "👑",
+    id: "pokemon",
+    name: "Pokémon",
+    emoji: "⚡",
     prompt:
-      "Zasaď příběh do pohádkového království s hodnými princeznami, statečnými rytíři a přátelskými draky.",
+      "Set the story in the cheerful world of Pokémon. Pokémon are friendly magical creatures with special powers who love their trainers. CHARACTER REFERENCE: Pikachu: small round yellow mouse Pokémon, pointed black-tipped ears, red cheek circles, brown stripe markings on back, lightning-bolt-shaped tail, large bright black eyes, cheerful expression. Bulbasaur: small teal-green dinosaur Pokémon, large red eyes, green bulb plant on back, four stubby legs. Friendly adventure atmosphere — focus on friendship, helping others, and discovering new places together. No battles or combat.",
+  },
+  {
+    id: "sonic",
+    name: "Sonic",
+    emoji: "💙",
+    prompt:
+      "Set the story in the colorful world of Sonic the Hedgehog. CHARACTER REFERENCE: Sonic: blue anthropomorphic hedgehog, spiky blue quills swept back, large bright green eyes, peach-colored muzzle and belly, white gloves on hands, red-and-white sneakers, confident cheerful expression. Tails (Miles Prower): small young fox with orange fur, large blue eyes, peach muzzle, two fluffy orange tails, white gloves, orange-and-white sneakers. Setting: Green Hill Zone — rolling bright green hills, loop-de-loops, palm trees, golden rings floating in air, bright blue sky with fluffy clouds. Fast-paced but friendly adventure, helping friends and collecting golden rings.",
   },
   {
     id: "auticka",

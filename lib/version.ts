@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.9";
+export const APP_VERSION = "2.10";
 
 // Changelog (newest first)
+// 2.10 - Fullscreen: image 16:9 (no crop), text pod ním; fix text overflow; témata: Pokémon + Sonic
 // 2.9 - Reader mode: viewport-filling layout (CSS Grid 1fr na book-card), image vyplní zbývající výšku
 // 2.8 - Fullscreen: tap-to-show ovládání (controls skryty, zobrazí se na klik/tap na 3s, pak zmizí)
 // 2.7 - Fullscreen: CSS Grid (1fr auto auto auto) na book-card → controls vždy viditelné; 16:9 aspect-ratio v reader; audio optional
