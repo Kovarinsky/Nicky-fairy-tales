@@ -172,6 +172,7 @@ export default function Home() {
   const progressRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<HTMLDivElement>(null);
   const bookScrolledRef = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // History
   const [storyHistory, setStoryHistory] = useState<HistoryEntry[]>([]);
@@ -468,6 +469,7 @@ export default function Home() {
         const res = await fetch("/api/scene", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(90_000),
           body: JSON.stringify({
             scene,
             heroDescription,
@@ -572,7 +574,9 @@ export default function Home() {
         setStatus("✨ Pohádka je připravena!");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Něco se pokazilo.");
+      const msg = err instanceof Error ? err.message : "Něco se pokazilo.";
+      const isFetchAbort = msg === "Failed to fetch" || msg.includes("AbortError") || msg.includes("NetworkError");
+      setError(isFetchAbort ? "FETCH_ABORT" : msg);
       setStatus("");
       if (background) setBgStatus("idle");
     } finally {
@@ -630,7 +634,8 @@ export default function Home() {
       cacheStory(entry.id, finalScenes).catch(() => {});
       setStatus("✨ Pohádka je připravena!");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Generování selhalo.");
+      const msg2 = err instanceof Error ? err.message : "Generování selhalo.";
+      setError(msg2 === "Failed to fetch" || msg2.includes("AbortError") ? "FETCH_ABORT" : msg2);
       setStatus("");
     } finally {
       setLoading(false);
@@ -692,7 +697,7 @@ export default function Home() {
       {/* ── Vrátit se na starší pohádku ── */}
 
       {/* ── FORM ── */}
-      <form className="form" onSubmit={createStory}>
+      <form className="form" ref={formRef} onSubmit={createStory}>
 
         {(chars.length > 0 || customChars.length > 0) && (
           <div className="field">
@@ -910,7 +915,16 @@ export default function Home() {
 
 
       {!readerMode && status && !loading && <p className="status">{status}</p>}
-      {!readerMode && error && <p className="error">⚠️ {error}</p>}
+      {!readerMode && error && (
+        <div className="error-box">
+          {error === "FETCH_ABORT"
+            ? <p className="error">📵 Spojení bylo přerušeno — přepnuli jste do jiné aplikace? Zkuste pohádku vytvořit znovu.</p>
+            : <p className="error">⚠️ {error}</p>}
+          <button type="button" className="btn-retry" onClick={() => { setError(""); formRef.current?.requestSubmit(); }}>
+            🔄 Zkusit znovu
+          </button>
+        </div>
+      )}
 
       {/* ── BOOK – shown when all scene images are ready (audio may be partial) ── */}
       {bookReady && current && (
