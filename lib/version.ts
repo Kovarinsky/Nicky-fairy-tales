@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.12";
+export const APP_VERSION = "2.13";
 
 // Changelog (newest first)
+// 2.13 - Tlačítko Vytvořit pohádku: animovaný progress fill + %; gen-cards pod tlačítkem; odstraněno Zpět na pohádku
 // 2.12 - Odstraněn fullscreen mód; oranžové šipky ← → pro navigaci scén
 // 2.11 - Gen-cards od začátku načítání; oranžové tlačítko 🏠 v ovládání; oranžové tlačítko Zpět na pohádku
 // 2.10 - Fullscreen: image 16:9 (no crop), text pod ním; fix text overflow; témata: Pokémon + Sonic

@@ -306,60 +306,50 @@ button:disabled {
   transform: none;
 }
 
-/* ── Progress bar (replaces button during generation) ── */
-.btn-progress {
-  width: 100%;
-  border-radius: 18px;
-  margin-top: 0.2rem;
-  padding: 0.85rem 1.1rem 1rem;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1.5px solid rgba(245, 158, 11, 0.4);
-}
+/* ── Animated progress button states ── */
 
-.btn-progress-label {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.85);
-  margin-bottom: 0.5rem;
-  text-align: center;
-  letter-spacing: 0.01em;
-}
-
-.btn-progress-track {
-  height: 14px;
-  background: rgba(245, 158, 11, 0.18);
-  border-radius: 999px;
-  overflow: hidden;
+/* Fill grows from left — driven by CSS custom property --progress-pct */
+.btn-create-loading {
   position: relative;
-}
-
-.btn-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
-  border-radius: 999px;
-  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-width: 2rem;
-}
-
-.btn-progress-pct {
-  font-size: 0.62rem;
-  font-weight: 900;
+  overflow: hidden;
+  cursor: wait;
+  background: rgba(30, 10, 0, 0.55);
+  box-shadow: 0 4px 18px rgba(249, 115, 22, 0.2);
   color: #fff;
-  padding-right: 6px;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
 
-/* Indeterminate shimmer for "Claude writing" phase */
-.btn-progress-shimmer {
+.btn-create-loading::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--progress-pct, 0%);
+  background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
+  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  border-radius: 18px 0 0 18px;
+}
+
+.btn-create-label {
+  position: relative;
+  z-index: 1;
+}
+
+/* Shimmer for "Claude writing story" phase (0% progress) */
+.btn-create-shimmer {
+  position: relative;
+  overflow: hidden;
+  cursor: wait;
+  background: rgba(30, 10, 0, 0.55);
+  color: #fff;
+}
+
+.btn-create-shimmer::before {
+  content: '';
   position: absolute;
   inset: 0;
   background: linear-gradient(90deg,
-    rgba(245,158,11,0.35) 0%,
-    rgba(249,115,22,0.9) 40%,
-    rgba(245,158,11,0.35) 80%
+    rgba(245,158,11,0.0) 0%,
+    rgba(249,115,22,0.6) 40%,
+    rgba(245,158,11,0.0) 80%
   );
   background-size: 200% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
@@ -429,34 +419,6 @@ button:disabled {
   transform: none;
 }
 
-/* ── Vrátit se na pohádku (orange call-to-action) ── */
-.btn-return-story {
-  display: block;
-  width: 100%;
-  background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
-  border: none;
-  border-radius: 14px;
-  color: #1a0a00;
-  font-size: 0.95rem;
-  font-weight: 800;
-  padding: 0.85rem 1rem;
-  margin-bottom: 0.6rem;
-  cursor: pointer;
-  text-align: center;
-  transition: filter 0.15s, transform 0.12s;
-  box-shadow: 0 2px 12px rgba(249,115,22,0.35);
-  letter-spacing: 0.01em;
-}
-
-.btn-return-story:hover {
-  filter: brightness(1.08);
-  transform: translateY(-1px);
-}
-
-.btn-return-story:active {
-  transform: translateY(0);
-  filter: brightness(0.96);
-}
 
 /* ── Background generation toast ── */
 .bg-toast {
@@ -1477,7 +1439,6 @@ body.is-fullscreen {
   .history-box { margin: 0.5rem 0.65rem 0; border-radius: 16px; }
   .history-item { gap: 0.5rem; padding: 0.65rem 0.8rem; }
   .history-play-btn { width: 34px; height: 34px; font-size: 0.85rem; }
-  .btn-progress { border-radius: 16px; padding: 0.75rem 0.9rem 0.85rem; }
 
   .status { font-size: 0.9rem; margin-top: 0.9rem; }
   .error { margin: 0.4rem 0.65rem 0; border-radius: 13px; }

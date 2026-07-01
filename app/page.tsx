@@ -684,11 +684,6 @@ export default function Home() {
       <p className="subtitle">Vyber postavy, téma a inspiraci – pohádka s obrázky a tatínkovým hlasem.</p>
 
       {/* ── Vrátit se na starší pohádku ── */}
-      {bookReady && (
-        <button type="button" className="btn-return-story" onClick={() => setViewMode("reader")}>
-          ▶ Zpět na „{title}"
-        </button>
-      )}
 
       {/* ── FORM ── */}
       <form className="form" onSubmit={createStory}>
@@ -823,43 +818,49 @@ export default function Home() {
           </label>
         </div>
 
-        {loading && bgStatus === "idle" ? (
-          <div className="btn-progress" ref={progressRef}>
-            <div className="btn-progress-label">{status}</div>
-            <div className="btn-progress-track">
-              {scenes.length === 0
-                ? <div className="btn-progress-shimmer" />
-                : <div className="btn-progress-fill" style={{ width: `${Math.round((doneCount / totalScenes) * 100)}%` }}>
-                    <span className="btn-progress-pct">{Math.round((doneCount / totalScenes) * 100)}%</span>
-                  </div>
-              }
+        {(() => {
+          const isGenerating = loading && bgStatus === "idle";
+          const progressPct = totalScenes > 0 ? Math.round((doneCount / totalScenes) * 100) : 0;
+          const showShimmer = isGenerating && scenes.length === 0;
+          return (
+            <div ref={progressRef}>
+              <button
+                type="submit"
+                className={`btn-create${isGenerating ? (showShimmer ? " btn-create-shimmer" : " btn-create-loading") : ""}`}
+                disabled={loading || allSelectedCount === 0 || !hasInspiration}
+                style={isGenerating && !showShimmer ? { '--progress-pct': `${progressPct}%` } as React.CSSProperties : undefined}
+              >
+                {isGenerating ? (
+                  showShimmer
+                    ? <span className="btn-create-label">✍️ Píšu příběh...</span>
+                    : <span className="btn-create-label">🎨 {progressPct}%</span>
+                ) : "✨ Vytvořit pohádku"}
+              </button>
+              {isGenerating && (
+                <div className="gen-cards" style={{ marginTop: '0.75rem' }}>
+                  {(scenes.length > 0 ? scenes : Array(sceneCount).fill(null)).map((s, i) => {
+                    const st = s ? (sceneStatuses[i] ?? "waiting") : "waiting";
+                    return (
+                      <div key={i} className={`gen-card gen-card-${st}`}>
+                        {s?.imageUrl
+                          ? <img src={s.imageUrl} alt={`Scéna ${i + 1}`} className="gen-card-img" />
+                          : <div className="gen-card-placeholder">
+                              {st === "generating" && <div className="gen-card-spinner" />}
+                              {st === "error" && <span className="gen-card-icon">⚠️</span>}
+                              {st === "waiting" && <span className="gen-card-icon">⏳</span>}
+                            </div>
+                        }
+                        <span className="gen-card-label">
+                          {st === "done" ? "✓" : st === "error" ? "!" : st === "generating" ? "🎨" : ""} {i + 1}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            <div className="gen-cards" style={{ marginTop: '0.7rem' }}>
-              {(scenes.length > 0 ? scenes : Array(sceneCount).fill(null)).map((s, i) => {
-                const st = s ? (sceneStatuses[i] ?? "waiting") : "waiting";
-                return (
-                  <div key={i} className={`gen-card gen-card-${st}`}>
-                    {s?.imageUrl
-                      ? <img src={s.imageUrl} alt={`Scéna ${i + 1}`} className="gen-card-img" />
-                      : <div className="gen-card-placeholder">
-                          {st === "generating" && <div className="gen-card-spinner" />}
-                          {st === "error" && <span className="gen-card-icon">⚠️</span>}
-                          {st === "waiting" && <span className="gen-card-icon">⏳</span>}
-                        </div>
-                    }
-                    <span className="gen-card-label">
-                      {st === "done" ? "✓" : st === "error" ? "!" : st === "generating" ? "🎨" : ""} {i + 1}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <button type="submit" className="btn-create" disabled={loading || allSelectedCount === 0 || !hasInspiration}>
-            ✨ Vytvořit pohádku
-          </button>
-        )}
+          );
+        })()}
       </form>
 
       {/* ── HISTORY ── */}
