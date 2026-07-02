@@ -1494,7 +1494,7 @@ export default function Home() {
           )}
           {bgStatus === "done" && (
             <>
-              <span>{t.newReady}</span>
+              <span>{bgProgress.done < bgProgress.total ? t.newIncomplete(bgProgress.total - bgProgress.done) : t.newReady}</span>
               <button type="button" className="bg-toast-btn" onClick={switchToBgStory}>{t.openStory}</button>
             </>
           )}

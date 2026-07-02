@@ -50,8 +50,7 @@ async function sanitizeWithGemini(apiKey: string, rawPrompt: string): Promise<st
             "",
             "Rules:",
             "- Remove all age numbers: '6-year-old', '6 years old', 'toddler', 'infant', Czech: 'letý', 'let', 'roků'",
-            "- Remove size comparisons that imply child age: 'half the height of', 'noticeably smaller than', 'roughly half'",
-            "- Replace 'small girl' → 'girl', 'small boy' → 'boy', 'little sister' → 'sister', 'little brother' → 'brother'",
+            "- KEEP relative height/size comparisons between characters (e.g. 'the smallest', 'reaches his waist', 'slightly taller than', 'much taller') — these are allowed and important for consistency",
             "- Replace any element that would show readable text in the image (signs with writing, open books showing text, newspapers with headlines, shop labels, posters with words, billboards) with a purely visual alternative (e.g. 'a colorful sign' instead of 'a sign saying Welcome', 'a closed storybook' instead of 'a book with text')",
             "- Keep ALL character names, hair color/style, eye color, clothing colors and types, scene action, and the style suffix UNCHANGED",
             "- Output ONLY the rewritten prompt — no explanation, no quotes, no markdown",
@@ -87,8 +86,6 @@ function regexSanitize(text: string): string {
     .replace(/\b\d+let[a-záčďéěíňóřšťúůýž]*\b/gi, "")
     .replace(/\b\d+\s+let\b/gi, "")
     .replace(/\b\d+\s+rok[ůuy]?\b/gi, "")
-    .replace(/\broughly half \w+'s height\b/gi, "")
-    .replace(/\bnoticeably smaller than\b/gi, "smaller than")
     .replace(/\btoddler\b/gi, "child")
     .replace(/\binfant\b/gi, "child")
     .replace(/\(\s*\)/g, "")
@@ -109,7 +106,7 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, withAspe
     parts.push({ inlineData: { data: ref.data, mimeType: ref.mimeType } });
   }
   if (refImages.length > 0) {
-    parts.push({ text: "Draw the characters so they are clearly recognizable as the people/animals in the reference photos above — same face shape, hair color and style, eye color and build — but rendered in the illustration style described below. Do NOT copy the photos' backgrounds or clothing unless the prompt says so." });
+    parts.push({ text: "Draw the characters so they are clearly recognizable as the people/animals in the reference photos above — same face shape, hair color and style, eye color, build, AGE and body size — but rendered in the illustration style described below. Keep every character's age and size true to their photo in every scene. Do NOT copy the photos' backgrounds or clothing unless the prompt says so." });
   }
   parts.push({ text: prompt });
   const bodyBuf = Buffer.from(
@@ -175,20 +172,22 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
     ? [
         `⚠ APPEARANCE LOCK — IMMUTABLE across every image in this story:`,
         heroDescription,
-        `Every named character MUST look IDENTICAL to this description: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes. These are LOCKED — do NOT change anything between scenes.`,
+        `Every named character MUST look IDENTICAL to this description in EVERY image: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes — AND the same AGE, same BODY SIZE and PROPORTIONS. Relative heights between characters NEVER change: a toddler stays toddler-sized, a child stays child-sized, adults stay adult-sized. These are LOCKED — do NOT change anything between scenes.`,
         `ONLY the characters named in the scene are visible — zero additional people, strangers, or background human figures.`,
       ].join(" ")
     : "";
 
   const charLockClose = heroDescription
-    ? `⚠ CONSISTENCY REMINDER: match hair, eyes, clothing EXACTLY as stated above — do NOT alter any detail.`
+    ? `⚠ CONSISTENCY REMINDER: match hair, eyes, clothing, age, body size and relative heights EXACTLY as stated above — do NOT alter any detail.`
     : "";
+
+  const STYLE_SUFFIX = "Walt Disney animated style, painterly storybook illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. Absolutely no text, letters, words, signs, labels, captions, subtitles, or writing of any kind anywhere in the image.";
 
   const rawPrompt = [
     charLockOpen,
     scene.imagePrompt,
     charLockClose,
-    "Walt Disney animated style, painterly storybook illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. Absolutely no text, letters, words, signs, labels, captions, subtitles, or writing of any kind anywhere in the image.",
+    STYLE_SUFFIX,
   ].filter(Boolean).join(" ");
 
   // Gemini sanitizes its own prompt — eliminates content filter guesswork
@@ -218,5 +217,22 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
       }
     }
   }
+
+  // Last resort for persistently blocked prompts: draw the SAME characters in a
+  // gentle generic moment inspired by the narration — better than a missing image
+  try {
+    const fallbackRaw = [
+      charLockOpen,
+      `The named characters stand together smiling, in a gentle scene inspired by this story moment: ${scene.narration.slice(0, 140)}`,
+      charLockClose,
+      STYLE_SUFFIX,
+    ].filter(Boolean).join(" ");
+    const safeFallback = await sanitizeWithGemini(apiKey, fallbackRaw);
+    console.warn(`[Gemini] scene ${scene.index}: using simplified fallback prompt`);
+    return await callGeminiImage(apiKey, model, safeFallback, withAspect, refImages);
+  } catch (e2) {
+    console.error(`[Gemini] scene ${scene.index} fallback failed: ${e2 instanceof Error ? e2.message : e2}`);
+  }
+
   throw new Error(`[scene ${scene.index}] ${lastErr.message}`);
 }

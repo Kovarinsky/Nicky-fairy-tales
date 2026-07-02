@@ -64,6 +64,7 @@ export const UI = {
     pdfTooBig: "PDF je příliš velké (max 3.5 MB).",
     stalled: "⚠️ Generování se zaseklo",
     stallReload: "🔁 Pokračovat",
+    newIncomplete: (n: number) => `⚠️ Hotovo, ale ${n} obr. chybí — otevřít a opravit`,
   },
   en: {
     subtitle: "Pick characters, a theme and inspiration – a fairy tale with pictures and Daddy's voice.",
@@ -126,5 +127,6 @@ export const UI = {
     pdfTooBig: "The PDF is too large (max 3.5 MB).",
     stalled: "⚠️ Generation got stuck",
     stallReload: "🔁 Resume",
+    newIncomplete: (n: number) => `⚠️ Done, but ${n} image(s) missing — open & fix`,
   },
 } as const;
