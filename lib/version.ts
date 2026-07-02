@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.25";
+export const APP_VERSION = "2.26";
 
 // Changelog (newest first)
+// 2.26 - Fix hlas (payload bez obrázku + odblokování play); šipky skryté i v portrait (jen s panelem); play zavře panel + restart rollingu; PWA manifest (fullscreen po přidání na plochu)
 // 2.25 - Automatická přestavba při otočení: layout + restart rolování textu (portrait ⇄ widescreen)
 // 2.24 - Widescreen: bez nadpisu, text = jednořádkový horizontální ticker dole, šipky jen s panelem (odsazené); obraz ~90 % výšky
 // 2.23 - Titulky v malém okně POD obrázkem (nepřekrývají obraz), auto-rolling; panel dole (portrait) / vpravo (landscape); fix výšky v landscape

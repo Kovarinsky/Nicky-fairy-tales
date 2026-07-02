@@ -545,7 +545,8 @@ button:disabled {
   font-size: 1.15rem;
 }
 
-/* Nav arrows float mid-height over the image; hidden while the panel is open */
+/* Nav arrows float mid-height over the image; hidden by default,
+   shown only together with the control panel (tap) */
 .reader-mode .book-nav {
   position: absolute;
   top: 50%;
@@ -556,15 +557,16 @@ button:disabled {
   padding: 0 0.45rem;
   pointer-events: none;
   z-index: 4;
+  display: none;
 }
 
 .reader-mode .book-nav .ctrl-nav {
   pointer-events: auto;
-  opacity: 0.8;
+  opacity: 0.85;
 }
 
 .reader-mode .ctrls-open .book-nav {
-  display: none;
+  display: flex;
 }
 
 .reader-mode .page-dots {
@@ -619,13 +621,8 @@ button:disabled {
     line-height: 1.35;
   }
 
-  /* Arrows hidden by default; tap shows them together with the panel
-     (right arrow shifted left of the side panel) */
-  .reader-mode .book-nav {
-    display: none;
-  }
+  /* Right arrow shifted left of the side panel */
   .reader-mode .ctrls-open .book-nav {
-    display: flex;
     padding-right: 6.5rem;
   }
 }

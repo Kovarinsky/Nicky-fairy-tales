@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Nunito } from "next/font/google";
 import "./globals.css";
 import PhotoBackground from "./PhotoBackground";
@@ -12,6 +12,17 @@ const nunito = Nunito({
 export const metadata: Metadata = {
   title: "Nickyho pohádky",
   description: "AI mluvené pohádky pro Nicolase",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Nickyho pohádky",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0a0520",
+  viewportFit: "cover",
 };
 
 function FairyBackground() {

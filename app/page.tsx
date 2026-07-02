@@ -327,6 +327,12 @@ export default function Home() {
     };
   }, []);
 
+  // Restart the subtitle roll from the top whenever narration starts playing
+  const [rollTick, setRollTick] = useState(0);
+  useEffect(() => {
+    if (isPlaying) setRollTick(t => t + 1);
+  }, [isPlaying]);
+
   // Rolling subtitles: long text scrolls slowly through the small window.
   // Portrait = vertical roll; landscape (single-line ticker) = horizontal roll.
   useEffect(() => {
@@ -354,7 +360,7 @@ export default function Home() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [page, slideKey, viewMode, scenes, orientTick]);
+  }, [page, slideKey, viewMode, scenes, orientTick, rollTick]);
 
   // Scroll progress into view when loading starts (mobile UX)
   useEffect(() => {
@@ -461,25 +467,37 @@ export default function Home() {
     const CONCURRENCY = 3;
     let idx = 0;
     const tasks = scenes.map((scene, i) => async () => {
-      const res = await fetch("/api/scene", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scene, audioOnly: true, voiceId: newVoiceId }),
-      });
-      const data = await safeJson<{ audioUrl?: string; error?: string }>(res);
-      if (!res.ok) return;
-      setScenes(prev => {
-        const next = [...prev];
-        next[i] = { ...next[i], audioUrl: data.audioUrl };
-        return next;
-      });
+      try {
+        const res = await fetch("/api/scene", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(60_000),
+          // Only narration is needed for audio — sending the whole scene
+          // (with base64 imageUrl) blows the request size limit
+          body: JSON.stringify({
+            scene: { index: scene.index, narration: scene.narration, imagePrompt: scene.imagePrompt },
+            audioOnly: true,
+            voiceId: newVoiceId,
+          }),
+        });
+        const data = await safeJson<{ audioUrl?: string; error?: string }>(res);
+        if (!res.ok || !data.audioUrl) return;
+        setScenes(prev => {
+          const next = [...prev];
+          next[i] = { ...next[i], audioUrl: data.audioUrl };
+          return next;
+        });
+      } catch {}
     });
 
     async function worker() {
       while (idx < tasks.length) { const i = idx++; await tasks[i](); }
     }
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, worker));
-    setRegenAudio(false);
+    try {
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, worker));
+    } finally {
+      setRegenAudio(false);
+    }
   }
 
   // Fire pending advance when a scene finishes generating
@@ -495,7 +513,12 @@ export default function Home() {
 
   function togglePlay() {
     const a = audioRef.current; if (!a) return;
-    isPlaying ? a.pause() : a.play().catch(() => {});
+    if (isPlaying) {
+      a.pause();
+    } else {
+      a.play().catch(() => {});
+      setCtrlsOpen(false); // hide the panel when narration starts
+    }
   }
 
   // ── Core: generate media for a script ────────────────────────────────────
