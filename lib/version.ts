@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.27";
+export const APP_VERSION = "2.28";
 
 // Changelog (newest first)
+// 2.28 - Text na bílém podkladu: portrait celý text bez rolování, landscape bílý jednořádkový ticker
 // 2.27 - Ticker jen pod šířkou obrázku; play z hlavní obrazovky → reader mód; replay z historie auto-přehraje; manifest bez orientation (rotace dle systému)
 // 2.26 - Fix hlas (payload bez obrázku + odblokování play); šipky skryté i v portrait (jen s panelem); play zavře panel + restart rollingu; PWA manifest (fullscreen po přidání na plochu)
 // 2.25 - Automatická přestavba při otočení: layout + restart rolování textu (portrait ⇄ widescreen)

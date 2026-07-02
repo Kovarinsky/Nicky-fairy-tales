@@ -356,22 +356,17 @@ export default function Home() {
     }
     el.scrollTop = 0;
     el.scrollLeft = 0;
-    const overX = el.scrollWidth - el.clientWidth;
-    const overY = el.scrollHeight - el.clientHeight;
-    const horizontal = overX > overY;
-    const overflow = horizontal ? overX : overY;
-    if (overflow <= 0) return;
-    const DELAY_MS = 2800;                  // let the reader start
-    const SPEED = horizontal ? 40 : 14;     // px per second
+    // Only the landscape single-line ticker rolls; portrait shows the whole text
+    const overflow = el.scrollWidth - el.clientWidth;
+    if (!landscape || overflow <= 0) return;
+    const DELAY_MS = 2800;   // let the reader start
+    const SPEED = 40;        // px per second
     const durMs = (overflow / SPEED) * 1000;
     let raf = 0;
     const start = performance.now();
     const tick = (t: number) => {
       const e = t - start - DELAY_MS;
-      if (e > 0) {
-        const pos = Math.min(overflow, (e / durMs) * overflow);
-        if (horizontal) el.scrollLeft = pos; else el.scrollTop = pos;
-      }
+      if (e > 0) el.scrollLeft = Math.min(overflow, (e / durMs) * overflow);
       if (e < durMs) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);

@@ -504,22 +504,20 @@ button:disabled {
   cursor: pointer;
 }
 
-/* Subtitles: small window UNDER the image — never overlaps it; long text
-   rolls automatically (JS) and can be scrolled by hand */
+/* Text UNDER the image on a white background — whole text visible in
+   portrait (no rolling), scrolls by hand only if extremely long */
 .reader-mode .page-body {
   flex: 0 0 auto;
-  height: 6.6rem;
+  max-height: 38dvh;
   overflow-y: auto;
-  background: rgba(8, 4, 24, 0.94);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 0.7rem 0.95rem 0.8rem;
+  background: rgba(248, 247, 255, 0.96);
+  padding: 0.8rem 0.95rem 0.9rem;
   cursor: pointer;
 }
 
 .reader-mode .page-text {
-  color: #fff;
-  font-size: 0.95rem;
-  line-height: 1.55;
+  font-size: 0.98rem;
+  line-height: 1.6;
 }
 
 /* Controls: hidden; tap → panel at the BOTTOM (portrait) */
