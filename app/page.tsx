@@ -1703,6 +1703,7 @@ export default function Home() {
       {!readerMode && status && !loading && <p className="status">{status}</p>}
       {!readerMode && error && (
         <div className="error-box">
+          <button type="button" className="error-dismiss" onClick={() => setError("")} aria-label="Zavřít">✕</button>
           {error === "FETCH_ABORT"
             ? <p className="error">{t.errFetchAbort}</p>
             : <p className="error">⚠️ {error}</p>}

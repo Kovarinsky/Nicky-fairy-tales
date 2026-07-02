@@ -1683,3 +1683,29 @@ button:disabled {
   font-size: 0.86rem;
   color: rgba(255,255,255,0.82);
 }
+
+.error-box {
+  position: relative;
+}
+
+.error-dismiss {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.4rem;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: rgba(153, 27, 27, 0.75);
+  font-size: 0.95rem;
+  font-weight: 800;
+  padding: 0.25rem 0.45rem;
+  z-index: 1;
+}
+
+.error-dismiss:hover:not(:disabled) {
+  background: transparent;
+  filter: none;
+  box-shadow: none;
+  transform: none;
+  color: rgba(153, 27, 27, 1);
+}
