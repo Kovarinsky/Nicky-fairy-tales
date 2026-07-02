@@ -220,11 +220,36 @@ export default function Home() {
     if (match) setSelectedVoiceId(match.id);
   }
 
-  // Background generation state
+  // Background generation state (LOCAL in-browser pipeline)
   const [bgStatus, setBgStatus] = useState<"idle" | "writing" | "generating" | "done">("idle");
   const [bgProgress, setBgProgress] = useState({ done: 0, total: 0 });
   const bgBufferRef = useRef<RenderedScene[]>([]);
   const bgTitleRef = useRef<string>("");
+
+  // Server jobs — a QUEUE: several fairy tales can generate on Vercel at once,
+  // each gets its own toast row and the newest one drives the gen-cards
+  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string };
+  const MAX_ACTIVE_JOBS = 3;
+  const [serverJobs, setServerJobs] = useState<ServerJob[]>([]);
+  // The ref is the synchronous source of truth (poll callbacks and the mount
+  // resume mutate it back-to-back — state alone would race); state mirrors it
+  const serverJobsRef = useRef<ServerJob[]>([]);
+  const syncServerJobs = useCallback((next: ServerJob[]) => {
+    serverJobsRef.current = next;
+    setServerJobs(next);
+    // Persist only unfinished job ids — finished stories live in history
+    try {
+      const ids = next.filter(j => j.phase === "writing" || j.phase === "generating").map(j => j.jobId);
+      if (ids.length === 0) localStorage.removeItem(SERVER_JOB_KEY);
+      else localStorage.setItem(SERVER_JOB_KEY, JSON.stringify({ jobs: ids }));
+    } catch {}
+  }, []);
+  const updateServerJob = useCallback((jobId: string, patch: Partial<ServerJob>) => {
+    syncServerJobs(serverJobsRef.current.map(j => (j.jobId === jobId ? { ...j, ...patch } : j)));
+  }, [syncServerJobs]);
+  const removeServerJob = useCallback((jobId: string) => {
+    syncServerJobs(serverJobsRef.current.filter(j => j.jobId !== jobId));
+  }, [syncServerJobs]);
 
   // In-memory cache: history entry id → fully rendered scenes (images + audio)
   const renderedMapRef = useRef<Map<string, RenderedScene[]>>(new Map());
@@ -232,7 +257,7 @@ export default function Home() {
   // ── Boot ──
   useEffect(() => {
     const saved = loadSettings();
-    if (saved.sceneCount !== undefined && saved.sceneCount >= 3 && saved.sceneCount <= 15) {
+    if (saved.sceneCount !== undefined && saved.sceneCount >= 3 && saved.sceneCount <= 20) {
       setSceneCount(saved.sceneCount);
     }
     fetch("/api/characters").then(r => r.json()).then(d => {
@@ -936,12 +961,19 @@ export default function Home() {
 
   // ── Server-side job: the whole story generates ON Vercel; the phone only
   //    polls for the result — switching apps or locking the screen is fine ──
-  const jobTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Progressive download: finished scenes stream in DURING generation, so the
-  // final "open" is instant and gen-cards show real thumbnails
-  const jobMediaRef = useRef<{ jobId: string; scenes: Map<number, { imageUrl?: string; audioUrl?: string }>; fetching: Set<number> }>({ jobId: "", scenes: new Map(), fetching: new Set() });
-  // Stall watch: when the server function dies on the 5-min limit, kick /continue
-  const jobStallRef = useRef({ lastChange: 0, lastSig: "", lastKick: 0 });
+  const jobTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+  // Progressive download (per job): finished scenes stream in DURING generation,
+  // so the final "open" is instant and gen-cards show real thumbnails
+  const jobMediaRef = useRef<Map<string, { scenes: Map<number, { imageUrl?: string; audioUrl?: string }>; fetching: Set<number> }>>(new Map());
+  // Per-job scene buffer for the gen-card thumbnails
+  const jobBuffersRef = useRef<Map<string, RenderedScene[]>>(new Map());
+  // Stall watch (per job): when the server function dies on the 5-min limit, kick /continue
+  const jobStallRef = useRef<Map<string, { lastChange: number; lastSig: string; lastKick: number }>>(new Map());
+
+  function stopJobPolling(jobId: string) {
+    const tm = jobTimersRef.current.get(jobId);
+    if (tm) { clearInterval(tm); jobTimersRef.current.delete(jobId); }
+  }
 
   async function fetchSceneJson(url: string): Promise<{ imageUrl?: string; audioUrl?: string } | null> {
     // 2 attempts — a hiccup while downloading one scene must not lose it
@@ -957,7 +989,7 @@ export default function Home() {
   async function finalizeServerJob(st: { title?: string; heroDescription?: string; scenesScript?: Scene[]; sceneUrls?: Record<number, string>; total?: number; voiceId?: string }, jobId: string) {
     const script = st.scenesScript || [];
     const urls = st.sceneUrls || {};
-    const pre = jobMediaRef.current.jobId === jobId ? jobMediaRef.current.scenes : new Map<number, { imageUrl?: string; audioUrl?: string }>();
+    const pre = jobMediaRef.current.get(jobId)?.scenes ?? new Map<number, { imageUrl?: string; audioUrl?: string }>();
     const media = await Promise.all(script.map(async (_, i) => {
       const cached = pre.get(i);
       if (cached) return cached; // už staženo průběžně během generování
@@ -988,44 +1020,77 @@ export default function Home() {
     renderedMapRef.current.set(jobId, rendered);
     cacheStory(jobId, rendered).catch(() => {});
     evictOldStories(loadHistory().map(e => e.id)).catch(() => {});
-    bgTitleRef.current = entry.title;
-    bgBufferRef.current = rendered;
-    setBgProgress({ done: rendered.filter(s => !isPlaceholderImg(s.imageUrl)).length, total: script.length });
-    setBgStatus("done");   // toast: „hotová ▶ Otevřít" (nebo ⚠️ při chybějících)
-    try { localStorage.removeItem(SERVER_JOB_KEY); } catch {}
+    // Job row → „hotová ▶ Otevřít"; the finished story is no longer persisted
+    // as a pending job (it lives in history + IndexedDB now)
+    updateServerJob(jobId, {
+      phase: "done",
+      title: entry.title,
+      done: rendered.filter(s => !isPlaceholderImg(s.imageUrl)).length,
+      total: script.length,
+    });
+    // uvolnit průběžnou cache jobu
+    jobMediaRef.current.delete(jobId);
+    jobBuffersRef.current.delete(jobId);
+    jobStallRef.current.delete(jobId);
   }
 
-  // Download finished scenes while the job still runs (max 2 at a time) and
-  // feed them into the gen-card thumbnails via bgBufferRef
+  // Open a finished server story from its toast row
+  async function openServerJob(job: ServerJob) {
+    let rendered = renderedMapRef.current.get(job.jobId);
+    if (!rendered || rendered.length === 0) {
+      // Fallback: merge the history script with the IndexedDB media cache
+      const entry = loadHistory().find(e => e.id === job.jobId);
+      const dbCached = await getCachedStory(job.jobId).catch(() => null);
+      if (entry && dbCached && dbCached.length > 0) {
+        rendered = entry.scenes.map((s, i) => ({ ...s, imageUrl: dbCached[i]?.imageUrl, audioUrl: dbCached[i]?.audioUrl }));
+      }
+    }
+    if (!rendered || rendered.length === 0) { removeServerJob(job.jobId); return; }
+    audioRef.current?.pause();
+    setIsPlaying(false);
+    introFiredRef.current = false;
+    setTitle(job.title || "Pohádka");
+    setScenes([...rendered]);
+    setPage(0);
+    setSlideKey(k => k + 1);
+    setViewMode("reader");
+    isAutoAdvanceRef.current = true;
+    removeServerJob(job.jobId);
+  }
+
+  // Download finished scenes while the job still runs (max 2 at a time per
+  // job) and feed them into the gen-card thumbnails
   function prefetchJobScenes(jobId: string, st: { scenesScript?: Scene[]; sceneUrls?: Record<number, string> }) {
-    const jm = jobMediaRef.current;
-    if (jm.jobId !== jobId) { jm.jobId = jobId; jm.scenes = new Map(); jm.fetching = new Set(); }
+    let jm = jobMediaRef.current.get(jobId);
+    if (!jm) { jm = { scenes: new Map(), fetching: new Set() }; jobMediaRef.current.set(jobId, jm); }
     const script = st.scenesScript || [];
     const urls = st.sceneUrls || {};
-    if (script.length > 0 && bgBufferRef.current.length !== script.length) {
-      bgBufferRef.current = script.map((s, i) => ({ ...s, imageUrl: jm.scenes.get(i)?.imageUrl, audioUrl: jm.scenes.get(i)?.audioUrl } as RenderedScene));
+    let buf = jobBuffersRef.current.get(jobId);
+    if (script.length > 0 && (!buf || buf.length !== script.length)) {
+      buf = script.map((s, i) => ({ ...s, imageUrl: jm!.scenes.get(i)?.imageUrl, audioUrl: jm!.scenes.get(i)?.audioUrl } as RenderedScene));
+      jobBuffersRef.current.set(jobId, buf);
     }
     const pending = Object.keys(urls).map(Number)
-      .filter(i => !jm.scenes.has(i) && !jm.fetching.has(i))
+      .filter(i => !jm!.scenes.has(i) && !jm!.fetching.has(i))
       .slice(0, 2);
     for (const i of pending) {
       jm.fetching.add(i);
       fetchSceneJson(urls[i]).then(m => {
-        jm.fetching.delete(i);
-        if (!m || jm.jobId !== jobId) return;
-        jm.scenes.set(i, m);
-        if (bgBufferRef.current[i]) {
-          bgBufferRef.current[i] = { ...bgBufferRef.current[i], imageUrl: m.imageUrl, audioUrl: m.audioUrl };
-        }
-      }).catch(() => { jm.fetching.delete(i); });
+        jm!.fetching.delete(i);
+        if (!m) return;
+        jm!.scenes.set(i, m);
+        const b = jobBuffersRef.current.get(jobId);
+        if (b && b[i]) b[i] = { ...b[i], imageUrl: m.imageUrl, audioUrl: m.audioUrl };
+      }).catch(() => { jm!.fetching.delete(i); });
     }
   }
 
   // When done/total stops moving for too long, the server function most
   // likely hit Vercel's 5-minute limit → ask /api/job/continue to resume
   function maybeKickContinue(jobId: string, st: { phase: string; done?: number; total?: number }) {
-    const w = jobStallRef.current;
-    const sig = `${jobId}|${st.phase}|${st.done ?? -1}/${st.total ?? -1}`;
+    let w = jobStallRef.current.get(jobId);
+    if (!w) { w = { lastChange: 0, lastSig: "", lastKick: 0 }; jobStallRef.current.set(jobId, w); }
+    const sig = `${st.phase}|${st.done ?? -1}/${st.total ?? -1}`;
     const now = Date.now();
     if (sig !== w.lastSig) {
       w.lastSig = sig; w.lastChange = now;
@@ -1044,7 +1109,7 @@ export default function Home() {
   }
 
   function startJobPolling(jobId: string) {
-    if (jobTimerRef.current) clearInterval(jobTimerRef.current);
+    stopJobPolling(jobId);
     const tick = async () => {
       try {
         const res = await fetch(`/api/job/status?id=${jobId}`, { cache: "no-store" });
@@ -1053,36 +1118,43 @@ export default function Home() {
         const st = await res.json();
         if (st.phase === "writing" || st.phase === "generating") maybeKickContinue(jobId, st);
         if (st.phase === "writing") {
-          setBgStatus("writing");
+          updateServerJob(jobId, { phase: "writing" });
         } else if (st.phase === "generating") {
           prefetchJobScenes(jobId, st);
-          setBgStatus("generating");
-          setBgProgress({ done: st.done || 0, total: st.total || 0 });
+          updateServerJob(jobId, { phase: "generating", done: st.done || 0, total: st.total || 0, title: st.title });
         } else if (st.phase === "done") {
-          if (jobTimerRef.current) { clearInterval(jobTimerRef.current); jobTimerRef.current = null; }
+          stopJobPolling(jobId);
           await finalizeServerJob(st, jobId);
         } else if (st.phase === "error") {
-          if (jobTimerRef.current) { clearInterval(jobTimerRef.current); jobTimerRef.current = null; }
-          setBgStatus("idle");
-          setError(String(st.error || t.errGeneric));
-          try { localStorage.removeItem(SERVER_JOB_KEY); } catch {}
+          stopJobPolling(jobId);
+          updateServerJob(jobId, { phase: "error", error: String(st.error || t.errGeneric) });
         }
       } catch {}
     };
     tick();
-    jobTimerRef.current = setInterval(tick, 4000);
+    jobTimersRef.current.set(jobId, setInterval(tick, 4000));
   }
 
-  // Resume polling of a server job after reload / app switch
+  function addServerJob(jobId: string) {
+    if (!serverJobsRef.current.some(j => j.jobId === jobId)) {
+      syncServerJobs([...serverJobsRef.current, { jobId, phase: "writing", done: 0, total: 0 }]);
+    }
+    startJobPolling(jobId);
+  }
+
+  // Resume polling of server jobs after reload / app switch
   useEffect(() => {
     try {
       const raw = localStorage.getItem(SERVER_JOB_KEY);
       if (raw) {
-        const { jobId } = JSON.parse(raw);
-        if (jobId) { setBgStatus("writing"); startJobPolling(jobId); }
+        const parsed = JSON.parse(raw);
+        const ids: string[] = Array.isArray(parsed?.jobs) ? parsed.jobs
+          : parsed?.jobId ? [parsed.jobId] : []; // zpětná kompatibilita se single-job formátem
+        for (const id of ids) if (typeof id === "string" && id) addServerJob(id);
       }
     } catch {}
-    return () => { if (jobTimerRef.current) clearInterval(jobTimerRef.current); };
+    const timers = jobTimersRef.current;
+    return () => { for (const tm of timers.values()) clearInterval(tm); timers.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1128,15 +1200,19 @@ export default function Home() {
         const { jobId } = await jobRes.json();
         if (jobId) {
           saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds });
-          try { localStorage.setItem(SERVER_JOB_KEY, JSON.stringify({ jobId })); } catch {}
-          setBgStatus("writing");
-          setBgProgress({ done: 0, total: 0 });
-          startJobPolling(jobId);
+          addServerJob(jobId);
           return; // phone is free — the server does the work
         }
       }
       // non-ok (e.g. 501 blob-not-configured) → fall through to local pipeline
     } catch { /* network hiccup → local pipeline */ }
+
+    // Local pipeline is exclusive — if server jobs are already running, don't
+    // start a second in-browser generation on top of them
+    if (serverJobsRef.current.some(j => j.phase === "writing" || j.phase === "generating")) {
+      setError(t.errGeneric);
+      return;
+    }
 
     if (!background) {
       setScenes([]); setTitle(""); setPage(0);
@@ -1496,25 +1572,37 @@ export default function Home() {
         </div>
 
         {(() => {
-          // Local pipeline (loading) OR a server job in progress (bgStatus)
-          const isGenerating = loading || bgStatus === "writing" || bgStatus === "generating";
+          // Three sources of progress: LOCAL pipeline (loading/bgStatus) and
+          // the SERVER job queue (serverJobs) — the newest server job drives
+          // the cards; more stories can be queued while they run
+          const activeJobs = serverJobs.filter(j => j.phase === "writing" || j.phase === "generating");
+          const newestJob = activeJobs[activeJobs.length - 1];
+          const localGen = loading || bgStatus === "writing" || bgStatus === "generating";
+          const isGenerating = localGen || !!newestJob;
           const bgGen = bgStatus === "generating";
-          const done = bgGen ? bgProgress.done : doneCount;
-          const total = bgGen ? bgProgress.total : totalScenes;
+          const jobGen = !localGen && newestJob?.phase === "generating";
+          const done = bgGen ? bgProgress.done : jobGen ? newestJob.done : doneCount;
+          const total = bgGen ? bgProgress.total : jobGen ? newestJob.total : totalScenes;
           const progressPct = total > 0 ? Math.round((done / total) * 100) : 0;
-          const showShimmer = isGenerating && (bgStatus === "writing" || (bgStatus === "idle" && scenes.length === 0));
-          const cardScenes: (RenderedScene | null)[] = bgGen
-            ? (bgBufferRef.current.length > 0 ? bgBufferRef.current : Array(total || sceneCount).fill(null))
-            : (bgStatus === "idle" && scenes.length > 0 ? scenes : Array(sceneCount).fill(null));
+          // Shimmer („píšu příběh") only while the LOCAL pipeline writes; a
+          // queued server job shows its state in the toast rows instead
+          const showShimmer = localGen && (bgStatus === "writing" || (bgStatus === "idle" && scenes.length === 0));
+          const canQueueMore = !localGen && activeJobs.length > 0 && activeJobs.length < MAX_ACTIVE_JOBS;
+          const btnBusy = localGen || activeJobs.length >= MAX_ACTIVE_JOBS;
+          const cardScenes: (RenderedScene | null)[] = jobGen
+            ? (jobBuffersRef.current.get(newestJob.jobId) ?? Array(newestJob.total || sceneCount).fill(null))
+            : bgGen
+              ? (bgBufferRef.current.length > 0 ? bgBufferRef.current : Array(total || sceneCount).fill(null))
+              : (bgStatus === "idle" && scenes.length > 0 && localGen ? scenes : Array(newestJob ? (newestJob.total || sceneCount) : sceneCount).fill(null));
           return (
             <div ref={progressRef}>
               <button
                 type="submit"
-                className={`btn-create${isGenerating ? (showShimmer ? " btn-create-shimmer" : " btn-create-loading") : ""}`}
-                disabled={loading || bgStatus === "writing" || bgStatus === "generating" || allSelectedCount === 0 || !hasInspiration}
-                style={isGenerating && !showShimmer ? { '--progress-pct': `${progressPct}%` } as React.CSSProperties : undefined}
+                className={`btn-create${localGen ? (showShimmer ? " btn-create-shimmer" : " btn-create-loading") : ""}`}
+                disabled={btnBusy || allSelectedCount === 0 || !hasInspiration}
+                style={localGen && !showShimmer ? { '--progress-pct': `${progressPct}%` } as React.CSSProperties : undefined}
               >
-                {isGenerating ? (
+                {localGen ? (
                   showShimmer
                     ? (
                       <span className="btn-create-label writing-label">
@@ -1524,11 +1612,14 @@ export default function Home() {
                       </span>
                     )
                     : <span className="btn-create-label">{t.scenesBtn(done, total, progressPct)}</span>
-                ) : t.createBtn}
+                ) : canQueueMore ? t.createNextBtn : t.createBtn}
               </button>
-              {isGenerating && (
+              {canQueueMore && (
+                <p className="gen-step-hint">{t.queueHint(activeJobs.length)}</p>
+              )}
+              {isGenerating && !canQueueMore && (
                 <p className="gen-step-hint">
-                  {showShimmer
+                  {showShimmer || (!localGen && newestJob?.phase === "writing")
                     ? t.step1Hint
                     : t.step2Hint(Math.min(done + 1, total), total, Math.max(1, Math.ceil((total - done) * 10 / 60)))}
                 </p>
@@ -1536,7 +1627,7 @@ export default function Home() {
               {isGenerating && (
                 <div className="gen-cards" style={{ marginTop: '0.25rem' }}>
                   {cardScenes.map((s, i) => {
-                    const st = bgGen
+                    const st = (bgGen || jobGen)
                       ? (!isPlaceholderImg(s?.imageUrl) ? "done" : i === done ? "generating" : "waiting")
                       : (s ? (sceneStatuses[i] ?? "waiting") : "waiting");
                     const showImg = s?.imageUrl && !isPlaceholderImg(s.imageUrl);
@@ -1758,18 +1849,42 @@ export default function Home() {
       {/* ── ROLLING CREDITS ── */}
       {/* ── BACKGROUND GENERATION TOAST — hidden while the reader control
             panel is open, so it never covers the buttons ── */}
-      {bgStatus !== "idle" && !(readerMode && ctrlsOpen) && (
-        <div className="bg-toast">
-          {bgStatus === "writing" && <span>{t.writingNew}</span>}
-          {bgStatus === "generating" && (
-            <span>🎨 {bgProgress.done} / {bgProgress.total} scén</span>
+      {(bgStatus !== "idle" || serverJobs.length > 0) && !(readerMode && ctrlsOpen) && (
+        <div className="bg-toast-stack">
+          {bgStatus !== "idle" && (
+            <div className="bg-toast">
+              {bgStatus === "writing" && <span>{t.writingNew}</span>}
+              {bgStatus === "generating" && (
+                <span>🎨 {bgProgress.done} / {bgProgress.total} scén</span>
+              )}
+              {bgStatus === "done" && (
+                <>
+                  <span>{bgProgress.done < bgProgress.total ? t.newIncomplete(bgProgress.total - bgProgress.done) : t.newReady}</span>
+                  <button type="button" className="bg-toast-btn" onClick={switchToBgStory}>{t.openStory}</button>
+                </>
+              )}
+            </div>
           )}
-          {bgStatus === "done" && (
-            <>
-              <span>{bgProgress.done < bgProgress.total ? t.newIncomplete(bgProgress.total - bgProgress.done) : t.newReady}</span>
-              <button type="button" className="bg-toast-btn" onClick={switchToBgStory}>{t.openStory}</button>
-            </>
-          )}
+          {serverJobs.map((j, idx) => (
+            <div key={j.jobId} className="bg-toast">
+              {j.phase === "writing" && <span>{serverJobs.length > 1 ? `${idx + 1}. ` : ""}{t.writingNew}</span>}
+              {j.phase === "generating" && (
+                <span>🎨 {serverJobs.length > 1 ? `${idx + 1}. pohádka: ` : ""}{j.done} / {j.total} scén</span>
+              )}
+              {j.phase === "done" && (
+                <>
+                  <span>{j.done < j.total ? t.newIncomplete(j.total - j.done) : `✨ ${j.title ? `„${j.title}"` : t.newReady.replace("✨ ", "")}`}</span>
+                  <button type="button" className="bg-toast-btn" onClick={() => openServerJob(j)}>{t.openStory}</button>
+                </>
+              )}
+              {j.phase === "error" && (
+                <>
+                  <span>⚠️ {j.error || t.errGeneric}</span>
+                  <button type="button" className="bg-toast-btn" onClick={() => removeServerJob(j.jobId)}>✕</button>
+                </>
+              )}
+            </div>
+          ))}
         </div>
       )}
 

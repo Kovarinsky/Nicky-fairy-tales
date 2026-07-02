@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.45";
+export const APP_VERSION = "2.46";
 
 // Changelog (newest first)
+// 2.46 - Fronta pohádek: až 3 pohádky se připravují najednou na serveru — další jde zadat hned, bez čekání; každá má vlastní řádek s průběhem a tlačítkem Otevřít, kartičky ukazují tu nejnovější
 // 2.45 - Až 20 stránek: navazovací serverový job (po 5min limitu Vercelu automaticky pokračuje endpointem /api/job/continue — zdarma, bez Pro plánu); delší příběhy od Clauda (16k tokenů); rychlejší načtení — hotové scény se stahují do telefonu průběžně už během výroby a kartičky ukazují skutečné náhledy
 // 2.44 - Fix „nabídka zmizela": rozepsaný draft bez obrázků už neotevře prázdnou temnou čtečku (obnova jen s kompletními obrázky + pojistka: čtečka bez pohádky → návrat na formulář); stažení hotové pohádky ze serveru s retry a placeholderem; otevřený panel ovládání už nepřekrývá toast průběhu
 // 2.43 - Serverové generování na Vercelu: pohádka se připraví na serveru (Blob), telefon jen sleduje stav a stáhne výsledek — přepnutí appky nevadí; bez Blob tokenu automatický fallback na lokální generování
