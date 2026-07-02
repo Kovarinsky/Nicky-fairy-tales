@@ -173,8 +173,11 @@ export default function Home() {
   const [slideKey, setSlideKey] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
-  const [musicOn, setMusicOn] = useState(true);
+  const [musicOn, setMusicOn] = useState(false); // ambient music/sounds off by default
   const [showCredits, setShowCredits] = useState(false);
+  const [models, setModels] = useState<{ story: string; image: string } | null>(null);
+  const goodnightCacheRef = useRef<{ key: string; url: string } | null>(null);
+  const goodnightAudioRef = useRef<HTMLAudioElement | null>(null);
   const [regenAudio, setRegenAudio] = useState(false);
   const [ctrlsOpen, setCtrlsOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -249,6 +252,9 @@ export default function Home() {
         setSelectedVoiceId(list[0].id);
       }
     }).catch(() => {});
+    fetch("/api/models").then(r => r.json()).then(d => {
+      if (d?.story) setModels({ story: d.story, image: d.image });
+    }).catch(() => {});
     setStoryHistory(loadHistory());
 
     // Restore UI language
@@ -314,9 +320,9 @@ export default function Home() {
   useEffect(() => {
     if (!bookReady || introFiredRef.current) return;
     introFiredRef.current = true;
-    ambientRef.current?.playIntro();
+    if (musicOn) ambientRef.current?.playIntro();
     ambientRef.current?.setScene(scenes[0]?.soundscape);
-  }, [bookReady, viewMode, scenes]);
+  }, [bookReady, viewMode, scenes, musicOn]);
 
   // Reset intro flag when new story starts
   useEffect(() => {
@@ -345,6 +351,49 @@ export default function Home() {
       window.removeEventListener("orientationchange", onChange);
     };
   }, []);
+
+  // Spoken "good night" when the credits roll at the end of the story
+  useEffect(() => {
+    if (!showCredits) {
+      goodnightAudioRef.current?.pause();
+      goodnightAudioRef.current = null;
+      return;
+    }
+    const lang = voices.find(v => v.id === selectedVoiceId)?.language ?? "cs";
+    const text = lang === "en"
+      ? "Good night, Nicolas and Valentina. Sweet dreams!"
+      : "Dobrou noc, Nicolásku a Valentýnko. Sladké sny!";
+    const key = `${selectedVoiceId}|${lang}`;
+    let cancelled = false;
+    (async () => {
+      try {
+        let url = goodnightCacheRef.current?.key === key ? goodnightCacheRef.current.url : null;
+        if (!url) {
+          const res = await fetch("/api/scene", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(30_000),
+            body: JSON.stringify({
+              scene: { index: 0, narration: text, imagePrompt: "x" },
+              audioOnly: true,
+              voiceId: selectedVoiceId || undefined,
+            }),
+          });
+          const data = await safeJson<{ audioUrl?: string }>(res);
+          if (!res.ok || !data.audioUrl) return;
+          url = data.audioUrl;
+          goodnightCacheRef.current = { key, url };
+        }
+        if (cancelled) return;
+        audioRef.current?.pause();
+        const a = new Audio(url);
+        goodnightAudioRef.current = a;
+        a.play().catch(() => {});
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCredits]);
 
   // Restart the subtitle roll from the top whenever narration starts playing
   const [rollTick, setRollTick] = useState(0);
@@ -1262,8 +1311,8 @@ export default function Home() {
               <p className="credits-title">{title}</p>
 
               <p className="credits-section">Příběh</p>
-              <p className="credits-item">Claude Opus — scénář a narrace</p>
-              <p className="credits-item">Google Gemini — ilustrace</p>
+              <p className="credits-item">Anthropic {models?.story ?? "Claude"} — scénář a narace</p>
+              <p className="credits-item">Google {models?.image ?? "Gemini"} — ilustrace</p>
               <p className="credits-item">ElevenLabs — hlas vypravěče</p>
 
               <p className="credits-section">Hrdinové</p>
@@ -1276,6 +1325,8 @@ export default function Home() {
               <p className="credits-section">Vytvořeno s láskou</p>
               <p className="credits-item">pro Nickyho pohádky</p>
               <p className="credits-item">© {new Date().getFullYear()}</p>
+
+              <p className="credits-goodnight">🌙 Dobrou noc, Nicolásku a Valentýnko 🌙</p>
 
               <p className="credits-tap">— klikni pro zavření —</p>
             </div>

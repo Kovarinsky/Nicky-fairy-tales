@@ -1540,6 +1540,14 @@ button:disabled {
   font-weight: 600;
 }
 
+.credits-goodnight {
+  margin-top: 2.5rem;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffe082;
+  text-shadow: 0 2px 14px rgba(255, 224, 130, 0.35);
+}
+
 
 /* ── Mobile-only overrides (edge-to-edge, smaller fonts) ── */
 @media (max-width: 600px) {
