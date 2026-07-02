@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.33";
+export const APP_VERSION = "2.34";
 
 // Changelog (newest first)
+// 2.34 - Panel přikotven dole; šipky integrované do obrázku (střed, jeho okraje); Recent stories přesunuty pod pohádku
 // 2.33 - Anglické názvy témat (Story world) při EN; vlastní postavy se ukládají (localStorage) — zůstávají do smazání ×, pohádky s nimi zůstávají v historii
 // 2.32 - Jednotná velikost obrázků: Gemini generuje 16:9 (imageConfig), zobrazení v pevném 16:9 rámu (cover) v obou orientacích
 // 2.31 - Portrait reader: text box přímo pod obrázkem, ovládací panel pod textem (jako v landscape); toggle panelu ťuknutím kamkoli na kartu

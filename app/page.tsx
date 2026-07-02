@@ -190,6 +190,7 @@ export default function Home() {
   const formRef = useRef<HTMLFormElement>(null);
   const pageBodyRef = useRef<HTMLDivElement>(null);
   const pageImgRef = useRef<HTMLImageElement>(null);
+  const navRef = useRef<HTMLDivElement>(null);
 
   // History
   const [storyHistory, setStoryHistory] = useState<HistoryEntry[]>([]);
@@ -412,6 +413,13 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showCredits]);
 
+  // Clear inline nav positioning when leaving the reader (form layout uses CSS flow)
+  useEffect(() => {
+    if (viewMode === "reader") return;
+    const nav = navRef.current;
+    if (nav) { nav.style.top = ""; nav.style.left = ""; nav.style.width = ""; nav.style.right = ""; }
+  }, [viewMode]);
+
   // Restart the subtitle roll from the top whenever narration starts playing
   const [rollTick, setRollTick] = useState(0);
   useEffect(() => {
@@ -437,6 +445,18 @@ export default function Home() {
       el.style.width = "";
       el.style.marginLeft = "";
       el.style.marginRight = "";
+    }
+    // Nav arrows integrated INTO the image: vertically centered on it,
+    // constrained to its displayed width
+    const nav = navRef.current;
+    const book = bookRef.current;
+    if (nav && imgEl && book) {
+      const br = book.getBoundingClientRect();
+      const ir = imgEl.getBoundingClientRect();
+      nav.style.top = `${Math.round(ir.top - br.top + ir.height / 2)}px`;
+      nav.style.left = `${Math.round(ir.left - br.left)}px`;
+      nav.style.width = `${Math.round(ir.width)}px`;
+      nav.style.right = "auto";
     }
     el.scrollTop = 0;
     el.scrollLeft = 0;
@@ -1156,35 +1176,6 @@ export default function Home() {
         })()}
       </form>
 
-      {/* ── HISTORY ── */}
-      {storyHistory.length > 0 && (
-        <div className="history-box">
-          <button type="button" className="history-toggle" onClick={() => setHistoryOpen(p => !p)}>
-            {t.historyTitle(storyHistory.length)} {historyOpen ? "▲" : "▼"}
-          </button>
-          {historyOpen && (
-            <div className="history-list">
-              {storyHistory.map(entry => (
-                <button key={entry.id} type="button" className="history-item"
-                  onClick={() => replayStory(entry)}
-                  disabled={loading && bgStatus === "idle"}>
-                  <div className="history-item-body">
-                    <span className="history-title">{entry.title}</span>
-                    <div className="history-badges">
-                      <span className="history-badge badge-offline">📥 offline</span>
-                      <span className="history-badge badge-size">{estimateStorySize(entry.scenes.length)}</span>
-                      <span className="history-badge badge-scenes">{t.scenesBadge(entry.scenes.length)}</span>
-                    </div>
-                    <span className="history-date">{fmtDate(entry.createdAt)}</span>
-                  </div>
-                  <span className="history-play-btn">▶</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       </>
       )}
 
@@ -1308,7 +1299,7 @@ export default function Home() {
           </div>
 
           {/* Nav arrows + dots outside the card — no overflow clipping */}
-          <div className="book-nav">
+          <div className="book-nav" ref={navRef}>
             <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page - 1)} disabled={!hasPrev} aria-label={t.prev}>←</button>
             <div className="page-dots">
               {scenes.map((_, i) => (
@@ -1326,6 +1317,37 @@ export default function Home() {
           )}
         </div>
       )}
+
+      {/* ── HISTORY — below the story so it does not distract ── */}
+      {/* ── HISTORY ── */}
+      {!readerMode && storyHistory.length > 0 && (
+        <div className="history-box">
+          <button type="button" className="history-toggle" onClick={() => setHistoryOpen(p => !p)}>
+            {t.historyTitle(storyHistory.length)} {historyOpen ? "▲" : "▼"}
+          </button>
+          {historyOpen && (
+            <div className="history-list">
+              {storyHistory.map(entry => (
+                <button key={entry.id} type="button" className="history-item"
+                  onClick={() => replayStory(entry)}
+                  disabled={loading && bgStatus === "idle"}>
+                  <div className="history-item-body">
+                    <span className="history-title">{entry.title}</span>
+                    <div className="history-badges">
+                      <span className="history-badge badge-offline">📥 offline</span>
+                      <span className="history-badge badge-size">{estimateStorySize(entry.scenes.length)}</span>
+                      <span className="history-badge badge-scenes">{t.scenesBadge(entry.scenes.length)}</span>
+                    </div>
+                    <span className="history-date">{fmtDate(entry.createdAt)}</span>
+                  </div>
+                  <span className="history-play-btn">▶</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
 
       {/* ── ROLLING CREDITS ── */}
       {/* ── BACKGROUND GENERATION TOAST ── */}
