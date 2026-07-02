@@ -1289,7 +1289,13 @@ export default function Home() {
               >
                 {isGenerating ? (
                   showShimmer
-                    ? <span className="btn-create-label">{t.writingBtn}</span>
+                    ? (
+                      <span className="btn-create-label writing-label">
+                        <span className="writing-pencil">✍️</span>
+                        {t.writingBtn}
+                        <span className="writing-dots"><span>.</span><span>.</span><span>.</span></span>
+                      </span>
+                    )
                     : <span className="btn-create-label">{t.scenesBtn(done, total, progressPct)}</span>
                 ) : t.createBtn}
               </button>

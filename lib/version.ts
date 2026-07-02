@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.40";
+export const APP_VERSION = "2.41";
 
 // Changelog (newest first)
+// 2.41 - Animace „Píšu příběh": píšící tužka ✍️, blikající tečky, výraznější a rychlejší shimmer
 // 2.40 - Key objects lock (auto a předměty stejné v celé pohádce); tlačítko 🔄 Na šířku v panelu (fullscreen + orientation lock)
 // 2.39 - Konzistence velikostí: povinné 'Heights:' v popisu postav, lock na věk/proporce, sanitizér zachovává výšky; fallback prompt pro blokované scény; poctivý toast při chybějících obrázcích
 // 2.38 - Anti-stuck: Wake Lock (displej nezhasne při generování), hlídač zaseknutí (2,5 min bez pokroku → tlačítko Pokračovat), auto-obnovení při návratu do zamrzlé záložky
