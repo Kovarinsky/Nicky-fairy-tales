@@ -1783,3 +1783,15 @@ button:disabled {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* Zvolený segment (jeho scény ukazují kartičky) */
+.job-seg-focus {
+  outline: 2.5px solid #fff;
+  outline-offset: -1px;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.35);
+}
+
+.job-seg-writing,
+.job-seg-generating {
+  cursor: pointer;
+}

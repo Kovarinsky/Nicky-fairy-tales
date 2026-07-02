@@ -207,6 +207,9 @@ export default function Home() {
     elevenlabs?: { used?: number; limit?: number; tier?: string; error?: string };
     czkRate?: number;
   };
+  // Which queued story the gen-cards preview (tap a segment to switch)
+  const [focusJobId, setFocusJobId] = useState<string | null>(null);
+
   const [usageOpen, setUsageOpen] = useState(false);
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [usageErr, setUsageErr] = useState(false);
@@ -1616,10 +1619,10 @@ export default function Home() {
 
         {(() => {
           // Three sources of progress: LOCAL pipeline (loading/bgStatus) and
-          // the SERVER job queue (serverJobs) — the newest server job drives
-          // the cards; more stories can be queued while they run
+          // the SERVER job queue (serverJobs) — tapping a segment picks which
+          // story the cards preview (default: the newest one)
           const activeJobs = serverJobs.filter(j => j.phase === "writing" || j.phase === "generating");
-          const newestJob = activeJobs[activeJobs.length - 1];
+          const newestJob = activeJobs.find(j => j.jobId === focusJobId) ?? activeJobs[activeJobs.length - 1];
           const localGen = loading || bgStatus === "writing" || bgStatus === "generating";
           const isGenerating = localGen || !!newestJob;
           const bgGen = bgStatus === "generating";
@@ -1664,11 +1667,12 @@ export default function Home() {
                     const pct = j.phase === "generating" && j.total > 0 ? Math.round((j.done / j.total) * 100) : 0;
                     return (
                       <div key={j.jobId}
-                        className={`job-seg job-seg-${j.phase}`}
+                        className={`job-seg job-seg-${j.phase}${newestJob?.jobId === j.jobId && activeJobs.length > 1 ? " job-seg-focus" : ""}`}
                         style={{ "--pct": `${pct}%` } as React.CSSProperties}
                         onClick={j.phase === "done" ? () => openServerJob(j)
-                          : j.phase === "error" ? () => removeServerJob(j.jobId) : undefined}
-                        role={j.phase === "done" || j.phase === "error" ? "button" : undefined}
+                          : j.phase === "error" ? () => removeServerJob(j.jobId)
+                          : () => setFocusJobId(j.jobId)}
+                        role="button"
                         title={j.title || undefined}
                       >
                         <span className="job-seg-fill" />
@@ -1695,7 +1699,7 @@ export default function Home() {
               )}
               {newestJob && serverJobs.length > 1 && (
                 <p className="gen-step-hint" style={{ marginTop: '0.3rem' }}>
-                  {t.cardsLabel(serverJobs.findIndex(j => j.jobId === newestJob.jobId) + 1)}
+                  {t.cardsLabel2(serverJobs.findIndex(j => j.jobId === newestJob.jobId) + 1)}
                 </p>
               )}
               {isGenerating && (

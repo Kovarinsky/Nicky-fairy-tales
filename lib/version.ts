@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.55";
+export const APP_VERSION = "2.56";
 
 // Changelog (newest first)
+// 2.56 - Ťuknutí na díl tlačítka (1./2./3.) přepne kartičky na průběh té konkrétní pohádky; zvolený díl je zvýrazněný bílým rámečkem
 // 2.55 - Fronta bez bublinek: velké tlačítko se rozdělí na části — jedna část na pohádku (✍️ píše se / 🎨 x/y s plnícím se pruhem / ▶ Otevřít / ⚠️ chyba); plovoucí bublinky z hlavní obrazovky zmizely
 // 2.54 - Oprava zaseknutého „Píšu novou pohádku": kratší imagePrompty (popis postav se do obrázků vkládá automaticky, nekopíruje se 20×) → psaní 20stránkové pohádky se vejde do 5min limitu; retry při zahlcení Claude API (429); popisek, že kartičky ukazují nejnovější pohádku
 // 2.53 - Při čtení pohádky se neukazují bublinky průběhu dalších pohádek — průběh a tlačítko Otevřít uvidíte po návratu Domů
