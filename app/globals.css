@@ -417,33 +417,6 @@ button:disabled {
   display: none;
 }
 
-.reader-mode .back-btn {
-  display: block;
-}
-
-.back-btn {
-  display: block;
-  background: transparent;
-  border: none;
-  color: rgba(255,255,255,0.45);
-  font-size: 0.82rem;
-  font-weight: 600;
-  padding: 0.3rem 0;
-  margin-bottom: 0.3rem;
-  cursor: pointer;
-  letter-spacing: 0.02em;
-  transition: color 0.15s;
-  box-shadow: none;
-}
-
-.back-btn:hover {
-  color: rgba(255,255,255,0.9);
-  background: transparent;
-  box-shadow: none;
-  filter: none;
-  transform: none;
-}
-
 
 /* ── Background generation toast ── */
 .bg-toast {
@@ -505,23 +478,34 @@ button:disabled {
   margin-bottom: 0.4rem;
 }
 
-/* Card fills remaining flex space; grid: image 1fr, body auto, controls auto */
+/* Card fills remaining flex space; image keeps NATURAL ratio (no crop, no stretch),
+   text scrolls if it doesn't fit */
 .reader-mode .book-card {
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-rows: 1fr auto auto;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   animation: none;
 }
 
-/* Image fills 1fr row */
 .reader-mode .page-image {
   width: 100%;
-  height: 100%;
+  flex: 1 1 0;
   min-height: 0;
+  height: auto;
   aspect-ratio: auto;
-  object-fit: cover;
+  object-fit: contain;
+  background: #14092e;
+}
+
+.reader-mode .page-body {
+  flex: 0 0 auto;
+  max-height: 34dvh;
+  overflow-y: auto;
+}
+
+.reader-mode .book-controls {
+  flex-shrink: 0;
 }
 
 .book-title {
@@ -566,9 +550,12 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
+  min-height: 220px;
+  padding: 1rem;
   color: rgba(255,255,255,0.7);
   font-size: 1rem;
   font-weight: 700;
+  text-align: center;
   background: linear-gradient(135deg, #1a0a3e 0%, #2d0d52 50%, #1a0a3e 100%);
 }
 
@@ -602,9 +589,26 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
-  padding: 0.9rem 1.25rem 1.1rem;
+  padding: 0.7rem 1.25rem 0.8rem;
   border-top: 1.5px solid rgba(196, 190, 235, 0.45);
   background: rgba(248, 247, 255, 0.7);
+}
+
+/* Button + label under it */
+.ctrl-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.22rem;
+  min-width: 0;
+}
+
+.ctrl-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(60, 50, 100, 0.65);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .ctrl-btn {
@@ -1393,7 +1397,6 @@ button:disabled {
   h1 { font-size: 1.55rem; text-align: left; padding: 0.7rem 0.85rem 0.1rem; }
   .subtitle { font-size: 0.82rem; text-align: left; padding: 0 0.85rem; margin-bottom: 0.6rem; }
   .container.reader-mode { padding-top: 0.4rem; padding-bottom: 0; }
-  .back-btn { padding: 0.3rem 0.65rem; }
 
   .photo-bg-img { height: 70vh; }
 

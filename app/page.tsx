@@ -117,6 +117,11 @@ function getTargetAge(ids: string[]): number {
   if (n && v) return 4; if (v) return 2; if (n) return 6; return 6;
 }
 
+// SVG data-URL = server-side fallback when Gemini failed to draw the scene
+function isPlaceholderImg(url?: string): boolean {
+  return !url || url.startsWith("data:image/svg");
+}
+
 function fmtDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString("cs-CZ", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -151,6 +156,10 @@ export default function Home() {
   // Generation state
   const [loading, setLoading] = useState(false);
   const [doneCount, setDoneCount] = useState(0);
+  const [fixingScene, setFixingScene] = useState<number | null>(null);
+  // Context of the last generation — needed for single-scene image repair
+  const heroDescRef = useRef("");
+  const imageRefsRef = useRef<Array<{ data: string; mimeType: string }>>([]);
   const [status, setStatus] = useState("");
   type SceneStatus = "waiting" | "generating" | "done" | "error";
   const [sceneStatuses, setSceneStatuses] = useState<SceneStatus[]>([]);
@@ -446,6 +455,8 @@ export default function Home() {
   ): Promise<RenderedScene[]> {
     // Local tracking array — returned at end for caching
     const localScenes: RenderedScene[] = scriptScenes.map(s => ({ ...s }));
+    heroDescRef.current = heroDescription;
+    imageRefsRef.current = customImageRefs;
 
     if (background) {
       bgTitleRef.current = scriptTitle;
@@ -462,10 +473,21 @@ export default function Home() {
       setStatus(`🎨 Generuji ${scriptScenes.length} scén...`);
     }
 
-    const CONCURRENCY = 1;
-    let completed = 0;
+    // 2 scenes in parallel — Gemini/ElevenLabs handle it, halves total wait time
+    const CONCURRENCY = 2;
 
-    const tasks = scriptScenes.map((scene, i) => async () => {
+    // done = scene has a real (non-placeholder) image
+    const realDone = () => localScenes.filter(s => !isPlaceholderImg(s.imageUrl)).length;
+    const publish = () => {
+      if (background) {
+        setBgProgress({ done: realDone(), total: scriptScenes.length });
+      } else {
+        setDoneCount(realDone());
+        setScenes([...localScenes]);
+      }
+    };
+
+    async function runScene(i: number) {
       if (!background) setSceneStatuses(prev => { const n = [...prev]; n[i] = "generating"; return n; });
       try {
         const res = await fetch("/api/scene", {
@@ -473,7 +495,7 @@ export default function Home() {
           headers: { "Content-Type": "application/json" },
           signal: AbortSignal.timeout(90_000),
           body: JSON.stringify({
-            scene,
+            scene: scriptScenes[i],
             heroDescription,
             characterIds: selectedIds,
             customCharacterImages: customImageRefs,
@@ -484,27 +506,63 @@ export default function Home() {
         if (media.imageDebug) console.warn(`[Gemini debug] scene ${i + 1}:`, media.imageDebug);
         if (!res.ok) throw new Error(media.error || `Scéna ${i + 1} selhala.`);
         localScenes[i] = { ...localScenes[i], imageUrl: media.imageUrl, audioUrl: media.audioUrl };
-        completed++;
-        if (background) {
-          setBgProgress({ done: completed, total: scriptScenes.length });
-        } else {
-          setDoneCount(completed);
-          setScenes([...localScenes]);
-          setSceneStatuses(prev => { const n = [...prev]; n[i] = "done"; return n; });
-        }
+        publish();
+        if (!background) setSceneStatuses(prev => { const n = [...prev]; n[i] = isPlaceholderImg(media.imageUrl) ? "error" : "done"; return n; });
       } catch {
         if (!background) setSceneStatuses(prev => { const n = [...prev]; n[i] = "error"; return n; });
       }
-    });
-
-    let idx = 0;
-    async function worker() {
-      while (idx < tasks.length) { const i = idx++; await tasks[i](); }
     }
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, worker));
+
+    async function runPool(indices: number[]) {
+      let idx = 0;
+      async function worker() {
+        while (idx < indices.length) { const i = indices[idx++]; await runScene(i); }
+      }
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, indices.length) }, worker));
+    }
+
+    await runPool(scriptScenes.map((_, i) => i));
+
+    // Verify pass: retry every scene whose image is missing or an SVG placeholder
+    const failed = localScenes.map((s, i) => (isPlaceholderImg(s.imageUrl) ? i : -1)).filter(i => i >= 0);
+    if (failed.length > 0) {
+      if (!background) setStatus(`🔧 Opravuji ${failed.length} obrázků...`);
+      await runPool(failed);
+    }
 
     if (background) setBgStatus("done");
     return localScenes;
+  }
+
+  // ── Repair a single scene image (manual, from the reader) ─────────────────
+  async function repairSceneImage(i: number) {
+    const scene = scenes[i];
+    if (!scene || fixingScene !== null) return;
+    setFixingScene(i);
+    try {
+      const res = await fetch("/api/scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(90_000),
+        body: JSON.stringify({
+          scene,
+          heroDescription: heroDescRef.current,
+          characterIds: selectedIds,
+          customCharacterImages: imageRefsRef.current,
+          voiceId: selectedVoiceId || undefined,
+        }),
+      });
+      const media = await safeJson<{ imageUrl?: string; audioUrl?: string; error?: string }>(res);
+      if (res.ok && media.imageUrl && !isPlaceholderImg(media.imageUrl)) {
+        setScenes(prev => {
+          const n = [...prev];
+          n[i] = { ...n[i], imageUrl: media.imageUrl, audioUrl: n[i].audioUrl || media.audioUrl };
+          return n;
+        });
+      }
+    } catch {} finally {
+      setFixingScene(null);
+    }
   }
 
   // ── Create story (full flow) ──────────────────────────────────────────────
@@ -835,9 +893,16 @@ export default function Home() {
         </div>
 
         {(() => {
-          const isGenerating = loading && bgStatus === "idle";
-          const progressPct = totalScenes > 0 ? Math.round((doneCount / totalScenes) * 100) : 0;
-          const showShimmer = isGenerating && scenes.length === 0;
+          const isGenerating = loading;
+          // Background mode: story runs while another one is displayed — progress from bgProgress/bgBufferRef
+          const bgGen = bgStatus === "generating";
+          const done = bgGen ? bgProgress.done : doneCount;
+          const total = bgGen ? bgProgress.total : totalScenes;
+          const progressPct = total > 0 ? Math.round((done / total) * 100) : 0;
+          const showShimmer = isGenerating && (bgStatus === "writing" || (bgStatus === "idle" && scenes.length === 0));
+          const cardScenes: (RenderedScene | null)[] = bgGen
+            ? bgBufferRef.current
+            : (bgStatus === "idle" && scenes.length > 0 ? scenes : Array(sceneCount).fill(null));
           return (
             <div ref={progressRef}>
               <button
@@ -849,24 +914,27 @@ export default function Home() {
                 {isGenerating ? (
                   showShimmer
                     ? <span className="btn-create-label">✍️ Píšu příběh...</span>
-                    : <span className="btn-create-label">🎨 {doneCount}/{totalScenes} scén ({progressPct}%)</span>
+                    : <span className="btn-create-label">🎨 {done}/{total} scén ({progressPct}%)</span>
                 ) : "✨ Vytvořit pohádku"}
               </button>
               {isGenerating && (
                 <p className="gen-step-hint">
                   {showShimmer
                     ? '📝 Krok 1/2 — Claude vymýšlí příběh… (~1 min)'
-                    : `🖼️ Krok 2/2 — Kreslím scénu ${doneCount + 1} / ${totalScenes}${totalScenes > 0 ? ` • zbývá ~${Math.max(1, Math.ceil((totalScenes - doneCount) * 18 / 60))} min` : ''}`}
+                    : `🖼️ Krok 2/2 — Kreslím scénu ${Math.min(done + 1, total)} / ${total}${total > 0 ? ` • zbývá ~${Math.max(1, Math.ceil((total - done) * 10 / 60))} min` : ''}`}
                 </p>
               )}
               {isGenerating && (
                 <div className="gen-cards" style={{ marginTop: '0.25rem' }}>
-                  {(scenes.length > 0 ? scenes : Array(sceneCount).fill(null)).map((s, i) => {
-                    const st = s ? (sceneStatuses[i] ?? "waiting") : "waiting";
+                  {cardScenes.map((s, i) => {
+                    const st = bgGen
+                      ? (!isPlaceholderImg(s?.imageUrl) ? "done" : i === done ? "generating" : "waiting")
+                      : (s ? (sceneStatuses[i] ?? "waiting") : "waiting");
+                    const showImg = s?.imageUrl && !isPlaceholderImg(s.imageUrl);
                     return (
                       <div key={i} className={`gen-card gen-card-${st}`}>
-                        {s?.imageUrl
-                          ? <img src={s.imageUrl} alt={`Scéna ${i + 1}`} className="gen-card-img" />
+                        {showImg
+                          ? <img src={s!.imageUrl} alt={`Scéna ${i + 1}`} className="gen-card-img" />
                           : <div className="gen-card-placeholder">
                               {st === "generating" && <div className="gen-card-spinner" />}
                               {st === "error" && <span className="gen-card-icon">⚠️</span>}
@@ -934,18 +1002,31 @@ export default function Home() {
       {/* ── BOOK – shown when all scene images are ready (audio may be partial) ── */}
       {bookReady && current && (
         <div className="book" ref={bookRef}>
-          <button type="button" className="back-btn" onClick={resetToForm}>
-            ← Nová pohádka
-          </button>
           <h2 className="book-title">{title}</h2>
 
           <div className="book-card" key={slideKey}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
-            {current.imageUrl ? (
+            {current.imageUrl && !isPlaceholderImg(current.imageUrl) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img className="page-image" src={current.imageUrl} alt={`Scéna ${page + 1}`} />
+            ) : current.imageUrl ? (
+              <div className="page-image placeholder">
+                {fixingScene === page ? (
+                  <>
+                    <div className="placeholder-spinner" />
+                    <span>🎨 Kreslím scénu {page + 1}...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🖼️ Obrázek se nepovedl vygenerovat</span>
+                    <button type="button" className="btn-retry" onClick={() => repairSceneImage(page)}>
+                      🔄 Vygenerovat obrázek
+                    </button>
+                  </>
+                )}
+              </div>
             ) : (
               <div className="page-image placeholder">
                 <div className="placeholder-spinner" />
@@ -958,48 +1039,66 @@ export default function Home() {
             </div>
 
             <div className="book-controls">
-              <button type="button" className={`ctrl-btn ctrl-play ${!current.audioUrl || regenAudio ? "ctrl-loading" : ""}`}
-                onClick={togglePlay} disabled={!current.audioUrl || regenAudio} aria-label={isPlaying ? "Pauza" : "Přehrát"}>
-                {regenAudio ? "⏳" : !current.audioUrl ? "⏳" : isPlaying ? "⏸" : "▶"}
-              </button>
+              <div className="ctrl-item">
+                <button type="button" className={`ctrl-btn ctrl-play ${!current.audioUrl || regenAudio ? "ctrl-loading" : ""}`}
+                  onClick={togglePlay} disabled={!current.audioUrl || regenAudio} aria-label={isPlaying ? "Pauza" : "Přehrát"}>
+                  {regenAudio ? "⏳" : !current.audioUrl ? "⏳" : isPlaying ? "⏸" : "▶"}
+                </button>
+                <span className="ctrl-label">{isPlaying ? "Pauza" : "Přehrát"}</span>
+              </div>
 
-              <span className="ctrl-counter">{page + 1} / {scenes.length}</span>
+              <div className="ctrl-item">
+                <span className="ctrl-counter">{page + 1} / {scenes.length}</span>
+                <span className="ctrl-label">Strana</span>
+              </div>
 
-              <button type="button" className={`ctrl-btn ctrl-auto ${autoAdvance ? "ctrl-auto-on" : ""}`}
-                onClick={() => setAutoAdvance(p => !p)} title={autoAdvance ? "Auto-přechod zapnut" : "Auto-přechod vypnut"}>
-                {autoAdvance ? "🔁" : "🔂"}
-              </button>
+              <div className="ctrl-item">
+                <button type="button" className={`ctrl-btn ctrl-auto ${autoAdvance ? "ctrl-auto-on" : ""}`}
+                  onClick={() => setAutoAdvance(p => !p)} title={autoAdvance ? "Auto-přechod zapnut" : "Auto-přechod vypnut"}>
+                  {autoAdvance ? "🔁" : "🔂"}
+                </button>
+                <span className="ctrl-label">Auto</span>
+              </div>
 
               {/* Voice cycle button — only when multiple voices available */}
               {voices.length > 1 && (
-                <button type="button" className={`ctrl-btn ctrl-auto ${regenAudio ? "ctrl-loading" : "ctrl-auto-on"}`}
-                  onClick={() => {
-                    const idx = voices.findIndex(v => v.id === selectedVoiceId);
-                    const next = voices[(idx + 1) % voices.length];
-                    switchVoice(next.id);
-                  }}
-                  disabled={regenAudio}
-                  title={`Hlas: ${voices.find(v => v.id === selectedVoiceId)?.name ?? "?"} — klikni pro přepnutí`}
-                >
-                  {regenAudio ? "⏳" : (voices.find(v => v.id === selectedVoiceId)?.emoji ?? "🎙️")}
-                </button>
+                <div className="ctrl-item">
+                  <button type="button" className={`ctrl-btn ctrl-auto ${regenAudio ? "ctrl-loading" : "ctrl-auto-on"}`}
+                    onClick={() => {
+                      const idx = voices.findIndex(v => v.id === selectedVoiceId);
+                      const next = voices[(idx + 1) % voices.length];
+                      switchVoice(next.id);
+                    }}
+                    disabled={regenAudio}
+                    title={`Hlas: ${voices.find(v => v.id === selectedVoiceId)?.name ?? "?"} — klikni pro přepnutí`}
+                  >
+                    {regenAudio ? "⏳" : (voices.find(v => v.id === selectedVoiceId)?.emoji ?? "🎙️")}
+                  </button>
+                  <span className="ctrl-label">Hlas</span>
+                </div>
               )}
 
-              <button type="button" className={`ctrl-btn ctrl-mute ${musicOn ? "ctrl-mute-on" : ""}`}
-                onClick={() => setMusicOn(p => !p)}
-                title={musicOn ? "Vypnout hudbu" : "Zapnout hudbu"}
-                aria-label={musicOn ? "Vypnout hudbu" : "Zapnout hudbu"}
-              >
-                {musicOn ? "🎵" : "🔇"}
-              </button>
+              <div className="ctrl-item">
+                <button type="button" className={`ctrl-btn ctrl-mute ${musicOn ? "ctrl-mute-on" : ""}`}
+                  onClick={() => setMusicOn(p => !p)}
+                  title={musicOn ? "Vypnout hudbu" : "Zapnout hudbu"}
+                  aria-label={musicOn ? "Vypnout hudbu" : "Zapnout hudbu"}
+                >
+                  {musicOn ? "🎵" : "🔇"}
+                </button>
+                <span className="ctrl-label">Hudba</span>
+              </div>
 
-              <button type="button" className="ctrl-btn ctrl-home"
-                onClick={resetToForm}
-                title="Hlavní stránka"
-                aria-label="Hlavní stránka"
-              >
-                🏠
-              </button>
+              <div className="ctrl-item">
+                <button type="button" className="ctrl-btn ctrl-home"
+                  onClick={resetToForm}
+                  title="Hlavní stránka"
+                  aria-label="Hlavní stránka"
+                >
+                  🏠
+                </button>
+                <span className="ctrl-label">Domů</span>
+              </div>
             </div>
           </div>
 
