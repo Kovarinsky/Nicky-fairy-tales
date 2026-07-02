@@ -183,6 +183,7 @@ export default function Home() {
   const bookRef = useRef<HTMLDivElement>(null);
   const bookScrolledRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const pageBodyRef = useRef<HTMLDivElement>(null);
 
   // History
   const [storyHistory, setStoryHistory] = useState<HistoryEntry[]>([]);
@@ -312,6 +313,27 @@ export default function Home() {
     const t = setTimeout(() => setCtrlsOpen(false), 6000);
     return () => clearTimeout(t);
   }, [ctrlsOpen, viewMode]);
+
+  // Rolling subtitles: long text scrolls slowly through the small window
+  useEffect(() => {
+    const el = pageBodyRef.current;
+    if (!el || viewMode !== "reader") return;
+    el.scrollTop = 0;
+    const overflow = el.scrollHeight - el.clientHeight;
+    if (overflow <= 0) return;
+    const DELAY_MS = 2800;   // let the reader start
+    const SPEED = 14;        // px per second
+    const durMs = (overflow / SPEED) * 1000;
+    let raf = 0;
+    const start = performance.now();
+    const tick = (t: number) => {
+      const e = t - start - DELAY_MS;
+      if (e > 0) el.scrollTop = Math.min(overflow, (e / durMs) * overflow);
+      if (e < durMs) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [page, slideKey, viewMode, scenes]);
 
   // Scroll progress into view when loading starts (mobile UX)
   useEffect(() => {
@@ -1046,7 +1068,7 @@ export default function Home() {
               </div>
             )}
 
-            <div className="page-body" onClick={() => setCtrlsOpen(v => !v)}>
+            <div className="page-body" ref={pageBodyRef} onClick={() => setCtrlsOpen(v => !v)}>
               <p className="page-text">{current.narration}</p>
             </div>
 
