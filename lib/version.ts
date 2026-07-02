@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.35";
+export const APP_VERSION = "2.36";
 
 // Changelog (newest first)
+// 2.36 - Nové referenční postavy: James (6, nejlepší kamarád z Riverside) a Bella (8, Jamesova sestra) s fotkami
 // 2.35 - Rodinné referenční fotky: táta Jan, máma Jana, pes Archie (nová postava), Valentýnka — Gemini nyní dostává fotky a kreslí podle skutečné podoby
 // 2.34 - Panel přikotven dole; šipky integrované do obrázku (střed, jeho okraje); Recent stories přesunuty pod pohádku
 // 2.33 - Anglické názvy témat (Story world) při EN; vlastní postavy se ukládají (localStorage) — zůstávají do smazání ×, pohádky s nimi zůstávají v historii

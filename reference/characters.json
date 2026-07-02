@@ -28,5 +28,17 @@
     "name": "Pes Archie",
     "description": "Archie: friendly Staffordshire Bull Terrier dog, red-brindle brown coat with white chest and white stripe on the muzzle, white paws, black collar with brass studs, stocky muscular build, happy expression with tongue out",
     "referenceFile": "archie.jpg"
+  },
+  {
+    "id": "james",
+    "name": "James",
+    "description": "James: 6-year-old boy with straight mid-brown hair with a fringe, dark brown eyes, cheeky warm smile, green T-shirt with cartoon dog print, white shorts, black sneakers with orange laces; Nicolas's best friend from Riverside school, same height as Nicolas",
+    "referenceFile": "james.jpg"
+  },
+  {
+    "id": "bella",
+    "name": "Bella",
+    "description": "Bella: 8-year-old girl with very long straight light-brown hair, blue-grey eyes, bright friendly smile, small shell earrings, cream sweatshirt, blue-grey shorts, pink sneakers; James's big sister, slightly taller than the boys",
+    "referenceFile": "bella.jpg"
   }
 ]
