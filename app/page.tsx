@@ -314,6 +314,19 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [ctrlsOpen, viewMode]);
 
+  // Re-run layout-dependent effects when the device rotates (portrait ⇄ landscape)
+  const [orientTick, setOrientTick] = useState(0);
+  useEffect(() => {
+    const onChange = () => setOrientTick(o => o + 1);
+    const mq = window.matchMedia("(orientation: landscape)");
+    mq.addEventListener("change", onChange);
+    window.addEventListener("orientationchange", onChange);
+    return () => {
+      mq.removeEventListener("change", onChange);
+      window.removeEventListener("orientationchange", onChange);
+    };
+  }, []);
+
   // Rolling subtitles: long text scrolls slowly through the small window.
   // Portrait = vertical roll; landscape (single-line ticker) = horizontal roll.
   useEffect(() => {
@@ -341,7 +354,7 @@ export default function Home() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [page, slideKey, viewMode, scenes]);
+  }, [page, slideKey, viewMode, scenes, orientTick]);
 
   // Scroll progress into view when loading starts (mobile UX)
   useEffect(() => {
