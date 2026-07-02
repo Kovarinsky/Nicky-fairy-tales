@@ -545,30 +545,6 @@ button:disabled {
   font-size: 1.15rem;
 }
 
-/* Landscape: panel on the RIGHT side instead */
-@media (orientation: landscape) {
-  .reader-mode .book-controls {
-    left: auto;
-    right: 0.55rem;
-    bottom: auto;
-    top: 50%;
-    transform: translateY(-50%);
-    flex-direction: column;
-    gap: 0.4rem;
-    width: 82px;
-    padding: 0.55rem 0.45rem;
-    max-height: calc(100dvh - 4rem);
-    overflow-y: auto;
-  }
-  .reader-mode .ctrl-item .ctrl-btn {
-    height: 38px;
-    font-size: 1.05rem;
-  }
-  .reader-mode .ctrl-label {
-    font-size: 0.55rem;
-  }
-}
-
 /* Nav arrows float mid-height over the image; hidden while the panel is open */
 .reader-mode .book-nav {
   position: absolute;
@@ -593,6 +569,65 @@ button:disabled {
 
 .reader-mode .page-dots {
   display: none;
+}
+
+/* Landscape / widescreen: maximize the picture —
+   no title, one-line rolling ticker, arrows only with the panel */
+@media (orientation: landscape) {
+  .reader-mode .book-controls {
+    left: auto;
+    right: 0.55rem;
+    bottom: auto;
+    top: 50%;
+    transform: translateY(-50%);
+    flex-direction: column;
+    gap: 0.4rem;
+    width: 82px;
+    padding: 0.55rem 0.45rem;
+    max-height: calc(100dvh - 4rem);
+    overflow-y: auto;
+  }
+  .reader-mode .ctrl-item .ctrl-btn {
+    height: 38px;
+    font-size: 1.05rem;
+  }
+  .reader-mode .ctrl-label {
+    font-size: 0.55rem;
+  }
+
+  /* Title hidden — image gets the space */
+  .reader-mode .book-title {
+    display: none;
+  }
+  .reader-mode .book {
+    margin-top: 0;
+  }
+  .container.reader-mode {
+    padding: 0.3rem 0.3rem 0;
+  }
+
+  /* Text: single-line ticker at the bottom */
+  .reader-mode .page-body {
+    height: auto;
+    padding: 0.45rem 0.9rem 0.55rem;
+    overflow-x: hidden;
+    overflow-y: hidden;
+  }
+  .reader-mode .page-text {
+    white-space: nowrap;
+    font-size: 0.95rem;
+    line-height: 1.35;
+  }
+
+  /* Arrows hidden by default; tap shows them together with the panel
+     (right arrow shifted left of the side panel) */
+  .reader-mode .book-nav {
+    display: none;
+  }
+  .reader-mode .ctrls-open .book-nav {
+    display: flex;
+    padding-right: 6.5rem;
+  }
 }
 
 .book-title {

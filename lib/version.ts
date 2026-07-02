@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.23";
+export const APP_VERSION = "2.24";
 
 // Changelog (newest first)
+// 2.24 - Widescreen: bez nadpisu, text = jednořádkový horizontální ticker dole, šipky jen s panelem (odsazené); obraz ~90 % výšky
 // 2.23 - Titulky v malém okně POD obrázkem (nepřekrývají obraz), auto-rolling; panel dole (portrait) / vpravo (landscape); fix výšky v landscape
 // 2.22 - Imerzní čtečka: obraz přes celý screen, text jako titulky dole (scrolluje, nikdy nepřeteče), ovládání skryté — ťuknutí zobrazí panel vpravo, šipky plovoucí po stranách
 // 2.21 - Šířka: full-width obraz na mobilu, tablet/landscape = obraz vedle textu; velká tlačítka přes celý panel; vlajka hlasu (🇨🇿/🇬🇧); play už neukazuje ⏳ při přepnutí hlasu
