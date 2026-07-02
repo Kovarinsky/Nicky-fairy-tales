@@ -102,7 +102,7 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, withAspe
   // so Gemini can match the likeness when drawing the stylized scene
   const parts: Array<Record<string, unknown>> = [];
   for (const ref of refImages) {
-    parts.push({ text: `Reference photo of ${ref.name || "a story character"} (match this person's/animal's likeness):` });
+    parts.push({ text: ref.label || `Reference photo of ${ref.name || "a story character"} (match this person's/animal's likeness):` });
     parts.push({ inlineData: { data: ref.data, mimeType: ref.mimeType } });
   }
   if (refImages.length > 0) {

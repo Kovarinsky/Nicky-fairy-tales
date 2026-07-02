@@ -37,6 +37,18 @@ export async function POST(req: NextRequest) {
       if (ci?.data && ci?.mimeType) refImages.push({ data: ci.data, mimeType: ci.mimeType, name: "a custom story character" });
     }
 
+    // Consistency anchor: the first finished illustration of THIS story —
+    // characters, sizes, art style and recurring objects are copied from it
+    const anchor = body.styleAnchor;
+    if (anchor?.data && anchor?.mimeType) {
+      refImages.push({
+        data: anchor.data,
+        mimeType: anchor.mimeType,
+        label:
+          "CONSISTENCY ANCHOR — an illustration from THIS SAME story. Copy from it EXACTLY: every character's design, clothing, hair, body size and the relative heights between characters, the art style, AND every recurring object. The car keeps the identical body type, shape, colors and details in this scene (a sedan stays a sedan — it never becomes a different car):",
+      });
+    }
+
     let imageDebug = "";
     let audioDebug = "";
     const [imageResult, audio] = await Promise.all([

@@ -810,6 +810,14 @@ export default function Home() {
     };
     lastProgressRef.current = Date.now();
 
+    // Consistency anchor: scene 1's finished image is sent as a visual
+    // reference for every later scene (characters, sizes, style, objects)
+    const anchorFrom = (url?: string) => {
+      if (!url || isPlaceholderImg(url)) return undefined;
+      const m = url.match(/^data:(image\/[a-z.+-]+);base64,(.+)$/);
+      return m ? { mimeType: m[1], data: m[2] } : undefined;
+    };
+
     async function runScene(i: number) {
       if (!background) setSceneStatuses(prev => { const n = [...prev]; n[i] = "generating"; return n; });
       try {
@@ -823,6 +831,7 @@ export default function Home() {
             characterIds: selectedIds,
             customCharacterImages: customImageRefs,
             voiceId: voiceId || undefined,
+            ...(i > 0 ? { styleAnchor: anchorFrom(localScenes[0]?.imageUrl) } : {}),
           }),
         });
         const media = await safeJson<{ imageUrl?: string; audioUrl?: string; error?: string; imageDebug?: string }>(res);
@@ -848,9 +857,13 @@ export default function Home() {
       await Promise.all(Array.from({ length: Math.min(CONCURRENCY, indices.length) }, worker));
     }
 
-    // First pass: only scenes that still need work (resume skips finished ones)
+    // First pass: only scenes that still need work (resume skips finished ones).
+    // Scene 1 goes FIRST and alone — its image then anchors all other scenes.
     const initial = localScenes.map((s, i) => (sceneNeedsWork(s) ? i : -1)).filter(i => i >= 0);
-    await runPool(initial);
+    if (initial.includes(0)) {
+      await runPool([0]);
+    }
+    await runPool(initial.filter(i => i !== 0));
 
     // Verification: the story is NOT complete until every image is real.
     // Up to 3 extra rounds with growing back-off retry the failed scenes.
@@ -880,6 +893,9 @@ export default function Home() {
     const scene = scenes[i];
     if (!scene || fixingScene !== null) return;
     setFixingScene(i);
+    // Anchor the repair to the story's first image for consistency
+    const a0 = i > 0 ? scenes[0]?.imageUrl : undefined;
+    const m = a0 && !isPlaceholderImg(a0) ? a0.match(/^data:(image\/[a-z.+-]+);base64,(.+)$/) : null;
     try {
       const res = await fetch("/api/scene", {
         method: "POST",
@@ -891,6 +907,7 @@ export default function Home() {
           characterIds: selectedIds,
           customCharacterImages: imageRefsRef.current,
           voiceId: selectedVoiceId || undefined,
+          ...(m ? { styleAnchor: { mimeType: m[1], data: m[2] } } : {}),
         }),
       });
       const media = await safeJson<{ imageUrl?: string; audioUrl?: string; error?: string }>(res);

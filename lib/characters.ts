@@ -37,6 +37,8 @@ export interface ReferenceImage {
   mimeType: string;
   /** Jméno postavy na fotce (pro instrukci v promptu) */
   name?: string;
+  /** Volitelný vlastní instrukční text místo výchozího "Reference photo of ..." */
+  label?: string;
 }
 
 function mimeFromExt(file: string): string {
