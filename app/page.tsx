@@ -159,6 +159,8 @@ export default function Home() {
   // Generation state
   const [loading, setLoading] = useState(false);
   const [doneCount, setDoneCount] = useState(0);
+  const [stalled, setStalled] = useState(false);
+  const lastProgressRef = useRef(0);
   const [fixingScene, setFixingScene] = useState<number | null>(null);
   // Context of the last generation — needed for single-scene image repair
   const heroDescRef = useRef("");
@@ -347,6 +349,49 @@ export default function Home() {
   useEffect(() => {
     if (scenes.length === 0) introFiredRef.current = false;
   }, [scenes.length]);
+
+  // ── Anti-stuck guards ──────────────────────────────────────────────────────
+  // 1) Keep the screen awake while generating (mobile Chrome freezes timers
+  //    and kills fetches when the screen turns off / tab goes background)
+  useEffect(() => {
+    const active = loading || bgStatus === "generating";
+    let lock: { release?: () => Promise<void> } | null = null;
+    if (active && "wakeLock" in navigator) {
+      (navigator as Navigator & { wakeLock: { request: (t: string) => Promise<never> } })
+        .wakeLock.request("screen").then((l: { release?: () => Promise<void> }) => { lock = l; }).catch(() => {});
+    }
+    return () => { lock?.release?.().catch(() => {}); };
+  }, [loading, bgStatus]);
+
+  // 2) Stall watchdog: no scene finished for 2.5 min while generating → offer reload
+  //    (the pending-job memory + progressive cache make the reload resume cleanly)
+  useEffect(() => {
+    const active = loading || bgStatus === "generating";
+    if (!active) { setStalled(false); return; }
+    const iv = setInterval(() => {
+      if (lastProgressRef.current && Date.now() - lastProgressRef.current > 150_000) setStalled(true);
+    }, 15_000);
+    return () => clearInterval(iv);
+  }, [loading, bgStatus]);
+
+  // 3) Returning to a frozen tab with a stalled generation → auto-reload once
+  useEffect(() => {
+    function onVis() {
+      if (document.visibilityState !== "visible") return;
+      const active = loading || bgStatus === "generating";
+      if (!active || !lastProgressRef.current) return;
+      if (Date.now() - lastProgressRef.current > 150_000) {
+        try {
+          if (!sessionStorage.getItem("nicky-stall-reload")) {
+            sessionStorage.setItem("nicky-stall-reload", "1");
+            window.location.reload();
+          }
+        } catch {}
+      }
+    }
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [loading, bgStatus]);
 
   // ── Auto-resume an interrupted generation after reload/app kill ───────────
   const resumeFiredRef = useRef(false);
@@ -728,6 +773,7 @@ export default function Home() {
     const CONCURRENCY = 2;
 
     const publish = () => {
+      lastProgressRef.current = Date.now();   // heartbeat for the stall watchdog
       if (background) {
         setBgProgress({ done: realDone(), total: scriptScenes.length });
       } else {
@@ -735,6 +781,7 @@ export default function Home() {
         setScenes([...localScenes]);
       }
     };
+    lastProgressRef.current = Date.now();
 
     async function runScene(i: number) {
       if (!background) setSceneStatuses(prev => { const n = [...prev]; n[i] = "generating"; return n; });
@@ -793,7 +840,9 @@ export default function Home() {
     const complete = localScenes.every(s => !isPlaceholderImg(s.imageUrl));
     if (entryId && complete) {
       try { localStorage.removeItem(JOB_KEY); } catch {}
+      try { sessionStorage.removeItem("nicky-stall-reload"); } catch {}
     }
+    setStalled(false);
 
     if (background) setBgStatus("done");
     return localScenes;
@@ -1426,6 +1475,14 @@ export default function Home() {
         </div>
       )}
 
+
+      {/* ── STALL TOAST — reload resumes the remembered job ── */}
+      {stalled && (
+        <div className="bg-toast stall-toast">
+          <span>{t.stalled}</span>
+          <button type="button" className="bg-toast-btn" onClick={() => window.location.reload()}>{t.stallReload}</button>
+        </div>
+      )}
 
       {/* ── ROLLING CREDITS ── */}
       {/* ── BACKGROUND GENERATION TOAST ── */}

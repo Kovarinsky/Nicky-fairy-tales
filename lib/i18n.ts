@@ -62,6 +62,8 @@ export const UI = {
     newReady: "✨ Nová pohádka je hotová!",
     openStory: "▶ Otevřít",
     pdfTooBig: "PDF je příliš velké (max 3.5 MB).",
+    stalled: "⚠️ Generování se zaseklo",
+    stallReload: "🔁 Pokračovat",
   },
   en: {
     subtitle: "Pick characters, a theme and inspiration – a fairy tale with pictures and Daddy's voice.",
@@ -122,5 +124,7 @@ export const UI = {
     newReady: "✨ The new story is ready!",
     openStory: "▶ Open",
     pdfTooBig: "The PDF is too large (max 3.5 MB).",
+    stalled: "⚠️ Generation got stuck",
+    stallReload: "🔁 Resume",
   },
 } as const;

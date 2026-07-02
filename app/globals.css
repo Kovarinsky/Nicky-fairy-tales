@@ -469,6 +469,12 @@ button:disabled {
   box-shadow: 0 4px 24px rgba(0,0,0,0.4);
 }
 
+/* Stall warning sits above the progress toast */
+.stall-toast {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 4.2rem);
+  border-color: rgba(249, 115, 22, 0.7);
+}
+
 .bg-toast-btn {
   background: var(--purple);
   border: none;

@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.37";
+export const APP_VERSION = "2.38";
 
 // Changelog (newest first)
+// 2.38 - Anti-stuck: Wake Lock (displej nezhasne při generování), hlídač zaseknutí (2,5 min bez pokroku → tlačítko Pokračovat), auto-obnovení při návratu do zamrzlé záložky
 // 2.37 - Odolné generování: job se pamatuje (text i obrázky), auto-resume po restartu; průběžné cachování scén; až 3 verifikační kola — pohádka není hotová, dokud nejsou všechny obrázky
 // 2.36 - Nové referenční postavy: James (6, nejlepší kamarád z Riverside) a Bella (8, Jamesova sestra) s fotkami
 // 2.35 - Rodinné referenční fotky: táta Jan, máma Jana, pes Archie (nová postava), Valentýnka — Gemini nyní dostává fotky a kreslí podle skutečné podoby
