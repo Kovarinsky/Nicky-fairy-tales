@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.43";
+export const APP_VERSION = "2.44";
 
 // Changelog (newest first)
+// 2.44 - Fix „nabídka zmizela": rozepsaný draft bez obrázků už neotevře prázdnou temnou čtečku (obnova jen s kompletními obrázky + pojistka: čtečka bez pohádky → návrat na formulář); stažení hotové pohádky ze serveru s retry a placeholderem; otevřený panel ovládání už nepřekrývá toast průběhu
 // 2.43 - Serverové generování na Vercelu: pohádka se připraví na serveru (Blob), telefon jen sleduje stav a stáhne výsledek — přepnutí appky nevadí; bez Blob tokenu automatický fallback na lokální generování
 // 2.42 - Kotevní obrázek: scéna 1 se generuje první a její obrázek je vizuální referencí pro všechny další scény — postavy, výšky, styl i předměty (auto) se kopírují z ní
 // 2.41 - Animace „Píšu příběh": píšící tužka ✍️, blikající tečky, výraznější a rychlejší shimmer

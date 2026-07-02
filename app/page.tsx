@@ -286,12 +286,14 @@ export default function Home() {
       }
     } catch {}
 
-    // Restore story interrupted by window switch
+    // Restore story interrupted by window switch — only when every scene has
+    // an image, otherwise the reader would open onto an empty dark page
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
         const draft = JSON.parse(raw);
-        if (draft?.scenes?.length > 0 && draft.title) {
+        if (draft?.scenes?.length > 0 && draft.title
+            && draft.scenes.every((s: RenderedScene) => s.imageUrl)) {
           setTitle(draft.title);
           setScenes(draft.scenes);
           setPage(draft.page ?? 0);
@@ -305,7 +307,7 @@ export default function Home() {
   // ── Save draft on window switch (Android background kill) ──
   useEffect(() => {
     function onVisibilityChange() {
-      if (document.hidden && scenes.length > 0) {
+      if (document.hidden && scenes.length > 0 && scenes.every(s => s.imageUrl)) {
         try {
           localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, scenes, page }));
         } catch {}
@@ -429,6 +431,13 @@ export default function Home() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Safety net: the reader must never be an empty dark page — if there is no
+  // story to show (e.g. a bad draft or an empty background buffer put us
+  // here), fall back to the form so the menu is always reachable
+  useEffect(() => {
+    if (viewMode === "reader" && !bookReady) setViewMode("form");
+  }, [viewMode, bookReady]);
 
   // Reader controls: show briefly when reader opens, then auto-hide
   useEffect(() => {
@@ -612,6 +621,7 @@ export default function Home() {
 
   // ── Switch to completed background story ──
   function switchToBgStory() {
+    if (bgBufferRef.current.length === 0) { setBgStatus("idle"); return; }
     audioRef.current?.pause();
     setIsPlaying(false);
     const newScenes = [...bgBufferRef.current];
@@ -933,11 +943,21 @@ export default function Home() {
     const urls = st.sceneUrls || {};
     const media = await Promise.all(script.map(async (_, i) => {
       if (!urls[i]) return null;
-      try { return await fetch(urls[i]).then(r => (r.ok ? r.json() : null)); } catch { return null; }
+      // 2 attempts — a hiccup while downloading one scene must not lose it
+      for (let a = 0; a < 2; a++) {
+        try {
+          const r = await fetch(urls[i], { cache: "no-store" });
+          if (r.ok) return await r.json();
+        } catch {}
+      }
+      return null;
     }));
+    // Missing image → SVG placeholder (same convention as /api/scene), so the
+    // book still opens and shows the "redraw" button instead of nothing
+    const missingSvg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 9'%3E%3C/svg%3E";
     const rendered: RenderedScene[] = script.map((s, i) => ({
       ...s,
-      imageUrl: media[i]?.imageUrl,
+      imageUrl: media[i]?.imageUrl || missingSvg,
       audioUrl: media[i]?.audioUrl,
     }));
     const entry: HistoryEntry = {
@@ -1674,8 +1694,9 @@ export default function Home() {
       )}
 
       {/* ── ROLLING CREDITS ── */}
-      {/* ── BACKGROUND GENERATION TOAST ── */}
-      {bgStatus !== "idle" && (
+      {/* ── BACKGROUND GENERATION TOAST — hidden while the reader control
+            panel is open, so it never covers the buttons ── */}
+      {bgStatus !== "idle" && !(readerMode && ctrlsOpen) && (
         <div className="bg-toast">
           {bgStatus === "writing" && <span>{t.writingNew}</span>}
           {bgStatus === "generating" && (
