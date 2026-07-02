@@ -4,7 +4,6 @@
   "description": "AI mluvené pohádky pro Nicolase",
   "start_url": "/",
   "display": "fullscreen",
-  "orientation": "any",
   "background_color": "#0a0520",
   "theme_color": "#0a0520",
   "icons": [

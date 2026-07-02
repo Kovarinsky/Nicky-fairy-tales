@@ -184,6 +184,7 @@ export default function Home() {
   const bookScrolledRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const pageBodyRef = useRef<HTMLDivElement>(null);
+  const pageImgRef = useRef<HTMLImageElement>(null);
 
   // History
   const [storyHistory, setStoryHistory] = useState<HistoryEntry[]>([]);
@@ -338,6 +339,21 @@ export default function Home() {
   useEffect(() => {
     const el = pageBodyRef.current;
     if (!el || viewMode !== "reader") return;
+    // Landscape: shrink the ticker to the image's DISPLAYED width (letterboxed
+    // content, not the full screen); portrait uses the full width
+    const imgEl = pageImgRef.current;
+    const landscape = window.matchMedia("(orientation: landscape)").matches;
+    if (landscape && imgEl && imgEl.naturalWidth > 0) {
+      const r = imgEl.getBoundingClientRect();
+      const contentW = Math.min(r.width, r.height * (imgEl.naturalWidth / imgEl.naturalHeight));
+      el.style.width = `${Math.round(contentW)}px`;
+      el.style.marginLeft = "auto";
+      el.style.marginRight = "auto";
+    } else {
+      el.style.width = "";
+      el.style.marginLeft = "";
+      el.style.marginRight = "";
+    }
     el.scrollTop = 0;
     el.scrollLeft = 0;
     const overX = el.scrollWidth - el.clientWidth;
@@ -386,7 +402,7 @@ export default function Home() {
     isAutoAdvanceRef.current = false;
     const t = setTimeout(() => audioRef.current?.play().catch(() => {}), 420);
     return () => clearTimeout(t);
-  }, [page, currentAudioUrl, allScenesReady]);
+  }, [page, currentAudioUrl, allScenesReady, slideKey]);
 
   // ── Swipe navigation ──
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -517,7 +533,8 @@ export default function Home() {
       a.pause();
     } else {
       a.play().catch(() => {});
-      setCtrlsOpen(false); // hide the panel when narration starts
+      setCtrlsOpen(false);              // hide the panel when narration starts
+      if (viewMode !== "reader") setViewMode("reader"); // play from main screen → reader mode
     }
   }
 
@@ -735,6 +752,7 @@ export default function Home() {
       setSlideKey(k => k + 1);
       setViewMode("reader");
       setHistoryOpen(false);
+      isAutoAdvanceRef.current = true; // start narration right away
     }
 
     // 1. Instant restore from in-memory ref (bg generation continues uninterrupted)
@@ -1088,6 +1106,8 @@ export default function Home() {
             {current.imageUrl && !isPlaceholderImg(current.imageUrl) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img className="page-image" src={current.imageUrl} alt={`Scéna ${page + 1}`}
+                ref={pageImgRef}
+                onLoad={() => setRollTick(t => t + 1)}
                 onClick={() => setCtrlsOpen(v => !v)} />
             ) : current.imageUrl ? (
               <div className="page-image placeholder">
