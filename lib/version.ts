@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.28";
+export const APP_VERSION = "2.29";
 
 // Changelog (newest first)
+// 2.29 - Přepínač jazyka UI 🇨🇿/🇬🇧: celé rozhraní česky nebo anglicky, volba se pamatuje, EN auto-vybere anglického vypravěče
 // 2.28 - Text na bílém podkladu: portrait celý text bez rolování, landscape bílý jednořádkový ticker
 // 2.27 - Ticker jen pod šířkou obrázku; play z hlavní obrazovky → reader mód; replay z historie auto-přehraje; manifest bez orientation (rotace dle systému)
 // 2.26 - Fix hlas (payload bez obrázku + odblokování play); šipky skryté i v portrait (jen s panelem); play zavře panel + restart rollingu; PWA manifest (fullscreen po přidání na plochu)

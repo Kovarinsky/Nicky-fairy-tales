@@ -5,6 +5,7 @@ import type { StoryScript, RenderedScene, Scene } from "@/lib/types";
 import { AmbientPlayer } from "@/lib/ambient";
 import { cacheStory, getCachedStory, evictOldStories } from "@/lib/scene-cache";
 import { APP_VERSION } from "@/lib/version";
+import { UI, UI_LANG_KEY, type UILang } from "@/lib/i18n";
 
 // ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; }
@@ -198,6 +199,17 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<"form" | "reader">("form");
   const readerMode = viewMode === "reader";
 
+  // UI language (CZ default; EN for Nicolas's foreign friends)
+  const [uiLang, setUiLang] = useState<UILang>("cs");
+  const t = UI[uiLang];
+  function switchLang(l: UILang) {
+    setUiLang(l);
+    try { localStorage.setItem(UI_LANG_KEY, l); } catch {}
+    // Match the narrator voice to the UI language when one exists
+    const match = voices.find(v => v.language === (l === "cs" ? "cs" : "en"));
+    if (match) setSelectedVoiceId(match.id);
+  }
+
   // Background generation state
   const [bgStatus, setBgStatus] = useState<"idle" | "writing" | "generating" | "done">("idle");
   const [bgProgress, setBgProgress] = useState({ done: 0, total: 0 });
@@ -238,6 +250,12 @@ export default function Home() {
       }
     }).catch(() => {});
     setStoryHistory(loadHistory());
+
+    // Restore UI language
+    try {
+      const l = localStorage.getItem(UI_LANG_KEY);
+      if (l === "cs" || l === "en") setUiLang(l);
+    } catch {}
 
     // Restore story interrupted by window switch
     try {
@@ -559,7 +577,7 @@ export default function Home() {
       setSlideKey(0);
       setDoneCount(0);
       setSceneStatuses(scriptScenes.map(() => "waiting"));
-      setStatus(`🎨 Generuji ${scriptScenes.length} scén...`);
+      setStatus(t.statusGenerating(scriptScenes.length));
     }
 
     // 2 scenes in parallel — Gemini/ElevenLabs handle it, halves total wait time
@@ -615,7 +633,7 @@ export default function Home() {
     // Verify pass: retry every scene whose image is missing or an SVG placeholder
     const failed = localScenes.map((s, i) => (isPlaceholderImg(s.imageUrl) ? i : -1)).filter(i => i >= 0);
     if (failed.length > 0) {
-      if (!background) setStatus(`🔧 Opravuji ${failed.length} obrázků...`);
+      if (!background) setStatus(t.statusRepairing(failed.length));
       await runPool(failed);
     }
 
@@ -668,7 +686,7 @@ export default function Home() {
     }
     setLoading(true);
     try {
-      setStatus("✍️ Claude vymýšlí příběh...");
+      setStatus(t.statusWriting);
       const selectedCustomObjs = customChars.filter(c => selectedCustomIds.includes(c.id));
 
       const storyRes = await fetch("/api/story", {
@@ -693,7 +711,7 @@ export default function Home() {
         }),
       });
       const script = await safeJson<StoryScript & { error?: string }>(storyRes);
-      if (!storyRes.ok) throw new Error(script.error || "Nepodařilo se vytvořit příběh.");
+      if (!storyRes.ok) throw new Error(script.error || t.errStory);
 
       // Save to history immediately (text only, before slow image generation)
       const entry: HistoryEntry = {
@@ -720,11 +738,11 @@ export default function Home() {
       cacheStory(entry.id, finalScenes).catch(() => {});
       evictOldStories(loadHistory().map(e => e.id)).catch(() => {});
       if (!background) {
-        setStatus("✨ Pohádka je připravena!");
+        setStatus(t.statusReady);
         setViewMode("reader");
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Něco se pokazilo.";
+      const msg = err instanceof Error ? err.message : t.errGeneric;
       const isFetchAbort = msg === "Failed to fetch" || msg.includes("AbortError") || msg.includes("NetworkError");
       setError(isFetchAbort ? "FETCH_ABORT" : msg);
       setStatus("");
@@ -784,10 +802,10 @@ export default function Home() {
       const finalScenes = await generateMedia(entry.title, entry.heroDescription, entry.scenes, [], selectedVoiceId);
       renderedMapRef.current.set(entry.id, finalScenes);
       cacheStory(entry.id, finalScenes).catch(() => {});
-      setStatus("✨ Pohádka je připravena!");
+      setStatus(t.statusReady);
       setViewMode("reader");
     } catch (err) {
-      const msg2 = err instanceof Error ? err.message : "Generování selhalo.";
+      const msg2 = err instanceof Error ? err.message : t.errReplay;
       setError(msg2 === "Failed to fetch" || msg2.includes("AbortError") ? "FETCH_ABORT" : msg2);
       setStatus("");
     } finally {
@@ -827,7 +845,7 @@ export default function Home() {
     if (r) setInspImages(p => [...p, { ...r, name: file.name }]);
   }
   async function handleInspPdf(file: File) {
-    if (file.size > 3.5 * 1024 * 1024) { alert("PDF je příliš velké (max 3.5 MB)."); return; }
+    if (file.size > 3.5 * 1024 * 1024) { alert(t.pdfTooBig); return; }
     const b = await fileToBase64(file).catch(() => null);
     if (b) setInspPdf({ base64: b, name: file.name });
   }
@@ -844,8 +862,12 @@ export default function Home() {
 
       {!readerMode && (
       <>
-      <h1>📖 Nickyho pohádky <span className="version-badge">v{APP_VERSION}</span></h1>
-      <p className="subtitle">Vyber postavy, téma a inspiraci – pohádka s obrázky a tatínkovým hlasem.</p>
+      <div className="lang-switch">
+        <button type="button" className={`lang-btn ${uiLang === "cs" ? "lang-on" : ""}`} onClick={() => switchLang("cs")}>🇨🇿 CZ</button>
+        <button type="button" className={`lang-btn ${uiLang === "en" ? "lang-on" : ""}`} onClick={() => switchLang("en")}>🇬🇧 EN</button>
+      </div>
+      <h1>📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"} <span className="version-badge">v{APP_VERSION}</span></h1>
+      <p className="subtitle">{t.subtitle}</p>
 
       {/* ── Vrátit se na starší pohádku ── */}
 
@@ -854,7 +876,7 @@ export default function Home() {
 
         {(chars.length > 0 || customChars.length > 0) && (
           <div className="field">
-            <label>Kdo v pohádce vystupuje?</label>
+            <label>{t.whoLabel}</label>
             <div className="chips">
               {chars.map(c => (
                 <label key={c.id} className={`chip ${selectedIds.includes(c.id) ? "chip-on" : ""}`}>
@@ -870,7 +892,7 @@ export default function Home() {
                 </div>
               ))}
               <button type="button" className={`chip chip-btn ${addingChar ? "chip-on" : ""}`} onClick={() => setAddingChar(p => !p)}>
-                {addingChar ? "✕ Zrušit" : "+ Vlastní postava"}
+                {addingChar ? t.cancelChip : t.addCharChip}
               </button>
             </div>
           </div>
@@ -878,20 +900,20 @@ export default function Home() {
 
         {addingChar && (
           <div className="add-char-panel">
-            <p className="panel-title">Nová postava</p>
+            <p className="panel-title">{t.newCharTitle}</p>
             <div className="field">
-              <label>Jméno *</label>
-              <input type="text" value={newCharName} onChange={e => setNewCharName(e.target.value)} placeholder="Kubík, Pohádková víla, Dráček..." autoFocus />
+              <label>{t.nameLabel}</label>
+              <input type="text" value={newCharName} onChange={e => setNewCharName(e.target.value)} placeholder={t.namePlaceholder} autoFocus />
             </div>
             <div className="field">
-              <label>Popis (nepovinné)</label>
-              <textarea value={newCharDesc} onChange={e => setNewCharDesc(e.target.value)} placeholder="Malý hnědý medvídek s červenou mašlí..." />
+              <label>{t.descLabel}</label>
+              <textarea value={newCharDesc} onChange={e => setNewCharDesc(e.target.value)} placeholder={t.descPlaceholder} />
             </div>
             <div className="field">
-              <label>Fotka postavy (nepovinné)</label>
+              <label>{t.photoLabel}</label>
               <div className="file-row">
                 <button type="button" className="outline-btn" onClick={() => charPhotoRef.current?.click()}>
-                  📷 {newCharPhoto ? "Změnit" : "Nahrát fotku"}
+                  📷 {newCharPhoto ? t.changePhoto : t.uploadPhoto}
                 </button>
                 {newCharPhoto && <img src={newCharPhoto.previewUrl} alt="náhled" className="mini-preview" />}
               </div>
@@ -899,15 +921,15 @@ export default function Home() {
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleCharPhoto(f); e.target.value = ""; }} />
             </div>
             <div className="file-row">
-              <button type="button" onClick={addCustomChar} disabled={!newCharName.trim()}>Přidat postavu</button>
-              <button type="button" className="outline-btn" onClick={() => { setAddingChar(false); setNewCharName(""); setNewCharDesc(""); setNewCharPhoto(null); }}>Zrušit</button>
+              <button type="button" onClick={addCustomChar} disabled={!newCharName.trim()}>{t.addCharBtn}</button>
+              <button type="button" className="outline-btn" onClick={() => { setAddingChar(false); setNewCharName(""); setNewCharDesc(""); setNewCharPhoto(null); }}>{t.cancel}</button>
             </div>
           </div>
         )}
 
         {themes.length > 0 && (
           <div className="field">
-            <label>Svět pohádky</label>
+            <label>{t.worldLabel}</label>
             <div className="chips">
               {themes.map(t => (
                 <button type="button" key={t.id} className={`chip chip-btn ${selectedTheme === t.id ? "chip-on" : ""}`}
@@ -921,7 +943,7 @@ export default function Home() {
 
         {voices.length > 1 && (
           <div className="field">
-            <label>Hlas vypravěče</label>
+            <label>{t.voiceLabel}</label>
             <div className="chips">
               {voices.map(v => (
                 <button type="button" key={v.id}
@@ -936,14 +958,14 @@ export default function Home() {
         )}
 
         <div className="field">
-          <label>Přání & inspirace</label>
-          <textarea value={topic} onChange={e => setTopic(e.target.value)} placeholder="Vlastní zápletka nebo přání (nepovinné)..." />
+          <label>{t.wishLabel}</label>
+          <textarea value={topic} onChange={e => setTopic(e.target.value)} placeholder={t.wishPlaceholder} />
           <div className="insp-row">
             <button type="button" className={`insp-btn ${inspImages.length > 0 ? "chip-on" : ""}`}
               onClick={() => inspImageRef.current?.click()} disabled={inspImages.length >= 3}>
-              📷 Foto{inspImages.length > 0 ? ` (${inspImages.length})` : ""}
+              📷 {t.photoBtn}{inspImages.length > 0 ? ` (${inspImages.length})` : ""}
             </button>
-            <button type="button" className={`insp-btn ${inspUrlActive ? "chip-on" : ""}`} onClick={() => setInspUrlActive(p => !p)}>🔗 Web odkaz</button>
+            <button type="button" className={`insp-btn ${inspUrlActive ? "chip-on" : ""}`} onClick={() => setInspUrlActive(p => !p)}>🔗 {t.webBtn}</button>
             <button type="button" className={`insp-btn ${inspPdf ? "chip-on" : ""}`} onClick={() => inspPdfRef.current?.click()}>📄 PDF{inspPdf ? " ✓" : ""}</button>
           </div>
           <input ref={inspImageRef} type="file" accept="image/*" multiple style={{ display: "none" }}
@@ -970,15 +992,15 @@ export default function Home() {
         </div>
 
         <div className="field">
-          <label>Počet stránek: {sceneCount}</label>
+          <label>{t.pagesLabel}: {sceneCount}</label>
           <input type="range" min={3} max={15} value={sceneCount} onChange={e => setSceneCount(Number(e.target.value))} />
         </div>
 
         <div className="field">
-          <label>Hudba</label>
+          <label>{t.musicLabel}</label>
           <label className={`chip ${musicOn ? "chip-on" : ""}`} style={{display:"flex", justifyContent:"center"}}>
             <input type="checkbox" checked={musicOn} onChange={() => setMusicOn(p => !p)} />
-            {musicOn ? "🎵 Zapnuta" : "🔇 Vypnuta"}
+            {musicOn ? t.musicOn : t.musicOff}
           </label>
         </div>
 
@@ -1003,15 +1025,15 @@ export default function Home() {
               >
                 {isGenerating ? (
                   showShimmer
-                    ? <span className="btn-create-label">✍️ Píšu příběh...</span>
-                    : <span className="btn-create-label">🎨 {done}/{total} scén ({progressPct}%)</span>
-                ) : "✨ Vytvořit pohádku"}
+                    ? <span className="btn-create-label">{t.writingBtn}</span>
+                    : <span className="btn-create-label">{t.scenesBtn(done, total, progressPct)}</span>
+                ) : t.createBtn}
               </button>
               {isGenerating && (
                 <p className="gen-step-hint">
                   {showShimmer
-                    ? '📝 Krok 1/2 — Claude vymýšlí příběh… (~1 min)'
-                    : `🖼️ Krok 2/2 — Kreslím scénu ${Math.min(done + 1, total)} / ${total}${total > 0 ? ` • zbývá ~${Math.max(1, Math.ceil((total - done) * 10 / 60))} min` : ''}`}
+                    ? t.step1Hint
+                    : t.step2Hint(Math.min(done + 1, total), total, Math.max(1, Math.ceil((total - done) * 10 / 60)))}
                 </p>
               )}
               {isGenerating && (
@@ -1048,7 +1070,7 @@ export default function Home() {
       {storyHistory.length > 0 && (
         <div className="history-box">
           <button type="button" className="history-toggle" onClick={() => setHistoryOpen(p => !p)}>
-            📚 Poslední pohádky ({storyHistory.length}) {historyOpen ? "▲" : "▼"}
+            {t.historyTitle(storyHistory.length)} {historyOpen ? "▲" : "▼"}
           </button>
           {historyOpen && (
             <div className="history-list">
@@ -1061,7 +1083,7 @@ export default function Home() {
                     <div className="history-badges">
                       <span className="history-badge badge-offline">📥 offline</span>
                       <span className="history-badge badge-size">{estimateStorySize(entry.scenes.length)}</span>
-                      <span className="history-badge badge-scenes">{entry.scenes.length} scén</span>
+                      <span className="history-badge badge-scenes">{t.scenesBadge(entry.scenes.length)}</span>
                     </div>
                     <span className="history-date">{fmtDate(entry.createdAt)}</span>
                   </div>
@@ -1081,10 +1103,10 @@ export default function Home() {
       {!readerMode && error && (
         <div className="error-box">
           {error === "FETCH_ABORT"
-            ? <p className="error">📵 Spojení bylo přerušeno — přepnuli jste do jiné aplikace? Zkuste pohádku vytvořit znovu.</p>
+            ? <p className="error">{t.errFetchAbort}</p>
             : <p className="error">⚠️ {error}</p>}
           <button type="button" className="btn-retry" onClick={() => { setError(""); formRef.current?.requestSubmit(); }}>
-            🔄 Zkusit znovu
+            {t.retry}
           </button>
         </div>
       )}
@@ -1100,7 +1122,7 @@ export default function Home() {
           >
             {current.imageUrl && !isPlaceholderImg(current.imageUrl) ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img className="page-image" src={current.imageUrl} alt={`Scéna ${page + 1}`}
+              <img className="page-image" src={current.imageUrl} alt={t.sceneAlt(page + 1)}
                 ref={pageImgRef}
                 onLoad={() => setRollTick(t => t + 1)}
                 onClick={() => setCtrlsOpen(v => !v)} />
@@ -1109,13 +1131,13 @@ export default function Home() {
                 {fixingScene === page ? (
                   <>
                     <div className="placeholder-spinner" />
-                    <span>🎨 Kreslím scénu {page + 1}...</span>
+                    <span>{t.drawingScene(page + 1)}</span>
                   </>
                 ) : (
                   <>
-                    <span>🖼️ Obrázek se nepovedl vygenerovat</span>
+                    <span>{t.imgFailed}</span>
                     <button type="button" className="btn-retry" onClick={() => repairSceneImage(page)}>
-                      🔄 Vygenerovat obrázek
+                      {t.regenImg}
                     </button>
                   </>
                 )}
@@ -1123,7 +1145,7 @@ export default function Home() {
             ) : (
               <div className="page-image placeholder">
                 <div className="placeholder-spinner" />
-                <span>🎨 Generuji scénu {page + 1}...</span>
+                <span>{t.genScene(page + 1)}</span>
               </div>
             )}
 
@@ -1134,15 +1156,15 @@ export default function Home() {
             <div className="book-controls">
               <div className="ctrl-item">
                 <button type="button" className={`ctrl-btn ctrl-play ${!current.audioUrl || regenAudio ? "ctrl-loading" : ""}`}
-                  onClick={togglePlay} disabled={!current.audioUrl || regenAudio} aria-label={isPlaying ? "Pauza" : "Přehrát"}>
+                  onClick={togglePlay} disabled={!current.audioUrl || regenAudio} aria-label={isPlaying ? t.pause : t.play}>
                   {!current.audioUrl && !regenAudio ? "⏳" : isPlaying ? "⏸" : "▶"}
                 </button>
-                <span className="ctrl-label">{isPlaying ? "Pauza" : "Přehrát"}</span>
+                <span className="ctrl-label">{isPlaying ? t.pause : t.play}</span>
               </div>
 
               <div className="ctrl-item">
                 <span className="ctrl-counter">{page + 1} / {scenes.length}</span>
-                <span className="ctrl-label">Strana</span>
+                <span className="ctrl-label">{t.pageLbl}</span>
               </div>
 
               <div className="ctrl-item">
@@ -1150,7 +1172,7 @@ export default function Home() {
                   onClick={() => setAutoAdvance(p => !p)} title={autoAdvance ? "Auto-přechod zapnut" : "Auto-přechod vypnut"}>
                   {autoAdvance ? "🔁" : "🔂"}
                 </button>
-                <span className="ctrl-label">Auto</span>
+                <span className="ctrl-label">{t.auto}</span>
               </div>
 
               {/* Voice cycle button — only when multiple voices available */}
@@ -1167,7 +1189,7 @@ export default function Home() {
                   >
                     {voices.find(v => v.id === selectedVoiceId)?.emoji ?? "🎙️"}
                   </button>
-                  <span className="ctrl-label">Hlas</span>
+                  <span className="ctrl-label">{t.voice}</span>
                 </div>
               )}
 
@@ -1179,7 +1201,7 @@ export default function Home() {
                 >
                   {musicOn ? "🎵" : "🔇"}
                 </button>
-                <span className="ctrl-label">Hudba</span>
+                <span className="ctrl-label">{t.music}</span>
               </div>
 
               <div className="ctrl-item">
@@ -1190,14 +1212,14 @@ export default function Home() {
                 >
                   🏠
                 </button>
-                <span className="ctrl-label">Domů</span>
+                <span className="ctrl-label">{t.home}</span>
               </div>
             </div>
           </div>
 
           {/* Nav arrows + dots outside the card — no overflow clipping */}
           <div className="book-nav">
-            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page - 1)} disabled={!hasPrev} aria-label="Předchozí">←</button>
+            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page - 1)} disabled={!hasPrev} aria-label={t.prev}>←</button>
             <div className="page-dots">
               {scenes.map((_, i) => (
                 <button key={i} type="button"
@@ -1205,7 +1227,7 @@ export default function Home() {
                   onClick={() => goToPage(i)} aria-label={`Strana ${i + 1}`} />
               ))}
             </div>
-            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page + 1)} disabled={!hasNext} aria-label="Další">→</button>
+            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page + 1)} disabled={!hasNext} aria-label={t.next}>→</button>
           </div>
 
           {current.audioUrl && (
@@ -1219,14 +1241,14 @@ export default function Home() {
       {/* ── BACKGROUND GENERATION TOAST ── */}
       {bgStatus !== "idle" && (
         <div className="bg-toast">
-          {bgStatus === "writing" && <span>✍️ Píšu novou pohádku...</span>}
+          {bgStatus === "writing" && <span>{t.writingNew}</span>}
           {bgStatus === "generating" && (
             <span>🎨 {bgProgress.done} / {bgProgress.total} scén</span>
           )}
           {bgStatus === "done" && (
             <>
-              <span>✨ Nová pohádka je hotová!</span>
-              <button type="button" className="bg-toast-btn" onClick={switchToBgStory}>▶ Otevřít</button>
+              <span>{t.newReady}</span>
+              <button type="button" className="bg-toast-btn" onClick={switchToBgStory}>{t.openStory}</button>
             </>
           )}
         </div>
