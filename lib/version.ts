@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.42";
+export const APP_VERSION = "2.43";
 
 // Changelog (newest first)
+// 2.43 - Serverové generování na Vercelu: pohádka se připraví na serveru (Blob), telefon jen sleduje stav a stáhne výsledek — přepnutí appky nevadí; bez Blob tokenu automatický fallback na lokální generování
 // 2.42 - Kotevní obrázek: scéna 1 se generuje první a její obrázek je vizuální referencí pro všechny další scény — postavy, výšky, styl i předměty (auto) se kopírují z ní
 // 2.41 - Animace „Píšu příběh": píšící tužka ✍️, blikající tečky, výraznější a rychlejší shimmer
 // 2.40 - Key objects lock (auto a předměty stejné v celé pohádce); tlačítko 🔄 Na šířku v panelu (fullscreen + orientation lock)

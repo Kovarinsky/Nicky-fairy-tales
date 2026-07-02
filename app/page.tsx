@@ -31,6 +31,7 @@ interface HistoryEntry {
 const HISTORY_KEY = "nicky-story-history";
 const CUSTOM_CHARS_KEY = "nicky-custom-chars";
 const JOB_KEY = "nicky-pending-job";
+const SERVER_JOB_KEY = "nicky-server-job";
 const HISTORY_MAX = 10;
 const SETTINGS_KEY = "nicky-settings";
 const DRAFT_KEY = "nicky-story-draft";
@@ -923,11 +924,138 @@ export default function Home() {
     }
   }
 
+  // ── Server-side job: the whole story generates ON Vercel; the phone only
+  //    polls for the result — switching apps or locking the screen is fine ──
+  const jobTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  async function finalizeServerJob(st: { title?: string; heroDescription?: string; scenesScript?: Scene[]; sceneUrls?: Record<number, string>; total?: number; voiceId?: string }, jobId: string) {
+    const script = st.scenesScript || [];
+    const urls = st.sceneUrls || {};
+    const media = await Promise.all(script.map(async (_, i) => {
+      if (!urls[i]) return null;
+      try { return await fetch(urls[i]).then(r => (r.ok ? r.json() : null)); } catch { return null; }
+    }));
+    const rendered: RenderedScene[] = script.map((s, i) => ({
+      ...s,
+      imageUrl: media[i]?.imageUrl,
+      audioUrl: media[i]?.audioUrl,
+    }));
+    const entry: HistoryEntry = {
+      id: jobId,
+      title: st.title || "Pohádka",
+      heroDescription: st.heroDescription || "",
+      createdAt: new Date().toISOString(),
+      scenes: script,
+      selectedIds,
+      themeId: selectedTheme,
+      topic,
+    };
+    saveHistory(entry);
+    setStoryHistory(loadHistory());
+    heroDescRef.current = st.heroDescription || "";
+    renderedMapRef.current.set(jobId, rendered);
+    cacheStory(jobId, rendered).catch(() => {});
+    evictOldStories(loadHistory().map(e => e.id)).catch(() => {});
+    bgTitleRef.current = entry.title;
+    bgBufferRef.current = rendered;
+    setBgProgress({ done: rendered.filter(s => !isPlaceholderImg(s.imageUrl)).length, total: script.length });
+    setBgStatus("done");   // toast: „hotová ▶ Otevřít" (nebo ⚠️ při chybějících)
+    try { localStorage.removeItem(SERVER_JOB_KEY); } catch {}
+  }
+
+  function startJobPolling(jobId: string) {
+    if (jobTimerRef.current) clearInterval(jobTimerRef.current);
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/job/status?id=${jobId}`, { cache: "no-store" });
+        if (res.status === 404) return; // status not written yet
+        if (!res.ok) return;
+        const st = await res.json();
+        if (st.phase === "writing") {
+          setBgStatus("writing");
+        } else if (st.phase === "generating") {
+          setBgStatus("generating");
+          setBgProgress({ done: st.done || 0, total: st.total || 0 });
+        } else if (st.phase === "done") {
+          if (jobTimerRef.current) { clearInterval(jobTimerRef.current); jobTimerRef.current = null; }
+          await finalizeServerJob(st, jobId);
+        } else if (st.phase === "error") {
+          if (jobTimerRef.current) { clearInterval(jobTimerRef.current); jobTimerRef.current = null; }
+          setBgStatus("idle");
+          setError(String(st.error || t.errGeneric));
+          try { localStorage.removeItem(SERVER_JOB_KEY); } catch {}
+        }
+      } catch {}
+    };
+    tick();
+    jobTimerRef.current = setInterval(tick, 4000);
+  }
+
+  // Resume polling of a server job after reload / app switch
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SERVER_JOB_KEY);
+      if (raw) {
+        const { jobId } = JSON.parse(raw);
+        if (jobId) { setBgStatus("writing"); startJobPolling(jobId); }
+      }
+    } catch {}
+    return () => { if (jobTimerRef.current) clearInterval(jobTimerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Create story (full flow) ──────────────────────────────────────────────
   async function createStory(e: React.FormEvent) {
     e.preventDefault();
     const background = bookReady; // run in bg if current story (images) already visible
     setError("");
+
+    const selectedCustomObjsForJob = customChars.filter(c => selectedCustomIds.includes(c.id));
+    const storyPayload = {
+      topic, themeId: selectedTheme || undefined,
+      characterIds: selectedIds,
+      age: getTargetAge([...selectedIds, ...selectedCustomIds]),
+      sceneCount,
+      language: voices.find(v => v.id === selectedVoiceId)?.language ?? "cs",
+      customCharacters: selectedCustomObjsForJob.map(c => ({
+        id: c.id, name: c.name,
+        description: c.description,
+        photoBase64: c.photoBase64,
+        photoMimeType: c.photoMimeType,
+      })),
+      inspirationUrl: inspUrlActive && inspUrl.trim() ? inspUrl.trim() : undefined,
+      inspirationImages: inspImages.map(i => ({ data: i.data, mimeType: i.mimeType })),
+      inspirationPdfBase64: inspPdf?.base64 || undefined,
+    };
+
+    // Try the SERVER job first — generation survives app switches & screen off
+    try {
+      const jobRes = await fetch("/api/job/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(15_000),
+        body: JSON.stringify({
+          ...storyPayload,
+          voiceId: selectedVoiceId || "",
+          customCharacterImages: selectedCustomObjsForJob
+            .filter(c => c.photoBase64 && c.photoMimeType)
+            .map(c => ({ data: c.photoBase64!, mimeType: c.photoMimeType! })),
+        }),
+      });
+      if (jobRes.ok) {
+        const { jobId } = await jobRes.json();
+        if (jobId) {
+          saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds });
+          try { localStorage.setItem(SERVER_JOB_KEY, JSON.stringify({ jobId })); } catch {}
+          setBgStatus("writing");
+          setBgProgress({ done: 0, total: 0 });
+          startJobPolling(jobId);
+          return; // phone is free — the server does the work
+        }
+      }
+      // non-ok (e.g. 501 blob-not-configured) → fall through to local pipeline
+    } catch { /* network hiccup → local pipeline */ }
+
     if (!background) {
       setScenes([]); setTitle(""); setPage(0);
       introFiredRef.current = false;
@@ -1286,22 +1414,22 @@ export default function Home() {
         </div>
 
         {(() => {
-          const isGenerating = loading;
-          // Background mode: story runs while another one is displayed — progress from bgProgress/bgBufferRef
+          // Local pipeline (loading) OR a server job in progress (bgStatus)
+          const isGenerating = loading || bgStatus === "writing" || bgStatus === "generating";
           const bgGen = bgStatus === "generating";
           const done = bgGen ? bgProgress.done : doneCount;
           const total = bgGen ? bgProgress.total : totalScenes;
           const progressPct = total > 0 ? Math.round((done / total) * 100) : 0;
           const showShimmer = isGenerating && (bgStatus === "writing" || (bgStatus === "idle" && scenes.length === 0));
           const cardScenes: (RenderedScene | null)[] = bgGen
-            ? bgBufferRef.current
+            ? (bgBufferRef.current.length > 0 ? bgBufferRef.current : Array(total || sceneCount).fill(null))
             : (bgStatus === "idle" && scenes.length > 0 ? scenes : Array(sceneCount).fill(null));
           return (
             <div ref={progressRef}>
               <button
                 type="submit"
                 className={`btn-create${isGenerating ? (showShimmer ? " btn-create-shimmer" : " btn-create-loading") : ""}`}
-                disabled={loading || allSelectedCount === 0 || !hasInspiration}
+                disabled={loading || bgStatus === "writing" || bgStatus === "generating" || allSelectedCount === 0 || !hasInspiration}
                 style={isGenerating && !showShimmer ? { '--progress-pct': `${progressPct}%` } as React.CSSProperties : undefined}
               >
                 {isGenerating ? (
