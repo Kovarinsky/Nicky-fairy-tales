@@ -1032,6 +1032,20 @@ export default function Home() {
     jobMediaRef.current.delete(jobId);
     jobBuffersRef.current.delete(jobId);
     jobStallRef.current.delete(jobId);
+
+    // Úklid Blob úložiště: smazat data jobů, které vypadly z historie
+    // posledních pohádek (běžící joby a čerstvé joby server nikdy nemaže)
+    try {
+      const keepIds = [
+        ...loadHistory().map(e => e.id),
+        ...serverJobsRef.current.map(j => j.jobId),
+      ];
+      fetch("/api/job/cleanup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keepIds }),
+      }).catch(() => {});
+    } catch {}
   }
 
   // Open a finished server story from its toast row
