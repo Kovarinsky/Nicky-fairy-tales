@@ -205,6 +205,7 @@ export default function Home() {
   type UsageData = {
     claude?: { usd?: number; days?: number; error?: string };
     elevenlabs?: { used?: number; limit?: number; tier?: string; error?: string };
+    czkRate?: number;
   };
   const [usageOpen, setUsageOpen] = useState(false);
   const [usage, setUsage] = useState<UsageData | null>(null);
@@ -1896,11 +1897,16 @@ export default function Home() {
               ) : (
                 <>
                   <p>{usage.claude && typeof usage.claude.usd === "number"
-                    ? t.usageClaude(usage.claude.usd.toFixed(2), usage.claude.days ?? 30)
+                    ? t.usageClaude(
+                        usage.claude.usd.toFixed(2),
+                        Math.round(usage.claude.usd * (usage.czkRate ?? 23)).toLocaleString("cs-CZ"),
+                        usage.claude.days ?? 30)
                     : usage.claude?.error === "admin-key-missing" ? t.usageClaudeMissing : `🤖 Claude: ${usage.claude?.error ?? "?"}`}</p>
                   <p>{usage.elevenlabs && typeof usage.elevenlabs.used === "number" && !usage.elevenlabs.error
                     ? t.usageEleven(usage.elevenlabs.used.toLocaleString("cs-CZ"), (usage.elevenlabs.limit ?? 0).toLocaleString("cs-CZ"))
-                    : `🎙️ ElevenLabs: ${usage.elevenlabs?.error ?? "?"}`}</p>
+                    : usage.elevenlabs?.error === "missing-permission"
+                      ? t.usageElevenPerm
+                      : `🎙️ ElevenLabs: ${usage.elevenlabs?.error ?? "?"}`}</p>
                   <p>{t.usageGemini}</p>
                 </>
               )}

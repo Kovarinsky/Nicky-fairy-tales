@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.50";
+export const APP_VERSION = "2.51";
 
 // Changelog (newest first)
+// 2.51 - Oprava Spotřeby: částky z Anthropic API jsou v centech (ukazovalo 100× víc), přepočet na Kč kurzem ČNB; srozumitelná hláška, když ElevenLabs klíč nemá oprávnění číst účet
 // 2.50 - Chybová hláška jde zavřít křížkem ✕ (dřív zůstávala až do dalšího pokusu)
 // 2.49 - Přehled 💰 Spotřeba: skutečná útrata za Claude (Admin API, celý účet, posledních 30 dní) a stav kreditů ElevenLabs přímo v aplikaci; Gemini jen odkazem (Google útratu přes API nevydává)
 // 2.48 - Spolehlivější start serverové výroby (fronty): 2 pokusy s timeoutem 30 s místo jednoho s 15 s, server odpovídá okamžitě (zápis zadání do Blobu až po odpovědi) — méně pádů do lokálního generování bez fronty
