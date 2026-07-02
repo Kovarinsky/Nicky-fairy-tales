@@ -1924,9 +1924,9 @@ export default function Home() {
       )}
 
       {/* ── ROLLING CREDITS ── */}
-      {/* ── BACKGROUND GENERATION TOAST — hidden while the reader control
-            panel is open, so it never covers the buttons ── */}
-      {(bgStatus !== "idle" || serverJobs.length > 0) && !(readerMode && ctrlsOpen) && (
+      {/* ── BACKGROUND GENERATION TOASTS — never while reading a story;
+            progress reappears on the home screen ── */}
+      {(bgStatus !== "idle" || serverJobs.length > 0) && !readerMode && (
         <div className="bg-toast-stack">
           {bgStatus !== "idle" && (
             <div className="bg-toast">
