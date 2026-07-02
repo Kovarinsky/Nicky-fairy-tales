@@ -1657,6 +1657,32 @@ export default function Home() {
                     : <span className="btn-create-label">{t.scenesBtn(done, total, progressPct)}</span>
                 ) : canQueueMore ? t.createNextBtn : t.createBtn}
               </button>
+              {/* Queue segments — the big button "splits" into one part per story */}
+              {serverJobs.length > 0 && (
+                <div className="job-strip">
+                  {serverJobs.map((j, idx) => {
+                    const pct = j.phase === "generating" && j.total > 0 ? Math.round((j.done / j.total) * 100) : 0;
+                    return (
+                      <div key={j.jobId}
+                        className={`job-seg job-seg-${j.phase}`}
+                        style={{ "--pct": `${pct}%` } as React.CSSProperties}
+                        onClick={j.phase === "done" ? () => openServerJob(j)
+                          : j.phase === "error" ? () => removeServerJob(j.jobId) : undefined}
+                        role={j.phase === "done" || j.phase === "error" ? "button" : undefined}
+                        title={j.title || undefined}
+                      >
+                        <span className="job-seg-fill" />
+                        <span className="job-seg-label">
+                          {idx + 1}. {j.phase === "writing" ? t.segWriting
+                            : j.phase === "generating" ? `🎨 ${j.done}/${j.total}`
+                            : j.phase === "done" ? t.segOpen
+                            : t.segError}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               {canQueueMore && (
                 <p className="gen-step-hint">{t.queueHint(activeJobs.length)}</p>
               )}
@@ -1929,44 +1955,22 @@ export default function Home() {
       )}
 
       {/* ── ROLLING CREDITS ── */}
-      {/* ── BACKGROUND GENERATION TOASTS — never while reading a story;
-            progress reappears on the home screen ── */}
-      {(bgStatus !== "idle" || serverJobs.length > 0) && !readerMode && (
+      {/* ── BACKGROUND GENERATION TOAST — only the legacy local pipeline;
+            server-job progress lives in the create-button segments ── */}
+      {bgStatus !== "idle" && !readerMode && (
         <div className="bg-toast-stack">
-          {bgStatus !== "idle" && (
-            <div className="bg-toast">
-              {bgStatus === "writing" && <span>{t.writingNew}</span>}
-              {bgStatus === "generating" && (
-                <span>🎨 {bgProgress.done} / {bgProgress.total} scén</span>
-              )}
-              {bgStatus === "done" && (
-                <>
-                  <span>{bgProgress.done < bgProgress.total ? t.newIncomplete(bgProgress.total - bgProgress.done) : t.newReady}</span>
-                  <button type="button" className="bg-toast-btn" onClick={switchToBgStory}>{t.openStory}</button>
-                </>
-              )}
-            </div>
-          )}
-          {serverJobs.map((j, idx) => (
-            <div key={j.jobId} className="bg-toast">
-              {j.phase === "writing" && <span>{serverJobs.length > 1 ? `${idx + 1}. ` : ""}{t.writingNew}</span>}
-              {j.phase === "generating" && (
-                <span>🎨 {serverJobs.length > 1 ? `${idx + 1}. pohádka: ` : ""}{j.done} / {j.total} scén</span>
-              )}
-              {j.phase === "done" && (
-                <>
-                  <span>{j.done < j.total ? t.newIncomplete(j.total - j.done) : `✨ ${j.title ? `„${j.title}"` : t.newReady.replace("✨ ", "")}`}</span>
-                  <button type="button" className="bg-toast-btn" onClick={() => openServerJob(j)}>{t.openStory}</button>
-                </>
-              )}
-              {j.phase === "error" && (
-                <>
-                  <span>⚠️ {j.error || t.errGeneric}</span>
-                  <button type="button" className="bg-toast-btn" onClick={() => removeServerJob(j.jobId)}>✕</button>
-                </>
-              )}
-            </div>
-          ))}
+          <div className="bg-toast">
+            {bgStatus === "writing" && <span>{t.writingNew}</span>}
+            {bgStatus === "generating" && (
+              <span>🎨 {bgProgress.done} / {bgProgress.total} scén</span>
+            )}
+            {bgStatus === "done" && (
+              <>
+                <span>{bgProgress.done < bgProgress.total ? t.newIncomplete(bgProgress.total - bgProgress.done) : t.newReady}</span>
+                <button type="button" className="bg-toast-btn" onClick={switchToBgStory}>{t.openStory}</button>
+              </>
+            )}
+          </div>
         </div>
       )}
 

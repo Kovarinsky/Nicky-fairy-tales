@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.54";
+export const APP_VERSION = "2.55";
 
 // Changelog (newest first)
+// 2.55 - Fronta bez bublinek: velké tlačítko se rozdělí na části — jedna část na pohádku (✍️ píše se / 🎨 x/y s plnícím se pruhem / ▶ Otevřít / ⚠️ chyba); plovoucí bublinky z hlavní obrazovky zmizely
 // 2.54 - Oprava zaseknutého „Píšu novou pohádku": kratší imagePrompty (popis postav se do obrázků vkládá automaticky, nekopíruje se 20×) → psaní 20stránkové pohádky se vejde do 5min limitu; retry při zahlcení Claude API (429); popisek, že kartičky ukazují nejnovější pohádku
 // 2.53 - Při čtení pohádky se neukazují bublinky průběhu dalších pohádek — průběh a tlačítko Otevřít uvidíte po návratu Domů
 // 2.52 - Čtečka na PC a tabletu přes CELOU obrazovku (zrušen limit šířky 860 px v reader módu; formulář zůstává úzký)
