@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.21";
+export const APP_VERSION = "2.22";
 
 // Changelog (newest first)
+// 2.22 - Imerzní čtečka: obraz přes celý screen, text jako titulky dole (scrolluje, nikdy nepřeteče), ovládání skryté — ťuknutí zobrazí panel vpravo, šipky plovoucí po stranách
 // 2.21 - Šířka: full-width obraz na mobilu, tablet/landscape = obraz vedle textu; velká tlačítka přes celý panel; vlajka hlasu (🇨🇿/🇬🇧); play už neukazuje ⏳ při přepnutí hlasu
 // 2.20 - Reader: obraz bez ořezu/deformace (contain, kino styl), text scrolluje; pryč Nová pohádka; popisky pod tlačítky; auto-kontrola + oprava chybějících obrázků; 2 scény paralelně; progres i pro bg pohádku
 // 2.19 - Reader mode: book vyplní viewport bez edge-to-edge; šipky ← → přesunuty pod kartu (žádné ořezání)

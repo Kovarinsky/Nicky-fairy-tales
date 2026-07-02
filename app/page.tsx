@@ -175,6 +175,7 @@ export default function Home() {
   const [musicOn, setMusicOn] = useState(true);
   const [showCredits, setShowCredits] = useState(false);
   const [regenAudio, setRegenAudio] = useState(false);
+  const [ctrlsOpen, setCtrlsOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const ambientRef = useRef<AmbientPlayer | null>(null);
   const pendingPageRef = useRef<number | null>(null);
@@ -301,6 +302,16 @@ export default function Home() {
   useEffect(() => {
     if (scenes.length === 0) introFiredRef.current = false;
   }, [scenes.length]);
+
+  // Reader controls: show briefly when reader opens, then auto-hide
+  useEffect(() => {
+    if (viewMode === "reader") setCtrlsOpen(true);
+  }, [viewMode]);
+  useEffect(() => {
+    if (!ctrlsOpen || viewMode !== "reader") return;
+    const t = setTimeout(() => setCtrlsOpen(false), 6000);
+    return () => clearTimeout(t);
+  }, [ctrlsOpen, viewMode]);
 
   // Scroll progress into view when loading starts (mobile UX)
   useEffect(() => {
@@ -1001,7 +1012,7 @@ export default function Home() {
 
       {/* ── BOOK – shown when all scene images are ready (audio may be partial) ── */}
       {bookReady && current && (
-        <div className="book" ref={bookRef}>
+        <div className={`book${ctrlsOpen ? " ctrls-open" : ""}`} ref={bookRef}>
           <h2 className="book-title">{title}</h2>
 
           <div className="book-card" key={slideKey}
@@ -1010,7 +1021,8 @@ export default function Home() {
           >
             {current.imageUrl && !isPlaceholderImg(current.imageUrl) ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img className="page-image" src={current.imageUrl} alt={`Scéna ${page + 1}`} />
+              <img className="page-image" src={current.imageUrl} alt={`Scéna ${page + 1}`}
+                onClick={() => setCtrlsOpen(v => !v)} />
             ) : current.imageUrl ? (
               <div className="page-image placeholder">
                 {fixingScene === page ? (
@@ -1034,7 +1046,7 @@ export default function Home() {
               </div>
             )}
 
-            <div className="page-body">
+            <div className="page-body" onClick={() => setCtrlsOpen(v => !v)}>
               <p className="page-text">{current.narration}</p>
             </div>
 
