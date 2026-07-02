@@ -411,9 +411,9 @@ export default function Home() {
     const imgEl = pageImgRef.current;
     const landscape = window.matchMedia("(orientation: landscape)").matches;
     if (landscape && imgEl && imgEl.naturalWidth > 0) {
+      // Image now renders in a fixed 16:9 cover frame — ticker matches the frame width
       const r = imgEl.getBoundingClientRect();
-      const contentW = Math.min(r.width, r.height * (imgEl.naturalWidth / imgEl.naturalHeight));
-      el.style.width = `${Math.round(contentW)}px`;
+      el.style.width = `${Math.round(r.width)}px`;
       el.style.marginLeft = "auto";
       el.style.marginRight = "auto";
     } else {

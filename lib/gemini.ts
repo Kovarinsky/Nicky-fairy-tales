@@ -96,11 +96,14 @@ function regexSanitize(text: string): string {
 }
 
 // Step 2: Call Gemini image model with the sanitized prompt
-function callGeminiImage(apiKey: string, model: string, prompt: string): Promise<ImageResult> {
+function callGeminiImage(apiKey: string, model: string, prompt: string, withAspect = true): Promise<ImageResult> {
+  const generationConfig: Record<string, unknown> = { responseModalities: ["IMAGE", "TEXT"] };
+  // Force uniform 16:9 output so every scene renders at the same size
+  if (withAspect) generationConfig.imageConfig = { aspectRatio: "16:9" };
   const bodyBuf = Buffer.from(
     JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
+      generationConfig,
     }),
     "utf-8"
   );
@@ -181,13 +184,19 @@ export async function generateSceneImage(scene: Scene, heroDescription: string):
   console.log(`[Gemini] scene ${scene.index} model=${model} (${safePrompt.length} chars): ${safePrompt.slice(0, 200)}`);
 
   const MAX_ATTEMPTS = 3;
+  let withAspect = true;
   let lastErr = new Error("Gemini nevrátil obrázek");
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      return await callGeminiImage(apiKey, model, safePrompt);
+      return await callGeminiImage(apiKey, model, safePrompt, withAspect);
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e));
       console.error(`[Gemini] scene ${scene.index} attempt ${attempt}/${MAX_ATTEMPTS}: ${lastErr.message}`);
+      // Older image models don't know imageConfig/aspectRatio — retry without it
+      if (withAspect && /image_config|imageConfig|aspect_ratio|aspectRatio|Unknown name/i.test(lastErr.message)) {
+        withAspect = false;
+        continue;
+      }
       const isRateLimit = lastErr.message.startsWith("Gemini 429");
       const isBlocked = lastErr.message.startsWith("Gemini BLOCKED");
       if ((lastErr.message.match(/^Gemini 4/) && !isRateLimit) || isBlocked) break;
