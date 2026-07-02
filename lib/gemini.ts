@@ -172,7 +172,7 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
     ? [
         `⚠ APPEARANCE LOCK — IMMUTABLE across every image in this story:`,
         heroDescription,
-        `Every named character MUST look IDENTICAL to this description in EVERY image: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes — AND the same AGE, same BODY SIZE and PROPORTIONS. Relative heights between characters NEVER change: a toddler stays toddler-sized, a child stays child-sized, adults stay adult-sized. These are LOCKED — do NOT change anything between scenes.`,
+        `Every named character MUST look IDENTICAL to this description in EVERY image: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes — AND the same AGE, same BODY SIZE and PROPORTIONS. Relative heights between characters NEVER change: a toddler stays toddler-sized, a child stays child-sized, adults stay adult-sized. Any recurring OBJECT listed above (vehicle, magic item, toy) keeps IDENTICAL type, shape and colors in every scene — the same car stays the same car. These are LOCKED — do NOT change anything between scenes.`,
         `ONLY the characters named in the scene are visible — zero additional people, strangers, or background human figures.`,
       ].join(" ")
     : "";

@@ -65,6 +65,8 @@ export const UI = {
     stalled: "⚠️ Generování se zaseklo",
     stallReload: "🔁 Pokračovat",
     newIncomplete: (n: number) => `⚠️ Hotovo, ale ${n} obr. chybí — otevřít a opravit`,
+    rotate: "Na šířku",
+    rotateBack: "Na výšku",
   },
   en: {
     subtitle: "Pick characters, a theme and inspiration – a fairy tale with pictures and Daddy's voice.",
@@ -128,5 +130,7 @@ export const UI = {
     stalled: "⚠️ Generation got stuck",
     stallReload: "🔁 Resume",
     newIncomplete: (n: number) => `⚠️ Done, but ${n} image(s) missing — open & fix`,
+    rotate: "Landscape",
+    rotateBack: "Portrait",
   },
 } as const;

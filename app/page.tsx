@@ -184,6 +184,7 @@ export default function Home() {
   const goodnightAudioRef = useRef<HTMLAudioElement | null>(null);
   const [regenAudio, setRegenAudio] = useState(false);
   const [ctrlsOpen, setCtrlsOpen] = useState(false);
+  const [forcedLs, setForcedLs] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const ambientRef = useRef<AmbientPlayer | null>(null);
   const pendingPageRef = useRef<number | null>(null);
@@ -706,6 +707,32 @@ export default function Home() {
       goToPage(p);
     }
   }, [scenes, goToPage]);
+
+  // ── Rotate button: force landscape without the system rotation toggle ─────
+  // Orientation lock requires fullscreen on Android Chrome; both are reverted
+  // when switching back. If the device doesn't support locking (iOS Safari),
+  // the button silently does its best (fullscreen only).
+  async function toggleForcedLandscape() {
+    const so = (screen as Screen & { orientation?: { lock?: (o: string) => Promise<void>; unlock?: () => void } }).orientation;
+    if (!forcedLs) {
+      try { await document.documentElement.requestFullscreen?.(); } catch {}
+      try { await so?.lock?.("landscape"); } catch {}
+      setForcedLs(true);
+    } else {
+      try { so?.unlock?.(); } catch {}
+      try { if (document.fullscreenElement) await document.exitFullscreen(); } catch {}
+      setForcedLs(false);
+    }
+  }
+
+  // Leaving fullscreen via system back → drop the forced-landscape state
+  useEffect(() => {
+    function onFsChange() {
+      if (!document.fullscreenElement) setForcedLs(false);
+    }
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
 
   function togglePlay() {
     const a = audioRef.current; if (!a) return;
@@ -1410,6 +1437,17 @@ export default function Home() {
                   {musicOn ? "🎵" : "🔇"}
                 </button>
                 <span className="ctrl-label">{t.music}</span>
+              </div>
+
+              <div className="ctrl-item">
+                <button type="button" className={`ctrl-btn ctrl-auto ${forcedLs ? "ctrl-auto-on" : ""}`}
+                  onClick={toggleForcedLandscape}
+                  title={forcedLs ? "Zpět na výšku" : "Otočit na šířku"}
+                  aria-label={forcedLs ? "Zpět na výšku" : "Otočit na šířku"}
+                >
+                  {forcedLs ? "📱" : "🔄"}
+                </button>
+                <span className="ctrl-label">{forcedLs ? t.rotateBack : t.rotate}</span>
               </div>
 
               <div className="ctrl-item">
