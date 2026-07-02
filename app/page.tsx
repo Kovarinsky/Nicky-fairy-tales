@@ -201,6 +201,26 @@ export default function Home() {
   const [storyHistory, setStoryHistory] = useState<HistoryEntry[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
 
+  // Usage overview (real spend via /api/usage)
+  type UsageData = {
+    claude?: { usd?: number; days?: number; error?: string };
+    elevenlabs?: { used?: number; limit?: number; tier?: string; error?: string };
+  };
+  const [usageOpen, setUsageOpen] = useState(false);
+  const [usage, setUsage] = useState<UsageData | null>(null);
+  const [usageErr, setUsageErr] = useState(false);
+  function toggleUsage() {
+    const next = !usageOpen;
+    setUsageOpen(next);
+    if (next && !usage) {
+      setUsageErr(false);
+      fetch("/api/usage", { signal: AbortSignal.timeout(20_000) })
+        .then(r => r.json())
+        .then(d => setUsage(d))
+        .catch(() => setUsageErr(true));
+    }
+  }
+
   const allScenesReady = scenes.length > 0 && scenes.every(s => s.imageUrl && s.audioUrl);
   // bookReady: all images present (SVG fallback always set) — use for UI display and FS trigger
   const bookReady = scenes.length > 0 && scenes.every(s => s.imageUrl);
@@ -1859,6 +1879,34 @@ export default function Home() {
         </div>
       )}
 
+
+      {/* ── USAGE — real spend overview ── */}
+      {!readerMode && (
+        <div className="history-box">
+          <button type="button" className="history-toggle" onClick={toggleUsage}>
+            {t.usageTitle} {usageOpen ? "▲" : "▼"}
+          </button>
+          {usageOpen && (
+            <div className="usage-body">
+              {usageErr ? (
+                <p>{t.usageError}</p>
+              ) : !usage ? (
+                <p>{t.usageLoading}</p>
+              ) : (
+                <>
+                  <p>{usage.claude && typeof usage.claude.usd === "number"
+                    ? t.usageClaude(usage.claude.usd.toFixed(2), usage.claude.days ?? 30)
+                    : usage.claude?.error === "admin-key-missing" ? t.usageClaudeMissing : `🤖 Claude: ${usage.claude?.error ?? "?"}`}</p>
+                  <p>{usage.elevenlabs && typeof usage.elevenlabs.used === "number" && !usage.elevenlabs.error
+                    ? t.usageEleven(usage.elevenlabs.used.toLocaleString("cs-CZ"), (usage.elevenlabs.limit ?? 0).toLocaleString("cs-CZ"))
+                    : `🎙️ ElevenLabs: ${usage.elevenlabs?.error ?? "?"}`}</p>
+                  <p>{t.usageGemini}</p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── STALL TOAST — reload resumes the remembered job ── */}
       {stalled && (

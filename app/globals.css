@@ -1669,3 +1669,17 @@ button:disabled {
   .page-dots { gap: 0.28rem; }
   .dot { width: 7px; height: 7px; }
 }
+
+/* ── Usage overview (💰 Spotřeba) ── */
+.usage-body {
+  padding: 0.35rem 0.9rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.usage-body p {
+  margin: 0;
+  font-size: 0.86rem;
+  color: rgba(255,255,255,0.82);
+}
