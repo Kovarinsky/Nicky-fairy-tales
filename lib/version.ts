@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.53";
+export const APP_VERSION = "2.54";
 
 // Changelog (newest first)
+// 2.54 - Oprava zaseknutého „Píšu novou pohádku": kratší imagePrompty (popis postav se do obrázků vkládá automaticky, nekopíruje se 20×) → psaní 20stránkové pohádky se vejde do 5min limitu; retry při zahlcení Claude API (429); popisek, že kartičky ukazují nejnovější pohádku
 // 2.53 - Při čtení pohádky se neukazují bublinky průběhu dalších pohádek — průběh a tlačítko Otevřít uvidíte po návratu Domů
 // 2.52 - Čtečka na PC a tabletu přes CELOU obrazovku (zrušen limit šířky 860 px v reader módu; formulář zůstává úzký)
 // 2.51 - Oprava Spotřeby: částky z Anthropic API jsou v centech (ukazovalo 100× víc), přepočet na Kč kurzem ČNB; srozumitelná hláška, když ElevenLabs klíč nemá oprávnění číst účet

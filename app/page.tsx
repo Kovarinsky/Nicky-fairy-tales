@@ -1667,6 +1667,11 @@ export default function Home() {
                     : t.step2Hint(Math.min(done + 1, total), total, Math.max(1, Math.ceil((total - done) * 10 / 60)))}
                 </p>
               )}
+              {newestJob && serverJobs.length > 1 && (
+                <p className="gen-step-hint" style={{ marginTop: '0.3rem' }}>
+                  {t.cardsLabel(serverJobs.findIndex(j => j.jobId === newestJob.jobId) + 1)}
+                </p>
+              )}
               {isGenerating && (
                 <div className="gen-cards" style={{ marginTop: '0.25rem' }}>
                   {cardScenes.map((s, i) => {

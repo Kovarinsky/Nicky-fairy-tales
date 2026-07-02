@@ -43,7 +43,7 @@ function buildSystemPrompt(language: "cs" | "en"): string {
       "- Be extremely specific — not 'blond hair' but 'straight light-blond hair'; not 'red shirt' but 'white T-shirt with two red horizontal stripes'.",
       "- DO NOT include age numbers or age words ('6-year-old', 'toddler') — only hair, eyes, clothing, accessories, facial features.",
       "- END heroDescription with a 'Heights:' entry stating the RELATIVE heights of all characters WITHOUT age words, e.g. 'Heights: Valentýna is the smallest and reaches Nicolas's waist; James is slightly taller than Nicolas; Jana and Jan are grown-ups, much taller than all the children.' This keeps body sizes consistent across every image.",
-      "- If the story features a RECURRING OBJECT (the car they travel in, a magic item, a favourite toy), add a 'Key objects:' entry to heroDescription with its EXACT appearance ('an old sky-blue pickup truck with a rusty crane, round friendly headlight eyes'), and copy that description VERBATIM into every imagePrompt where the object appears. The object NEVER changes type, shape or color between scenes — the same car stays the same car for the whole story.",
+      "- If the story features a RECURRING OBJECT (the car they travel in, a magic item, a favourite toy), add a 'Key objects:' entry to heroDescription with its EXACT appearance ('an old sky-blue pickup truck with a rusty crane, round friendly headlight eyes'). In imagePrompts refer to it by ONE short fixed tag (e.g. 'the sky-blue pickup truck') — the full description is injected into the image model automatically. The object NEVER changes type, shape or color between scenes — the same car stays the same car for the whole story.",
       "- If reference photos are attached, describe what you SEE in the photo exactly.",
       "- These descriptions NEVER change across scenes.",
       "",
@@ -57,11 +57,10 @@ function buildSystemPrompt(language: "cs" | "en"): string {
       "- Emotional arc: wonder → tension → hope → surprise → earned resolution.",
       "",
       "═══ IMAGE PROMPTS ═══",
-      "- Write in ENGLISH, max 130 words.",
-      "- START with: 'APPEARANCE LOCK:' followed by each character's name and their FULL description copied VERBATIM from heroDescription — every word, nothing shortened.",
-      "- Then describe: scene action, setting, mood, lighting.",
-      "- End with: 'Only [names in this scene] present — no other people or background figures.' then 'Walt Disney animated style, painterly storybook illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation, no text.'",
-      "- ABSOLUTE RULE: every imagePrompt for a character must use IDENTICAL wording to heroDescription. If heroDescription says 'straight light-blond hair', write 'straight light-blond hair' — never 'blond hair', never 'light hair'. Any deviation breaks consistency.",
+      "- Write in ENGLISH, max 60 words. Keep them SHORT — heroDescription (the appearance lock) is injected into the image model automatically with every scene, so do NOT copy character descriptions here.",
+      "- Refer to characters by NAME only, describe: scene action, poses, facial emotion, setting, mood, lighting.",
+      "- End with: 'Only [names in this scene] present — no other people or background figures.'",
+      "- Do not add style directions (Disney/storybook style is appended automatically).",
       "- No age numbers or age-specific terms.",
       "",
       "═══ SOUNDSCAPE ═══",
@@ -105,7 +104,7 @@ function buildSystemPrompt(language: "cs" | "en"): string {
     "- Buď maximálně konkrétní — ne 'blond hair' ale 'straight light-blond hair'; ne 'red shirt' ale 'white T-shirt with two red horizontal stripes'.",
     "- NEZAHRNUJ číselný věk ani slova o věku ('6-year-old', 'toddler') — jen vlasy, oči, oblečení, doplňky, výraz tváře.",
     "- heroDescription ZAKONČI záznamem 'Heights:' s RELATIVNÍMI výškami všech postav BEZ věkových slov, např. 'Heights: Valentýna is the smallest and reaches Nicolas's waist; James is slightly taller than Nicolas; Jana and Jan are grown-ups, much taller than all the children.' Tím zůstanou velikosti těl konzistentní na všech obrázcích.",
-    "- Pokud v příběhu vystupuje OPAKUJÍCÍ SE PŘEDMĚT (auto, kterým jedou, kouzelný předmět, oblíbená hračka), přidej do heroDescription záznam 'Key objects:' s jeho PŘESNÝM vzhledem ('an old sky-blue pickup truck with a rusty crane, round friendly headlight eyes') a kopíruj ho DOSLOVA do každého imagePromptu, kde se předmět objeví. Předmět NIKDY nemění typ, tvar ani barvu mezi scénami — stejné auto zůstává stejným autem celou pohádku.",
+    "- Pokud v příběhu vystupuje OPAKUJÍCÍ SE PŘEDMĚT (auto, kterým jedou, kouzelný předmět, oblíbená hračka), přidej do heroDescription záznam 'Key objects:' s jeho PŘESNÝM vzhledem ('an old sky-blue pickup truck with a rusty crane, round friendly headlight eyes'). V imagePromptech na něj odkazuj JEDNÍM krátkým stálým označením (např. 'the sky-blue pickup truck') — plný popis se do obrázkového modelu vkládá automaticky. Předmět NIKDY nemění typ, tvar ani barvu mezi scénami — stejné auto zůstává stejným autem celou pohádku.",
     "- Pokud jsou přiloženy referenční fotografie, popiš přesně co vidíš na fotce.",
     "- Tyto popisy se NIKDY nemění napříč scénami.",
     "",
@@ -119,11 +118,10 @@ function buildSystemPrompt(language: "cs" | "en"): string {
     "- Emoční oblouk: úžas → napětí → naděje → překvapení → zasloužené rozuzlení.",
     "",
     "═══ IMAGE PROMPTS ═══",
-    "- Psát ANGLICKY, max 130 slov.",
-    "- ZAČNI: 'APPEARANCE LOCK:' a pak pro každou postavu jméno a PLNÝ popis zkopírovaný DOSLOVA z heroDescription — každé slovo, nic nezkracovat.",
-    "- Pak popiš: akci scény, prostředí, náladu, osvětlení.",
-    "- Ukonči: 'Only [jména v této scéně] present — no other people or background figures.' pak 'Walt Disney animated style, painterly storybook illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation, no text.'",
-    "- ABSOLUTNÍ PRAVIDLO: každý imagePrompt musí používat IDENTICKÉ výrazy jako heroDescription. Pokud heroDescription říká 'straight light-blond hair', piš vždy 'straight light-blond hair' — nikdy 'blond hair', nikdy 'light hair'. Jakákoli odchylka ničí konzistenci.",
+    "- Psát ANGLICKY, max 60 slov. Drž je KRÁTKÉ — heroDescription (appearance lock) se do obrázkového modelu vkládá automaticky u každé scény, NEKOPÍRUJ sem popisy postav.",
+    "- Postavy jen JMÉNEM; popiš: akci scény, pózy, výraz tváře, prostředí, náladu, osvětlení.",
+    "- Ukonči: 'Only [jména v této scéně] present — no other people or background figures.'",
+    "- Nepřidávej stylové pokyny (Disney/storybook styl se připojuje automaticky).",
     "- Žádné věkové číslice ani věkově specifické výrazy.",
     "",
     "═══ SOUNDSCAPE ═══",
@@ -213,9 +211,8 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
         `Number of scenes: ${req.sceneCount}`,
         `Narration language: English`,
         "",
-        "IMPORTANT for imagePrompts: in every image repeat the exact visual description",
-        "of all characters appearing in the scene and place them in the scene's environment.",
-        "Facial expression must match the scene's emotion (joy, wonder, tension, calm...).",
+        "IMPORTANT for imagePrompts: keep them short — name the characters present, their action",
+        "and the scene's environment. Facial expression must match the scene's emotion.",
       ]
     : [
         req.themeName ? `Svět / téma: ${req.themeName}` : "",
@@ -228,9 +225,8 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
         `Počet scén: ${req.sceneCount}`,
         `Jazyk vyprávění: čeština`,
         "",
-        "DŮLEŽITÉ pro imagePrompty: v každém obrazu zopakuj přesný vizuální popis",
-        "všech postav, které ve scéně vystupují, a zasaď je do prostředí dané scény.",
-        "Výraz tváře musí odpovídat emoci scény (radost, úžas, napětí, klid...).",
+        "DŮLEŽITÉ pro imagePrompty: drž je krátké — vyjmenuj přítomné postavy, jejich akci",
+        "a prostředí scény. Výraz tváře musí odpovídat emoci scény (radost, úžas, napětí, klid...).",
       ];
 
   if (extras.inspirationUrlText) {
@@ -307,19 +303,30 @@ async function callAnthropicApi(body: object): Promise<string> {
   const apiKey = sanitizeApiKey(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) throw new Error("Chybí ANTHROPIC_API_KEY.");
 
-  // Use native fetch (Node 18+) — avoids node:https header-char validation quirks
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": ANTHROPIC_VERSION,
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(250_000),
-  });
-
-  const text = await res.text();
+  // Use native fetch (Node 18+) — avoids node:https header-char validation quirks.
+  // 429/529 (rate limit / overload) se zkouší znovu — fronta pohádek posílá
+  // víc požadavků najednou.
+  let res: Response | null = null;
+  let text = "";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(250_000),
+    });
+    text = await res.text();
+    if (res.status !== 429 && res.status !== 529) break;
+    const retryAfter = Number(res.headers.get("retry-after"));
+    const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter, 30) * 1000 : 12_000;
+    console.warn(`[Claude] ${res.status}, retry in ${waitMs / 1000}s (attempt ${attempt + 1})`);
+    await new Promise(r => setTimeout(r, waitMs));
+  }
+  if (!res) throw new Error("Anthropic: no response");
   if (!res.ok) throw new Error(`Anthropic ${res.status}: ${text.slice(0, 400)}`);
 
   let data: { content?: Array<{ type: string; text?: string }>; error?: { message?: string } };
