@@ -30,6 +30,7 @@ interface HistoryEntry {
 
 const HISTORY_KEY = "nicky-story-history";
 const CUSTOM_CHARS_KEY = "nicky-custom-chars";
+const JOB_KEY = "nicky-pending-job";
 const HISTORY_MAX = 10;
 const SETTINGS_KEY = "nicky-settings";
 const DRAFT_KEY = "nicky-story-draft";
@@ -347,6 +348,41 @@ export default function Home() {
     if (scenes.length === 0) introFiredRef.current = false;
   }, [scenes.length]);
 
+  // ── Auto-resume an interrupted generation after reload/app kill ───────────
+  const resumeFiredRef = useRef(false);
+  useEffect(() => {
+    if (resumeFiredRef.current) return;
+    resumeFiredRef.current = true;
+    (async () => {
+      let job: { entryId: string; title: string; heroDescription: string; scenes: Scene[]; voiceId?: string; characterIds?: string[] } | null = null;
+      try { job = JSON.parse(localStorage.getItem(JOB_KEY) || "null"); } catch {}
+      if (!job?.entryId || !Array.isArray(job.scenes) || job.scenes.length === 0) return;
+      // Reuse scenes already finished before the interruption
+      const cached = await getCachedStory(job.entryId).catch(() => null);
+      const merged: RenderedScene[] = job.scenes.map((s, i) => ({
+        ...s,
+        imageUrl: cached?.[i]?.imageUrl,
+        audioUrl: cached?.[i]?.audioUrl,
+      }));
+      if (merged.every(s => !isPlaceholderImg(s.imageUrl) && s.audioUrl)) {
+        try { localStorage.removeItem(JOB_KEY); } catch {}
+        return;
+      }
+      if (job.characterIds?.length) setSelectedIds(job.characterIds);
+      setLoading(true);
+      try {
+        // Background mode → progress toast; when done, the "Otevřít" toast appears
+        const finalScenes = await generateMedia(
+          job.title, job.heroDescription, job.scenes, [], job.voiceId || "", true, job.entryId, merged
+        );
+        renderedMapRef.current.set(job.entryId, finalScenes);
+      } catch {} finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Reader controls: show briefly when reader opens, then auto-hide
   useEffect(() => {
     if (viewMode === "reader") setCtrlsOpen(true);
@@ -638,39 +674,59 @@ export default function Home() {
   }
 
   // ── Core: generate media for a script ────────────────────────────────────
+  // entryId → the job is remembered (localStorage) and every finished scene is
+  // cached progressively, so an interrupted generation resumes after reload.
+  // `existing` lets a resume reuse already-finished scenes.
   async function generateMedia(
     scriptTitle: string,
     heroDescription: string,
     scriptScenes: Scene[],
     customImageRefs: Array<{ data: string; mimeType: string }>,
     voiceId: string,
-    background = false
+    background = false,
+    entryId?: string,
+    existing?: RenderedScene[]
   ): Promise<RenderedScene[]> {
     // Local tracking array — returned at end for caching
-    const localScenes: RenderedScene[] = scriptScenes.map(s => ({ ...s }));
+    const localScenes: RenderedScene[] =
+      existing && existing.length === scriptScenes.length
+        ? existing.map(s => ({ ...s }))
+        : scriptScenes.map(s => ({ ...s }));
     heroDescRef.current = heroDescription;
     imageRefsRef.current = customImageRefs;
+
+    // Remember the job (script incl. text) until every image is verified
+    if (entryId) {
+      try {
+        localStorage.setItem(JOB_KEY, JSON.stringify({
+          entryId, title: scriptTitle, heroDescription,
+          scenes: scriptScenes, voiceId, characterIds: selectedIds,
+        }));
+      } catch {}
+    }
+
+    const sceneNeedsWork = (s: RenderedScene) => isPlaceholderImg(s.imageUrl) || !s.audioUrl;
+    // done = scene has a real (non-placeholder) image
+    const realDone = () => localScenes.filter(s => !isPlaceholderImg(s.imageUrl)).length;
 
     if (background) {
       bgTitleRef.current = scriptTitle;
       bgBufferRef.current = localScenes;  // share reference
       setBgStatus("generating");
-      setBgProgress({ done: 0, total: scriptScenes.length });
+      setBgProgress({ done: realDone(), total: scriptScenes.length });
     } else {
       setTitle(scriptTitle);
       setScenes([...localScenes]);
       setPage(0);
       setSlideKey(0);
-      setDoneCount(0);
-      setSceneStatuses(scriptScenes.map(() => "waiting"));
+      setDoneCount(realDone());
+      setSceneStatuses(localScenes.map(s => (sceneNeedsWork(s) ? "waiting" : "done")));
       setStatus(t.statusGenerating(scriptScenes.length));
     }
 
     // 2 scenes in parallel — Gemini/ElevenLabs handle it, halves total wait time
     const CONCURRENCY = 2;
 
-    // done = scene has a real (non-placeholder) image
-    const realDone = () => localScenes.filter(s => !isPlaceholderImg(s.imageUrl)).length;
     const publish = () => {
       if (background) {
         setBgProgress({ done: realDone(), total: scriptScenes.length });
@@ -701,6 +757,10 @@ export default function Home() {
         localScenes[i] = { ...localScenes[i], imageUrl: media.imageUrl, audioUrl: media.audioUrl };
         publish();
         if (!background) setSceneStatuses(prev => { const n = [...prev]; n[i] = isPlaceholderImg(media.imageUrl) ? "error" : "done"; return n; });
+        // Progressive cache — a finished scene survives reload/app kill
+        if (entryId && !isPlaceholderImg(media.imageUrl)) {
+          cacheStory(entryId, localScenes).catch(() => {});
+        }
       } catch {
         if (!background) setSceneStatuses(prev => { const n = [...prev]; n[i] = "error"; return n; });
       }
@@ -714,13 +774,25 @@ export default function Home() {
       await Promise.all(Array.from({ length: Math.min(CONCURRENCY, indices.length) }, worker));
     }
 
-    await runPool(scriptScenes.map((_, i) => i));
+    // First pass: only scenes that still need work (resume skips finished ones)
+    const initial = localScenes.map((s, i) => (sceneNeedsWork(s) ? i : -1)).filter(i => i >= 0);
+    await runPool(initial);
 
-    // Verify pass: retry every scene whose image is missing or an SVG placeholder
-    const failed = localScenes.map((s, i) => (isPlaceholderImg(s.imageUrl) ? i : -1)).filter(i => i >= 0);
-    if (failed.length > 0) {
+    // Verification: the story is NOT complete until every image is real.
+    // Up to 3 extra rounds with growing back-off retry the failed scenes.
+    for (let round = 1; round <= 3; round++) {
+      const failed = localScenes.map((s, i) => (isPlaceholderImg(s.imageUrl) ? i : -1)).filter(i => i >= 0);
+      if (failed.length === 0) break;
       if (!background) setStatus(t.statusRepairing(failed.length));
+      await new Promise(r => setTimeout(r, 2500 * round));
       await runPool(failed);
+    }
+
+    // Job is done only when everything is verified — otherwise it stays
+    // remembered and resumes on the next app start
+    const complete = localScenes.every(s => !isPlaceholderImg(s.imageUrl));
+    if (entryId && complete) {
+      try { localStorage.removeItem(JOB_KEY); } catch {}
     }
 
     if (background) setBgStatus("done");
@@ -818,7 +890,7 @@ export default function Home() {
         .map(c => ({ data: c.photoBase64!, mimeType: c.photoMimeType! }));
 
       saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds });
-      const finalScenes = await generateMedia(script.title, script.heroDescription, script.scenes, customImageRefs, selectedVoiceId, background);
+      const finalScenes = await generateMedia(script.title, script.heroDescription, script.scenes, customImageRefs, selectedVoiceId, background, entry.id);
       renderedMapRef.current.set(entry.id, finalScenes);
       // Cache even if some audio failed — imageUrl always has SVG fallback
       cacheStory(entry.id, finalScenes).catch(() => {});
@@ -863,18 +935,24 @@ export default function Home() {
 
     // 2. Try IndexedDB — survives PWA restart (bg generation continues uninterrupted)
     const dbCached = await getCachedStory(entry.id);
+    let partial: RenderedScene[] | undefined;
     if (dbCached && dbCached.length > 0) {
       const restored: RenderedScene[] = entry.scenes.map((s, i) => ({
         ...s,
         imageUrl: dbCached[i]?.imageUrl,
         audioUrl: dbCached[i]?.audioUrl,
       }));
-      renderedMapRef.current.set(entry.id, restored);
-      showCached(restored);
-      return;
+      if (restored.every(s => !isPlaceholderImg(s.imageUrl))) {
+        renderedMapRef.current.set(entry.id, restored);
+        showCached(restored);
+        return;
+      }
+      // Incomplete cache (interrupted generation) — reuse finished scenes,
+      // regenerate only the missing ones below
+      partial = restored;
     }
 
-    // 3. Cache miss — full regeneration only when nothing else is running
+    // 3. Cache miss/partial — regeneration only when nothing else is running
     if (loading || bgStatus !== "idle") {
       // Background gen in progress — can't regenerate now; user sees the toast when it's done
       setHistoryOpen(false);
@@ -885,7 +963,7 @@ export default function Home() {
     setScenes([]); setTitle(""); setPage(0);
     introFiredRef.current = false;
     try {
-      const finalScenes = await generateMedia(entry.title, entry.heroDescription, entry.scenes, [], selectedVoiceId);
+      const finalScenes = await generateMedia(entry.title, entry.heroDescription, entry.scenes, [], selectedVoiceId, false, entry.id, partial);
       renderedMapRef.current.set(entry.id, finalScenes);
       cacheStory(entry.id, finalScenes).catch(() => {});
       setStatus(t.statusReady);
