@@ -9,7 +9,7 @@ import { UI, UI_LANG_KEY, type UILang } from "@/lib/i18n";
 
 // ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; }
-interface ThemeOption { id: string; name: string; emoji: string; }
+interface ThemeOption { id: string; name: string; nameEn?: string; emoji: string; }
 interface VoiceOption { id: string; name: string; emoji: string; description: string; language: string; }
 interface CustomChar {
   id: string; name: string; description: string;
@@ -29,6 +29,7 @@ interface HistoryEntry {
 }
 
 const HISTORY_KEY = "nicky-story-history";
+const CUSTOM_CHARS_KEY = "nicky-custom-chars";
 const HISTORY_MAX = 10;
 const SETTINGS_KEY = "nicky-settings";
 const DRAFT_KEY = "nicky-story-draft";
@@ -261,6 +262,22 @@ export default function Home() {
     try {
       const l = localStorage.getItem(UI_LANG_KEY);
       if (l === "cs" || l === "en") setUiLang(l);
+    } catch {}
+
+    // Restore saved custom characters (kept until deleted with ×)
+    try {
+      const raw = localStorage.getItem(CUSTOM_CHARS_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) as CustomChar[];
+        if (Array.isArray(saved) && saved.length > 0) {
+          setCustomChars(saved.map(c => ({
+            ...c,
+            previewUrl: c.photoBase64 && c.photoMimeType
+              ? `data:${c.photoMimeType};base64,${c.photoBase64}`
+              : undefined,
+          })));
+        }
+      }
     } catch {}
 
     // Restore story interrupted by window switch
@@ -873,19 +890,43 @@ export default function Home() {
     const r = await resizeAndEncode(file, 800).catch(() => null);
     if (r) setNewCharPhoto(r);
   }
+  // Persist custom characters — they stay until explicitly deleted (×)
+  function saveCustomChars(list: CustomChar[]) {
+    try {
+      localStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(
+        list.map(({ previewUrl, ...c }) => c)   // previewUrl is rebuilt from base64
+      ));
+    } catch {
+      // quota exceeded — retry without photos so at least names survive
+      try {
+        localStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(
+          list.map(c => ({ id: c.id, name: c.name, description: c.description }))
+        ));
+      } catch {}
+    }
+  }
+
   function addCustomChar() {
     if (!newCharName.trim()) return;
     const id = `custom_${Date.now()}`;
-    setCustomChars(p => [...p, {
-      id, name: newCharName.trim(),
-      description: newCharDesc.trim() || `a character named ${newCharName.trim()}`,
-      photoBase64: newCharPhoto?.data, photoMimeType: newCharPhoto?.mimeType, previewUrl: newCharPhoto?.previewUrl,
-    }]);
+    setCustomChars(p => {
+      const next = [...p, {
+        id, name: newCharName.trim(),
+        description: newCharDesc.trim() || `a character named ${newCharName.trim()}`,
+        photoBase64: newCharPhoto?.data, photoMimeType: newCharPhoto?.mimeType, previewUrl: newCharPhoto?.previewUrl,
+      }];
+      saveCustomChars(next);
+      return next;
+    });
     setSelectedCustomIds(p => [...p, id]);
     setAddingChar(false); setNewCharName(""); setNewCharDesc(""); setNewCharPhoto(null);
   }
   function removeCustomChar(id: string) {
-    setCustomChars(p => p.filter(c => c.id !== id));
+    setCustomChars(p => {
+      const next = p.filter(c => c.id !== id);
+      saveCustomChars(next);
+      return next;
+    });
     setSelectedCustomIds(p => p.filter(x => x !== id));
   }
   async function handleInspImage(file: File) {
@@ -980,10 +1021,10 @@ export default function Home() {
           <div className="field">
             <label>{t.worldLabel}</label>
             <div className="chips">
-              {themes.map(t => (
-                <button type="button" key={t.id} className={`chip chip-btn ${selectedTheme === t.id ? "chip-on" : ""}`}
-                  onClick={() => setSelectedTheme(p => p === t.id ? "" : t.id)}>
-                  <span>{t.emoji}</span> {t.name}
+              {themes.map(th => (
+                <button type="button" key={th.id} className={`chip chip-btn ${selectedTheme === th.id ? "chip-on" : ""}`}
+                  onClick={() => setSelectedTheme(p => p === th.id ? "" : th.id)}>
+                  <span>{th.emoji}</span> {uiLang === "en" && th.nameEn ? th.nameEn : th.name}
                 </button>
               ))}
             </div>

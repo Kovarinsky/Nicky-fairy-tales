@@ -6,6 +6,6 @@ import { THEMES } from "@/lib/themes";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const themes = THEMES.map((t) => ({ id: t.id, name: t.name, emoji: t.emoji }));
+  const themes = THEMES.map((t) => ({ id: t.id, name: t.name, nameEn: t.nameEn, emoji: t.emoji }));
   return NextResponse.json({ themes });
 }

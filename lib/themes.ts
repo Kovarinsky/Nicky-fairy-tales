@@ -4,6 +4,8 @@
 export interface Theme {
   id: string;
   name: string;
+  /** English display name (UI language switch) */
+  nameEn: string;
   emoji: string;
   /** Nápověda pro vypravěče (Claude), jak svět uchopit */
   prompt: string;
@@ -13,6 +15,7 @@ export const THEMES: Theme[] = [
   {
     id: "krtek",
     name: "Krteček",
+    nameEn: "Little Mole (Krteček)",
     emoji: "🐭",
     prompt:
       "Set the story in the world of Krteček (Zdeněk Miler): kind woodland animals on a meadow and in a forest. CHARACTER REFERENCE: Krteček: small round black mole, tiny white-rimmed black eyes, tiny pink nose, pure black fur, no clothing, small rounded paws. | Myška: small grey mouse, large pink round ears, tiny black eyes, pink nose, sometimes wears a red dress. | Ježek: small brown hedgehog, spiky brown-grey quills on back, white belly, small black eyes. Pleasant, gentle atmosphere, no evil characters.",
@@ -20,6 +23,7 @@ export const THEMES: Theme[] = [
   {
     id: "paw-patrol",
     name: "Tlapková patrola",
+    nameEn: "Paw Patrol",
     emoji: "🐕",
     prompt:
       "Set the story in the world of Paw Patrol: brave rescue pups working together. CHARACTER REFERENCE: Chase: German shepherd puppy, tan and brown fur, blue police uniform vest with paw badge, blue police cap, blue collar. | Marshall: Dalmatian puppy, white fur with black spots, red firefighter uniform, red firefighter hat. | Rubble: English bulldog puppy, brown and cream fur, yellow construction hat, orange construction vest. | Skye: cockapoo puppy, pink fur with darker pink highlights, pink aviator goggles on head, pink pilot uniform. | Ryder: boy with brown hair, red jacket with paw logo, blue jeans, red helmet. Adventure Bay setting.",
@@ -27,6 +31,7 @@ export const THEMES: Theme[] = [
   {
     id: "krkonose",
     name: "Krkonošské pohádky",
+    nameEn: "Krakonoš Mountain Tales",
     emoji: "🏔️",
     prompt:
       "Zasaď příběh do Krkonošských pohádek: hodný vládce hor Krakonoš, chytrá Anče, Kuba a hajný, v zasněžených i letních horách. Lidová, vlídná atmosféra.",
@@ -34,6 +39,7 @@ export const THEMES: Theme[] = [
   {
     id: "mickey",
     name: "Mickey Mouse",
+    nameEn: "Mickey Mouse",
     emoji: "🐭",
     prompt:
       "Set the story in the cheerful world of Mickey Mouse and friends. CHARACTER REFERENCE — use these exact descriptions: Mickey Mouse: round black ears on round head, white oval eyes with black pupils, red shorts with two white round buttons, white four-fingered gloves, large yellow oval shoes, cheerful round black mouse face. | Minnie Mouse: round black ears with large red polka-dot bow on head, white oval eyes, red dress with white polka dots, white collar and white cuffs, white gloves, yellow shoes. | Pluto: large orange-yellow dog body, long floppy ears, big black nose, green collar with tag. | Goofy: tall lanky dog-like character, orange turtleneck, blue overalls with two buttons, brown hat, green long-sleeved shirt underneath. | Donald Duck: white duck, blue sailor shirt, blue sailor hat with black ribbon, red bow tie, no pants, yellow bill and feet.",
@@ -41,6 +47,7 @@ export const THEMES: Theme[] = [
   {
     id: "dinosauri",
     name: "Dinosauři",
+    nameEn: "Dinosaurs",
     emoji: "🦕",
     prompt:
       "Zasaď příběh do dávného světa hodných dinosaurů – přátelští býložravci, prehistorická příroda, žádné násilí.",
@@ -48,6 +55,7 @@ export const THEMES: Theme[] = [
   {
     id: "vesmir",
     name: "Vesmír",
+    nameEn: "Space",
     emoji: "🚀",
     prompt:
       "Zasaď příběh do vesmíru – rakety, planety, hodní mimozemšťané a hvězdy. Dobrodružné a zvídavé.",
@@ -55,6 +63,7 @@ export const THEMES: Theme[] = [
   {
     id: "pokemon",
     name: "Pokémon",
+    nameEn: "Pokémon",
     emoji: "⚡",
     prompt:
       "Set the story in the cheerful world of Pokémon. Pokémon are friendly magical creatures with special powers who love their trainers. CHARACTER REFERENCE: Pikachu: small round yellow mouse Pokémon, pointed black-tipped ears, red cheek circles, brown stripe markings on back, lightning-bolt-shaped tail, large bright black eyes, cheerful expression. Bulbasaur: small teal-green dinosaur Pokémon, large red eyes, green bulb plant on back, four stubby legs. Friendly adventure atmosphere — focus on friendship, helping others, and discovering new places together. No battles or combat.",
@@ -62,6 +71,7 @@ export const THEMES: Theme[] = [
   {
     id: "sonic",
     name: "Sonic",
+    nameEn: "Sonic",
     emoji: "💙",
     prompt:
       "Set the story in the colorful world of Sonic the Hedgehog. CHARACTER REFERENCE: Sonic: blue anthropomorphic hedgehog, spiky blue quills swept back, large bright green eyes, peach-colored muzzle and belly, white gloves on hands, red-and-white sneakers, confident cheerful expression. Tails (Miles Prower): small young fox with orange fur, large blue eyes, peach muzzle, two fluffy orange tails, white gloves, orange-and-white sneakers. Setting: Green Hill Zone — rolling bright green hills, loop-de-loops, palm trees, golden rings floating in air, bright blue sky with fluffy clouds. Fast-paced but friendly adventure, helping friends and collecting golden rings.",
@@ -69,6 +79,7 @@ export const THEMES: Theme[] = [
   {
     id: "auticka",
     name: "Autíčka",
+    nameEn: "Racing Cars",
     emoji: "🚗",
     prompt:
       "Zasaď příběh do světa veselých závodních autíček a aut, která si pomáhají (ve stylu Cars).",
