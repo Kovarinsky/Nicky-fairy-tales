@@ -1042,7 +1042,7 @@ export default function Home() {
               <div className="ctrl-item">
                 <button type="button" className={`ctrl-btn ctrl-play ${!current.audioUrl || regenAudio ? "ctrl-loading" : ""}`}
                   onClick={togglePlay} disabled={!current.audioUrl || regenAudio} aria-label={isPlaying ? "Pauza" : "Přehrát"}>
-                  {regenAudio ? "⏳" : !current.audioUrl ? "⏳" : isPlaying ? "⏸" : "▶"}
+                  {!current.audioUrl && !regenAudio ? "⏳" : isPlaying ? "⏸" : "▶"}
                 </button>
                 <span className="ctrl-label">{isPlaying ? "Pauza" : "Přehrát"}</span>
               </div>
@@ -1072,7 +1072,7 @@ export default function Home() {
                     disabled={regenAudio}
                     title={`Hlas: ${voices.find(v => v.id === selectedVoiceId)?.name ?? "?"} — klikni pro přepnutí`}
                   >
-                    {regenAudio ? "⏳" : (voices.find(v => v.id === selectedVoiceId)?.emoji ?? "🎙️")}
+                    {voices.find(v => v.id === selectedVoiceId)?.emoji ?? "🎙️"}
                   </button>
                   <span className="ctrl-label">Hlas</span>
                 </div>
