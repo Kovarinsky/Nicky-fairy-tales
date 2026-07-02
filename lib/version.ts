@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.51";
+export const APP_VERSION = "2.52";
 
 // Changelog (newest first)
+// 2.52 - Čtečka na PC a tabletu přes CELOU obrazovku (zrušen limit šířky 860 px v reader módu; formulář zůstává úzký)
 // 2.51 - Oprava Spotřeby: částky z Anthropic API jsou v centech (ukazovalo 100× víc), přepočet na Kč kurzem ČNB; srozumitelná hláška, když ElevenLabs klíč nemá oprávnění číst účet
 // 2.50 - Chybová hláška jde zavřít křížkem ✕ (dřív zůstávala až do dalšího pokusu)
 // 2.49 - Přehled 💰 Spotřeba: skutečná útrata za Claude (Admin API, celý účet, posledních 30 dní) a stav kreditů ElevenLabs přímo v aplikaci; Gemini jen odkazem (Google útratu přes API nevydává)
