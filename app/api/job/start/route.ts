@@ -13,9 +13,11 @@ import { narrateScene } from "@/lib/elevenlabs";
 import { charactersByIds, loadCharacters, loadReferenceImages, type ReferenceImage } from "@/lib/characters";
 import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character, Scene } from "@/lib/types";
+import { blobToken } from "@/lib/blob-token";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
+
 
 const ANCHOR_LABEL =
   "CONSISTENCY ANCHOR — an illustration from THIS SAME story. Copy from it EXACTLY: every character's design, clothing, hair, body size and the relative heights between characters, the art style, AND every recurring object. The car keeps the identical body type, shape, colors and details in this scene (a sedan stays a sedan — it never becomes a different car):";
@@ -39,6 +41,7 @@ async function putJson(path: string, data: unknown): Promise<string> {
     addRandomSuffix: false,
     allowOverwrite: true,
     contentType: "application/json",
+    token: blobToken(),
   });
   return blob.url;
 }
@@ -171,7 +174,7 @@ async function runJob(id: string, body: Record<string, unknown>) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!blobToken()) {
     return NextResponse.json({ error: "blob-not-configured" }, { status: 501 });
   }
   try {

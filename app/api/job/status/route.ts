@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { head } from "@vercel/blob";
+import { blobToken } from "@/lib/blob-token";
 
 export const runtime = "nodejs";
 
@@ -11,11 +12,11 @@ export async function GET(req: NextRequest) {
   if (!/^[a-z0-9-]{10,}$/i.test(id)) {
     return NextResponse.json({ error: "invalid id" }, { status: 400 });
   }
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!blobToken()) {
     return NextResponse.json({ error: "blob-not-configured" }, { status: 501 });
   }
   try {
-    const h = await head(`jobs/${id}/status.json`);
+    const h = await head(`jobs/${id}/status.json`, { token: blobToken() });
     const res = await fetch(`${h.url}?t=${Date.now()}`, { cache: "no-store" });
     if (!res.ok) throw new Error(`blob fetch ${res.status}`);
     const status = await res.json();
