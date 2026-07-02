@@ -32,7 +32,7 @@ const HISTORY_KEY = "nicky-story-history";
 const CUSTOM_CHARS_KEY = "nicky-custom-chars";
 const JOB_KEY = "nicky-pending-job";
 const SERVER_JOB_KEY = "nicky-server-job";
-const HISTORY_MAX = 10;
+const HISTORY_MAX = 20; // offline zásoba: posledních 20 pohádek v telefonu
 const SETTINGS_KEY = "nicky-settings";
 const DRAFT_KEY = "nicky-story-draft";
 
@@ -280,6 +280,8 @@ export default function Home() {
 
   // ── Boot ──
   useEffect(() => {
+    // 20 offline pohádek je až ~800 MB — požádat prohlížeč, ať cache nemaže
+    try { navigator.storage?.persist?.().catch(() => {}); } catch {}
     const saved = loadSettings();
     if (saved.sceneCount !== undefined && saved.sceneCount >= 3 && saved.sceneCount <= 20) {
       setSceneCount(saved.sceneCount);
@@ -1201,6 +1203,15 @@ export default function Home() {
     e.preventDefault();
     const background = bookReady; // run in bg if current story (images) already visible
     setError("");
+
+    // Mobilní data: pohádka stáhne ~30 MB — jednorázové potvrzení za sezení
+    try {
+      const conn = (navigator as Navigator & { connection?: { type?: string } }).connection;
+      if (conn?.type === "cellular" && !sessionStorage.getItem("nicky-cell-ok")) {
+        if (!window.confirm(t.cellularWarn)) return;
+        sessionStorage.setItem("nicky-cell-ok", "1");
+      }
+    } catch {}
 
     const selectedCustomObjsForJob = customChars.filter(c => selectedCustomIds.includes(c.id));
     const storyPayload = {
