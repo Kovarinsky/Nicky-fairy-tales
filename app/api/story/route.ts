@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       themePrompt: theme?.prompt,
       characters,
       age: Number(body.age) || 4,
-      sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), 15),
+      sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), 20),
       language,
     };
 

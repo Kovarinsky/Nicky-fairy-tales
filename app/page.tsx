@@ -937,20 +937,32 @@ export default function Home() {
   // ── Server-side job: the whole story generates ON Vercel; the phone only
   //    polls for the result — switching apps or locking the screen is fine ──
   const jobTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Progressive download: finished scenes stream in DURING generation, so the
+  // final "open" is instant and gen-cards show real thumbnails
+  const jobMediaRef = useRef<{ jobId: string; scenes: Map<number, { imageUrl?: string; audioUrl?: string }>; fetching: Set<number> }>({ jobId: "", scenes: new Map(), fetching: new Set() });
+  // Stall watch: when the server function dies on the 5-min limit, kick /continue
+  const jobStallRef = useRef({ lastChange: 0, lastSig: "", lastKick: 0 });
+
+  async function fetchSceneJson(url: string): Promise<{ imageUrl?: string; audioUrl?: string } | null> {
+    // 2 attempts — a hiccup while downloading one scene must not lose it
+    for (let a = 0; a < 2; a++) {
+      try {
+        const r = await fetch(url, { cache: "no-store" });
+        if (r.ok) return await r.json();
+      } catch {}
+    }
+    return null;
+  }
 
   async function finalizeServerJob(st: { title?: string; heroDescription?: string; scenesScript?: Scene[]; sceneUrls?: Record<number, string>; total?: number; voiceId?: string }, jobId: string) {
     const script = st.scenesScript || [];
     const urls = st.sceneUrls || {};
+    const pre = jobMediaRef.current.jobId === jobId ? jobMediaRef.current.scenes : new Map<number, { imageUrl?: string; audioUrl?: string }>();
     const media = await Promise.all(script.map(async (_, i) => {
+      const cached = pre.get(i);
+      if (cached) return cached; // už staženo průběžně během generování
       if (!urls[i]) return null;
-      // 2 attempts — a hiccup while downloading one scene must not lose it
-      for (let a = 0; a < 2; a++) {
-        try {
-          const r = await fetch(urls[i], { cache: "no-store" });
-          if (r.ok) return await r.json();
-        } catch {}
-      }
-      return null;
+      return fetchSceneJson(urls[i]);
     }));
     // Missing image → SVG placeholder (same convention as /api/scene), so the
     // book still opens and shows the "redraw" button instead of nothing
@@ -983,6 +995,54 @@ export default function Home() {
     try { localStorage.removeItem(SERVER_JOB_KEY); } catch {}
   }
 
+  // Download finished scenes while the job still runs (max 2 at a time) and
+  // feed them into the gen-card thumbnails via bgBufferRef
+  function prefetchJobScenes(jobId: string, st: { scenesScript?: Scene[]; sceneUrls?: Record<number, string> }) {
+    const jm = jobMediaRef.current;
+    if (jm.jobId !== jobId) { jm.jobId = jobId; jm.scenes = new Map(); jm.fetching = new Set(); }
+    const script = st.scenesScript || [];
+    const urls = st.sceneUrls || {};
+    if (script.length > 0 && bgBufferRef.current.length !== script.length) {
+      bgBufferRef.current = script.map((s, i) => ({ ...s, imageUrl: jm.scenes.get(i)?.imageUrl, audioUrl: jm.scenes.get(i)?.audioUrl } as RenderedScene));
+    }
+    const pending = Object.keys(urls).map(Number)
+      .filter(i => !jm.scenes.has(i) && !jm.fetching.has(i))
+      .slice(0, 2);
+    for (const i of pending) {
+      jm.fetching.add(i);
+      fetchSceneJson(urls[i]).then(m => {
+        jm.fetching.delete(i);
+        if (!m || jm.jobId !== jobId) return;
+        jm.scenes.set(i, m);
+        if (bgBufferRef.current[i]) {
+          bgBufferRef.current[i] = { ...bgBufferRef.current[i], imageUrl: m.imageUrl, audioUrl: m.audioUrl };
+        }
+      }).catch(() => { jm.fetching.delete(i); });
+    }
+  }
+
+  // When done/total stops moving for too long, the server function most
+  // likely hit Vercel's 5-minute limit → ask /api/job/continue to resume
+  function maybeKickContinue(jobId: string, st: { phase: string; done?: number; total?: number }) {
+    const w = jobStallRef.current;
+    const sig = `${jobId}|${st.phase}|${st.done ?? -1}/${st.total ?? -1}`;
+    const now = Date.now();
+    if (sig !== w.lastSig) {
+      w.lastSig = sig; w.lastChange = now;
+      lastProgressRef.current = now; // server progress feeds the local stall watchdog too
+      return;
+    }
+    // writing has no progress signal → longer patience (Claude can take ~3 min on 20 scenes)
+    const limit = st.phase === "writing" ? 330_000 : 150_000;
+    if (now - w.lastChange < limit || now - w.lastKick < 120_000) return;
+    w.lastKick = now;
+    fetch("/api/job/continue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: jobId }),
+    }).catch(() => {});
+  }
+
   function startJobPolling(jobId: string) {
     if (jobTimerRef.current) clearInterval(jobTimerRef.current);
     const tick = async () => {
@@ -991,9 +1051,11 @@ export default function Home() {
         if (res.status === 404) return; // status not written yet
         if (!res.ok) return;
         const st = await res.json();
+        if (st.phase === "writing" || st.phase === "generating") maybeKickContinue(jobId, st);
         if (st.phase === "writing") {
           setBgStatus("writing");
         } else if (st.phase === "generating") {
+          prefetchJobScenes(jobId, st);
           setBgStatus("generating");
           setBgProgress({ done: st.done || 0, total: st.total || 0 });
         } else if (st.phase === "done") {
@@ -1422,7 +1484,7 @@ export default function Home() {
 
         <div className="field">
           <label>{t.pagesLabel}: {sceneCount}</label>
-          <input type="range" min={3} max={15} value={sceneCount} onChange={e => setSceneCount(Number(e.target.value))} />
+          <input type="range" min={3} max={20} value={sceneCount} onChange={e => setSceneCount(Number(e.target.value))} />
         </div>
 
         <div className="field">

@@ -370,7 +370,7 @@ export async function generateStory(req: StoryRequest, extras: StoryExtras = {})
   for (let attempt = 1; attempt <= 2; attempt++) {
     const raw = await callAnthropicApi({
       model,
-      max_tokens: 8192,
+      max_tokens: 16384, // 20 scén s vyprávěním a popisy obrázků se do 8k nevešlo
       system: buildSystemPrompt(language),
       messages: [{ role: "user", content }],
     });
