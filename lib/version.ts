@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.57";
+export const APP_VERSION = "2.58";
 
 // Changelog (newest first)
+// 2.58 - Záchrana zaseknutých pohádek: job, který na serveru nikdy nezapsal stav (404), se automaticky oživí přes /continue nebo po 5 min ukončí chybou; zaseknutý díl tlačítka červeně pulzuje s ⚠️ — ťuknutím nakopnete, podruhé odeberete z fronty
 // 2.57 - Offline zásoba rozšířena na 20 pohádek (localStorage/IndexedDB/Blob drží posledních 20; žádost o trvalé úložiště, ať prohlížeč cache nemaže); upozornění před generováním na mobilních datech (~30 MB, potvrzení 1× za sezení)
 // 2.56 - Ťuknutí na díl tlačítka (1./2./3.) přepne kartičky na průběh té konkrétní pohádky; zvolený díl je zvýrazněný bílým rámečkem
 // 2.55 - Fronta bez bublinek: velké tlačítko se rozdělí na části — jedna část na pohádku (✍️ píše se / 🎨 x/y s plnícím se pruhem / ▶ Otevřít / ⚠️ chyba); plovoucí bublinky z hlavní obrazovky zmizely

@@ -252,7 +252,7 @@ export default function Home() {
 
   // Server jobs — a QUEUE: several fairy tales can generate on Vercel at once,
   // each gets its own toast row and the newest one drives the gen-cards
-  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string };
+  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean };
   const MAX_ACTIVE_JOBS = 3;
   const [serverJobs, setServerJobs] = useState<ServerJob[]>([]);
   // The ref is the synchronous source of truth (poll callbacks and the mount
@@ -994,7 +994,21 @@ export default function Home() {
   // Per-job scene buffer for the gen-card thumbnails
   const jobBuffersRef = useRef<Map<string, RenderedScene[]>>(new Map());
   // Stall watch (per job): when the server function dies on the 5-min limit, kick /continue
-  const jobStallRef = useRef<Map<string, { lastChange: number; lastSig: string; lastKick: number }>>(new Map());
+  const jobStallRef = useRef<Map<string, { lastChange: number; lastSig: string; lastKick: number; fails404: number; manualKicks: number }>>(new Map());
+
+  function stallStateFor(jobId: string) {
+    let w = jobStallRef.current.get(jobId);
+    if (!w) { w = { lastChange: 0, lastSig: "", lastKick: 0, fails404: 0, manualKicks: 0 }; jobStallRef.current.set(jobId, w); }
+    return w;
+  }
+
+  function kickContinue(jobId: string) {
+    return fetch("/api/job/continue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: jobId }),
+    }).catch(() => null);
+  }
 
   function stopJobPolling(jobId: string) {
     const tm = jobTimersRef.current.get(jobId);
@@ -1127,25 +1141,23 @@ export default function Home() {
 
   // When done/total stops moving for too long, the server function most
   // likely hit Vercel's 5-minute limit → ask /api/job/continue to resume
-  function maybeKickContinue(jobId: string, st: { phase: string; done?: number; total?: number }) {
-    let w = jobStallRef.current.get(jobId);
-    if (!w) { w = { lastChange: 0, lastSig: "", lastKick: 0 }; jobStallRef.current.set(jobId, w); }
+  function maybeKickContinue(jobId: string, st: { phase: string; done?: number; total?: number }, stalledNow?: boolean) {
+    const w = stallStateFor(jobId);
     const sig = `${st.phase}|${st.done ?? -1}/${st.total ?? -1}`;
     const now = Date.now();
     if (sig !== w.lastSig) {
       w.lastSig = sig; w.lastChange = now;
       lastProgressRef.current = now; // server progress feeds the local stall watchdog too
+      if (stalledNow) updateServerJob(jobId, { stalled: false });
       return;
     }
     // writing has no progress signal → longer patience (Claude can take ~3 min on 20 scenes)
-    const limit = st.phase === "writing" ? 330_000 : 150_000;
-    if (now - w.lastChange < limit || now - w.lastKick < 120_000) return;
+    const limit = st.phase === "writing" ? 240_000 : 150_000;
+    if (now - w.lastChange < limit) return;
+    if (!stalledNow) updateServerJob(jobId, { stalled: true });
+    if (now - w.lastKick < 120_000) return;
     w.lastKick = now;
-    fetch("/api/job/continue", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: jobId }),
-    }).catch(() => {});
+    kickContinue(jobId);
   }
 
   function startJobPolling(jobId: string) {
@@ -1153,10 +1165,33 @@ export default function Home() {
     const tick = async () => {
       try {
         const res = await fetch(`/api/job/status?id=${jobId}`, { cache: "no-store" });
-        if (res.status === 404) return; // status not written yet
+        if (res.status === 404) {
+          // Status was never written — the server start died before its first
+          // write. Revive via /continue; give up after ~5 minutes of 404s.
+          const w = stallStateFor(jobId);
+          w.fails404++;
+          if (w.fails404 >= 75) {
+            stopJobPolling(jobId);
+            updateServerJob(jobId, { phase: "error", error: t.errGeneric });
+            return;
+          }
+          if (w.fails404 >= 8 && Date.now() - w.lastKick > 120_000) {
+            w.lastKick = Date.now();
+            const r = await kickContinue(jobId);
+            // Nejde navázat (zadání se nedochovalo) → ukončit s chybou
+            if (r && r.status === 404) {
+              stopJobPolling(jobId);
+              updateServerJob(jobId, { phase: "error", error: t.errGeneric });
+            }
+          }
+          return;
+        }
         if (!res.ok) return;
+        stallStateFor(jobId).fails404 = 0;
         const st = await res.json();
-        if (st.phase === "writing" || st.phase === "generating") maybeKickContinue(jobId, st);
+        if (st.phase === "writing" || st.phase === "generating") {
+          maybeKickContinue(jobId, st, serverJobsRef.current.find(j => j.jobId === jobId)?.stalled);
+        }
         if (st.phase === "writing") {
           updateServerJob(jobId, { phase: "writing" });
         } else if (st.phase === "generating") {
@@ -1678,17 +1713,26 @@ export default function Home() {
                     const pct = j.phase === "generating" && j.total > 0 ? Math.round((j.done / j.total) * 100) : 0;
                     return (
                       <div key={j.jobId}
-                        className={`job-seg job-seg-${j.phase}${newestJob?.jobId === j.jobId && activeJobs.length > 1 ? " job-seg-focus" : ""}`}
+                        className={`job-seg job-seg-${j.phase}${j.stalled ? " job-seg-stalled" : ""}${newestJob?.jobId === j.jobId && activeJobs.length > 1 ? " job-seg-focus" : ""}`}
                         style={{ "--pct": `${pct}%` } as React.CSSProperties}
                         onClick={j.phase === "done" ? () => openServerJob(j)
                           : j.phase === "error" ? () => removeServerJob(j.jobId)
+                          : j.stalled ? () => {
+                              const w = stallStateFor(j.jobId);
+                              if (w.manualKicks === 0) {
+                                if (window.confirm(t.stuckKickAsk)) { w.manualKicks++; w.lastKick = Date.now(); kickContinue(j.jobId); }
+                              } else if (window.confirm(t.stuckRemoveAsk)) {
+                                stopJobPolling(j.jobId);
+                                removeServerJob(j.jobId);
+                              } else { w.lastKick = Date.now(); kickContinue(j.jobId); }
+                            }
                           : () => setFocusJobId(j.jobId)}
                         role="button"
                         title={j.title || undefined}
                       >
                         <span className="job-seg-fill" />
                         <span className="job-seg-label">
-                          {idx + 1}. {j.phase === "writing" ? t.segWriting
+                          {idx + 1}. {j.stalled ? "⚠️ " : ""}{j.phase === "writing" ? t.segWriting
                             : j.phase === "generating" ? `🎨 ${j.done}/${j.total}`
                             : j.phase === "done" ? t.segOpen
                             : t.segError}

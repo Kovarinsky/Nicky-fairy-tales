@@ -1795,3 +1795,10 @@ button:disabled {
 .job-seg-generating {
   cursor: pointer;
 }
+
+/* Zaseknutý job — červené pulzování, ťuknutí nabídne nakopnutí/odebrání */
+.job-seg-stalled {
+  border-color: rgba(239, 68, 68, 0.85);
+  animation: pulse 1.2s ease-in-out infinite;
+  cursor: pointer;
+}
