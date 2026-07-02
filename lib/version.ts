@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.30";
+export const APP_VERSION = "2.31";
 
 // Changelog (newest first)
+// 2.31 - Portrait reader: text box přímo pod obrázkem, ovládací panel pod textem (jako v landscape); toggle panelu ťuknutím kamkoli na kartu
 // 2.30 - Hudba defaultně vypnutá; titulky ukazují skutečné modely (API /api/models); mluvené „Dobrou noc, Nicolásku a Valentýnko" na konci titulků
 // 2.29 - Přepínač jazyka UI 🇨🇿/🇬🇧: celé rozhraní česky nebo anglicky, volba se pamatuje, EN auto-vybere anglického vypravěče
 // 2.28 - Text na bílém podkladu: portrait celý text bez rolování, landscape bílý jednořádkový ticker

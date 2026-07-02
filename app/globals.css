@@ -508,7 +508,7 @@ button:disabled {
   margin-bottom: 0.4rem;
 }
 
-/* ── Immersive reader: image fills the space above a small subtitle window,
+/* ── Immersive reader: portrait = centered stack image → text → panel,
      controls hidden until tap ── */
 .reader-mode .book-card {
   flex: 1;
@@ -516,30 +516,31 @@ button:disabled {
   position: relative;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   animation: none;
   background: #14092e;
+  cursor: pointer;
 }
 
+/* Portrait: image keeps its natural height (no dark gap pushed between
+   image and text); shrinks only when it wouldn't fit */
 .reader-mode .page-image {
   width: 100%;
-  flex: 1 1 0;
+  flex: 0 1 auto;
   min-height: 0;
   height: auto;
   aspect-ratio: auto;
   object-fit: contain;
   background: #14092e;
-  cursor: pointer;
 }
 
-/* Text UNDER the image on a white background — whole text visible in
-   portrait (no rolling), scrolls by hand only if extremely long */
+/* Text box directly UNDER the image on a white background */
 .reader-mode .page-body {
   flex: 0 0 auto;
-  max-height: 38dvh;
+  max-height: 34dvh;
   overflow-y: auto;
   background: rgba(248, 247, 255, 0.96);
   padding: 0.8rem 0.95rem 0.9rem;
-  cursor: pointer;
 }
 
 .reader-mode .page-text {
@@ -547,12 +548,11 @@ button:disabled {
   line-height: 1.6;
 }
 
-/* Controls: hidden; tap → panel at the BOTTOM (portrait) */
+/* Controls: hidden; tap → panel right BELOW the text box (in flow) */
 .reader-mode .book-controls {
-  position: absolute;
-  left: 0.5rem;
-  right: 0.5rem;
-  bottom: 0.5rem;
+  position: static;
+  flex: 0 0 auto;
+  margin: 0.5rem 0.5rem 0;
   z-index: 6;
   display: none;
   border-radius: 20px;
@@ -601,7 +601,12 @@ button:disabled {
 /* Landscape / widescreen: maximize the picture —
    no title, one-line rolling ticker, arrows only with the panel */
 @media (orientation: landscape) {
+  .reader-mode .page-image {
+    flex: 1 1 0;
+  }
   .reader-mode .book-controls {
+    position: absolute;
+    margin: 0;
     left: auto;
     right: 0.55rem;
     bottom: auto;

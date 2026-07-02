@@ -1168,13 +1168,13 @@ export default function Home() {
           <div className="book-card" key={slideKey}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
+            onClick={() => { if (readerMode) setCtrlsOpen(v => !v); }}
           >
             {current.imageUrl && !isPlaceholderImg(current.imageUrl) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img className="page-image" src={current.imageUrl} alt={t.sceneAlt(page + 1)}
                 ref={pageImgRef}
-                onLoad={() => setRollTick(t => t + 1)}
-                onClick={() => setCtrlsOpen(v => !v)} />
+                onLoad={() => setRollTick(t => t + 1)} />
             ) : current.imageUrl ? (
               <div className="page-image placeholder">
                 {fixingScene === page ? (
@@ -1198,11 +1198,11 @@ export default function Home() {
               </div>
             )}
 
-            <div className="page-body" ref={pageBodyRef} onClick={() => setCtrlsOpen(v => !v)}>
+            <div className="page-body" ref={pageBodyRef}>
               <p className="page-text">{current.narration}</p>
             </div>
 
-            <div className="book-controls">
+            <div className="book-controls" onClick={e => e.stopPropagation()}>
               <div className="ctrl-item">
                 <button type="button" className={`ctrl-btn ctrl-play ${!current.audioUrl || regenAudio ? "ctrl-loading" : ""}`}
                   onClick={togglePlay} disabled={!current.audioUrl || regenAudio} aria-label={isPlaying ? t.pause : t.play}>
