@@ -21,10 +21,13 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const id = crypto.randomUUID();
-    // Zadání stranou — continue endpoint z něj načte stejné vstupy
-    await putJson(`jobs/${id}/request.json`, body);
-    const job = runJob(id, body);
-    try { waitUntil(job); } catch { /* local dev — the promise runs in-process */ }
+    // Zadání stranou (pro /api/job/continue) + samotný job — obojí až PO
+    // odeslání odpovědi, aby start nikdy nečekal na Blob a klient nespadl
+    // do lokálního generování kvůli pomalé odpovědi
+    const work = putJson(`jobs/${id}/request.json`, body)
+      .catch(e => console.error(`[job ${id}] request.json write failed:`, e))
+      .then(() => runJob(id, body));
+    try { waitUntil(work); } catch { /* local dev — the promise runs in-process */ }
     return NextResponse.json({ jobId: id });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Neznámá chyba";

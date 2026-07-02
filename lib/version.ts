@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.47";
+export const APP_VERSION = "2.48";
 
 // Changelog (newest first)
+// 2.48 - Spolehlivější start serverové výroby (fronty): 2 pokusy s timeoutem 30 s místo jednoho s 15 s, server odpovídá okamžitě (zápis zadání do Blobu až po odpovědi) — méně pádů do lokálního generování bez fronty
 // 2.47 - Automatický úklid Blob úložiště: po dokončení pohádky se smažou serverová data jobů, které vypadly z historie posledních 10 pohádek (běžící a čerstvé joby <24 h se nikdy nemažou)
 // 2.46 - Fronta pohádek: až 3 pohádky se připravují najednou na serveru — další jde zadat hned, bez čekání; každá má vlastní řádek s průběhem a tlačítkem Otevřít, kartičky ukazují tu nejnovější
 // 2.45 - Až 20 stránek: navazovací serverový job (po 5min limitu Vercelu automaticky pokračuje endpointem /api/job/continue — zdarma, bez Pro plánu); delší příběhy od Clauda (16k tokenů); rychlejší načtení — hotové scény se stahují do telefonu průběžně už během výroby a kartičky ukazují skutečné náhledy

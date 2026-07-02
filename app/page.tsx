@@ -1196,30 +1196,38 @@ export default function Home() {
       inspirationPdfBase64: inspPdf?.base64 || undefined,
     };
 
-    // Try the SERVER job first — generation survives app switches & screen off
-    try {
-      const jobRes = await fetch("/api/job/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(15_000),
-        body: JSON.stringify({
-          ...storyPayload,
-          voiceId: selectedVoiceId || "",
-          customCharacterImages: selectedCustomObjsForJob
-            .filter(c => c.photoBase64 && c.photoMimeType)
-            .map(c => ({ data: c.photoBase64!, mimeType: c.photoMimeType! })),
-        }),
-      });
-      if (jobRes.ok) {
-        const { jobId } = await jobRes.json();
-        if (jobId) {
-          saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds });
-          addServerJob(jobId);
-          return; // phone is free — the server does the work
+    // Try the SERVER job first — generation survives app switches & screen off.
+    // 2 attempts with a generous timeout (cold start + slow mobile upload);
+    // the local in-browser pipeline is only a last resort, it has no queue.
+    const jobBody = JSON.stringify({
+      ...storyPayload,
+      voiceId: selectedVoiceId || "",
+      customCharacterImages: selectedCustomObjsForJob
+        .filter(c => c.photoBase64 && c.photoMimeType)
+        .map(c => ({ data: c.photoBase64!, mimeType: c.photoMimeType! })),
+    });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const jobRes = await fetch("/api/job/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(30_000),
+          body: jobBody,
+        });
+        if (jobRes.ok) {
+          const { jobId } = await jobRes.json();
+          if (jobId) {
+            saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds });
+            addServerJob(jobId);
+            return; // phone is free — the server does the work
+          }
         }
+        if (jobRes.status === 501) break; // blob not configured → local pipeline
+        console.warn(`[job/start] attempt ${attempt + 1} failed: HTTP ${jobRes.status}`);
+      } catch (e) {
+        console.warn(`[job/start] attempt ${attempt + 1} failed:`, e);
       }
-      // non-ok (e.g. 501 blob-not-configured) → fall through to local pipeline
-    } catch { /* network hiccup → local pipeline */ }
+    }
 
     // Local pipeline is exclusive — if server jobs are already running, don't
     // start a second in-browser generation on top of them
