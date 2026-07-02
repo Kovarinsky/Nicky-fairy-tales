@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.34";
+export const APP_VERSION = "2.35";
 
 // Changelog (newest first)
+// 2.35 - Rodinné referenční fotky: táta Jan, máma Jana, pes Archie (nová postava), Valentýnka — Gemini nyní dostává fotky a kreslí podle skutečné podoby
 // 2.34 - Panel přikotven dole; šipky integrované do obrázku (střed, jeho okraje); Recent stories přesunuty pod pohádku
 // 2.33 - Anglické názvy témat (Story world) při EN; vlastní postavy se ukládají (localStorage) — zůstávají do smazání ×, pohádky s nimi zůstávají v historii
 // 2.32 - Jednotná velikost obrázků: Gemini generuje 16:9 (imageConfig), zobrazení v pevném 16:9 rámu (cover) v obou orientacích

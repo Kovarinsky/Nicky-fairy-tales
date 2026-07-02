@@ -35,6 +35,8 @@ export function charactersByIds(ids: string[]): Character[] {
 export interface ReferenceImage {
   data: string; // base64
   mimeType: string;
+  /** Jméno postavy na fotce (pro instrukci v promptu) */
+  name?: string;
 }
 
 function mimeFromExt(file: string): string {
@@ -54,6 +56,7 @@ export function loadReferenceImages(characters: Character[]): ReferenceImage[] {
     images.push({
       data: readFileSync(filePath).toString("base64"),
       mimeType: mimeFromExt(c.referenceFile),
+      name: c.name,
     });
   }
   return images;

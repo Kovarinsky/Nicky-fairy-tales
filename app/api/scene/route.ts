@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateSceneImage } from "@/lib/gemini";
 import { narrateScene } from "@/lib/elevenlabs";
+import { charactersByIds, loadReferenceImages, type ReferenceImage } from "@/lib/characters";
 import type { Scene } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -28,10 +29,18 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Reference photos: built-in characters (from reference/) + custom character photos
+    const characterIds: string[] = Array.isArray(body.characterIds) ? body.characterIds : [];
+    const refImages: ReferenceImage[] = loadReferenceImages(charactersByIds(characterIds));
+    const customImages = Array.isArray(body.customCharacterImages) ? body.customCharacterImages : [];
+    for (const ci of customImages) {
+      if (ci?.data && ci?.mimeType) refImages.push({ data: ci.data, mimeType: ci.mimeType, name: "a custom story character" });
+    }
+
     let imageDebug = "";
     let audioDebug = "";
     const [imageResult, audio] = await Promise.all([
-      generateSceneImage(scene, heroDescription).catch((e: Error) => {
+      generateSceneImage(scene, heroDescription, refImages).catch((e: Error) => {
         imageDebug = e.message;
         console.error(`[Gemini] ${e.message}`);
         return null; // fallback to SVG placeholder

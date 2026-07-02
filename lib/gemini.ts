@@ -1,5 +1,6 @@
 import { request } from "https";
 import type { Scene } from "./types";
+import type { ReferenceImage } from "./characters";
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.0-flash-preview-image-generation";
 const SANITIZE_MODEL = "gemini-2.0-flash"; // fast text model — sanitizes its own image model's prompt
@@ -95,14 +96,25 @@ function regexSanitize(text: string): string {
     .trim();
 }
 
-// Step 2: Call Gemini image model with the sanitized prompt
-function callGeminiImage(apiKey: string, model: string, prompt: string, withAspect = true): Promise<ImageResult> {
+// Step 2: Call Gemini image model with the sanitized prompt (+ reference photos)
+function callGeminiImage(apiKey: string, model: string, prompt: string, withAspect = true, refImages: ReferenceImage[] = []): Promise<ImageResult> {
   const generationConfig: Record<string, unknown> = { responseModalities: ["IMAGE", "TEXT"] };
   // Force uniform 16:9 output so every scene renders at the same size
   if (withAspect) generationConfig.imageConfig = { aspectRatio: "16:9" };
+  // Reference photos go first, each labeled with the character's name,
+  // so Gemini can match the likeness when drawing the stylized scene
+  const parts: Array<Record<string, unknown>> = [];
+  for (const ref of refImages) {
+    parts.push({ text: `Reference photo of ${ref.name || "a story character"} (match this person's/animal's likeness):` });
+    parts.push({ inlineData: { data: ref.data, mimeType: ref.mimeType } });
+  }
+  if (refImages.length > 0) {
+    parts.push({ text: "Draw the characters so they are clearly recognizable as the people/animals in the reference photos above — same face shape, hair color and style, eye color and build — but rendered in the illustration style described below. Do NOT copy the photos' backgrounds or clothing unless the prompt says so." });
+  }
+  parts.push({ text: prompt });
   const bodyBuf = Buffer.from(
     JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      contents: [{ role: "user", parts }],
       generationConfig,
     }),
     "utf-8"
@@ -153,7 +165,7 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, withAspe
   });
 }
 
-export async function generateSceneImage(scene: Scene, heroDescription: string): Promise<ImageResult> {
+export async function generateSceneImage(scene: Scene, heroDescription: string, refImages: ReferenceImage[] = []): Promise<ImageResult> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
   const model = (process.env.GEMINI_IMAGE_MODEL || IMAGE_MODEL).trim();
@@ -188,7 +200,7 @@ export async function generateSceneImage(scene: Scene, heroDescription: string):
   let lastErr = new Error("Gemini nevrátil obrázek");
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      return await callGeminiImage(apiKey, model, safePrompt, withAspect);
+      return await callGeminiImage(apiKey, model, safePrompt, withAspect, refImages);
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e));
       console.error(`[Gemini] scene ${scene.index} attempt ${attempt}/${MAX_ATTEMPTS}: ${lastErr.message}`);

@@ -14,11 +14,19 @@
   {
     "id": "jan",
     "name": "Táta Jan",
-    "description": "Jan: short dark-brown hair, warm brown eyes, light-grey T-shirt, dark navy jeans, tall adult man with a short dark beard stubble, broad friendly smile"
+    "description": "Jan: adult man with very short light-brown hair, short grey-brown stubble beard, warm smile, navy-blue polo shirt with white horizontal stripes, navy shorts, tall athletic build",
+    "referenceFile": "jan.jpg"
   },
   {
     "id": "jana",
     "name": "Máma Jana",
-    "description": "Jana: shoulder-length dark-brown hair, warm brown eyes, white blouse, light beige trousers, medium height adult woman, kind warm smile"
+    "description": "Jana: adult woman with very long straight blonde hair, blue-grey eyes, gentle smile, lilac-purple hoodie with drawstrings, black leggings, slim medium height",
+    "referenceFile": "jana.jpg"
+  },
+  {
+    "id": "archie",
+    "name": "Pes Archie",
+    "description": "Archie: friendly Staffordshire Bull Terrier dog, red-brindle brown coat with white chest and white stripe on the muzzle, white paws, black collar with brass studs, stocky muscular build, happy expression with tongue out",
+    "referenceFile": "archie.jpg"
   }
 ]
