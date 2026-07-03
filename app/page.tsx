@@ -1407,6 +1407,19 @@ export default function Home() {
     }
   }
 
+  // ── Delete a story from history (localStorage + IndexedDB + memory) ──────
+  function deleteStory(e: React.MouseEvent, entry: HistoryEntry) {
+    e.stopPropagation();
+    if (!window.confirm(t.deleteStoryAsk(entry.title))) return;
+    try {
+      const next = loadHistory().filter(x => x.id !== entry.id);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+      setStoryHistory(next);
+      renderedMapRef.current.delete(entry.id);
+      evictOldStories(next.map(x => x.id)).catch(() => {});
+    } catch {}
+  }
+
   // ── Replay from history ───────────────────────────────────────────────────
   async function replayStory(entry: HistoryEntry) {
     // Helper: switch to a set of ready scenes without interrupting bg generation
@@ -1989,6 +2002,8 @@ export default function Home() {
                     </div>
                     <span className="history-date">{fmtDate(entry.createdAt)}</span>
                   </div>
+                  <span className="history-del" role="button" aria-label={t.deleteStory}
+                    onClick={e => deleteStory(e, entry)}>🗑️</span>
                   <span className="history-play-btn">▶</span>
                 </button>
               ))}

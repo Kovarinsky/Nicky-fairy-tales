@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.62";
+export const APP_VERSION = "2.63";
 
 // Changelog (newest first)
+// 2.63 - Mazání pohádek z historie: ikona 🗑️ u každé položky (s potvrzením) — smaže pohádku z telefonu vč. offline dat a uvolní místo
 // 2.62 - Věrnější táta Jan: nová detailní fotka obličeje jako druhá reference pro Gemini + přesnější popis (vysoké čelo, krátké tmavě hnědé vlasy, strniště, hnědé oči); podpora více referenčních fotek na postavu
 // 2.61 - Oprava „blob-write-failed: invalid header value": Blob token se čistí (uvozovky, nové řádky, smetí z Quickstartu) — z hodnoty se vytáhne jen samotný vercel_blob_rw_… token
 // 2.60 - Server už nehromadí hotové pohádky (jsou v telefonu): po stažení se serverová data pohádky mažou okamžitě, úklid chrání jen běžící joby (+1h lhůta), běží 1× za hodinu — bezplatný 1GB Blob se už nezaplní; důvod selhání startu se zobrazí (Server: blob-write-failed…)
