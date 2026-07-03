@@ -94,10 +94,10 @@ function regexSanitize(text: string): string {
 }
 
 // Step 2: Call Gemini image model with the sanitized prompt (+ reference photos)
-function callGeminiImage(apiKey: string, model: string, prompt: string, withAspect = true, refImages: ReferenceImage[] = []): Promise<ImageResult> {
+function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: string | null = "16:9", refImages: ReferenceImage[] = []): Promise<ImageResult> {
   const generationConfig: Record<string, unknown> = { responseModalities: ["IMAGE", "TEXT"] };
-  // Force uniform 16:9 output so every scene renders at the same size
-  if (withAspect) generationConfig.imageConfig = { aspectRatio: "16:9" };
+  // Uniform aspect ratio (16:9 scenes, 9:16 app backgrounds); null = model default
+  if (aspect) generationConfig.imageConfig = { aspectRatio: aspect };
   // Reference photos go first, each labeled with the character's name,
   // so Gemini can match the likeness when drawing the stylized scene
   const parts: Array<Record<string, unknown>> = [];
@@ -162,6 +162,32 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, withAspe
   });
 }
 
+// Pozadí aplikace — ilustrovaná scenérie ve stejném stylu jako pohádky,
+// na výšku (telefon), bez postav a bez textu. Prompt je bezpečný a pevně
+// daný (lib/backgrounds.ts), sanitizace není potřeba.
+export async function generateBackgroundImage(prompt: string): Promise<ImageResult> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
+  const model = (process.env.GEMINI_IMAGE_MODEL || IMAGE_MODEL).trim();
+  let aspect: string | null = "9:16";
+  let lastErr = new Error("Gemini nevrátil obrázek");
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await callGeminiImage(apiKey, model, prompt, aspect);
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+      console.error(`[Gemini bg] attempt ${attempt}/3: ${lastErr.message}`);
+      if (aspect && /image_config|imageConfig|aspect_ratio|aspectRatio|Unknown name/i.test(lastErr.message)) {
+        aspect = null;
+        continue;
+      }
+      if (lastErr.message.match(/^Gemini 4/) && !lastErr.message.startsWith("Gemini 429")) break;
+      if (attempt < 3) await new Promise(r => setTimeout(r, 5000 * attempt));
+    }
+  }
+  throw lastErr;
+}
+
 export async function generateSceneImage(scene: Scene, heroDescription: string, refImages: ReferenceImage[] = []): Promise<ImageResult> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
@@ -199,7 +225,7 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
   let lastErr = new Error("Gemini nevrátil obrázek");
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      return await callGeminiImage(apiKey, model, safePrompt, withAspect, refImages);
+      return await callGeminiImage(apiKey, model, safePrompt, withAspect ? "16:9" : null, refImages);
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e));
       console.error(`[Gemini] scene ${scene.index} attempt ${attempt}/${MAX_ATTEMPTS}: ${lastErr.message}`);
@@ -229,7 +255,7 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
     ].filter(Boolean).join(" ");
     const safeFallback = await sanitizeWithGemini(apiKey, fallbackRaw);
     console.warn(`[Gemini] scene ${scene.index}: using simplified fallback prompt`);
-    return await callGeminiImage(apiKey, model, safeFallback, withAspect, refImages);
+    return await callGeminiImage(apiKey, model, safeFallback, withAspect ? "16:9" : null, refImages);
   } catch (e2) {
     console.error(`[Gemini] scene ${scene.index} fallback failed: ${e2 instanceof Error ? e2.message : e2}`);
   }

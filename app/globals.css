@@ -113,6 +113,24 @@ body {
     linear-gradient(180deg, #241046 0%, #3b1668 58%, #1c0b38 100%);
 }
 
+/* Ilustrované pozadí od Gemini (--bg-img nastavuje klient po stažení).
+   Leží nad gradientem scény, pod pixelart postavičkami a overlayem. */
+.photo-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: var(--bg-img, none);
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+:root[style*="--bg-img"] .photo-bg::before {
+  opacity: 1;
+}
+
 /* Dark gradient overlay for readability */
 .photo-bg::after {
   content: "";

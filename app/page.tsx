@@ -1452,8 +1452,33 @@ export default function Home() {
     ? (THEME_BG[selectedTheme] ?? (customThemes.some(ct => ct.id === selectedTheme) ? "fantasy" : "night"))
     : "night";
   const activeBg = bgChoice === "auto" ? autoBg : bgChoice;
+  const bgUrlCacheRef = useRef<Record<string, string>>({});
   useEffect(() => {
-    document.documentElement.dataset.bg = activeBg;
+    // Gradient scény naskočí hned (data-bg), ilustrace se přes něj položí,
+    // jakmile je stažená (--bg-img). Maluje se jen jednou — server ji cachuje.
+    const root = document.documentElement;
+    root.dataset.bg = activeBg;
+    let dead = false;
+    const show = (url: string) => {
+      const img = new Image();
+      img.onload = () => { if (!dead) root.style.setProperty("--bg-img", `url("${url}")`); };
+      img.src = url;
+    };
+    root.style.removeProperty("--bg-img");
+    const cached = bgUrlCacheRef.current[activeBg];
+    if (cached) {
+      show(cached);
+    } else {
+      fetch(`/api/bg-image?scene=${activeBg}`, { signal: AbortSignal.timeout(110_000) })
+        .then(r => (r.ok ? r.json() : null))
+        .then((d: { url?: string } | null) => {
+          if (dead || !d?.url) return;
+          bgUrlCacheRef.current[activeBg] = d.url;
+          show(d.url);
+        })
+        .catch(() => {});
+    }
+    return () => { dead = true; };
   }, [activeBg]);
   function cycleBg() {
     const order = ["auto", ...BG_SCENES.map(s => s.id)];
