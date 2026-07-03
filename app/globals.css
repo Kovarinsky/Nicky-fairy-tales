@@ -35,6 +35,84 @@ body {
   background: #0a0e2e;
 }
 
+/* ── Světy pozadí (tlačítko 🎨, auto podle tématu pohádky) ──
+   Čisté CSS gradienty — nic se nestahuje, funguje offline.
+   Přepíná se přes <html data-bg="…">, tmavý overlay ::after
+   drží čitelnost textu ve všech světech. */
+:root[data-bg="night"] .photo-bg {
+  background:
+    radial-gradient(1.5px 1.5px at 18% 22%, rgba(255,255,255,0.8), transparent 60%),
+    radial-gradient(2px 2px at 72% 12%, rgba(255,255,255,0.7), transparent 60%),
+    radial-gradient(1.5px 1.5px at 88% 38%, rgba(255,255,255,0.6), transparent 60%),
+    radial-gradient(1.5px 1.5px at 42% 8%, rgba(255,255,255,0.5), transparent 60%),
+    radial-gradient(2px 2px at 8% 55%, rgba(255,255,255,0.45), transparent 60%),
+    radial-gradient(50% 35% at 80% 0%, rgba(124, 77, 255, 0.22), transparent 70%),
+    linear-gradient(180deg, #0a0e2e 0%, #0d1340 100%);
+}
+:root[data-bg="forest"] .photo-bg {
+  background:
+    radial-gradient(45% 30% at 22% 0%, rgba(255, 244, 179, 0.20), transparent 70%),
+    radial-gradient(120% 55% at 50% 108%, #1c5a2e 0%, rgba(28, 90, 46, 0) 62%),
+    radial-gradient(70% 40% at 85% 95%, rgba(13, 58, 26, 0.9), transparent 70%),
+    linear-gradient(180deg, #0d2818 0%, #124024 55%, #0a2413 100%);
+}
+:root[data-bg="mountains"] .photo-bg {
+  background:
+    radial-gradient(60% 38% at 70% 4%, rgba(103, 232, 249, 0.20), transparent 70%),
+    radial-gradient(110% 45% at 30% 110%, rgba(226, 240, 255, 0.30), transparent 65%),
+    radial-gradient(90% 38% at 78% 104%, rgba(191, 219, 254, 0.22), transparent 65%),
+    linear-gradient(180deg, #101c38 0%, #1d3a5f 60%, #2a4d78 100%);
+}
+:root[data-bg="space"] .photo-bg {
+  background:
+    radial-gradient(2px 2px at 15% 18%, rgba(255,255,255,0.9), transparent 60%),
+    radial-gradient(1.5px 1.5px at 65% 8%, rgba(255,255,255,0.75), transparent 60%),
+    radial-gradient(2px 2px at 85% 45%, rgba(255,255,255,0.7), transparent 60%),
+    radial-gradient(1.5px 1.5px at 35% 35%, rgba(255,255,255,0.6), transparent 60%),
+    radial-gradient(1.5px 1.5px at 55% 60%, rgba(255,255,255,0.5), transparent 60%),
+    radial-gradient(80px 80px at 79% 20%, #fbbf24 0%, #d97706 48%, rgba(217, 119, 6, 0) 52%),
+    radial-gradient(55% 40% at 20% 75%, rgba(124, 58, 237, 0.30), transparent 70%),
+    radial-gradient(40% 30% at 90% 80%, rgba(6, 182, 212, 0.18), transparent 70%),
+    linear-gradient(180deg, #050414 0%, #0b0824 100%);
+}
+:root[data-bg="dino"] .photo-bg {
+  background:
+    radial-gradient(55% 32% at 75% 0%, rgba(251, 146, 60, 0.35), transparent 70%),
+    radial-gradient(120% 50% at 40% 110%, #2f5a12 0%, rgba(47, 90, 18, 0) 62%),
+    radial-gradient(60% 35% at 95% 100%, rgba(20, 55, 8, 0.9), transparent 70%),
+    linear-gradient(180deg, #22370f 0%, #2a4a14 55%, #173107 100%);
+}
+:root[data-bg="bay"] .photo-bg {
+  background:
+    radial-gradient(65px 65px at 22% 12%, #fde68a 0%, #f59e0b 46%, rgba(245, 158, 11, 0) 52%),
+    radial-gradient(120% 42% at 50% 112%, rgba(14, 116, 144, 0.85), transparent 65%),
+    radial-gradient(60% 25% at 70% 68%, rgba(103, 232, 249, 0.18), transparent 70%),
+    linear-gradient(180deg, #0b2f4f 0%, #125a86 58%, #0d3f63 100%);
+}
+:root[data-bg="road"] .photo-bg {
+  background:
+    radial-gradient(90% 30% at 50% 62%, rgba(251, 146, 60, 0.35), transparent 70%),
+    radial-gradient(120% 45% at 50% 112%, #1e2029 0%, rgba(30, 32, 41, 0) 65%),
+    radial-gradient(45% 28% at 12% 8%, rgba(250, 204, 21, 0.15), transparent 70%),
+    linear-gradient(180deg, #241a33 0%, #46281c 58%, #191a22 100%);
+}
+:root[data-bg="cartoon"] .photo-bg {
+  background:
+    radial-gradient(120% 85% at 50% 112%, rgba(190, 24, 93, 0.55), transparent 60%),
+    radial-gradient(55% 35% at 18% 0%, rgba(250, 204, 21, 0.22), transparent 70%),
+    radial-gradient(50% 32% at 85% 10%, rgba(96, 165, 250, 0.20), transparent 70%),
+    linear-gradient(180deg, #2a0f3f 0%, #4a1030 100%);
+}
+:root[data-bg="fantasy"] .photo-bg {
+  background:
+    radial-gradient(1.5px 1.5px at 25% 20%, rgba(255,255,255,0.8), transparent 60%),
+    radial-gradient(2px 2px at 70% 10%, rgba(255,255,255,0.7), transparent 60%),
+    radial-gradient(1.5px 1.5px at 85% 42%, rgba(255,255,255,0.55), transparent 60%),
+    radial-gradient(60% 40% at 75% 90%, rgba(236, 72, 153, 0.30), transparent 70%),
+    radial-gradient(50% 35% at 15% 70%, rgba(56, 189, 248, 0.18), transparent 70%),
+    linear-gradient(180deg, #241046 0%, #3b1668 58%, #1c0b38 100%);
+}
+
 /* Dark gradient overlay for readability */
 .photo-bg::after {
   content: "";
@@ -91,6 +169,11 @@ body {
   justify-content: flex-end;
   gap: 0.35rem;
   margin-bottom: 0.2rem;
+}
+
+/* Tlačítko rolování pozadí — vlevo, jazyky zůstávají vpravo */
+.bg-cycle-btn {
+  margin-right: auto;
 }
 
 .lang-btn {

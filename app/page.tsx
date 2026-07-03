@@ -6,6 +6,7 @@ import { AmbientPlayer } from "@/lib/ambient";
 import { cacheStory, getCachedStory, evictOldStories } from "@/lib/scene-cache";
 import { APP_VERSION } from "@/lib/version";
 import { UI, UI_LANG_KEY, type UILang } from "@/lib/i18n";
+import { BG_SCENES, bgSceneById, THEME_BG } from "@/lib/backgrounds";
 
 // ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; nameEn?: string; }
@@ -36,6 +37,7 @@ const SERVER_JOB_KEY = "nicky-server-job";
 const HISTORY_MAX = 20; // offline zásoba: posledních 20 pohádek v telefonu
 const SETTINGS_KEY = "nicky-settings";
 const DRAFT_KEY = "nicky-story-draft";
+const BG_KEY = "nicky-bg"; // "auto" | id světa pozadí (lib/backgrounds.ts)
 
 function loadHistory(): HistoryEntry[] {
   try {
@@ -1438,6 +1440,31 @@ export default function Home() {
     } catch {}
   }, []);
 
+  // ── 🎨 Pozadí aplikace — auto podle tématu, nebo ruční rolování ──────────
+  const [bgChoice, setBgChoice] = useState("auto");
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(BG_KEY);
+      if (saved && (saved === "auto" || bgSceneById(saved))) setBgChoice(saved);
+    } catch {}
+  }, []);
+  const autoBg = selectedTheme
+    ? (THEME_BG[selectedTheme] ?? (customThemes.some(ct => ct.id === selectedTheme) ? "fantasy" : "night"))
+    : "night";
+  const activeBg = bgChoice === "auto" ? autoBg : bgChoice;
+  useEffect(() => {
+    document.documentElement.dataset.bg = activeBg;
+  }, [activeBg]);
+  function cycleBg() {
+    const order = ["auto", ...BG_SCENES.map(s => s.id)];
+    const next = order[(order.indexOf(bgChoice) + 1) % order.length];
+    setBgChoice(next);
+    try { localStorage.setItem(BG_KEY, next); } catch {}
+  }
+  const bgLabel = bgChoice === "auto"
+    ? `🎨 ${t.bgAuto}`
+    : `${bgSceneById(bgChoice)!.emoji} ${uiLang === "en" ? bgSceneById(bgChoice)!.nameEn : bgSceneById(bgChoice)!.name}`;
+
   // ── 🎲 Vymysli námět — Claude navrhne námět do textového pole ────────────
   const [ideaLoading, setIdeaLoading] = useState(false);
   async function suggestIdea() {
@@ -1649,6 +1676,7 @@ export default function Home() {
       {!readerMode && (
       <>
       <div className="lang-switch">
+        <button type="button" className="lang-btn bg-cycle-btn" onClick={cycleBg} title={t.bgTitle}>{bgLabel}</button>
         <button type="button" className={`lang-btn ${uiLang === "cs" ? "lang-on" : ""}`} onClick={() => switchLang("cs")}>🇨🇿 CZ</button>
         <button type="button" className={`lang-btn ${uiLang === "en" ? "lang-on" : ""}`} onClick={() => switchLang("en")}>🇬🇧 EN</button>
       </div>
