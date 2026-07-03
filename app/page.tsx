@@ -1885,6 +1885,7 @@ export default function Home() {
             <button type="button" className="stepper-btn" onClick={() => setSceneCount(n => Math.min(20, n + 1))}
               disabled={sceneCount >= 20} aria-label="+1">+</button>
           </div>
+          <p className="gen-step-hint stepper-hint">{t.pagesTime(Math.max(1, Math.round(sceneCount * 0.5)))}</p>
         </div>
 
         <div className="field">

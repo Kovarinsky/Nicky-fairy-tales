@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.70";
+export const APP_VERSION = "2.71";
 
 // Changelog (newest first)
+// 2.71 - Pod počtem stránek se ukazuje orientační délka čtení: „🕐 cca X min čtení (1 stránka ≈ půl minuty)", přepočítává se hned při změně počtu
 // 2.70 - Počet stránek se místo posuvníku (šlo o něj omylem zavadit) nastavuje tlačítky − a + po stranách čísla; drží meze 3–20
 // 2.69 - Tlačítko 🧹 Smazat text u pole přání (objeví se, jen když v poli něco je); živější přednes hlasu (voice_settings: víc intonace a dramatičnosti); zvířecí zvuky se píší foneticky a protaženě („Haf haf!“, „Mňauuu…“), ať je vypravěč zahraje; česká výslovnost jmen — do TTS jde Nikolásek/Džejms/Árčí (titulky zůstávají s původním pravopisem)
 // 2.68 - Pozadí aplikace jsou teď ilustrace ve stylu pohádek: maluje je Gemini (stejný styl jako obrázky scén), každý z 9 světů se vygeneruje jen jednou a uloží na server (backgrounds/); než se stáhne, drží barevný gradient z v2.67
