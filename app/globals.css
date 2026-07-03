@@ -1432,8 +1432,16 @@ button:disabled {
 
 .history-list {
   display: grid;
+  /* minmax(0,1fr): dlouhý název nesmí roztáhnout řádek za okraj obrazovky
+     (jinak vytlačí tlačítka 🗑️ a ▶ mimo displej) */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
   border-top: 1px solid rgba(255,255,255,0.12);
+}
+
+.history-item {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .history-item {
