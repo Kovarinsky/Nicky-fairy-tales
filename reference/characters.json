@@ -3,13 +3,15 @@
     "id": "nicolas",
     "name": "Nicolásek",
     "description": "Nicolas: straight light-blond hair, bright blue eyes, white T-shirt with two red horizontal stripes, mid-blue denim shorts, white sneakers with grey soles, tall boy",
-    "referenceFile": "nicolas.jpg"
+    "referenceFile": "nicolas.jpg",
+    "nameEn": "Nicolas"
   },
   {
     "id": "valentyna",
     "name": "Valentýnka",
     "description": "Valentýna: wavy light-blonde hair with large pink fabric bow, sky-blue eyes, yellow dress with small white flower print and white collar, white sandals, very small — roughly half Nicolas's height",
-    "referenceFile": "valentyna.jpg"
+    "referenceFile": "valentyna.jpg",
+    "nameEn": "Valentina"
   },
   {
     "id": "jan",
@@ -18,30 +20,35 @@
     "referenceFile": "jan.jpg",
     "referenceFiles": [
       "jan-face.jpg"
-    ]
+    ],
+    "nameEn": "Dad Jan"
   },
   {
     "id": "jana",
     "name": "Máma Jana",
     "description": "Jana: adult woman with very long straight blonde hair, blue-grey eyes, gentle smile, lilac-purple hoodie with drawstrings, black leggings, slim medium height",
-    "referenceFile": "jana.jpg"
+    "referenceFile": "jana.jpg",
+    "nameEn": "Mom Jana"
   },
   {
     "id": "archie",
     "name": "Pes Archie",
     "description": "Archie: friendly Staffordshire Bull Terrier dog, red-brindle brown coat with white chest and white stripe on the muzzle, white paws, black collar with brass studs, stocky muscular build, happy expression with tongue out",
-    "referenceFile": "archie.jpg"
+    "referenceFile": "archie.jpg",
+    "nameEn": "Archie the dog"
   },
   {
     "id": "james",
     "name": "James",
     "description": "James: 6-year-old boy with straight mid-brown hair with a fringe, dark brown eyes, cheeky warm smile, green T-shirt with cartoon dog print, white shorts, black sneakers with orange laces; Nicolas's best friend from Riverside school, half a head TALLER than Nicolas",
-    "referenceFile": "james.jpg"
+    "referenceFile": "james.jpg",
+    "nameEn": "James"
   },
   {
     "id": "bella",
     "name": "Bella",
     "description": "Bella: 8-year-old girl with very long straight light-brown hair, blue-grey eyes, bright friendly smile, small shell earrings, cream sweatshirt, blue-grey shorts, pink sneakers; James's big sister, slightly taller than the boys",
-    "referenceFile": "bella.jpg"
+    "referenceFile": "bella.jpg",
+    "nameEn": "Bella"
   }
 ]

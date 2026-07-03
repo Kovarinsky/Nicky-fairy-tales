@@ -153,7 +153,10 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
     })),
   ];
 
-  const cast = allChars.map((c) => `- ${c.name}: ${c.description}`).join("\n");
+  // V anglickém vyprávění vystupují postavy pod anglickou podobou jména
+  const displayName = (c: { name: string; nameEn?: string }) =>
+    req.language === "en" && c.nameEn ? c.nameEn : c.name;
+  const cast = allChars.map((c) => `- ${displayName(c)}: ${c.description}`).join("\n");
 
   const hasNicky = allChars.some((c) => c.id === "nicolas");
   const hasValentyna = allChars.some((c) => c.id === "valentyna");
@@ -338,6 +341,21 @@ async function callAnthropicApi(body: object): Promise<string> {
   const textBlock = (data.content || []).find((b) => b.type === "text");
   if (!textBlock?.text) throw new Error("Claude nevrátil text. Odpověď: " + text.slice(0, 200));
   return textBlock.text;
+}
+
+/** Vymyslí jeden hravý námět na pohádku (1–2 věty) — pro tlačítko 🎲 v UI. */
+export async function suggestTopicIdea(language: "cs" | "en", characterNames: string[]): Promise<string> {
+  const model = (process.env.ANTHROPIC_MODEL || MODEL).trim();
+  const who = characterNames.length ? characterNames.join(", ") : language === "en" ? "the children" : "děti";
+  const prompt = language === "en"
+    ? `Suggest ONE playful, original bedtime-story idea (1-2 sentences, max 40 words) for small children, featuring: ${who}. Make it concrete and magical (a place, a problem, a twist seed). Reply with ONLY the idea text — no quotes, no intro. Vary wildly: pick an unexpected setting or magical object.`
+    : `Navrhni JEDEN hravý, originální námět na pohádku před spaním (1–2 věty, max 40 slov) pro malé děti, kde vystupují: ${who}. Ať je konkrétní a kouzelný (místo, problém, zárodek překvapení). Odpověz POUZE textem námětu — bez uvozovek, bez úvodu. Buď pokaždé jiný: vyber nečekané prostředí nebo kouzelný předmět.`;
+  const raw = await callAnthropicApi({
+    model,
+    max_tokens: 300,
+    messages: [{ role: "user", content: prompt }],
+  });
+  return raw.trim().replace(/^["'„]|["'"]$/g, "");
 }
 
 export async function generateStory(req: StoryRequest, extras: StoryExtras = {}): Promise<StoryScript> {

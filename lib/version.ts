@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.65";
+export const APP_VERSION = "2.66";
 
 // Changelog (newest first)
+// 2.66 - Anglické názvy postav v EN verzi (Dad Jan, Mom Jana, Archie the dog…) v chipech i vyprávění; tlačítko 🎲 Vymysli námět (Claude navrhne zápletku do pole přání); vlastní svět pohádky podle fotky nebo popisu — chip „+ Vlastní svět", uložené světy se dají znovu použít i smazat
 // 2.65 - Titulky na šířku: text jede synchronně s hlasem (řízeno pozicí v nahrávce, pauza text zastaví), vnitřní okraje rámečku + měkké vyjíždění textu na krajích; rámeček zůstává na šířku obrázku
 // 2.64 - Oprava: dlouhý název pohádky vytlačoval tlačítka 🗑️ a ▶ mimo displej (grid minmax(0,1fr) + zkrácení názvu trojtečkou)
 // 2.63 - Mazání pohádek z historie: ikona 🗑️ u každé položky (s potvrzením) — smaže pohádku z telefonu vč. offline dat a uvolní místo

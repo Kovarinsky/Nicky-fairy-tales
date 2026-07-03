@@ -102,10 +102,16 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       const rawCustom = Array.isArray(body.customCharacters) ? (body.customCharacters as StoryExtras["customCharacters"]) : [];
       const urlText = body.inspirationUrl ? await fetchUrlText(String(body.inspirationUrl)) : "";
 
+      // Vlastní svět (téma podle fotky/popisu) má přednost před předdefinovaným
+      const rawCustomTheme = body.customTheme as { name?: unknown; prompt?: unknown } | undefined;
+      const customTheme = rawCustomTheme && typeof rawCustomTheme.prompt === "string"
+        ? { name: String(rawCustomTheme.name || "Vlastní svět"), prompt: String(rawCustomTheme.prompt).slice(0, 1200) }
+        : undefined;
+
       const storyReq: StoryRequest = {
         topic,
-        themeName: theme?.name,
-        themePrompt: theme?.prompt,
+        themeName: customTheme?.name ?? theme?.name,
+        themePrompt: customTheme?.prompt ?? theme?.prompt,
         characters,
         age: Number(body.age) || 4,
         sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), MAX_SCENES),

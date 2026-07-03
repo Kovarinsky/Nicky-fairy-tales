@@ -7,6 +7,6 @@ import { loadCharacters } from "@/lib/characters";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const characters = loadCharacters().map((c) => ({ id: c.id, name: c.name }));
+  const characters = loadCharacters().map((c) => ({ id: c.id, name: c.name, nameEn: c.nameEn }));
   return NextResponse.json({ characters });
 }

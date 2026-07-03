@@ -77,10 +77,15 @@ export async function POST(req: NextRequest) {
 
     const language = String(body.language || "cs") === "en" ? "en" : "cs";
 
+    // Vlastní svět (téma podle fotky/popisu) má přednost před předdefinovaným
+    const customTheme = body.customTheme && typeof body.customTheme.prompt === "string"
+      ? { name: String(body.customTheme.name || "Vlastní svět"), prompt: String(body.customTheme.prompt).slice(0, 1200) }
+      : undefined;
+
     const storyReq: StoryRequest = {
       topic,
-      themeName: theme?.name,
-      themePrompt: theme?.prompt,
+      themeName: customTheme?.name ?? theme?.name,
+      themePrompt: customTheme?.prompt ?? theme?.prompt,
       characters,
       age: Number(body.age) || 4,
       sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), 20),

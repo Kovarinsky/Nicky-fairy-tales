@@ -8,7 +8,7 @@ import { APP_VERSION } from "@/lib/version";
 import { UI, UI_LANG_KEY, type UILang } from "@/lib/i18n";
 
 // ── Local types ─────────────────────────────────────────────────────────────
-interface CharOption { id: string; name: string; }
+interface CharOption { id: string; name: string; nameEn?: string; }
 interface ThemeOption { id: string; name: string; nameEn?: string; emoji: string; }
 interface VoiceOption { id: string; name: string; emoji: string; description: string; language: string; }
 interface CustomChar {
@@ -30,6 +30,7 @@ interface HistoryEntry {
 
 const HISTORY_KEY = "nicky-story-history";
 const CUSTOM_CHARS_KEY = "nicky-custom-chars";
+const CUSTOM_THEMES_KEY = "nicky-custom-themes";
 const JOB_KEY = "nicky-pending-job";
 const SERVER_JOB_KEY = "nicky-server-job";
 const HISTORY_MAX = 20; // offline zásoba: posledních 20 pohádek v telefonu
@@ -1286,8 +1287,11 @@ export default function Home() {
     } catch {}
 
     const selectedCustomObjsForJob = customChars.filter(c => selectedCustomIds.includes(c.id));
+    // Vlastní svět: prompt jde místo themeId, fotka světa jako inspirace
+    const activeCustomTheme = customThemes.find(ct => ct.id === selectedTheme);
     const storyPayload = {
-      topic, themeId: selectedTheme || undefined,
+      topic, themeId: activeCustomTheme ? undefined : selectedTheme || undefined,
+      customTheme: activeCustomTheme ? { name: activeCustomTheme.name, prompt: activeCustomTheme.prompt } : undefined,
       characterIds: selectedIds,
       age: getTargetAge([...selectedIds, ...selectedCustomIds]),
       sceneCount,
@@ -1299,7 +1303,11 @@ export default function Home() {
         photoMimeType: c.photoMimeType,
       })),
       inspirationUrl: inspUrlActive && inspUrl.trim() ? inspUrl.trim() : undefined,
-      inspirationImages: inspImages.map(i => ({ data: i.data, mimeType: i.mimeType })),
+      inspirationImages: [
+        ...inspImages.map(i => ({ data: i.data, mimeType: i.mimeType })),
+        ...(activeCustomTheme?.photoBase64 && activeCustomTheme.photoMimeType
+          ? [{ data: activeCustomTheme.photoBase64, mimeType: activeCustomTheme.photoMimeType }] : []),
+      ],
       inspirationPdfBase64: inspPdf?.base64 || undefined,
     };
 
@@ -1365,22 +1373,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: AbortSignal.timeout(180_000),
-        body: JSON.stringify({
-          topic, themeId: selectedTheme || undefined,
-          characterIds: selectedIds,
-          age: getTargetAge([...selectedIds, ...selectedCustomIds]),
-          sceneCount,
-          language: voices.find(v => v.id === selectedVoiceId)?.language ?? "cs",
-          customCharacters: selectedCustomObjs.map(c => ({
-            id: c.id, name: c.name,
-            description: c.description,
-            photoBase64: c.photoBase64,
-            photoMimeType: c.photoMimeType,
-          })),
-          inspirationUrl: inspUrlActive && inspUrl.trim() ? inspUrl.trim() : undefined,
-          inspirationImages: inspImages.map(i => ({ data: i.data, mimeType: i.mimeType })),
-          inspirationPdfBase64: inspPdf?.base64 || undefined,
-        }),
+        body: JSON.stringify(storyPayload), // stejné zadání jako serverový job (vč. vlastního světa)
       });
       const script = await safeJson<StoryScript & { error?: string }>(storyRes);
       if (!storyRes.ok) throw new Error(script.error || t.errStory);
@@ -1421,6 +1414,49 @@ export default function Home() {
       if (background) setBgStatus("idle");
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Custom worlds (story themes by photo/description)
+  interface CustomTheme { id: string; name: string; prompt: string; photoBase64?: string; photoMimeType?: string; previewUrl?: string }
+  const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
+  const [addingTheme, setAddingTheme] = useState(false);
+  const [newThemeName, setNewThemeName] = useState("");
+  const [newThemeDesc, setNewThemeDesc] = useState("");
+  const [newThemePhoto, setNewThemePhoto] = useState<{ data: string; mimeType: string; previewUrl: string } | null>(null);
+  const themePhotoRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CUSTOM_THEMES_KEY);
+      if (raw) {
+        const list = JSON.parse(raw) as CustomTheme[];
+        setCustomThemes(list.map(c => ({
+          ...c,
+          previewUrl: c.photoBase64 && c.photoMimeType ? `data:${c.photoMimeType};base64,${c.photoBase64}` : undefined,
+        })));
+      }
+    } catch {}
+  }, []);
+
+  // ── 🎲 Vymysli námět — Claude navrhne námět do textového pole ────────────
+  const [ideaLoading, setIdeaLoading] = useState(false);
+  async function suggestIdea() {
+    setIdeaLoading(true);
+    try {
+      const names = [
+        ...chars.filter(c => selectedIds.includes(c.id)).map(c => (uiLang === "en" && c.nameEn ? c.nameEn : c.name)),
+        ...customChars.filter(c => selectedCustomIds.includes(c.id)).map(c => c.name),
+      ];
+      const res = await fetch("/api/topic-idea", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(30_000),
+        body: JSON.stringify({ language: uiLang, characterNames: names }),
+      });
+      const d = await safeJson<{ idea?: string }>(res);
+      if (res.ok && d.idea) setTopic(d.idea);
+    } catch {} finally {
+      setIdeaLoading(false);
     }
   }
 
@@ -1559,6 +1595,41 @@ export default function Home() {
     const r = await resizeAndEncode(file, 512).catch(() => null);
     if (r) setInspImages(p => [...p, { ...r, name: file.name }]);
   }
+
+  // ── Vlastní svět pohádky (téma podle fotky nebo popisu) ──────────────────
+  function saveCustomThemes(list: CustomTheme[]) {
+    try {
+      localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(list.map(({ previewUrl, ...c }) => c)));
+    } catch {
+      try {
+        localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(list.map(c => ({ id: c.id, name: c.name, prompt: c.prompt }))));
+      } catch {}
+    }
+  }
+  async function handleThemePhoto(file: File) {
+    const r = await resizeAndEncode(file, 640).catch(() => null);
+    if (r) setNewThemePhoto(r);
+  }
+  function addCustomTheme() {
+    if (!newThemeName.trim() && !newThemeDesc.trim()) return;
+    const id = `ctheme_${Date.now()}`;
+    const name = newThemeName.trim() || (uiLang === "en" ? "My world" : "Můj svět");
+    setCustomThemes(p => {
+      const next = [...p, {
+        id, name,
+        prompt: newThemeDesc.trim() || name,
+        photoBase64: newThemePhoto?.data, photoMimeType: newThemePhoto?.mimeType, previewUrl: newThemePhoto?.previewUrl,
+      }];
+      saveCustomThemes(next);
+      return next;
+    });
+    setSelectedTheme(id);
+    setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhoto(null);
+  }
+  function removeCustomTheme(id: string) {
+    setCustomThemes(p => { const next = p.filter(c => c.id !== id); saveCustomThemes(next); return next; });
+    setSelectedTheme(p => (p === id ? "" : p));
+  }
   async function handleInspPdf(file: File) {
     if (file.size > 3.5 * 1024 * 1024) { alert(t.pdfTooBig); return; }
     const b = await fileToBase64(file).catch(() => null);
@@ -1596,7 +1667,7 @@ export default function Home() {
               {chars.map(c => (
                 <label key={c.id} className={`chip ${selectedIds.includes(c.id) ? "chip-on" : ""}`}>
                   <input type="checkbox" checked={selectedIds.includes(c.id)} onChange={() => toggleChar(c.id)} />
-                  {c.name}
+                  {uiLang === "en" && c.nameEn ? c.nameEn : c.name}
                 </label>
               ))}
               {customChars.map(c => (
@@ -1652,7 +1723,45 @@ export default function Home() {
                   <span>{th.emoji}</span> {uiLang === "en" && th.nameEn ? th.nameEn : th.name}
                 </button>
               ))}
+              {customThemes.map(ct => (
+                <div key={ct.id} className={`chip custom-chip ${selectedTheme === ct.id ? "chip-on" : ""}`}>
+                  {ct.previewUrl && <img src={ct.previewUrl} alt={ct.name} className="chip-avatar" />}
+                  <span className="chip-label" onClick={() => setSelectedTheme(p => p === ct.id ? "" : ct.id)}>🌍 {ct.name}</span>
+                  <button type="button" className="chip-remove" onClick={() => removeCustomTheme(ct.id)}>×</button>
+                </div>
+              ))}
+              <button type="button" className={`chip chip-btn ${addingTheme ? "chip-on" : ""}`} onClick={() => setAddingTheme(p => !p)}>
+                {addingTheme ? t.cancelChip : t.addWorldChip}
+              </button>
             </div>
+            {addingTheme && (
+              <div className="add-char-panel">
+                <p className="panel-title">{t.newWorldTitle}</p>
+                <div className="field">
+                  <label>{t.worldNameLabel}</label>
+                  <input type="text" value={newThemeName} onChange={e => setNewThemeName(e.target.value)} placeholder={t.worldNamePlaceholder} autoFocus />
+                </div>
+                <div className="field">
+                  <label>{t.worldDescLabel}</label>
+                  <textarea value={newThemeDesc} onChange={e => setNewThemeDesc(e.target.value)} placeholder={t.worldDescPlaceholder} />
+                </div>
+                <div className="field">
+                  <label>{t.worldPhotoLabel}</label>
+                  <div className="file-row">
+                    <button type="button" className="outline-btn" onClick={() => themePhotoRef.current?.click()}>
+                      📷 {newThemePhoto ? t.changePhoto : t.uploadPhoto}
+                    </button>
+                    {newThemePhoto && <img src={newThemePhoto.previewUrl} alt="náhled" className="mini-preview" />}
+                  </div>
+                  <input ref={themePhotoRef} type="file" accept="image/*" style={{ display: "none" }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleThemePhoto(f); e.target.value = ""; }} />
+                </div>
+                <div className="panel-actions">
+                  <button type="button" onClick={addCustomTheme} disabled={!newThemeName.trim() && !newThemeDesc.trim()}>{t.saveWorld}</button>
+                  <button type="button" className="outline-btn" onClick={() => { setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhoto(null); }}>{t.cancel}</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1676,6 +1785,9 @@ export default function Home() {
           <label>{t.wishLabel}</label>
           <textarea value={topic} onChange={e => setTopic(e.target.value)} placeholder={t.wishPlaceholder} />
           <div className="insp-row">
+            <button type="button" className="insp-btn" onClick={suggestIdea} disabled={ideaLoading}>
+              {ideaLoading ? "⏳ " : "🎲 "}{t.ideaBtn}
+            </button>
             <button type="button" className={`insp-btn ${inspImages.length > 0 ? "chip-on" : ""}`}
               onClick={() => inspImageRef.current?.click()} disabled={inspImages.length >= 3}>
               📷 {t.photoBtn}{inspImages.length > 0 ? ` (${inspImages.length})` : ""}

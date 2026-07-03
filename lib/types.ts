@@ -12,6 +12,8 @@ export interface Character {
   referenceFile?: string;
   /** Další referenční fotky (např. detail obličeje) */
   referenceFiles?: string[];
+  /** Anglická podoba jména (pro EN rozhraní i vyprávění) */
+  nameEn?: string;
 }
 
 /** Vstup od uživatele z formuláře */
