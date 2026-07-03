@@ -5,6 +5,28 @@ function sanitizeApiKey(key: string | undefined): string {
   return (key || "").replace(/[^\x20-\x7E]/g, "").trim();
 }
 
+// Fonetický přepis jmen, která český syntetický hlas čte špatně („James" by
+// přečetl „Jamés", „Nicolásek" jako „Nicolásek" s C). Mění se JEN text posílaný
+// do TTS — titulky v aplikaci zůstávají s původním pravopisem. Náhrady fungují
+// i pro české pády (Jamesovi → Džejmsovi, Archieho → Árčího, Nicoláskem → Nikoláskem).
+const CS_PRONUNCIATIONS: Array<[RegExp, string]> = [
+  [/Nicol/g, "Nikol"],
+  [/James/g, "Džejms"],
+  [/Archie/g, "Árčí"],
+];
+
+// Česká narace se pozná podle diakritiky — anglický text zůstane nedotčený
+function looksCzech(text: string): boolean {
+  return /[ěščřžýáíéůúťďňĚŠČŘŽÝÁÍÉŮÚŤĎŇ]/.test(text);
+}
+
+function applyCzechPronunciations(text: string): string {
+  if (!looksCzech(text)) return text;
+  let out = text;
+  for (const [re, replacement] of CS_PRONUNCIATIONS) out = out.replace(re, replacement);
+  return out;
+}
+
 function sanitizeText(text: string): string {
   return text
     .replace(/…/g, "...")   // horizontal ellipsis
@@ -37,9 +59,17 @@ export async function narrateScene(scene: Scene, overrideVoiceId?: string): Prom
         "xi-api-key": apiKey,
       },
       body: JSON.stringify({
-        text: sanitizeText(scene.narration),
+        text: applyCzechPronunciations(sanitizeText(scene.narration)),
         model_id: modelId,
         output_format: "mp3_44100_128",
+        // Živější přednes: nižší stability = větší intonační rozsah (citoslovce,
+        // zvířecí zvuky), style dodá dramatičnost, speaker_boost drží barvu hlasu
+        voice_settings: {
+          stability: 0.42,
+          similarity_boost: 0.8,
+          style: 0.35,
+          use_speaker_boost: true,
+        },
       }),
       signal: AbortSignal.timeout(60_000),
     }

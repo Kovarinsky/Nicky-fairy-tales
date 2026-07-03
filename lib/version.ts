@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.68";
+export const APP_VERSION = "2.69";
 
 // Changelog (newest first)
+// 2.69 - Tlačítko 🧹 Smazat text u pole přání (objeví se, jen když v poli něco je); živější přednes hlasu (voice_settings: víc intonace a dramatičnosti); zvířecí zvuky se píší foneticky a protaženě („Haf haf!“, „Mňauuu…“), ať je vypravěč zahraje; česká výslovnost jmen — do TTS jde Nikolásek/Džejms/Árčí (titulky zůstávají s původním pravopisem)
 // 2.68 - Pozadí aplikace jsou teď ilustrace ve stylu pohádek: maluje je Gemini (stejný styl jako obrázky scén), každý z 9 světů se vygeneruje jen jednou a uloží na server (backgrounds/); než se stáhne, drží barevný gradient z v2.67
 // 2.67 - Přepínatelné pozadí aplikace: 9 světů (noc, les, hory, vesmír, džungle, moře, závody, pouť, kouzlo) malovaných v CSS; tlačítko 🎨 vlevo nahoře jimi roluje, režim Auto přepne pozadí samo podle zvoleného tématu pohádky (vlastní svět = ✨ kouzlo); volba se pamatuje
 // 2.66 - Anglické názvy postav v EN verzi (Dad Jan, Mom Jana, Archie the dog…) v chipech i vyprávění; tlačítko 🎲 Vymysli námět (Claude navrhne zápletku do pole přání); vlastní svět pohádky podle fotky nebo popisu — chip „+ Vlastní svět", uložené světy se dají znovu použít i smazat

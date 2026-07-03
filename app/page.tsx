@@ -1841,6 +1841,11 @@ export default function Home() {
             <button type="button" className="insp-btn" onClick={suggestIdea} disabled={ideaLoading}>
               {ideaLoading ? "⏳ " : "🎲 "}{t.ideaBtn}
             </button>
+            {topic.trim() !== "" && (
+              <button type="button" className="insp-btn" onClick={() => setTopic("")}>
+                🧹 {t.clearTextBtn}
+              </button>
+            )}
             <button type="button" className={`insp-btn ${inspImages.length > 0 ? "chip-on" : ""}`}
               onClick={() => inspImageRef.current?.click()} disabled={inspImages.length >= 3}>
               📷 {t.photoBtn}{inspImages.length > 0 ? ` (${inspImages.length})` : ""}
