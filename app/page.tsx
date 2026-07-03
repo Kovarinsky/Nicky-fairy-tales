@@ -285,19 +285,20 @@ export default function Home() {
     // Úklid serverového úložiště i při startu aplikace (ne jen po dokončení
     // pohádky) — plné úložiště blokuje start nových jobů; max 1× za 6 h
     try {
-      const last = Number(localStorage.getItem("nicky-cleanup-at") || 0);
-      if (Date.now() - last > 6 * 3600_000) {
-        localStorage.setItem("nicky-cleanup-at", String(Date.now()));
+      const last = Number(localStorage.getItem("nicky-cleanup2-at") || 0);
+      if (Date.now() - last > 3600_000) {
+        localStorage.setItem("nicky-cleanup2-at", String(Date.now()));
         let jobIds: string[] = [];
         try {
           const parsed = JSON.parse(localStorage.getItem(SERVER_JOB_KEY) || "{}");
           jobIds = Array.isArray(parsed?.jobs) ? parsed.jobs : parsed?.jobId ? [parsed.jobId] : [];
         } catch {}
-        const keepIds = [...loadHistory().map(e => e.id), ...jobIds];
+        // Server nedrží hotové pohádky (jsou v telefonu) — chránit jen
+        // rozpracované joby; ostatní starší 1 h se mažou
         fetch("/api/job/cleanup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keepIds }),
+          body: JSON.stringify({ keepIds: jobIds }),
         }).catch(() => {});
       }
     } catch {}
@@ -1092,17 +1093,17 @@ export default function Home() {
     jobBuffersRef.current.delete(jobId);
     jobStallRef.current.delete(jobId);
 
-    // Úklid Blob úložiště: smazat data jobů, které vypadly z historie
-    // posledních pohádek (běžící joby a čerstvé joby server nikdy nemaže)
+    // Úklid Blob úložiště: tahle pohádka je stažená v telefonu → její
+    // serverová data smazat hned; server nemusí držet žádné hotové pohádky
+    // (chránit jen běžící joby, čerstvé chrání hodinová lhůta)
     try {
-      const keepIds = [
-        ...loadHistory().map(e => e.id),
-        ...serverJobsRef.current.map(j => j.jobId),
-      ];
       fetch("/api/job/cleanup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keepIds }),
+        body: JSON.stringify({
+          deleteIds: [jobId],
+          keepIds: serverJobsRef.current.filter(j => j.phase === "writing" || j.phase === "generating").map(j => j.jobId),
+        }),
       }).catch(() => {});
     } catch {}
   }
@@ -1312,6 +1313,12 @@ export default function Home() {
           }
         }
         if (jobRes.status === 501) break; // blob not configured → local pipeline
+        // Důvod selhání ukázat (např. blob-write-failed = plné úložiště) —
+        // generování pokračuje lokálně, ale uživatel ví, proč není fronta
+        try {
+          const errBody = await jobRes.json();
+          if (attempt === 1 && errBody?.error) setError(`Server: ${String(errBody.error).slice(0, 180)}`);
+        } catch {}
         console.warn(`[job/start] attempt ${attempt + 1} failed: HTTP ${jobRes.status}`);
       } catch (e) {
         console.warn(`[job/start] attempt ${attempt + 1} failed:`, e);

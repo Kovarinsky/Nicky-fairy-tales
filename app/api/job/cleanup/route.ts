@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 // Nemazat čerstvé joby (mohou ještě běžet) — běžící navíc chrání keepIds
-const MIN_AGE_MS = 3 * 60 * 60 * 1000;
+const MIN_AGE_MS = 60 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
   if (!blobToken()) {
@@ -21,6 +21,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const keep = new Set<string>(
       Array.isArray(body?.keepIds) ? body.keepIds.filter((x: unknown) => typeof x === "string") : []
+    );
+    // deleteIds = joby ke smazání OKAMŽITĚ (telefon už si pohádku stáhl)
+    const deleteNow = new Set<string>(
+      Array.isArray(body?.deleteIds) ? body.deleteIds.filter((x: unknown) => typeof x === "string") : []
     );
 
     // Projít všechny bloby pod jobs/ a posbírat kandidáty na smazání
@@ -34,6 +38,7 @@ export async function POST(req: NextRequest) {
         if (!m) continue;
         const id = m[1];
         jobsSeen.add(id);
+        if (deleteNow.has(id)) { toDelete.push(blob.url); continue; }
         if (keep.has(id)) continue;
         if (Date.now() - new Date(blob.uploadedAt).getTime() < MIN_AGE_MS) continue;
         toDelete.push(blob.url);
