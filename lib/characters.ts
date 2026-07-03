@@ -52,14 +52,16 @@ function mimeFromExt(file: string): string {
 export function loadReferenceImages(characters: Character[]): ReferenceImage[] {
   const images: ReferenceImage[] = [];
   for (const c of characters) {
-    if (!c.referenceFile) continue;
-    const filePath = path.join(REFERENCE_DIR, c.referenceFile);
-    if (!existsSync(filePath)) continue;
-    images.push({
-      data: readFileSync(filePath).toString("base64"),
-      mimeType: mimeFromExt(c.referenceFile),
-      name: c.name,
-    });
+    const files = [c.referenceFile, ...(c.referenceFiles ?? [])].filter((f): f is string => !!f);
+    for (const file of files) {
+      const filePath = path.join(REFERENCE_DIR, file);
+      if (!existsSync(filePath)) continue;
+      images.push({
+        data: readFileSync(filePath).toString("base64"),
+        mimeType: mimeFromExt(file),
+        name: c.name,
+      });
+    }
   }
   return images;
 }

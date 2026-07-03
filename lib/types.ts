@@ -10,6 +10,8 @@ export interface Character {
   description: string;
   /** Název souboru s referenční fotkou ve složce reference/ (volitelné) */
   referenceFile?: string;
+  /** Další referenční fotky (např. detail obličeje) */
+  referenceFiles?: string[];
 }
 
 /** Vstup od uživatele z formuláře */
