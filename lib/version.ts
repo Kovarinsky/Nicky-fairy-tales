@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.64";
+export const APP_VERSION = "2.65";
 
 // Changelog (newest first)
+// 2.65 - Titulky na šířku: text jede synchronně s hlasem (řízeno pozicí v nahrávce, pauza text zastaví), vnitřní okraje rámečku + měkké vyjíždění textu na krajích; rámeček zůstává na šířku obrázku
 // 2.64 - Oprava: dlouhý název pohádky vytlačoval tlačítka 🗑️ a ▶ mimo displej (grid minmax(0,1fr) + zkrácení názvu trojtečkou)
 // 2.63 - Mazání pohádek z historie: ikona 🗑️ u každé položky (s potvrzením) — smaže pohádku z telefonu vč. offline dat a uvolní místo
 // 2.62 - Věrnější táta Jan: nová detailní fotka obličeje jako druhá reference pro Gemini + přesnější popis (vysoké čelo, krátké tmavě hnědé vlasy, strniště, hnědé oči); podpora více referenčních fotek na postavu

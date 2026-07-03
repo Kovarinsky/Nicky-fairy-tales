@@ -194,6 +194,7 @@ export default function Home() {
   const bookScrolledRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const pageBodyRef = useRef<HTMLDivElement>(null);
+  const pageClipRef = useRef<HTMLDivElement>(null);
   const pageImgRef = useRef<HTMLImageElement>(null);
   const navRef = useRef<HTMLDivElement>(null);
 
@@ -623,18 +624,34 @@ export default function Home() {
     }
     el.scrollTop = 0;
     el.scrollLeft = 0;
+    // Landscape: roluje vnitřní .page-clip (bílý rámeček stojí, text jede)
+    const clip = pageClipRef.current;
+    const scroller = landscape && clip ? clip : el;
+    scroller.scrollLeft = 0;
     // Only the landscape single-line ticker rolls; portrait shows the whole text
-    const overflow = el.scrollWidth - el.clientWidth;
+    const overflow = scroller.scrollWidth - scroller.clientWidth;
     if (!landscape || overflow <= 0) return;
-    const DELAY_MS = 2800;   // let the reader start
-    const SPEED = 40;        // px per second
-    const durMs = (overflow / SPEED) * 1000;
+    // Synchronizace s hlasem: text dojede na konec ~2 s před koncem nahrávky.
+    // Bez hlasu (nepřehrává se) fallback na konstantní rychlost.
+    const audio = audioRef.current;
+    const DELAY_MS = 2200;
+    const SPEED = 40; // px/s (fallback)
+    const fallbackDur = (overflow / SPEED) * 1000;
     let raf = 0;
     const start = performance.now();
     const tick = (t: number) => {
-      const e = t - start - DELAY_MS;
-      if (e > 0) el.scrollLeft = Math.min(overflow, (e / durMs) * overflow);
-      if (e < durMs) raf = requestAnimationFrame(tick);
+      const dur = audio && Number.isFinite(audio.duration) ? audio.duration : 0;
+      const audioActive = audio && dur > 3 && (audio.currentTime > 0.05 || !audio.paused);
+      let p: number;
+      if (audioActive) {
+        // Řízeno přímo pozicí v nahrávce — drží krok, pauza zastaví text
+        p = Math.min(1, Math.max(0, (audio!.currentTime - 1.2) / Math.max(1, dur - 3.2)));
+      } else {
+        const e = t - start - DELAY_MS;
+        p = Math.min(1, Math.max(0, e / fallbackDur));
+      }
+      scroller.scrollLeft = p * overflow;
+      if (p < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -1882,7 +1899,9 @@ export default function Home() {
             )}
 
             <div className="page-body" ref={pageBodyRef}>
-              <p className="page-text">{current.narration}</p>
+              <div className="page-clip" ref={pageClipRef}>
+                <p className="page-text">{current.narration}</p>
+              </div>
             </div>
 
             <div className="book-controls" onClick={e => e.stopPropagation()}>
