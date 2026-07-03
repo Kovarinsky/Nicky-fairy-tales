@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.69";
+export const APP_VERSION = "2.70";
 
 // Changelog (newest first)
+// 2.70 - Počet stránek se místo posuvníku (šlo o něj omylem zavadit) nastavuje tlačítky − a + po stranách čísla; drží meze 3–20
 // 2.69 - Tlačítko 🧹 Smazat text u pole přání (objeví se, jen když v poli něco je); živější přednes hlasu (voice_settings: víc intonace a dramatičnosti); zvířecí zvuky se píší foneticky a protaženě („Haf haf!“, „Mňauuu…“), ať je vypravěč zahraje; česká výslovnost jmen — do TTS jde Nikolásek/Džejms/Árčí (titulky zůstávají s původním pravopisem)
 // 2.68 - Pozadí aplikace jsou teď ilustrace ve stylu pohádek: maluje je Gemini (stejný styl jako obrázky scén), každý z 9 světů se vygeneruje jen jednou a uloží na server (backgrounds/); než se stáhne, drží barevný gradient z v2.67
 // 2.67 - Přepínatelné pozadí aplikace: 9 světů (noc, les, hory, vesmír, džungle, moře, závody, pouť, kouzlo) malovaných v CSS; tlačítko 🎨 vlevo nahoře jimi roluje, režim Auto přepne pozadí samo podle zvoleného tématu pohádky (vlastní svět = ✨ kouzlo); volba se pamatuje

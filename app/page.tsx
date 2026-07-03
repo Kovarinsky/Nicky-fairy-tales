@@ -1877,8 +1877,14 @@ export default function Home() {
         </div>
 
         <div className="field">
-          <label>{t.pagesLabel}: {sceneCount}</label>
-          <input type="range" min={3} max={20} value={sceneCount} onChange={e => setSceneCount(Number(e.target.value))} />
+          <label>{t.pagesLabel}</label>
+          <div className="stepper">
+            <button type="button" className="stepper-btn" onClick={() => setSceneCount(n => Math.max(3, n - 1))}
+              disabled={sceneCount <= 3} aria-label="−1">−</button>
+            <span className="stepper-value">{sceneCount}</span>
+            <button type="button" className="stepper-btn" onClick={() => setSceneCount(n => Math.min(20, n + 1))}
+              disabled={sceneCount >= 20} aria-label="+1">+</button>
+          </div>
         </div>
 
         <div className="field">

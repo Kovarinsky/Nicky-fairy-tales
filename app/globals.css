@@ -311,17 +311,43 @@ textarea {
   min-height: 80px;
 }
 
-input[type="range"] {
-  padding: 0;
-  border: none;
-  background: transparent;
-  accent-color: var(--purple);
-  width: 100%;
-  cursor: pointer;
-  height: 4px;
+/* ── Počet stránek: − číslo + (posuvník šlo omylem přejet prstem) ── */
+.stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
 }
 
-input[type="range"]:focus { box-shadow: none; }
+.stepper-btn {
+  width: 56px;
+  height: 48px;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  border-radius: 14px;
+  background: rgba(124, 77, 255, 0.28);
+  color: #fff;
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.stepper-btn:active { transform: scale(0.94); background: rgba(124, 77, 255, 0.5); }
+
+.stepper-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.stepper-value {
+  min-width: 3.2rem;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── Chips — keyboard-key grid ── */
 .chips {
