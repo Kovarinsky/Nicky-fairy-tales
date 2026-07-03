@@ -10,7 +10,8 @@ import { blobToken } from "@/lib/blob-token";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MIN_AGE_MS = 24 * 60 * 60 * 1000;
+// Nemazat čerstvé joby (mohou ještě běžet) — běžící navíc chrání keepIds
+const MIN_AGE_MS = 3 * 60 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
   if (!blobToken()) {

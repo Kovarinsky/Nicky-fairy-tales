@@ -21,9 +21,17 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const id = crypto.randomUUID();
-    // Zadání stranou (pro /api/job/continue) + samotný job — obojí až PO
-    // odeslání odpovědi, aby start nikdy nečekal na Blob a klient nespadl
-    // do lokálního generování kvůli pomalé odpovědi
+    // Úvodní zápis stavu SYNCHRONNĚ — když Blob nefunguje (plné úložiště,
+    // špatný token), vrátíme chybu hned místo „zombie" jobu, který nikdy
+    // nezapíše stav a klient na něj marně čeká
+    try {
+      await putJson(`jobs/${id}/status.json`, { phase: "writing", createdAt: Date.now(), voiceId: String(body.voiceId || "") });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "blob write failed";
+      console.error(`[job ${id}] initial status write failed:`, msg);
+      return NextResponse.json({ error: `blob-write-failed: ${msg.slice(0, 160)}` }, { status: 500 });
+    }
+    // Zadání (pro /api/job/continue) + samotný job — už po odeslání odpovědi
     const work = putJson(`jobs/${id}/request.json`, body)
       .catch(e => console.error(`[job ${id}] request.json write failed:`, e))
       .then(() => runJob(id, body));

@@ -282,6 +282,25 @@ export default function Home() {
   useEffect(() => {
     // 20 offline pohádek je až ~800 MB — požádat prohlížeč, ať cache nemaže
     try { navigator.storage?.persist?.().catch(() => {}); } catch {}
+    // Úklid serverového úložiště i při startu aplikace (ne jen po dokončení
+    // pohádky) — plné úložiště blokuje start nových jobů; max 1× za 6 h
+    try {
+      const last = Number(localStorage.getItem("nicky-cleanup-at") || 0);
+      if (Date.now() - last > 6 * 3600_000) {
+        localStorage.setItem("nicky-cleanup-at", String(Date.now()));
+        let jobIds: string[] = [];
+        try {
+          const parsed = JSON.parse(localStorage.getItem(SERVER_JOB_KEY) || "{}");
+          jobIds = Array.isArray(parsed?.jobs) ? parsed.jobs : parsed?.jobId ? [parsed.jobId] : [];
+        } catch {}
+        const keepIds = [...loadHistory().map(e => e.id), ...jobIds];
+        fetch("/api/job/cleanup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keepIds }),
+        }).catch(() => {});
+      }
+    } catch {}
     const saved = loadSettings();
     if (saved.sceneCount !== undefined && saved.sceneCount >= 3 && saved.sceneCount <= 20) {
       setSceneCount(saved.sceneCount);
