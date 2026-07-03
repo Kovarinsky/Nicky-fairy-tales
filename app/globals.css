@@ -1449,6 +1449,13 @@ button:disabled {
   line-height: 1.4;
 }
 
+/* Doplňující otázka Clauda při nastudování vlastního světa */
+.world-question {
+  color: #fbbf24;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
 .gen-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));

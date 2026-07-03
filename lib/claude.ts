@@ -346,18 +346,77 @@ async function callAnthropicApi(body: object): Promise<string> {
 }
 
 /** Vymyslí jeden hravý námět na pohádku (1–2 věty) — pro tlačítko 🎲 v UI. */
-export async function suggestTopicIdea(language: "cs" | "en", characterNames: string[]): Promise<string> {
+export interface TopicIdeaContext {
+  /** Vybraný svět pohádky — námět se musí odehrávat v něm */
+  themeName?: string;
+  themePrompt?: string;
+  /** Co už má uživatel napsané v poli přání — námět na tom staví */
+  userHint?: string;
+}
+
+export async function suggestTopicIdea(language: "cs" | "en", characterNames: string[], ctx: TopicIdeaContext = {}): Promise<string> {
   const model = (process.env.ANTHROPIC_MODEL || MODEL).trim();
   const who = characterNames.length ? characterNames.join(", ") : language === "en" ? "the children" : "děti";
+  const worldPart = ctx.themeName
+    ? language === "en"
+      ? ` The story MUST take place in this world: ${ctx.themeName}.${ctx.themePrompt ? ` World guide: ${ctx.themePrompt.slice(0, 800)}` : ""} Use this world's places and well-known characters alongside the featured heroes.`
+      : ` Námět se MUSÍ odehrávat v tomto světě: ${ctx.themeName}.${ctx.themePrompt ? ` Průvodce světem: ${ctx.themePrompt.slice(0, 800)}` : ""} Využij místa a známé postavy tohoto světa spolu s uvedenými hrdiny.`
+    : "";
+  const hintPart = ctx.userHint
+    ? language === "en"
+      ? ` Build on the user's notes and include them in the idea: "${ctx.userHint.slice(0, 300)}".`
+      : ` Vyjdi z poznámek uživatele a zapracuj je do námětu: „${ctx.userHint.slice(0, 300)}".`
+    : "";
   const prompt = language === "en"
-    ? `Suggest ONE playful, original bedtime-story idea (1-2 sentences, max 40 words) for small children, featuring: ${who}. Make it concrete and magical (a place, a problem, a twist seed). Reply with ONLY the idea text — no quotes, no intro. Vary wildly: pick an unexpected setting or magical object.`
-    : `Navrhni JEDEN hravý, originální námět na pohádku před spaním (1–2 věty, max 40 slov) pro malé děti, kde vystupují: ${who}. Ať je konkrétní a kouzelný (místo, problém, zárodek překvapení). Odpověz POUZE textem námětu — bez uvozovek, bez úvodu. Buď pokaždé jiný: vyber nečekané prostředí nebo kouzelný předmět.`;
+    ? `Suggest ONE playful, original bedtime-story idea (1-2 sentences, max 40 words) for small children, featuring: ${who}.${worldPart}${hintPart} Make it concrete and magical (a place, a problem, a twist seed). Reply with ONLY the idea text — no quotes, no intro. Vary wildly: pick an unexpected setting or magical object.`
+    : `Navrhni JEDEN hravý, originální námět na pohádku před spaním (1–2 věty, max 40 slov) pro malé děti, kde vystupují: ${who}.${worldPart}${hintPart} Ať je konkrétní a kouzelný (místo, problém, zárodek překvapení). Odpověz POUZE textem námětu — bez uvozovek, bez úvodu. Buď pokaždé jiný: vyber nečekané prostředí nebo kouzelný předmět.`;
   const raw = await callAnthropicApi({
     model,
     max_tokens: 300,
     messages: [{ role: "user", content: prompt }],
   });
   return raw.trim().replace(/^["'„]|["'"]$/g, "");
+}
+
+// Nastudování vlastního světa: z popisu uživatele (a textu stažených odkazů)
+// sestaví průvodce světem ve stylu THEMES promptů (anglicky, s CHARACTER
+// REFERENCE). Když chybí podstatná informace, vrátí i JEDNU doplňující otázku.
+export async function studyWorld(
+  language: "cs" | "en",
+  name: string,
+  description: string,
+  urlTexts: string[]
+): Promise<{ prompt: string; question: string | null }> {
+  const model = (process.env.ANTHROPIC_MODEL || MODEL).trim();
+  const sources = urlTexts.filter(Boolean).map((t, i) => `WEB SOURCE ${i + 1}:\n${t.slice(0, 2500)}`).join("\n\n");
+  const prompt = [
+    `You are defining a fairy-tale "world" for a children's story generator. The user wants their stories to take place in this world.`,
+    `USER'S WORLD NAME: ${name || "(none)"}`,
+    `USER'S DESCRIPTION: ${description.slice(0, 1500)}`,
+    sources ? `FETCHED WEB CONTENT the user linked to:\n${sources}` : "",
+    ``,
+    `Write a world guide the story generator will follow. Format it like this, in ENGLISH:`,
+    `1) One sentence: "Set the story in the world of X: ..." (setting, era, mood).`,
+    `2) If the world has well-known characters (from the description, web content, or your own knowledge of this fairy tale/show/book), add "CHARACTER REFERENCE:" with each character's EXACT visual look (colors, clothing, size), separated by " | ".`,
+    `3) One sentence about atmosphere/tone (gentle, adventurous...).`,
+    `Max 180 words total. Recognize the fairy tale/show/book if you know it and use your knowledge of it.`,
+    ``,
+    language === "en"
+      ? `If an essential detail is missing or ambiguous (which characters matter, what the world looks like), also ask ONE short clarifying question in ENGLISH — the user will answer and re-run. Otherwise question is null.`
+      : `Pokud chybí podstatný detail nebo je popis nejednoznačný (které postavy jsou důležité, jak svět vypadá), polož navíc JEDNU krátkou doplňující otázku ČESKY — uživatel odpoví a nechá svět nastudovat znovu. Jinak je question null.`,
+    ``,
+    `Reply with ONLY valid JSON: {"prompt":"...","question":"..." or null}`,
+  ].filter(Boolean).join("\n");
+  const raw = await callAnthropicApi({
+    model,
+    max_tokens: 1000,
+    messages: [{ role: "user", content: prompt }],
+  });
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("Claude nevrátil JSON.");
+  const parsed = JSON.parse(jsonMatch[0]) as { prompt?: string; question?: string | null };
+  if (!parsed.prompt) throw new Error("Claude nevrátil popis světa.");
+  return { prompt: parsed.prompt, question: parsed.question || null };
 }
 
 export async function generateStory(req: StoryRequest, extras: StoryExtras = {}): Promise<StoryScript> {

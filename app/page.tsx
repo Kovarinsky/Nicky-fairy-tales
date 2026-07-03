@@ -1427,6 +1427,36 @@ export default function Home() {
   const [newThemeDesc, setNewThemeDesc] = useState("");
   const [newThemePhoto, setNewThemePhoto] = useState<{ data: string; mimeType: string; previewUrl: string } | null>(null);
   const themePhotoRef = useRef<HTMLInputElement>(null);
+  // 🧠 Nastudování světa: Claude z popisu (i odkazu) sestaví průvodce světem,
+  // případně vrátí jednu doplňující otázku — uživatel doplní a nechá znovu
+  const [worldStudyLoading, setWorldStudyLoading] = useState(false);
+  const [worldQuestion, setWorldQuestion] = useState<string | null>(null);
+  const [worldStudyError, setWorldStudyError] = useState(false);
+  async function studyNewWorld() {
+    if (!newThemeName.trim() && !newThemeDesc.trim()) return;
+    setWorldStudyLoading(true);
+    setWorldQuestion(null);
+    setWorldStudyError(false);
+    try {
+      const res = await fetch("/api/world-study", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(55_000),
+        body: JSON.stringify({ language: uiLang, name: newThemeName, description: newThemeDesc }),
+      });
+      const d = await safeJson<{ prompt?: string; question?: string | null }>(res);
+      if (res.ok && d.prompt) {
+        setNewThemeDesc(d.prompt);
+        setWorldQuestion(d.question || null);
+      } else {
+        setWorldStudyError(true);
+      }
+    } catch {
+      setWorldStudyError(true);
+    } finally {
+      setWorldStudyLoading(false);
+    }
+  }
   useEffect(() => {
     try {
       const raw = localStorage.getItem(CUSTOM_THEMES_KEY);
@@ -1499,11 +1529,19 @@ export default function Home() {
         ...chars.filter(c => selectedIds.includes(c.id)).map(c => (uiLang === "en" && c.nameEn ? c.nameEn : c.name)),
         ...customChars.filter(c => selectedCustomIds.includes(c.id)).map(c => c.name),
       ];
+      // Námět respektuje vybraný svět pohádky i to, co už je v poli napsané
+      const activeCustom = customThemes.find(ct => ct.id === selectedTheme);
       const res = await fetch("/api/topic-idea", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: AbortSignal.timeout(30_000),
-        body: JSON.stringify({ language: uiLang, characterNames: names }),
+        body: JSON.stringify({
+          language: uiLang,
+          characterNames: names,
+          themeId: activeCustom ? undefined : selectedTheme || undefined,
+          customTheme: activeCustom ? { name: activeCustom.name, prompt: activeCustom.prompt } : undefined,
+          hint: topic.trim() || undefined,
+        }),
       });
       const d = await safeJson<{ idea?: string }>(res);
       if (res.ok && d.idea) setTopic(d.idea);
@@ -1677,6 +1715,7 @@ export default function Home() {
     });
     setSelectedTheme(id);
     setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhoto(null);
+    setWorldQuestion(null); setWorldStudyError(false);
   }
   function removeCustomTheme(id: string) {
     setCustomThemes(p => { const next = p.filter(c => c.id !== id); saveCustomThemes(next); return next; });
@@ -1797,6 +1836,14 @@ export default function Home() {
                 <div className="field">
                   <label>{t.worldDescLabel}</label>
                   <textarea value={newThemeDesc} onChange={e => setNewThemeDesc(e.target.value)} placeholder={t.worldDescPlaceholder} />
+                  <div className="insp-row">
+                    <button type="button" className="insp-btn" onClick={studyNewWorld}
+                      disabled={worldStudyLoading || (!newThemeName.trim() && !newThemeDesc.trim())}>
+                      {worldStudyLoading ? "⏳ " : "🧠 "}{t.studyWorldBtn}
+                    </button>
+                  </div>
+                  {worldQuestion && <p className="gen-step-hint world-question">❓ {worldQuestion} — {t.worldQuestionHint}</p>}
+                  {worldStudyError && <p className="gen-step-hint">{t.worldStudyError}</p>}
                 </div>
                 <div className="field">
                   <label>{t.worldPhotoLabel}</label>
@@ -1811,7 +1858,7 @@ export default function Home() {
                 </div>
                 <div className="panel-actions">
                   <button type="button" onClick={addCustomTheme} disabled={!newThemeName.trim() && !newThemeDesc.trim()}>{t.saveWorld}</button>
-                  <button type="button" className="outline-btn" onClick={() => { setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhoto(null); }}>{t.cancel}</button>
+                  <button type="button" className="outline-btn" onClick={() => { setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhoto(null); setWorldQuestion(null); setWorldStudyError(false); }}>{t.cancel}</button>
                 </div>
               </div>
             )}

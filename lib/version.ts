@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.71";
+export const APP_VERSION = "2.72";
 
 // Changelog (newest first)
+// 2.72 - 🎲 Vymysli námět respektuje vybraný svět pohádky a zaškrtnuté postavy (a staví na už napsaném textu); u vlastního světa nové tlačítko 🧠 Nastuduj svět — z popisu nebo vloženého internetového odkazu Claude sestaví průvodce světem (postavy, vzhled, atmosféra), a když mu něco chybí, položí doplňující otázku
 // 2.71 - Pod počtem stránek se ukazuje orientační délka čtení: „🕐 cca X min čtení (1 stránka ≈ půl minuty)", přepočítává se hned při změně počtu
 // 2.70 - Počet stránek se místo posuvníku (šlo o něj omylem zavadit) nastavuje tlačítky − a + po stranách čísla; drží meze 3–20
 // 2.69 - Tlačítko 🧹 Smazat text u pole přání (objeví se, jen když v poli něco je); živější přednes hlasu (voice_settings: víc intonace a dramatičnosti); zvířecí zvuky se píší foneticky a protaženě („Haf haf!“, „Mňauuu…“), ať je vypravěč zahraje; česká výslovnost jmen — do TTS jde Nikolásek/Džejms/Árčí (titulky zůstávají s původním pravopisem)
