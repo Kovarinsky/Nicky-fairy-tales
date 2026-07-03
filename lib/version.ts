@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.60";
+export const APP_VERSION = "2.61";
 
 // Changelog (newest first)
+// 2.61 - Oprava „blob-write-failed: invalid header value": Blob token se čistí (uvozovky, nové řádky, smetí z Quickstartu) — z hodnoty se vytáhne jen samotný vercel_blob_rw_… token
 // 2.60 - Server už nehromadí hotové pohádky (jsou v telefonu): po stažení se serverová data pohádky mažou okamžitě, úklid chrání jen běžící joby (+1h lhůta), běží 1× za hodinu — bezplatný 1GB Blob se už nezaplní; důvod selhání startu se zobrazí (Server: blob-write-failed…)
 // 2.59 - Diagnóza mrtvých startů: start jobu zapíše stav SYNCHRONNĚ — když Blob zápis selže (plné úložiště / token), vrátí se viditelná chyba místo zombie jobu; úklid úložiště běží i při startu aplikace (1× za 6 h) a maže osiřelé joby starší 3 h
 // 2.58 - Záchrana zaseknutých pohádek: job, který na serveru nikdy nezapsal stav (404), se automaticky oživí přes /continue nebo po 5 min ukončí chybou; zaseknutý díl tlačítka červeně pulzuje s ⚠️ — ťuknutím nakopnete, podruhé odeberete z fronty
