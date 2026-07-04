@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.77";
+export const APP_VERSION = "2.78";
 
 // Changelog (newest first)
+// 2.78 - Strop automatických oživení: pohádka bez posunu se oživí max 4×, pak se zastaví s chybou („zastaveno, ať se nepálí kredit") — každé oživení překresluje scény a stálo peníze; posun vpřed počítadlo nuluje
 // 2.77 - Ochrana denní kvóty Gemini (1000 obrázků/den/model): při stropu se pokusy neopakují, automaticky se zkusí záložní model (gemini-2.5-flash-image → kapacita 2×), a když je na stropu i ten, pohádka se okamžitě zastaví s jasnou chybou; nakopnutí po resetu naváže na hotové scény (nepíše ani nekreslí znovu)
 // 2.76 - Když Gemini nekreslí (vyčerpaná kvóta, billing…), appka ukáže důvod přímo pod tlačítkem („🎨 Obrázky hlásí chybu: Gemini 429…") místo věčných přesýpacích hodin; pohádka bez jediného obrázku skončí viditelnou chybou, ne prázdnou knížkou
 // 2.75 - Křížek ✕ v rohu dílů tlačítka fronty: zaseknutou/chybovou pohádku zruší jedním ťuknutím (smaže i data na serveru); zdravě běžící se 1× zeptá, ať ji děti nezruší omylem

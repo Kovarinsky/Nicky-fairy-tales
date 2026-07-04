@@ -1046,11 +1046,11 @@ export default function Home() {
   // Per-job scene buffer for the gen-card thumbnails
   const jobBuffersRef = useRef<Map<string, RenderedScene[]>>(new Map());
   // Stall watch (per job): when the server function dies on the 5-min limit, kick /continue
-  const jobStallRef = useRef<Map<string, { lastChange: number; lastSig: string; lastKick: number; fails404: number; manualKicks: number }>>(new Map());
+  const jobStallRef = useRef<Map<string, { lastChange: number; lastSig: string; lastKick: number; fails404: number; manualKicks: number; autoKicks: number }>>(new Map());
 
   function stallStateFor(jobId: string) {
     let w = jobStallRef.current.get(jobId);
-    if (!w) { w = { lastChange: 0, lastSig: "", lastKick: 0, fails404: 0, manualKicks: 0 }; jobStallRef.current.set(jobId, w); }
+    if (!w) { w = { lastChange: 0, lastSig: "", lastKick: 0, fails404: 0, manualKicks: 0, autoKicks: 0 }; jobStallRef.current.set(jobId, w); }
     return w;
   }
 
@@ -1199,6 +1199,7 @@ export default function Home() {
     const now = Date.now();
     if (sig !== w.lastSig) {
       w.lastSig = sig; w.lastChange = now;
+      w.autoKicks = 0; // posun vpřed → počítadlo oživení se nuluje
       lastProgressRef.current = now; // server progress feeds the local stall watchdog too
       if (stalledNow) updateServerJob(jobId, { stalled: false });
       return;
@@ -1208,6 +1209,15 @@ export default function Home() {
     if (now - w.lastChange < limit) return;
     if (!stalledNow) updateServerJob(jobId, { stalled: true });
     if (now - w.lastKick < 120_000) return;
+    // Pojistka proti pálení kreditu: po 4 automatických oživeních BEZ posunu
+    // se job zastaví s chybou — každé oživení překresluje scény (Gemini platby
+    // a denní kvóta 1000/den). Dál jde jen ručně: ✕ zrušit, nebo ťuknout ⚠️.
+    if (w.autoKicks >= 4) {
+      stopJobPolling(jobId);
+      updateServerJob(jobId, { phase: "error", error: t.errAutoKicks });
+      return;
+    }
+    w.autoKicks++;
     w.lastKick = now;
     kickContinue(jobId);
   }
