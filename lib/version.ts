@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.72";
+export const APP_VERSION = "2.73";
 
 // Changelog (newest first)
+// 2.73 - Aplikace se otevírá vždy do hlavního menu — rozečtená pohádka už nenaskočí přes celou obrazovku, zůstává načtená pod formulářem (▶ ji otevře ve čtečce)
 // 2.72 - 🎲 Vymysli námět respektuje vybraný svět pohádky a zaškrtnuté postavy (a staví na už napsaném textu); u vlastního světa nové tlačítko 🧠 Nastuduj svět — z popisu nebo vloženého internetového odkazu Claude sestaví průvodce světem (postavy, vzhled, atmosféra), a když mu něco chybí, položí doplňující otázku
 // 2.71 - Pod počtem stránek se ukazuje orientační délka čtení: „🕐 cca X min čtení (1 stránka ≈ půl minuty)", přepočítává se hned při změně počtu
 // 2.70 - Počet stránek se místo posuvníku (šlo o něj omylem zavadit) nastavuje tlačítky − a + po stranách čísla; drží meze 3–20

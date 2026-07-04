@@ -362,7 +362,8 @@ export default function Home() {
     } catch {}
 
     // Restore story interrupted by window switch — only when every scene has
-    // an image, otherwise the reader would open onto an empty dark page
+    // an image. The app opens on the MAIN MENU (form); the restored book sits
+    // below it and play switches to the reader — no jump straight into a story.
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
@@ -372,7 +373,6 @@ export default function Home() {
           setTitle(draft.title);
           setScenes(draft.scenes);
           setPage(draft.page ?? 0);
-          setViewMode("reader");
         }
         localStorage.removeItem(DRAFT_KEY);
       }
