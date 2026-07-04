@@ -280,6 +280,17 @@ export default function Home() {
     syncServerJobs(serverJobsRef.current.filter(j => j.jobId !== jobId));
   }, [syncServerJobs]);
 
+  // ✕ na dílu tlačítka: zrušit pohádku jedním ťuknutím (z fronty + data na serveru)
+  const cancelServerJob = useCallback((jobId: string) => {
+    removeServerJob(jobId);
+    const keep = serverJobsRef.current.filter(j => j.jobId !== jobId).map(j => j.jobId);
+    fetch("/api/job/cleanup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deleteIds: [jobId], keepIds: keep }),
+    }).catch(() => {});
+  }, [removeServerJob]);
+
   // In-memory cache: history entry id → fully rendered scenes (images + audio)
   const renderedMapRef = useRef<Map<string, RenderedScene[]>>(new Map());
 
@@ -2045,6 +2056,16 @@ export default function Home() {
                         title={j.title || undefined}
                       >
                         <span className="job-seg-fill" />
+                        {j.phase !== "done" && (
+                          <button type="button" className="job-seg-x" aria-label={t.segCancel} title={t.segCancel}
+                            onClick={e => {
+                              e.stopPropagation();
+                              // Zaseknutá / chybová: zrušit hned; zdravě běžící: 1× potvrdit
+                              if (j.phase === "error" || j.stalled || window.confirm(t.cancelJobAsk)) {
+                                cancelServerJob(j.jobId);
+                              }
+                            }}>✕</button>
+                        )}
                         <span className="job-seg-label">
                           {idx + 1}. {j.stalled ? "⚠️ " : ""}{j.phase === "writing" ? t.segWriting
                             : j.phase === "generating" ? `🎨 ${j.done}/${j.total}`
