@@ -6,7 +6,7 @@
 
 import { put, head } from "@vercel/blob";
 import { generateStory, type StoryExtras } from "@/lib/claude";
-import { generateSceneImage } from "@/lib/gemini";
+import { generateSceneImage, isDailyQuotaError } from "@/lib/gemini";
 import { narrateScene } from "@/lib/elevenlabs";
 import { charactersByIds, loadCharacters, loadReferenceImages, type ReferenceImage } from "@/lib/characters";
 import { themeById } from "@/lib/themes";
@@ -79,11 +79,13 @@ async function fetchUrlText(url: string): Promise<string> {
 export async function runJob(id: string, body: Record<string, unknown>) {
   const statusPath = `jobs/${id}/status.json`;
 
-  // Navázání: existující stav (napsaný příběh + hotové scény) se přeskočí
+  // Navázání: existující stav (napsaný příběh + hotové scény) se přeskočí.
+  // I job ve stavu error se scénami naváže (např. po resetu denní kvóty) —
+  // dokreslí jen chybějící obrázky, nepíše a nekreslí celou pohádku znovu.
   const prev = await readJson<JobStatus>(statusPath);
   const st: JobStatus =
-    prev && prev.phase !== "error" && prev.scenesScript?.length
-      ? { ...prev }
+    prev && prev.scenesScript?.length
+      ? { ...prev, error: undefined, imgError: undefined }
       : { phase: "writing", createdAt: Date.now(), voiceId: String(body.voiceId || "") };
   const write = () => {
     st.updatedAt = Date.now();
@@ -164,14 +166,19 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     }
     const voiceId = String(body.voiceId || "") || undefined;
 
+    // Denní kvóta Gemini vyčerpaná → STOP celého jobu. Každý další pokus by
+    // jen pálil požadavky (limit je 1000/den/model) — reset je až o půlnoci PT.
+    let quotaExhausted = false;
+
     async function doScene(i: number): Promise<void> {
-      if (st.sceneUrls![i]) return; // už hotová z předchozího běhu
+      if (st.sceneUrls![i] || quotaExhausted) return; // hotová / kvóta vyčerpaná
       const scene = scenesScript[i];
       const refs = anchor && i > 0 ? [...refBase, anchor] : refBase;
       const [img, audio] = await Promise.all([
         generateSceneImage(scene, heroDescription, refs).catch((e: Error) => {
           console.error(`[job ${id}] scene ${i + 1} image: ${e.message}`);
           st.imgError = e.message.slice(0, 220);
+          if (isDailyQuotaError(e.message)) quotaExhausted = true;
           return null;
         }),
         narrateScene(scene, voiceId).catch((e: Error) => {
@@ -204,10 +211,18 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     await Promise.all(Array.from({ length: Math.min(3, Math.max(0, total - 1)) }, worker));
 
     // Verification rounds — the job is done only when every image exists
-    for (let round = 0; round < 2; round++) {
+    for (let round = 0; round < 2 && !quotaExhausted; round++) {
       const missing = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
       if (missing.length === 0) break;
       for (const i of missing) await doScene(i);
+    }
+
+    // Denní kvóta vyčerpaná uprostřed práce → jasná chyba, žádné další pokusy
+    if (quotaExhausted && Object.keys(st.sceneUrls!).length < total) {
+      st.phase = "error";
+      st.error = `Vyčerpán denní limit kreslení Gemini (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo). Resetuje se kolem 9:00 ráno — pak pohádku zadejte znovu.`;
+      await write();
+      return;
     }
 
     // Ani jeden obrázek = viditelná chyba (typicky vyčerpaná kvóta / billing

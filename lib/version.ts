@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.76";
+export const APP_VERSION = "2.77";
 
 // Changelog (newest first)
+// 2.77 - Ochrana denní kvóty Gemini (1000 obrázků/den/model): při stropu se pokusy neopakují, automaticky se zkusí záložní model (gemini-2.5-flash-image → kapacita 2×), a když je na stropu i ten, pohádka se okamžitě zastaví s jasnou chybou; nakopnutí po resetu naváže na hotové scény (nepíše ani nekreslí znovu)
 // 2.76 - Když Gemini nekreslí (vyčerpaná kvóta, billing…), appka ukáže důvod přímo pod tlačítkem („🎨 Obrázky hlásí chybu: Gemini 429…") místo věčných přesýpacích hodin; pohádka bez jediného obrázku skončí viditelnou chybou, ne prázdnou knížkou
 // 2.75 - Křížek ✕ v rohu dílů tlačítka fronty: zaseknutou/chybovou pohádku zruší jedním ťuknutím (smaže i data na serveru); zdravě běžící se 1× zeptá, ať ji děti nezruší omylem
 // 2.74 - 📜 České pohádky: rolovací seznam 28 licenčně volných klasik (lidové, Erben, Němcová, Grimmové, Andersen, Perrault) — vybraná pohádka funguje jako svět, příběh se odehraje s vašimi hrdiny; 🎲 námět i auto pozadí ji respektují

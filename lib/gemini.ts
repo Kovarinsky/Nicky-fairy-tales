@@ -3,7 +3,16 @@ import type { Scene } from "./types";
 import type { ReferenceImage } from "./characters";
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.0-flash-preview-image-generation";
+// Záložní obrázkový model — denní kvóta (limit 1000/den) platí NA MODEL,
+// takže když primární narazí na strop, druhý model jede dál
+const FALLBACK_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL_FALLBACK || "gemini-2.5-flash-image";
 const SANITIZE_MODEL = "gemini-2.0-flash"; // fast text model — sanitizes its own image model's prompt
+
+// Denní kvóta / vyčerpaný kredit — okamžité opakování je zbytečné (reset až
+// o půlnoci PT / po dobití). Joby na tuto chybu musí přestat pálit pokusy.
+export function isDailyQuotaError(msg: string): boolean {
+  return /per_day|per day|requests_per_model|credits are depleted|QUOTA_DAILY/i.test(msg);
+}
 
 export interface ImageResult {
   buffer: Buffer;
@@ -221,43 +230,70 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
   console.log(`[Gemini] scene ${scene.index} model=${model} (${safePrompt.length} chars): ${safePrompt.slice(0, 200)}`);
 
   const MAX_ATTEMPTS = 3;
+  // Denní kvóta platí na model → při stropu primárního modelu zkusit záložní
+  const models = FALLBACK_IMAGE_MODEL && FALLBACK_IMAGE_MODEL !== model
+    ? [model, FALLBACK_IMAGE_MODEL]
+    : [model];
   let withAspect = true;
   let lastErr = new Error("Gemini nevrátil obrázek");
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      return await callGeminiImage(apiKey, model, safePrompt, withAspect ? "16:9" : null, refImages);
-    } catch (e) {
-      lastErr = e instanceof Error ? e : new Error(String(e));
-      console.error(`[Gemini] scene ${scene.index} attempt ${attempt}/${MAX_ATTEMPTS}: ${lastErr.message}`);
-      // Older image models don't know imageConfig/aspectRatio — retry without it
-      if (withAspect && /image_config|imageConfig|aspect_ratio|aspectRatio|Unknown name/i.test(lastErr.message)) {
-        withAspect = false;
-        continue;
-      }
-      const isRateLimit = lastErr.message.startsWith("Gemini 429");
-      const isBlocked = lastErr.message.startsWith("Gemini BLOCKED");
-      if ((lastErr.message.match(/^Gemini 4/) && !isRateLimit) || isBlocked) break;
-      if (attempt < MAX_ATTEMPTS) {
-        const delay = isRateLimit ? 15000 * attempt : 5000 * attempt;
-        await new Promise(r => setTimeout(r, delay));
+  let quotaHits = 0;
+
+  for (const m of models) {
+    let dailyCapped = false;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        return await callGeminiImage(apiKey, m, safePrompt, withAspect ? "16:9" : null, refImages);
+      } catch (e) {
+        lastErr = e instanceof Error ? e : new Error(String(e));
+        console.error(`[Gemini] scene ${scene.index} model=${m} attempt ${attempt}/${MAX_ATTEMPTS}: ${lastErr.message}`);
+        // Older image models don't know imageConfig/aspectRatio — retry without it
+        if (withAspect && /image_config|imageConfig|aspect_ratio|aspectRatio|Unknown name/i.test(lastErr.message)) {
+          withAspect = false;
+          continue;
+        }
+        // Denní strop / vyčerpaný kredit: NEOPAKOVAT (reset je za hodiny) —
+        // rovnou přejít na záložní model
+        if (isDailyQuotaError(lastErr.message)) {
+          quotaHits++;
+          dailyCapped = true;
+          break;
+        }
+        const isRateLimit = lastErr.message.startsWith("Gemini 429");
+        const isBlocked = lastErr.message.startsWith("Gemini BLOCKED");
+        if ((lastErr.message.match(/^Gemini 4/) && !isRateLimit) || isBlocked) break;
+        if (attempt < MAX_ATTEMPTS) {
+          const delay = isRateLimit ? 15000 * attempt : 5000 * attempt;
+          await new Promise(r => setTimeout(r, delay));
+        }
       }
     }
+    if (!dailyCapped) break; // jiná chyba než kvóta → záložní model nepomůže
+    if (dailyCapped && m !== models[models.length - 1]) {
+      console.warn(`[Gemini] scene ${scene.index}: model ${m} na denním stropu → zkouším ${models[models.length - 1]}`);
+    }
+  }
+
+  // Všechny modely na denním stropu → signál pro job-runner, ať job zastaví
+  if (quotaHits >= models.length) {
+    throw new Error(`QUOTA_DAILY [scene ${scene.index}] ${lastErr.message}`);
   }
 
   // Last resort for persistently blocked prompts: draw the SAME characters in a
   // gentle generic moment inspired by the narration — better than a missing image
-  try {
-    const fallbackRaw = [
-      charLockOpen,
-      `The named characters stand together smiling, in a gentle scene inspired by this story moment: ${scene.narration.slice(0, 140)}`,
-      charLockClose,
-      STYLE_SUFFIX,
-    ].filter(Boolean).join(" ");
-    const safeFallback = await sanitizeWithGemini(apiKey, fallbackRaw);
-    console.warn(`[Gemini] scene ${scene.index}: using simplified fallback prompt`);
-    return await callGeminiImage(apiKey, model, safeFallback, withAspect ? "16:9" : null, refImages);
-  } catch (e2) {
-    console.error(`[Gemini] scene ${scene.index} fallback failed: ${e2 instanceof Error ? e2.message : e2}`);
+  if (!isDailyQuotaError(lastErr.message)) {
+    try {
+      const fallbackRaw = [
+        charLockOpen,
+        `The named characters stand together smiling, in a gentle scene inspired by this story moment: ${scene.narration.slice(0, 140)}`,
+        charLockClose,
+        STYLE_SUFFIX,
+      ].filter(Boolean).join(" ");
+      const safeFallback = await sanitizeWithGemini(apiKey, fallbackRaw);
+      console.warn(`[Gemini] scene ${scene.index}: using simplified fallback prompt`);
+      return await callGeminiImage(apiKey, model, safeFallback, withAspect ? "16:9" : null, refImages);
+    } catch (e2) {
+      console.error(`[Gemini] scene ${scene.index} fallback failed: ${e2 instanceof Error ? e2.message : e2}`);
+    }
   }
 
   throw new Error(`[scene ${scene.index}] ${lastErr.message}`);
