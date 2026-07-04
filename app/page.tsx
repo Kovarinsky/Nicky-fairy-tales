@@ -257,7 +257,7 @@ export default function Home() {
 
   // Server jobs — a QUEUE: several fairy tales can generate on Vercel at once,
   // each gets its own toast row and the newest one drives the gen-cards
-  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean };
+  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string };
   const MAX_ACTIVE_JOBS = 3;
   const [serverJobs, setServerJobs] = useState<ServerJob[]>([]);
   // The ref is the synchronous source of truth (poll callbacks and the mount
@@ -1248,7 +1248,7 @@ export default function Home() {
           updateServerJob(jobId, { phase: "writing" });
         } else if (st.phase === "generating") {
           prefetchJobScenes(jobId, st);
-          updateServerJob(jobId, { phase: "generating", done: st.done || 0, total: st.total || 0, title: st.title });
+          updateServerJob(jobId, { phase: "generating", done: st.done || 0, total: st.total || 0, title: st.title, imgError: st.imgError || undefined });
         } else if (st.phase === "done") {
           stopJobPolling(jobId);
           await finalizeServerJob(st, jobId);
@@ -2091,6 +2091,9 @@ export default function Home() {
                 <p className="gen-step-hint" style={{ marginTop: '0.3rem' }}>
                   {t.cardsLabel2(serverJobs.findIndex(j => j.jobId === newestJob.jobId) + 1)}
                 </p>
+              )}
+              {newestJob?.imgError && (
+                <p className="gen-step-hint world-question">🎨 {t.imgErrHint}: {newestJob.imgError}</p>
               )}
               {isGenerating && (
                 <div className="gen-cards" style={{ marginTop: '0.25rem' }}>

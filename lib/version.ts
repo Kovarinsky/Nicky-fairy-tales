@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.75";
+export const APP_VERSION = "2.76";
 
 // Changelog (newest first)
+// 2.76 - Když Gemini nekreslí (vyčerpaná kvóta, billing…), appka ukáže důvod přímo pod tlačítkem („🎨 Obrázky hlásí chybu: Gemini 429…") místo věčných přesýpacích hodin; pohádka bez jediného obrázku skončí viditelnou chybou, ne prázdnou knížkou
 // 2.75 - Křížek ✕ v rohu dílů tlačítka fronty: zaseknutou/chybovou pohádku zruší jedním ťuknutím (smaže i data na serveru); zdravě běžící se 1× zeptá, ať ji děti nezruší omylem
 // 2.74 - 📜 České pohádky: rolovací seznam 28 licenčně volných klasik (lidové, Erben, Němcová, Grimmové, Andersen, Perrault) — vybraná pohádka funguje jako svět, příběh se odehraje s vašimi hrdiny; 🎲 námět i auto pozadí ji respektují
 // 2.73 - Aplikace se otevírá vždy do hlavního menu — rozečtená pohádka už nenaskočí přes celou obrazovku, zůstává načtená pod formulářem (▶ ji otevře ve čtečce)

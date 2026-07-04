@@ -30,6 +30,8 @@ export interface JobStatus {
   done?: number;
   sceneUrls?: Record<number, string>;
   error?: string;
+  /** Poslední chyba kreslení obrázku (429 kvóta, billing…) — ukazuje se v UI */
+  imgError?: string;
 }
 
 export async function putJson(path: string, data: unknown): Promise<string> {
@@ -169,6 +171,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       const [img, audio] = await Promise.all([
         generateSceneImage(scene, heroDescription, refs).catch((e: Error) => {
           console.error(`[job ${id}] scene ${i + 1} image: ${e.message}`);
+          st.imgError = e.message.slice(0, 220);
           return null;
         }),
         narrateScene(scene, voiceId).catch((e: Error) => {
@@ -176,7 +179,8 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           return null;
         }),
       ]);
-      if (!img) return; // retry rounds below
+      if (!img) { await write(); return; } // retry rounds below; chybu vidí klient
+      st.imgError = undefined;
       const payload = {
         index: scene.index,
         imageUrl: `data:${img.mimeType};base64,${img.buffer.toString("base64")}`,
@@ -204,6 +208,15 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       const missing = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
       if (missing.length === 0) break;
       for (const i of missing) await doScene(i);
+    }
+
+    // Ani jeden obrázek = viditelná chyba (typicky vyčerpaná kvóta / billing
+    // Gemini) místo „hotové" pohádky plné prázdných stránek
+    if (Object.keys(st.sceneUrls!).length === 0) {
+      st.phase = "error";
+      st.error = st.imgError ? `Obrázky se nekreslí: ${st.imgError}` : "Obrázky se nekreslí (Gemini nevrátil žádný obrázek)";
+      await write();
+      return;
     }
 
     st.phase = "done";
