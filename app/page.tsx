@@ -7,6 +7,7 @@ import { cacheStory, getCachedStory, evictOldStories } from "@/lib/scene-cache";
 import { APP_VERSION } from "@/lib/version";
 import { UI, UI_LANG_KEY, type UILang } from "@/lib/i18n";
 import { BG_SCENES, bgSceneById, THEME_BG } from "@/lib/backgrounds";
+import { FOLK_TALES, folkTaleById } from "@/lib/folk-tales";
 
 // ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; nameEn?: string; }
@@ -1289,11 +1290,15 @@ export default function Home() {
     } catch {}
 
     const selectedCustomObjsForJob = customChars.filter(c => selectedCustomIds.includes(c.id));
-    // Vlastní svět: prompt jde místo themeId, fotka světa jako inspirace
+    // Vlastní svět nebo klasická pohádka: prompt jde místo themeId, fotka světa jako inspirace
     const activeCustomTheme = customThemes.find(ct => ct.id === selectedTheme);
+    const activeFolk = folkTaleById(selectedTheme);
+    const themeOverride = activeCustomTheme
+      ? { name: activeCustomTheme.name, prompt: activeCustomTheme.prompt }
+      : activeFolk ? { name: activeFolk.name, prompt: activeFolk.prompt } : undefined;
     const storyPayload = {
-      topic, themeId: activeCustomTheme ? undefined : selectedTheme || undefined,
-      customTheme: activeCustomTheme ? { name: activeCustomTheme.name, prompt: activeCustomTheme.prompt } : undefined,
+      topic, themeId: themeOverride ? undefined : selectedTheme || undefined,
+      customTheme: themeOverride,
       characterIds: selectedIds,
       age: getTargetAge([...selectedIds, ...selectedCustomIds]),
       sceneCount,
@@ -1422,6 +1427,10 @@ export default function Home() {
   // Custom worlds (story themes by photo/description)
   interface CustomTheme { id: string; name: string; prompt: string; photoBase64?: string; photoMimeType?: string; previewUrl?: string }
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
+  // 📜 Klasické (licenčně volné) pohádky — rolovací seznam, vybraná se chová
+  // jako vlastní svět (posílá se jako customTheme s připraveným dějem)
+  const [folkOpen, setFolkOpen] = useState(false);
+  const selectedFolk = folkTaleById(selectedTheme);
   const [addingTheme, setAddingTheme] = useState(false);
   const [newThemeName, setNewThemeName] = useState("");
   const [newThemeDesc, setNewThemeDesc] = useState("");
@@ -1479,7 +1488,8 @@ export default function Home() {
     } catch {}
   }, []);
   const autoBg = selectedTheme
-    ? (THEME_BG[selectedTheme] ?? (customThemes.some(ct => ct.id === selectedTheme) ? "fantasy" : "night"))
+    ? (THEME_BG[selectedTheme]
+        ?? (customThemes.some(ct => ct.id === selectedTheme) || folkTaleById(selectedTheme) ? "fantasy" : "night"))
     : "night";
   const activeBg = bgChoice === "auto" ? autoBg : bgChoice;
   const bgUrlCacheRef = useRef<Record<string, string>>({});
@@ -1529,8 +1539,12 @@ export default function Home() {
         ...chars.filter(c => selectedIds.includes(c.id)).map(c => (uiLang === "en" && c.nameEn ? c.nameEn : c.name)),
         ...customChars.filter(c => selectedCustomIds.includes(c.id)).map(c => c.name),
       ];
-      // Námět respektuje vybraný svět pohádky i to, co už je v poli napsané
+      // Námět respektuje vybraný svět pohádky (i klasickou pohádku) a text v poli
       const activeCustom = customThemes.find(ct => ct.id === selectedTheme);
+      const folk = folkTaleById(selectedTheme);
+      const override = activeCustom
+        ? { name: activeCustom.name, prompt: activeCustom.prompt }
+        : folk ? { name: folk.name, prompt: folk.prompt } : undefined;
       const res = await fetch("/api/topic-idea", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1538,8 +1552,8 @@ export default function Home() {
         body: JSON.stringify({
           language: uiLang,
           characterNames: names,
-          themeId: activeCustom ? undefined : selectedTheme || undefined,
-          customTheme: activeCustom ? { name: activeCustom.name, prompt: activeCustom.prompt } : undefined,
+          themeId: override ? undefined : selectedTheme || undefined,
+          customTheme: override,
           hint: topic.trim() || undefined,
         }),
       });
@@ -1822,10 +1836,30 @@ export default function Home() {
                   <button type="button" className="chip-remove" onClick={() => removeCustomTheme(ct.id)}>×</button>
                 </div>
               ))}
+              <button type="button" className={`chip chip-btn ${folkOpen || selectedFolk ? "chip-on" : ""}`}
+                onClick={() => setFolkOpen(p => !p)}>
+                📜 {selectedFolk ? (uiLang === "en" ? selectedFolk.nameEn : selectedFolk.name) : t.folkChip}
+              </button>
               <button type="button" className={`chip chip-btn ${addingTheme ? "chip-on" : ""}`} onClick={() => setAddingTheme(p => !p)}>
                 {addingTheme ? t.cancelChip : t.addWorldChip}
               </button>
             </div>
+            {folkOpen && (
+              <div className="add-char-panel">
+                <p className="panel-title">{t.folkTitle}</p>
+                <div className="folk-list">
+                  {FOLK_TALES.map(ft => (
+                    <button type="button" key={ft.id}
+                      className={`folk-item ${selectedTheme === ft.id ? "folk-on" : ""}`}
+                      onClick={() => { setSelectedTheme(p => p === ft.id ? "" : ft.id); setFolkOpen(false); }}>
+                      <span className="folk-emoji">{ft.emoji}</span>
+                      <span>{uiLang === "en" ? ft.nameEn : ft.name}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="gen-step-hint">{t.folkHint}</p>
+              </div>
+            )}
             {addingTheme && (
               <div className="add-char-panel">
                 <p className="panel-title">{t.newWorldTitle}</p>

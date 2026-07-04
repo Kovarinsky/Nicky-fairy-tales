@@ -1449,6 +1449,45 @@ button:disabled {
   line-height: 1.4;
 }
 
+/* ── 📜 Rolovací seznam klasických pohádek (jako iOS picker) ── */
+.folk-list {
+  max-height: 300px;
+  overflow-y: auto;
+  scroll-snap-type: y proximity;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  background: rgba(10, 8, 40, 0.45);
+  /* měkké vyjíždění nahoře a dole jako u kolečka */
+  mask-image: linear-gradient(180deg, transparent 0, #000 1.6rem, #000 calc(100% - 1.6rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 1.6rem, #000 calc(100% - 1.6rem), transparent 100%);
+  padding: 0.8rem 0;
+}
+
+.folk-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.62rem 0.9rem;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  scroll-snap-align: center;
+  transition: background 0.12s;
+}
+
+.folk-item:active, .folk-item:hover { background: rgba(124, 77, 255, 0.25); }
+
+.folk-item.folk-on {
+  background: rgba(124, 77, 255, 0.4);
+}
+
+.folk-emoji { font-size: 1.15rem; width: 1.6rem; text-align: center; }
+
 /* Doplňující otázka Clauda při nastudování vlastního světa */
 .world-question {
   color: #fbbf24;

@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.73";
+export const APP_VERSION = "2.74";
 
 // Changelog (newest first)
+// 2.74 - 📜 České pohádky: rolovací seznam 28 licenčně volných klasik (lidové, Erben, Němcová, Grimmové, Andersen, Perrault) — vybraná pohádka funguje jako svět, příběh se odehraje s vašimi hrdiny; 🎲 námět i auto pozadí ji respektují
 // 2.73 - Aplikace se otevírá vždy do hlavního menu — rozečtená pohádka už nenaskočí přes celou obrazovku, zůstává načtená pod formulářem (▶ ji otevře ve čtečce)
 // 2.72 - 🎲 Vymysli námět respektuje vybraný svět pohádky a zaškrtnuté postavy (a staví na už napsaném textu); u vlastního světa nové tlačítko 🧠 Nastuduj svět — z popisu nebo vloženého internetového odkazu Claude sestaví průvodce světem (postavy, vzhled, atmosféra), a když mu něco chybí, položí doplňující otázku
 // 2.71 - Pod počtem stránek se ukazuje orientační délka čtení: „🕐 cca X min čtení (1 stránka ≈ půl minuty)", přepočítává se hned při změně počtu
