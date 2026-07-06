@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.79";
+export const APP_VERSION = "2.80";
 
 // Changelog (newest first)
+// 2.80 - Příběhy píše Claude Sonnet místo Opusu (kvalita pohádek srovnatelná, ~5× levnější psaní); jde přebít proměnnou ANTHROPIC_MODEL_PRIMARY
 // 2.79 - Levnější kreslení: primární obrázkový model je gemini-2.5-flash-image (~0,90 Kč/obrázek, −42 %), dražší gemini-3.1-flash-image (~1,55 Kč) zůstává jen jako záloha při vyčerpání denní kvóty; jde přebít proměnnou GEMINI_IMAGE_MODEL_PRIMARY
 // 2.78 - Strop automatických oživení: pohádka bez posunu se oživí max 4×, pak se zastaví s chybou („zastaveno, ať se nepálí kredit") — každé oživení překresluje scény a stálo peníze; posun vpřed počítadlo nuluje
 // 2.77 - Ochrana denní kvóty Gemini (1000 obrázků/den/model): při stropu se pokusy neopakují, automaticky se zkusí záložní model (gemini-2.5-flash-image → kapacita 2×), a když je na stropu i ten, pohádka se okamžitě zastaví s jasnou chybou; nakopnutí po resetu naváže na hotové scény (nepíše ani nekreslí znovu)

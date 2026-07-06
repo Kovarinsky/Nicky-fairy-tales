@@ -1,6 +1,9 @@
 import type { StoryRequest, StoryScript, Character } from "./types";
 
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
+// Příběhy píše Sonnet — kvalitou pohádek srovnatelný s Opusem, ~5× levnější.
+// Starší proměnná ANTHROPIC_MODEL (na Vercelu claude-opus-4-8) se už nepoužívá;
+// přebít jde přes ANTHROPIC_MODEL_PRIMARY.
+const MODEL = process.env.ANTHROPIC_MODEL_PRIMARY || "claude-sonnet-5";
 const ANTHROPIC_VERSION = "2023-06-01";
 
 export interface StoryExtras {
@@ -355,7 +358,7 @@ export interface TopicIdeaContext {
 }
 
 export async function suggestTopicIdea(language: "cs" | "en", characterNames: string[], ctx: TopicIdeaContext = {}): Promise<string> {
-  const model = (process.env.ANTHROPIC_MODEL || MODEL).trim();
+  const model = MODEL.trim();
   const who = characterNames.length ? characterNames.join(", ") : language === "en" ? "the children" : "děti";
   const worldPart = ctx.themeName
     ? language === "en"
@@ -387,7 +390,7 @@ export async function studyWorld(
   description: string,
   urlTexts: string[]
 ): Promise<{ prompt: string; question: string | null }> {
-  const model = (process.env.ANTHROPIC_MODEL || MODEL).trim();
+  const model = MODEL.trim();
   const sources = urlTexts.filter(Boolean).map((t, i) => `WEB SOURCE ${i + 1}:\n${t.slice(0, 2500)}`).join("\n\n");
   const prompt = [
     `You are defining a fairy-tale "world" for a children's story generator. The user wants their stories to take place in this world.`,
@@ -420,7 +423,7 @@ export async function studyWorld(
 }
 
 export async function generateStory(req: StoryRequest, extras: StoryExtras = {}): Promise<StoryScript> {
-  const model = (process.env.ANTHROPIC_MODEL || MODEL).trim();
+  const model = MODEL.trim();
   const parts: AnthropicPart[] = [];
 
   if (extras.inspirationPdfBase64) {
