@@ -2,10 +2,14 @@ import { request } from "https";
 import type { Scene } from "./types";
 import type { ReferenceImage } from "./characters";
 
-const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.0-flash-preview-image-generation";
+// Primární model: levnější gemini-2.5-flash-image (~$0.039 ≈ 0,90 Kč/obrázek).
+// Starší proměnná GEMINI_IMAGE_MODEL (na Vercelu gemini-3.1-flash-image,
+// $0.067 ≈ 1,55 Kč) je od v2.79 už jen ZÁLOHA — kvalita storybook ilustrací je
+// srovnatelná a náklady o ~42 % nižší. Přebít jde přes GEMINI_IMAGE_MODEL_PRIMARY.
+const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL_PRIMARY || "gemini-2.5-flash-image";
 // Záložní obrázkový model — denní kvóta (limit 1000/den) platí NA MODEL,
 // takže když primární narazí na strop, druhý model jede dál
-const FALLBACK_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL_FALLBACK || "gemini-2.5-flash-image";
+const FALLBACK_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL_FALLBACK || process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
 const SANITIZE_MODEL = "gemini-2.0-flash"; // fast text model — sanitizes its own image model's prompt
 
 // Denní kvóta / vyčerpaný kredit — okamžité opakování je zbytečné (reset až
@@ -177,7 +181,7 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
 export async function generateBackgroundImage(prompt: string): Promise<ImageResult> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
-  const model = (process.env.GEMINI_IMAGE_MODEL || IMAGE_MODEL).trim();
+  const model = IMAGE_MODEL.trim();
   let aspect: string | null = "9:16";
   let lastErr = new Error("Gemini nevrátil obrázek");
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -200,7 +204,7 @@ export async function generateBackgroundImage(prompt: string): Promise<ImageResu
 export async function generateSceneImage(scene: Scene, heroDescription: string, refImages: ReferenceImage[] = []): Promise<ImageResult> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
-  const model = (process.env.GEMINI_IMAGE_MODEL || IMAGE_MODEL).trim();
+  const model = IMAGE_MODEL.trim();
 
   // Build raw prompt: character lock bookends the scene (start + end = highest model attention)
   const charLockOpen = heroDescription
