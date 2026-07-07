@@ -599,6 +599,32 @@ export default function Home() {
     if (nav) { nav.style.top = ""; nav.style.left = ""; nav.style.width = ""; nav.style.right = ""; }
   }, [viewMode]);
 
+  // Wake Lock: při otevřené čtečce displej nezhasíná / nespoří (pohádka
+  // běží dlouhé minuty bez dotyku). Po návratu do appky se zámek obnoví.
+  useEffect(() => {
+    if (viewMode !== "reader") return;
+    type WakeSentinel = { release: () => Promise<void> };
+    type WakeLockApi = { request: (type: "screen") => Promise<WakeSentinel> };
+    const wl = (navigator as Navigator & { wakeLock?: WakeLockApi }).wakeLock;
+    if (!wl) return; // starší prohlížeč — nic se neděje, jen může zhasnout
+    let lock: WakeSentinel | null = null;
+    let dead = false;
+    const acquire = () => {
+      wl.request("screen").then(s => {
+        if (dead) { s.release().catch(() => {}); } else { lock = s; }
+      }).catch(() => {});
+    };
+    acquire();
+    // Systém zámek uvolní při přepnutí appky — po návratu ho vzít znovu
+    const onVis = () => { if (document.visibilityState === "visible" && !dead) acquire(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      dead = true;
+      document.removeEventListener("visibilitychange", onVis);
+      lock?.release().catch(() => {});
+    };
+  }, [viewMode]);
+
   // Restart the subtitle roll from the top whenever narration starts playing
   const [rollTick, setRollTick] = useState(0);
   useEffect(() => {

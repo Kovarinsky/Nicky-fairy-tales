@@ -852,6 +852,10 @@ button:disabled {
   }
   .reader-mode .page-text {
     white-space: nowrap;
+    display: inline-block;
+    /* větší vnitřní odsazení než šířka vyblednutí (1.1rem) — začátek
+       i konec věty jsou při rolování plně čitelné, ne v mlze okraje */
+    padding: 0 1.35rem;
     font-size: 0.95rem;
     line-height: 1.35;
   }
