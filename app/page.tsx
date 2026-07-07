@@ -1333,8 +1333,11 @@ export default function Home() {
       inspirationUrl: inspUrlActive && inspUrl.trim() ? inspUrl.trim() : undefined,
       inspirationImages: [
         ...inspImages.map(i => ({ data: i.data, mimeType: i.mimeType })),
-        ...(activeCustomTheme?.photoBase64 && activeCustomTheme.photoMimeType
-          ? [{ data: activeCustomTheme.photoBase64, mimeType: activeCustomTheme.photoMimeType }] : []),
+        // Fotky vlastního světa (nové: pole photos, staré světy: 1 fotka)
+        ...(activeCustomTheme?.photos?.length
+          ? activeCustomTheme.photos
+          : activeCustomTheme?.photoBase64 && activeCustomTheme.photoMimeType
+            ? [{ data: activeCustomTheme.photoBase64, mimeType: activeCustomTheme.photoMimeType }] : []),
       ],
       inspirationPdfBase64: inspPdf?.base64 || undefined,
     };
@@ -1445,8 +1448,10 @@ export default function Home() {
     }
   }
 
-  // Custom worlds (story themes by photo/description)
-  interface CustomTheme { id: string; name: string; prompt: string; photoBase64?: string; photoMimeType?: string; previewUrl?: string }
+  // Custom worlds (story themes by photo/description) — až 8 fotek na svět
+  // (photoBase64/photoMimeType = zpětná kompatibilita se světy s 1 fotkou)
+  interface CustomTheme { id: string; name: string; prompt: string; photos?: Array<{ data: string; mimeType: string }>; photoBase64?: string; photoMimeType?: string; previewUrl?: string }
+  const MAX_WORLD_PHOTOS = 8;
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
   // 📜 Klasické (licenčně volné) pohádky — rolovací seznam, vybraná se chová
   // jako vlastní svět (posílá se jako customTheme s připraveným dějem)
@@ -1455,7 +1460,7 @@ export default function Home() {
   const [addingTheme, setAddingTheme] = useState(false);
   const [newThemeName, setNewThemeName] = useState("");
   const [newThemeDesc, setNewThemeDesc] = useState("");
-  const [newThemePhoto, setNewThemePhoto] = useState<{ data: string; mimeType: string; previewUrl: string } | null>(null);
+  const [newThemePhotos, setNewThemePhotos] = useState<Array<{ data: string; mimeType: string; previewUrl: string }>>([]);
   const themePhotoRef = useRef<HTMLInputElement>(null);
   // 🧠 Nastudování světa: Claude z popisu (i odkazu) sestaví průvodce světem,
   // případně vrátí jednu doplňující otázku — uživatel doplní a nechá znovu
@@ -1494,7 +1499,9 @@ export default function Home() {
         const list = JSON.parse(raw) as CustomTheme[];
         setCustomThemes(list.map(c => ({
           ...c,
-          previewUrl: c.photoBase64 && c.photoMimeType ? `data:${c.photoMimeType};base64,${c.photoBase64}` : undefined,
+          previewUrl: c.photos?.[0]
+            ? `data:${c.photos[0].mimeType};base64,${c.photos[0].data}`
+            : c.photoBase64 && c.photoMimeType ? `data:${c.photoMimeType};base64,${c.photoBase64}` : undefined,
         })));
       }
     } catch {}
@@ -1733,7 +1740,7 @@ export default function Home() {
   }
   async function handleThemePhoto(file: File) {
     const r = await resizeAndEncode(file, 640).catch(() => null);
-    if (r) setNewThemePhoto(r);
+    if (r) setNewThemePhotos(p => (p.length >= MAX_WORLD_PHOTOS ? p : [...p, r]));
   }
   function addCustomTheme() {
     if (!newThemeName.trim() && !newThemeDesc.trim()) return;
@@ -1743,13 +1750,14 @@ export default function Home() {
       const next = [...p, {
         id, name,
         prompt: newThemeDesc.trim() || name,
-        photoBase64: newThemePhoto?.data, photoMimeType: newThemePhoto?.mimeType, previewUrl: newThemePhoto?.previewUrl,
+        photos: newThemePhotos.map(ph => ({ data: ph.data, mimeType: ph.mimeType })),
+        previewUrl: newThemePhotos[0]?.previewUrl,
       }];
       saveCustomThemes(next);
       return next;
     });
     setSelectedTheme(id);
-    setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhoto(null);
+    setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]);
     setWorldQuestion(null); setWorldStudyError(false);
   }
   function removeCustomTheme(id: string) {
@@ -1903,17 +1911,31 @@ export default function Home() {
                 <div className="field">
                   <label>{t.worldPhotoLabel}</label>
                   <div className="file-row">
-                    <button type="button" className="outline-btn" onClick={() => themePhotoRef.current?.click()}>
-                      📷 {newThemePhoto ? t.changePhoto : t.uploadPhoto}
+                    <button type="button" className="outline-btn" onClick={() => themePhotoRef.current?.click()}
+                      disabled={newThemePhotos.length >= MAX_WORLD_PHOTOS}>
+                      📷 {t.uploadPhoto} ({newThemePhotos.length}/{MAX_WORLD_PHOTOS})
                     </button>
-                    {newThemePhoto && <img src={newThemePhoto.previewUrl} alt="náhled" className="mini-preview" />}
                   </div>
-                  <input ref={themePhotoRef} type="file" accept="image/*" style={{ display: "none" }}
-                    onChange={e => { const f = e.target.files?.[0]; if (f) handleThemePhoto(f); e.target.value = ""; }} />
+                  {newThemePhotos.length > 0 && (
+                    <div className="world-photo-grid">
+                      {newThemePhotos.map((ph, i) => (
+                        <div key={i} className="world-photo-thumb">
+                          <img src={ph.previewUrl} alt={`fotka ${i + 1}`} />
+                          <button type="button" className="chip-remove world-photo-x" aria-label="Odebrat"
+                            onClick={() => setNewThemePhotos(p => p.filter((_, j) => j !== i))}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <input ref={themePhotoRef} type="file" accept="image/*" multiple style={{ display: "none" }}
+                    onChange={async e => {
+                      for (const f of Array.from(e.target.files || []).slice(0, MAX_WORLD_PHOTOS - newThemePhotos.length)) await handleThemePhoto(f);
+                      e.target.value = "";
+                    }} />
                 </div>
                 <div className="panel-actions">
                   <button type="button" onClick={addCustomTheme} disabled={!newThemeName.trim() && !newThemeDesc.trim()}>{t.saveWorld}</button>
-                  <button type="button" className="outline-btn" onClick={() => { setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhoto(null); setWorldQuestion(null); setWorldStudyError(false); }}>{t.cancel}</button>
+                  <button type="button" className="outline-btn" onClick={() => { setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]); setWorldQuestion(null); setWorldStudyError(false); }}>{t.cancel}</button>
                 </div>
               </div>
             )}
