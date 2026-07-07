@@ -2277,51 +2277,28 @@ export default function Home() {
               </div>
             </div>
 
+            {/* 4 tlačítka: řada na šířku obrázku (portrét) / sloupec na výšku
+                obrázku (fullscreen). Hlas a hudba se nastavují v hlavním menu,
+                auto-přechod scén je zapnutý vždy. */}
             <div className="book-controls" onClick={e => e.stopPropagation()}>
-              <button type="button" className={`ctrl-row ctrl-row-primary${!current.audioUrl || regenAudio ? " ctrl-row-loading" : ""}`}
+              <button type="button" className={`ctrl-cell ctrl-cell-primary${!current.audioUrl || regenAudio ? " ctrl-cell-loading" : ""}`}
                 onClick={togglePlay} disabled={!current.audioUrl || regenAudio}>
                 <span className="ctrl-ico">{!current.audioUrl && !regenAudio ? "⏳" : isPlaying ? "⏸" : "▶"}</span>
                 <span className="ctrl-txt">{isPlaying ? t.pause : t.play}</span>
               </button>
 
-              <div className="ctrl-row ctrl-row-info">
+              <div className="ctrl-cell ctrl-cell-info">
                 <span className="ctrl-ico">📖</span>
-                <span className="ctrl-txt">{t.pageLbl} {page + 1} / {scenes.length}</span>
+                <span className="ctrl-txt">{page + 1} / {scenes.length}</span>
               </div>
 
-              <button type="button" className={`ctrl-row${autoAdvance ? " ctrl-row-on" : ""}`}
-                onClick={() => setAutoAdvance(p => !p)}>
-                <span className="ctrl-ico">{autoAdvance ? "🔁" : "🔂"}</span>
-                <span className="ctrl-txt">{t.auto}</span>
-              </button>
-
-              {/* Voice cycle button — only when multiple voices available */}
-              {voices.length > 1 && (
-                <button type="button" className={`ctrl-row${regenAudio ? " ctrl-row-loading" : ""}`}
-                  onClick={() => {
-                    const idx = voices.findIndex(v => v.id === selectedVoiceId);
-                    const next = voices[(idx + 1) % voices.length];
-                    switchVoice(next.id);
-                  }}
-                  disabled={regenAudio}>
-                  <span className="ctrl-ico">{voices.find(v => v.id === selectedVoiceId)?.emoji ?? "🎙️"}</span>
-                  <span className="ctrl-txt">{t.voice}: {voices.find(v => v.id === selectedVoiceId)?.name ?? "?"}</span>
-                </button>
-              )}
-
-              <button type="button" className={`ctrl-row${musicOn ? " ctrl-row-on" : ""}`}
-                onClick={() => setMusicOn(p => !p)}>
-                <span className="ctrl-ico">{musicOn ? "🎵" : "🔇"}</span>
-                <span className="ctrl-txt">{t.music}</span>
-              </button>
-
-              <button type="button" className={`ctrl-row${forcedLs ? " ctrl-row-on" : ""}`}
+              <button type="button" className={`ctrl-cell${forcedLs ? " ctrl-cell-on" : ""}`}
                 onClick={toggleForcedLandscape}>
                 <span className="ctrl-ico">{forcedLs ? "📱" : "🔄"}</span>
                 <span className="ctrl-txt">{forcedLs ? t.rotateBack : t.rotate}</span>
               </button>
 
-              <button type="button" className="ctrl-row ctrl-row-home" onClick={resetToForm}>
+              <button type="button" className="ctrl-cell ctrl-cell-home" onClick={resetToForm}>
                 <span className="ctrl-ico">🏠</span>
                 <span className="ctrl-txt">{t.home}</span>
               </button>

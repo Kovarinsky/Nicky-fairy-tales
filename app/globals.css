@@ -739,8 +739,8 @@ button:disabled {
 }
 
 /* Controls: hidden; tap → panel pinned to the BOTTOM of the screen */
-/* Reader: kompaktní tmavý panel dole, mimo obrázek; ukáže se jen na ťuknutí
-   a po 5 s sám zmizí (řídí page.tsx) */
+/* Reader (portrét): jedna řada 4 tlačítek dole na šířku obrázku, tmavé sklo;
+   ukáže se jen na ťuknutí a po 5 s sám zmizí (řídí page.tsx) */
 .reader-mode .book-controls {
   position: absolute;
   left: 0.45rem;
@@ -749,61 +749,49 @@ button:disabled {
   margin: 0;
   z-index: 6;
   display: none;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.32rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
   padding: 0.45rem 0.5rem;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-top: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(18, 12, 42, 0.88);
+  background: rgba(18, 12, 42, 0.9);
   backdrop-filter: blur(8px);
   box-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
 }
 
 .reader-mode .ctrls-open .book-controls {
   display: grid;
-  max-height: 52dvh;
-  overflow-y: auto;
 }
 
-/* Kompaktní decentní řádky v readeru — tmavé sklo, menší písmo */
-.reader-mode .ctrl-row {
-  min-height: 38px;
-  padding: 0.28rem 0.6rem;
-  font-size: 0.78rem;
-  border-radius: 11px;
+.reader-mode .ctrl-cell {
+  min-height: 56px;
+  font-size: 0.72rem;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.16);
   color: #fff;
   box-shadow: none;
 }
 
-.reader-mode .ctrl-row-primary {
-  grid-column: 1 / -1;
-  min-height: 42px;
-  font-size: 0.88rem;
+.reader-mode .ctrl-cell-primary {
   background: linear-gradient(135deg, #7c4dff 0%, #5c35cc 100%);
   border-color: transparent;
 }
 
-.reader-mode .ctrl-row-on {
+.reader-mode .ctrl-cell-on {
   background: linear-gradient(135deg, rgba(124, 77, 255, 0.9), rgba(92, 53, 204, 0.9));
   border-color: transparent;
 }
 
-.reader-mode .ctrl-row-home {
+.reader-mode .ctrl-cell-home {
   background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
   border-color: transparent;
 }
 
-.reader-mode .ctrl-row-info {
+.reader-mode .ctrl-cell-info {
   background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.reader-mode .ctrl-ico {
-  font-size: 1rem;
-  width: 1.4rem;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 /* Nav arrows float mid-height over the image; hidden by default,
@@ -847,35 +835,28 @@ button:disabled {
     align-self: center;
     object-fit: cover;
   }
-  /* Landscape: úzký decentní sloupec vpravo v tmavém pruhu vedle obrázku */
+  /* Landscape (fullscreen): jeden sloupec 4 tlačítek na výšku obrázku,
+     u pravého kraje v tmavém pruhu vedle obrázku */
   .reader-mode .book-controls {
     position: absolute;
     margin: 0;
     left: auto;
     right: 0.4rem;
-    bottom: auto;
-    top: 50%;
-    transform: translateY(-50%);
+    top: 0.45rem;
+    bottom: 3.4rem; /* nad bílým pruhem titulků */
+    transform: none;
     grid-template-columns: 1fr;
-    gap: 0.28rem;
-    width: 148px;
-    padding: 0.4rem 0.4rem;
-    max-height: calc(100dvh - 2rem);
-    overflow-y: auto;
+    grid-template-rows: repeat(4, 1fr);
+    gap: 0.35rem;
+    width: 116px;
+    padding: 0.4rem;
   }
-  .reader-mode .ctrl-row {
-    min-height: 34px;
-    padding: 0.22rem 0.5rem;
-    font-size: 0.72rem;
-  }
-  .reader-mode .ctrl-row-primary {
-    grid-column: auto;
-    min-height: 38px;
-    font-size: 0.78rem;
+  .reader-mode .ctrl-cell {
+    min-height: 0;
+    font-size: 0.7rem;
   }
   .reader-mode .ctrl-ico {
-    font-size: 0.9rem;
-    width: 1.2rem;
+    font-size: 1.15rem;
   }
 
   /* Title hidden — image gets the space */
@@ -990,80 +971,76 @@ button:disabled {
 }
 
 /* ── Unified control bar ── */
+/* 4 tlačítka v jedné řadě na šířku obrázku */
 .book-controls {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.45rem;
-  padding: 0.8rem 1rem 0.9rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  padding: 0.7rem 1rem 0.8rem;
   border-top: 1.5px solid rgba(196, 190, 235, 0.45);
   background: rgba(248, 247, 255, 0.7);
 }
 
-/* ── Moderní řádková tlačítka přes celou šířku panelu ── */
-.ctrl-row {
+.ctrl-cell {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.7rem;
-  width: 100%;
-  min-height: 46px;
-  padding: 0.5rem 0.95rem;
+  justify-content: center;
+  gap: 0.18rem;
+  min-height: 58px;
+  min-width: 0;
+  padding: 0.4rem 0.3rem;
   border: 1.5px solid rgba(124, 77, 255, 0.22);
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(243, 240, 255, 0.95));
   color: #3b2f6b;
   font: inherit;
   font-weight: 800;
-  font-size: 0.95rem;
-  text-align: left;
+  font-size: 0.78rem;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(60, 50, 120, 0.12);
-  transition: transform 0.1s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  transition: transform 0.1s, background 0.15s, border-color 0.15s;
 }
 
-.ctrl-row:active { transform: scale(0.985); }
-.ctrl-row:disabled { opacity: 0.55; cursor: default; }
+.ctrl-cell:active { transform: scale(0.97); }
+.ctrl-cell:disabled { opacity: 0.55; cursor: default; }
 
-.ctrl-row-primary {
-  min-height: 54px;
-  font-size: 1.05rem;
+.ctrl-cell-primary {
   background: linear-gradient(135deg, #7c4dff 0%, #5c35cc 100%);
   color: #fff;
   border-color: transparent;
   box-shadow: 0 4px 14px rgba(124, 77, 255, 0.4);
 }
 
-.ctrl-row-on {
+.ctrl-cell-on {
   background: linear-gradient(135deg, rgba(124, 77, 255, 0.92), rgba(92, 53, 204, 0.92));
   color: #fff;
   border-color: transparent;
 }
 
-.ctrl-row-home {
+.ctrl-cell-home {
   background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
   color: #fff;
   border-color: transparent;
 }
 
-.ctrl-row-info {
+.ctrl-cell-info {
   background: rgba(124, 77, 255, 0.08);
   border-style: dashed;
   cursor: default;
   box-shadow: none;
 }
 
-.ctrl-row-loading { animation: pulse-soft 1.2s ease-in-out infinite; }
+.ctrl-cell-loading { animation: pulse-soft 1.2s ease-in-out infinite; }
 @keyframes pulse-soft { 50% { opacity: 0.6; } }
 
 .ctrl-ico {
-  font-size: 1.25rem;
-  width: 1.9rem;
-  text-align: center;
-  flex: 0 0 auto;
+  font-size: 1.35rem;
+  line-height: 1;
 }
 
 .ctrl-txt {
-  flex: 1;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

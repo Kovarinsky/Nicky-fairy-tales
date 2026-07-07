@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.90";
+export const APP_VERSION = "2.91";
 
 // Changelog (newest first)
+// 2.91 - Ovládání čtečky předěláno: jen 4 velká tlačítka (Přehrát/Pauza, Strana, Na šířku, Domů) — v portrétu jedna řada na šířku obrázku dole, ve fullscreenu jeden sloupec na výšku obrázku vpravo; tlačítka Hlas a Hudba se nastavují v hlavním menu, auto-přechod scén je zapnutý vždy
 // 2.90 - Ovládání čtečky je decentní: kompaktní tmavý panel (na výšku dole ve 2 sloupcích, na šířku úzký sloupek u kraje), nepřekrývá obrázek, objeví se jen ťuknutím na displej a po 5 s sám zmizí
 // 2.89 - Oprava swipe mazání: po swipu už se omylem nespustí pohádka (potlačení syntetizovaného kliku, stav v ref); odjištěná položka má neprůhledné pozadí — červené Smazat neprosvítá skrz text
 // 2.88 - Vision QA: každý vygenerovaný obrázek automaticky zkontroluje kontrolní model (dvojitá postava, cizí lidé, špatné vlasy/oblečení, anatomie) a vadný se JEDNOU překreslí s popisem chyby; do zámku přidáno „každá postava přesně jednou" (konec dvou tatínků)
