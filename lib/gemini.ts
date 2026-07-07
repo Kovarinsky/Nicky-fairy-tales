@@ -6,10 +6,11 @@ import type { ReferenceImage } from "./characters";
 // Starší proměnná GEMINI_IMAGE_MODEL (na Vercelu gemini-3.1-flash-image,
 // $0.067 ≈ 1,55 Kč) je od v2.79 už jen ZÁLOHA — kvalita storybook ilustrací je
 // srovnatelná a náklady o ~42 % nižší. Přebít jde přes GEMINI_IMAGE_MODEL_PRIMARY.
-const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL_PRIMARY || "gemini-2.5-flash-image";
+const IMAGE_MODEL = (process.env.GEMINI_IMAGE_MODEL_PRIMARY || "gemini-2.5-flash-image").trim();
 // Záložní obrázkový model — denní kvóta (limit 1000/den) platí NA MODEL,
-// takže když primární narazí na strop, druhý model jede dál
-const FALLBACK_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL_FALLBACK || process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
+// takže když primární narazí na strop, druhý model jede dál.
+// .trim() — hodnota ve Vercelu může mít omylem vložený newline na konci.
+const FALLBACK_IMAGE_MODEL = (process.env.GEMINI_IMAGE_MODEL_FALLBACK || process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image").trim();
 const SANITIZE_MODEL = "gemini-2.0-flash"; // fast text model — sanitizes its own image model's prompt
 
 // Denní kvóta / vyčerpaný kredit — okamžité opakování je zbytečné (reset až
