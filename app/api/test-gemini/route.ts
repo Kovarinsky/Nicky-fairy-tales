@@ -35,6 +35,10 @@ export async function GET() {
 
   if (!apiKey) return NextResponse.json({ error: "GEMINI_API_KEY not set" }, { status: 500 });
 
+  // Diagnostika: poslední 4 znaky klíče (bezpečné) — ověření, který klíč
+  // produkce skutečně používá (…KM5Q = správný, …WdJw = starý vyčerpaný)
+  const keyEnd = `…${apiKey.slice(-4)}`;
+
   let status = 0;
   let rawBody = "";
   try {
@@ -46,14 +50,14 @@ export async function GET() {
   }
 
   if (status >= 400) {
-    return NextResponse.json({ status, model, error: rawBody.slice(0, 800) });
+    return NextResponse.json({ status, model, keyEnd, error: rawBody.slice(0, 800) });
   }
 
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(rawBody);
   } catch {
-    return NextResponse.json({ status, model, parseError: "JSON parse failed", bodyStart: rawBody.slice(0, 500) });
+    return NextResponse.json({ status, model, keyEnd, parseError: "JSON parse failed", bodyStart: rawBody.slice(0, 500) });
   }
 
   type Part = { inlineData?: { mimeType?: string; data?: string }; text?: string };
@@ -69,6 +73,7 @@ export async function GET() {
   return NextResponse.json({
     status,
     model,
+    keyEnd,
     hasImage,
     finishReasons,
     safetyRatings,
