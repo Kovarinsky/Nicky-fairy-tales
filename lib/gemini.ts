@@ -2,15 +2,15 @@ import { request } from "https";
 import type { Scene } from "./types";
 import type { ReferenceImage } from "./characters";
 
-// Primární model: levnější gemini-2.5-flash-image (~$0.039 ≈ 0,90 Kč/obrázek).
-// Starší proměnná GEMINI_IMAGE_MODEL (na Vercelu gemini-3.1-flash-image,
-// $0.067 ≈ 1,55 Kč) je od v2.79 už jen ZÁLOHA — kvalita storybook ilustrací je
-// srovnatelná a náklady o ~42 % nižší. Přebít jde přes GEMINI_IMAGE_MODEL_PRIMARY.
-const IMAGE_MODEL = (process.env.GEMINI_IMAGE_MODEL_PRIMARY || "gemini-2.5-flash-image").trim();
+// Primární model: gemini-3.1-flash-image ($0.067 ≈ 1,55 Kč/obrázek) — v2.81
+// vráceno z levnějšího 2.5 (0,90 Kč): kreslil méně konzistentně a sklouzával
+// do 3D renderu. Přebít jde přes GEMINI_IMAGE_MODEL_PRIMARY.
+const IMAGE_MODEL = (process.env.GEMINI_IMAGE_MODEL_PRIMARY || process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image").trim();
 // Záložní obrázkový model — denní kvóta (limit 1000/den) platí NA MODEL,
 // takže když primární narazí na strop, druhý model jede dál.
 // .trim() — hodnota ve Vercelu může mít omylem vložený newline na konci.
-const FALLBACK_IMAGE_MODEL = (process.env.GEMINI_IMAGE_MODEL_FALLBACK || process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image").trim();
+const FALLBACK_RAW = (process.env.GEMINI_IMAGE_MODEL_FALLBACK || "gemini-2.5-flash-image").trim();
+const FALLBACK_IMAGE_MODEL = FALLBACK_RAW !== IMAGE_MODEL ? FALLBACK_RAW : "gemini-2.5-flash-image";
 const SANITIZE_MODEL = "gemini-2.0-flash"; // fast text model — sanitizes its own image model's prompt
 
 // Denní kvóta / vyčerpaný kredit — okamžité opakování je zbytečné (reset až
@@ -221,7 +221,7 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
     ? `⚠ CONSISTENCY REMINDER: match hair, eyes, clothing, age, body size and relative heights EXACTLY as stated above — do NOT alter any detail.`
     : "";
 
-  const STYLE_SUFFIX = "Walt Disney animated style, painterly storybook illustration, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. Absolutely no text, letters, words, signs, labels, captions, subtitles, or writing of any kind anywhere in the image.";
+  const STYLE_SUFFIX = "Hand-painted 2D storybook illustration, soft painterly brushwork in classic Disney animated-film style, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. Strictly FLAT 2D painting — NOT a 3D render, no CGI, no plastic skin, no photorealism. Absolutely no text, letters, words, signs, labels, captions, subtitles, watermarks, or artist signatures of any kind anywhere in the image.";
 
   const rawPrompt = [
     charLockOpen,

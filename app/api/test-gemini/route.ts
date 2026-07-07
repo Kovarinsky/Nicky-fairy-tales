@@ -30,8 +30,8 @@ function callRaw(apiKey: string, model: string): Promise<{ status: number; body:
 
 export async function GET() {
   const apiKey = process.env.GEMINI_API_KEY?.trim() ?? "";
-  // Stejná logika jako lib/gemini.ts: primární je levný model, GEMINI_IMAGE_MODEL je záloha
-  const model = process.env.GEMINI_IMAGE_MODEL_PRIMARY?.trim() || "gemini-2.5-flash-image";
+  // Stejná logika jako lib/gemini.ts (v2.81: primární je zpět 3.1)
+  const model = (process.env.GEMINI_IMAGE_MODEL_PRIMARY || process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image").trim();
 
   if (!apiKey) return NextResponse.json({ error: "GEMINI_API_KEY not set" }, { status: 500 });
 

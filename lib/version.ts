@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.80";
+export const APP_VERSION = "2.81";
 
 // Changelog (newest first)
+// 2.81 - Konzistence a kvalita obrázků: primární malíř zpět gemini-3.1-flash-image (2.5 jen záloha při kvótě); styl natvrdo 2D malovaná ilustrace (zákaz 3D renderu, fotorealismu i podpisů); sportovní vybavení (kolo!) a sportovní oblečení se zamyká jako Key object — stejný typ, barvy i dres v každé scéně
 // 2.80 - Příběhy píše Claude Sonnet místo Opusu (kvalita pohádek srovnatelná, ~5× levnější psaní); jde přebít proměnnou ANTHROPIC_MODEL_PRIMARY
 // 2.79 - Levnější kreslení: primární obrázkový model je gemini-2.5-flash-image (~0,90 Kč/obrázek, −42 %), dražší gemini-3.1-flash-image (~1,55 Kč) zůstává jen jako záloha při vyčerpání denní kvóty; jde přebít proměnnou GEMINI_IMAGE_MODEL_PRIMARY
 // 2.78 - Strop automatických oživení: pohádka bez posunu se oživí max 4×, pak se zastaví s chybou („zastaveno, ať se nepálí kredit") — každé oživení překresluje scény a stálo peníze; posun vpřed počítadlo nuluje
