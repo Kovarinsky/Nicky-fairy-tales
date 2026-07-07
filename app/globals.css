@@ -755,11 +755,9 @@ button:disabled {
 
 .reader-mode .ctrls-open .book-controls {
   display: flex;
-}
-
-.reader-mode .ctrl-item .ctrl-btn {
-  height: 44px;
-  font-size: 1.15rem;
+  /* všechna tlačítka (vč. Domů) dostupná i na výšku — panel jde rolovat */
+  max-height: 62dvh;
+  overflow-y: auto;
 }
 
 /* Nav arrows float mid-height over the image; hidden by default,
@@ -813,17 +811,19 @@ button:disabled {
     transform: translateY(-50%);
     flex-direction: column;
     gap: 0.4rem;
-    width: 82px;
-    padding: 0.55rem 0.45rem;
-    max-height: calc(100dvh - 4rem);
+    width: 216px;
+    padding: 0.6rem 0.55rem;
+    max-height: calc(100dvh - 3rem);
     overflow-y: auto;
   }
-  .reader-mode .ctrl-item .ctrl-btn {
-    height: 38px;
-    font-size: 1.05rem;
+  .reader-mode .ctrl-row {
+    min-height: 42px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.88rem;
   }
-  .reader-mode .ctrl-label {
-    font-size: 0.55rem;
+  .reader-mode .ctrl-row-primary {
+    min-height: 48px;
+    font-size: 0.98rem;
   }
 
   /* Title hidden — image gets the space */
@@ -940,38 +940,81 @@ button:disabled {
 /* ── Unified control bar ── */
 .book-controls {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  padding: 0.7rem 1.25rem 0.8rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  padding: 0.8rem 1rem 0.9rem;
   border-top: 1.5px solid rgba(196, 190, 235, 0.45);
   background: rgba(248, 247, 255, 0.7);
 }
 
-/* Button + label under it — items share the full panel width equally */
-.ctrl-item {
+/* ── Moderní řádková tlačítka přes celou šířku panelu ── */
+.ctrl-row {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.22rem;
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-/* Big full-width buttons, old-phone style */
-.ctrl-item .ctrl-btn {
+  gap: 0.7rem;
   width: 100%;
-  height: 52px;
-  border-radius: 16px;
-  font-size: 1.3rem;
+  min-height: 46px;
+  padding: 0.5rem 0.95rem;
+  border: 1.5px solid rgba(124, 77, 255, 0.22);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(243, 240, 255, 0.95));
+  color: #3b2f6b;
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(60, 50, 120, 0.12);
+  transition: transform 0.1s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
-.ctrl-label {
-  font-size: 0.6rem;
-  font-weight: 700;
-  color: rgba(60, 50, 100, 0.65);
-  letter-spacing: 0.02em;
+.ctrl-row:active { transform: scale(0.985); }
+.ctrl-row:disabled { opacity: 0.55; cursor: default; }
+
+.ctrl-row-primary {
+  min-height: 54px;
+  font-size: 1.05rem;
+  background: linear-gradient(135deg, #7c4dff 0%, #5c35cc 100%);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(124, 77, 255, 0.4);
+}
+
+.ctrl-row-on {
+  background: linear-gradient(135deg, rgba(124, 77, 255, 0.92), rgba(92, 53, 204, 0.92));
+  color: #fff;
+  border-color: transparent;
+}
+
+.ctrl-row-home {
+  background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+  color: #fff;
+  border-color: transparent;
+}
+
+.ctrl-row-info {
+  background: rgba(124, 77, 255, 0.08);
+  border-style: dashed;
+  cursor: default;
+  box-shadow: none;
+}
+
+.ctrl-row-loading { animation: pulse-soft 1.2s ease-in-out infinite; }
+@keyframes pulse-soft { 50% { opacity: 0.6; } }
+
+.ctrl-ico {
+  font-size: 1.25rem;
+  width: 1.9rem;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+.ctrl-txt {
+  flex: 1;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ctrl-btn {

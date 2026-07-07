@@ -744,6 +744,11 @@ export default function Home() {
   function resetToForm() {
     audioRef.current?.pause();
     setIsPlaying(false);
+    // Domů VŽDY opustí fullscreen i zámek otočení — jinak by se formulář
+    // zobrazil obrovský napříč displejem (fullscreen na šířku)
+    try { (screen as Screen & { orientation?: { unlock?: () => void } }).orientation?.unlock?.(); } catch {}
+    try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch {}
+    setForcedLs(false);
     setViewMode("form");
     try { localStorage.removeItem(DRAFT_KEY); } catch {}
   }
@@ -852,23 +857,27 @@ export default function Home() {
   // Orientation lock requires fullscreen on Android Chrome; both are reverted
   // when switching back. If the device doesn't support locking (iOS Safari),
   // the button silently does its best (fullscreen only).
+  // Rozhoduje se podle SKUTEČNÉHO stavu fullscreenu (ne podle stavu tlačítka)
+  // — když se appka do fullscreenu dostala jinou cestou, jedno ťuknutí ho
+  // rovnou opustí (dřív bylo potřeba mačkat 2×).
   async function toggleForcedLandscape() {
     const so = (screen as Screen & { orientation?: { lock?: (o: string) => Promise<void>; unlock?: () => void } }).orientation;
-    if (!forcedLs) {
+    const inFs = !!document.fullscreenElement;
+    if (!inFs) {
       try { await document.documentElement.requestFullscreen?.(); } catch {}
       try { await so?.lock?.("landscape"); } catch {}
       setForcedLs(true);
     } else {
       try { so?.unlock?.(); } catch {}
-      try { if (document.fullscreenElement) await document.exitFullscreen(); } catch {}
+      try { await document.exitFullscreen(); } catch {}
       setForcedLs(false);
     }
   }
 
-  // Leaving fullscreen via system back → drop the forced-landscape state
+  // Ikona tlačítka sleduje skutečný stav fullscreenu (i systémové gesto zpět)
   useEffect(() => {
     function onFsChange() {
-      if (!document.fullscreenElement) setForcedLs(false);
+      setForcedLs(!!document.fullscreenElement);
     }
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
@@ -2255,77 +2264,53 @@ export default function Home() {
             </div>
 
             <div className="book-controls" onClick={e => e.stopPropagation()}>
-              <div className="ctrl-item">
-                <button type="button" className={`ctrl-btn ctrl-play ${!current.audioUrl || regenAudio ? "ctrl-loading" : ""}`}
-                  onClick={togglePlay} disabled={!current.audioUrl || regenAudio} aria-label={isPlaying ? t.pause : t.play}>
-                  {!current.audioUrl && !regenAudio ? "⏳" : isPlaying ? "⏸" : "▶"}
-                </button>
-                <span className="ctrl-label">{isPlaying ? t.pause : t.play}</span>
+              <button type="button" className={`ctrl-row ctrl-row-primary${!current.audioUrl || regenAudio ? " ctrl-row-loading" : ""}`}
+                onClick={togglePlay} disabled={!current.audioUrl || regenAudio}>
+                <span className="ctrl-ico">{!current.audioUrl && !regenAudio ? "⏳" : isPlaying ? "⏸" : "▶"}</span>
+                <span className="ctrl-txt">{isPlaying ? t.pause : t.play}</span>
+              </button>
+
+              <div className="ctrl-row ctrl-row-info">
+                <span className="ctrl-ico">📖</span>
+                <span className="ctrl-txt">{t.pageLbl} {page + 1} / {scenes.length}</span>
               </div>
 
-              <div className="ctrl-item">
-                <span className="ctrl-counter">{page + 1} / {scenes.length}</span>
-                <span className="ctrl-label">{t.pageLbl}</span>
-              </div>
-
-              <div className="ctrl-item">
-                <button type="button" className={`ctrl-btn ctrl-auto ${autoAdvance ? "ctrl-auto-on" : ""}`}
-                  onClick={() => setAutoAdvance(p => !p)} title={autoAdvance ? "Auto-přechod zapnut" : "Auto-přechod vypnut"}>
-                  {autoAdvance ? "🔁" : "🔂"}
-                </button>
-                <span className="ctrl-label">{t.auto}</span>
-              </div>
+              <button type="button" className={`ctrl-row${autoAdvance ? " ctrl-row-on" : ""}`}
+                onClick={() => setAutoAdvance(p => !p)}>
+                <span className="ctrl-ico">{autoAdvance ? "🔁" : "🔂"}</span>
+                <span className="ctrl-txt">{t.auto}</span>
+              </button>
 
               {/* Voice cycle button — only when multiple voices available */}
               {voices.length > 1 && (
-                <div className="ctrl-item">
-                  <button type="button" className={`ctrl-btn ctrl-auto ${regenAudio ? "ctrl-loading" : "ctrl-auto-on"}`}
-                    onClick={() => {
-                      const idx = voices.findIndex(v => v.id === selectedVoiceId);
-                      const next = voices[(idx + 1) % voices.length];
-                      switchVoice(next.id);
-                    }}
-                    disabled={regenAudio}
-                    title={`Hlas: ${voices.find(v => v.id === selectedVoiceId)?.name ?? "?"} — klikni pro přepnutí`}
-                  >
-                    {voices.find(v => v.id === selectedVoiceId)?.emoji ?? "🎙️"}
-                  </button>
-                  <span className="ctrl-label">{t.voice}</span>
-                </div>
+                <button type="button" className={`ctrl-row${regenAudio ? " ctrl-row-loading" : ""}`}
+                  onClick={() => {
+                    const idx = voices.findIndex(v => v.id === selectedVoiceId);
+                    const next = voices[(idx + 1) % voices.length];
+                    switchVoice(next.id);
+                  }}
+                  disabled={regenAudio}>
+                  <span className="ctrl-ico">{voices.find(v => v.id === selectedVoiceId)?.emoji ?? "🎙️"}</span>
+                  <span className="ctrl-txt">{t.voice}: {voices.find(v => v.id === selectedVoiceId)?.name ?? "?"}</span>
+                </button>
               )}
 
-              <div className="ctrl-item">
-                <button type="button" className={`ctrl-btn ctrl-mute ${musicOn ? "ctrl-mute-on" : ""}`}
-                  onClick={() => setMusicOn(p => !p)}
-                  title={musicOn ? "Vypnout hudbu" : "Zapnout hudbu"}
-                  aria-label={musicOn ? "Vypnout hudbu" : "Zapnout hudbu"}
-                >
-                  {musicOn ? "🎵" : "🔇"}
-                </button>
-                <span className="ctrl-label">{t.music}</span>
-              </div>
+              <button type="button" className={`ctrl-row${musicOn ? " ctrl-row-on" : ""}`}
+                onClick={() => setMusicOn(p => !p)}>
+                <span className="ctrl-ico">{musicOn ? "🎵" : "🔇"}</span>
+                <span className="ctrl-txt">{t.music}</span>
+              </button>
 
-              <div className="ctrl-item">
-                <button type="button" className={`ctrl-btn ctrl-auto ${forcedLs ? "ctrl-auto-on" : ""}`}
-                  onClick={toggleForcedLandscape}
-                  title={forcedLs ? "Zpět na výšku" : "Otočit na šířku"}
-                  aria-label={forcedLs ? "Zpět na výšku" : "Otočit na šířku"}
-                >
-                  {forcedLs ? "📱" : "🔄"}
-                </button>
-                <span className="ctrl-label">{forcedLs ? t.rotateBack : t.rotate}</span>
-              </div>
+              <button type="button" className={`ctrl-row${forcedLs ? " ctrl-row-on" : ""}`}
+                onClick={toggleForcedLandscape}>
+                <span className="ctrl-ico">{forcedLs ? "📱" : "🔄"}</span>
+                <span className="ctrl-txt">{forcedLs ? t.rotateBack : t.rotate}</span>
+              </button>
 
-              <div className="ctrl-item">
-                <button type="button" className="ctrl-btn ctrl-home"
-                  onClick={resetToForm}
-                  title="Hlavní stránka"
-                  aria-label="Hlavní stránka"
-                >
-                  🏠
-                </button>
-                <span className="ctrl-label">{t.home}</span>
-              </div>
+              <button type="button" className="ctrl-row ctrl-row-home" onClick={resetToForm}>
+                <span className="ctrl-ico">🏠</span>
+                <span className="ctrl-txt">{t.home}</span>
+              </button>
             </div>
           </div>
 
