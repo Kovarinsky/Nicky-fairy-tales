@@ -1723,7 +1723,7 @@ export default function Home() {
     setSelectedCustomIds(p => p.filter(x => x !== id));
   }
   async function handleInspImage(file: File) {
-    if (inspImages.length >= 3) return;
+    if (inspImages.length >= 8) return; // inspirace: až 8 fotek (sjednoceno s vlastním světem)
     const r = await resizeAndEncode(file, 512).catch(() => null);
     if (r) setInspImages(p => [...p, { ...r, name: file.name }]);
   }
@@ -1971,14 +1971,14 @@ export default function Home() {
               </button>
             )}
             <button type="button" className={`insp-btn ${inspImages.length > 0 ? "chip-on" : ""}`}
-              onClick={() => inspImageRef.current?.click()} disabled={inspImages.length >= 3}>
+              onClick={() => inspImageRef.current?.click()} disabled={inspImages.length >= 8}>
               📷 {t.photoBtn}{inspImages.length > 0 ? ` (${inspImages.length})` : ""}
             </button>
             <button type="button" className={`insp-btn ${inspUrlActive ? "chip-on" : ""}`} onClick={() => setInspUrlActive(p => !p)}>🔗 {t.webBtn}</button>
             <button type="button" className={`insp-btn ${inspPdf ? "chip-on" : ""}`} onClick={() => inspPdfRef.current?.click()}>📄 PDF{inspPdf ? " ✓" : ""}</button>
           </div>
           <input ref={inspImageRef} type="file" accept="image/*" multiple style={{ display: "none" }}
-            onChange={async e => { for (const f of Array.from(e.target.files || []).slice(0, 3 - inspImages.length)) await handleInspImage(f); e.target.value = ""; }} />
+            onChange={async e => { for (const f of Array.from(e.target.files || []).slice(0, 8 - inspImages.length)) await handleInspImage(f); e.target.value = ""; }} />
           <input ref={inspPdfRef} type="file" accept=".pdf,application/pdf" style={{ display: "none" }}
             onChange={e => { const f = e.target.files?.[0]; if (f) handleInspPdf(f); e.target.value = ""; }} />
           {inspUrlActive && <input type="url" value={inspUrl} onChange={e => setInspUrl(e.target.value)} placeholder="https://cs.wikipedia.org/wiki/Krteček" className="url-input" />}
