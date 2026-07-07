@@ -739,25 +739,71 @@ button:disabled {
 }
 
 /* Controls: hidden; tap → panel pinned to the BOTTOM of the screen */
+/* Reader: kompaktní tmavý panel dole, mimo obrázek; ukáže se jen na ťuknutí
+   a po 5 s sám zmizí (řídí page.tsx) */
 .reader-mode .book-controls {
   position: absolute;
-  left: 0.5rem;
-  right: 0.5rem;
-  bottom: 0.5rem;
+  left: 0.45rem;
+  right: 0.45rem;
+  bottom: 0.45rem;
   margin: 0;
   z-index: 6;
   display: none;
-  border-radius: 20px;
-  border-top: none;
-  background: rgba(248, 247, 255, 0.96);
+  grid-template-columns: 1fr 1fr;
+  gap: 0.32rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(18, 12, 42, 0.88);
+  backdrop-filter: blur(8px);
   box-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
 }
 
 .reader-mode .ctrls-open .book-controls {
-  display: flex;
-  /* všechna tlačítka (vč. Domů) dostupná i na výšku — panel jde rolovat */
-  max-height: 62dvh;
+  display: grid;
+  max-height: 52dvh;
   overflow-y: auto;
+}
+
+/* Kompaktní decentní řádky v readeru — tmavé sklo, menší písmo */
+.reader-mode .ctrl-row {
+  min-height: 38px;
+  padding: 0.28rem 0.6rem;
+  font-size: 0.78rem;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  box-shadow: none;
+}
+
+.reader-mode .ctrl-row-primary {
+  grid-column: 1 / -1;
+  min-height: 42px;
+  font-size: 0.88rem;
+  background: linear-gradient(135deg, #7c4dff 0%, #5c35cc 100%);
+  border-color: transparent;
+}
+
+.reader-mode .ctrl-row-on {
+  background: linear-gradient(135deg, rgba(124, 77, 255, 0.9), rgba(92, 53, 204, 0.9));
+  border-color: transparent;
+}
+
+.reader-mode .ctrl-row-home {
+  background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+  border-color: transparent;
+}
+
+.reader-mode .ctrl-row-info {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.reader-mode .ctrl-ico {
+  font-size: 1rem;
+  width: 1.4rem;
 }
 
 /* Nav arrows float mid-height over the image; hidden by default,
@@ -801,29 +847,35 @@ button:disabled {
     align-self: center;
     object-fit: cover;
   }
+  /* Landscape: úzký decentní sloupec vpravo v tmavém pruhu vedle obrázku */
   .reader-mode .book-controls {
     position: absolute;
     margin: 0;
     left: auto;
-    right: 0.55rem;
+    right: 0.4rem;
     bottom: auto;
     top: 50%;
     transform: translateY(-50%);
-    flex-direction: column;
-    gap: 0.4rem;
-    width: 216px;
-    padding: 0.6rem 0.55rem;
-    max-height: calc(100dvh - 3rem);
+    grid-template-columns: 1fr;
+    gap: 0.28rem;
+    width: 148px;
+    padding: 0.4rem 0.4rem;
+    max-height: calc(100dvh - 2rem);
     overflow-y: auto;
   }
   .reader-mode .ctrl-row {
-    min-height: 42px;
-    padding: 0.4rem 0.75rem;
-    font-size: 0.88rem;
+    min-height: 34px;
+    padding: 0.22rem 0.5rem;
+    font-size: 0.72rem;
   }
   .reader-mode .ctrl-row-primary {
-    min-height: 48px;
-    font-size: 0.98rem;
+    grid-column: auto;
+    min-height: 38px;
+    font-size: 0.78rem;
+  }
+  .reader-mode .ctrl-ico {
+    font-size: 0.9rem;
+    width: 1.2rem;
   }
 
   /* Title hidden — image gets the space */

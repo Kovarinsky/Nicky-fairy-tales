@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.89";
+export const APP_VERSION = "2.90";
 
 // Changelog (newest first)
+// 2.90 - Ovládání čtečky je decentní: kompaktní tmavý panel (na výšku dole ve 2 sloupcích, na šířku úzký sloupek u kraje), nepřekrývá obrázek, objeví se jen ťuknutím na displej a po 5 s sám zmizí
 // 2.89 - Oprava swipe mazání: po swipu už se omylem nespustí pohádka (potlačení syntetizovaného kliku, stav v ref); odjištěná položka má neprůhledné pozadí — červené Smazat neprosvítá skrz text
 // 2.88 - Vision QA: každý vygenerovaný obrázek automaticky zkontroluje kontrolní model (dvojitá postava, cizí lidé, špatné vlasy/oblečení, anatomie) a vadný se JEDNOU překreslí s popisem chyby; do zámku přidáno „každá postava přesně jednou" (konec dvou tatínků)
 // 2.87 - Nový ovládací panel čtečky: moderní tlačítka přes celou šířku s popiskem (Přehrát, Auto, Hlas, Hudba, Na šířku, Domů — viditelné i na výšku, panel jde rolovat); otočení jedním ťuknutím (tlačítko se řídí skutečným stavem fullscreenu); Domů vždy ukončí fullscreen — home screen už nebude obrovský na šířku

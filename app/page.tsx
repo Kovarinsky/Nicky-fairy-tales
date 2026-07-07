@@ -599,6 +599,14 @@ export default function Home() {
     if (nav) { nav.style.top = ""; nav.style.left = ""; nav.style.width = ""; nav.style.right = ""; }
   }, [viewMode]);
 
+  // Ovládací panel se v readeru objeví jen ťuknutím a po 5 s sám zmizí —
+  // nesmí zakrývat obrázek během čtení
+  useEffect(() => {
+    if (!ctrlsOpen || viewMode !== "reader") return;
+    const timer = setTimeout(() => setCtrlsOpen(false), 5000);
+    return () => clearTimeout(timer);
+  }, [ctrlsOpen, viewMode]);
+
   // Wake Lock: při otevřené čtečce displej nezhasíná / nespoří (pohádka
   // běží dlouhé minuty bez dotyku). Po návratu do appky se zámek obnoví.
   useEffect(() => {
