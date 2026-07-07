@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.87";
+export const APP_VERSION = "2.88";
 
 // Changelog (newest first)
+// 2.88 - Vision QA: každý vygenerovaný obrázek automaticky zkontroluje kontrolní model (dvojitá postava, cizí lidé, špatné vlasy/oblečení, anatomie) a vadný se JEDNOU překreslí s popisem chyby; do zámku přidáno „každá postava přesně jednou" (konec dvou tatínků)
 // 2.87 - Nový ovládací panel čtečky: moderní tlačítka přes celou šířku s popiskem (Přehrát, Auto, Hlas, Hudba, Na šířku, Domů — viditelné i na výšku, panel jde rolovat); otočení jedním ťuknutím (tlačítko se řídí skutečným stavem fullscreenu); Domů vždy ukončí fullscreen — home screen už nebude obrovský na šířku
 // 2.86 - Displej při čtení pohádky nezhasíná (Wake Lock — drží se, dokud je otevřená čtečka, obnoví se po návratu do appky); rolující titulky: začátek i konec věty jsou plně čitelné (vnitřní odsazení textu větší než vyblednutí okrajů)
 // 2.85 - Hlubší a dramatičtější příběhy (přímá řeč ve scénách, pocity hrdinů, skutečná sázka, temný okamžik před rozuzlením); dlouhé názvy v Posledních pohádkách rolují tam a zpět (čitelné celé); stylové mazání: swipe doleva nebo ťuknutí na 🗑️ odhalí červené Smazat — konec systémového dialogu

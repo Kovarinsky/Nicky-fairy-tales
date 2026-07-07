@@ -176,6 +176,45 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
   });
 }
 
+// ── Vision QA: automatická kontrola vygenerovaného obrázku ──────────────────
+// Levný text+vision model zkontroluje typické vady (dvojitá postava, cizí
+// lidé, špatné vlasy/oblečení, anatomie). Vadný obrázek se JEDNOU překreslí
+// s popisem chyby. Kontrola nikdy neblokuje — při výpadku se obrázek přijme.
+async function verifySceneImage(apiKey: string, img: ImageResult, heroDescription: string): Promise<{ ok: boolean; problems: string }> {
+  try {
+    const raw = await geminiPost(apiKey, SANITIZE_MODEL, {
+      contents: [{
+        role: "user",
+        parts: [
+          { inlineData: { data: img.buffer.toString("base64"), mimeType: img.mimeType } },
+          { text: [
+            "You are a strict quality checker for a children's storybook illustration.",
+            "CANONICAL CHARACTER SHEET:",
+            heroDescription.slice(0, 1500),
+            "",
+            "Check the image for these DEFECTS ONLY:",
+            "1) DUPLICATE character — the same person drawn twice in one image",
+            "2) EXTRA people who are not on the character sheet",
+            "3) CLEARLY WRONG look of a named character (hair color or length obviously different, missing/added beard, completely different clothing colors)",
+            "4) ANATOMY errors (three arms, extra or missing limbs, malformed hands)",
+            "Minor style variation is FINE — flag only obvious defects a parent would notice.",
+            'Reply with ONLY JSON: {"ok":true} or {"ok":false,"problems":"short English description of the defects"}',
+          ].join("\n") },
+        ],
+      }],
+      generationConfig: { maxOutputTokens: 200 },
+    });
+    const data = JSON.parse(raw) as { candidates?: GeminiCandidate[] };
+    const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) return { ok: true, problems: "" };
+    const v = JSON.parse(m[0]) as { ok?: boolean; problems?: string };
+    return { ok: v.ok !== false, problems: String(v.problems || "").slice(0, 300) };
+  } catch {
+    return { ok: true, problems: "" };
+  }
+}
+
 // Pozadí aplikace — ilustrovaná scenérie ve stejném stylu jako pohádky,
 // na výšku (telefon), bez postav a bez textu. Prompt je bezpečný a pevně
 // daný (lib/backgrounds.ts), sanitizace není potřeba.
@@ -213,7 +252,7 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
         `⚠ APPEARANCE LOCK — IMMUTABLE across every image in this story:`,
         heroDescription,
         `Every named character MUST look IDENTICAL to this description in EVERY image: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes — AND the same AGE, same BODY SIZE and PROPORTIONS. Relative heights between characters NEVER change: a toddler stays toddler-sized, a child stays child-sized, adults stay adult-sized. Any recurring OBJECT listed above (vehicle, magic item, toy) keeps IDENTICAL type, shape and colors in every scene — the same car stays the same car. These are LOCKED — do NOT change anything between scenes.`,
-        `ONLY the characters named in the scene are visible — zero additional people, strangers, or background human figures.`,
+        `ONLY the characters named in the scene are visible — zero additional people, strangers, or background human figures. Each named character appears EXACTLY ONCE in the image — NEVER draw two copies of the same person.`,
       ].join(" ")
     : "";
 
@@ -247,7 +286,26 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
     let dailyCapped = false;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
-        return await callGeminiImage(apiKey, m, safePrompt, withAspect ? "16:9" : null, refImages);
+        let img = await callGeminiImage(apiKey, m, safePrompt, withAspect ? "16:9" : null, refImages);
+        // Vision QA: vadný obrázek (dvojitá postava, špatné vlasy, anatomie)
+        // se JEDNOU překreslí s konkrétním popisem chyby
+        if (heroDescription) {
+          const v = await verifySceneImage(apiKey, img, heroDescription);
+          if (!v.ok && v.problems) {
+            console.warn(`[Gemini QA] scene ${scene.index}: REJECTED (${v.problems}) → redraw`);
+            try {
+              const img2 = await callGeminiImage(
+                apiKey, m,
+                `${safePrompt} ⚠ CORRECTION: the previous attempt was rejected because: ${v.problems}. Fix exactly these issues — follow the APPEARANCE LOCK precisely and draw each named character EXACTLY ONCE.`,
+                withAspect ? "16:9" : null, refImages
+              );
+              const v2 = await verifySceneImage(apiKey, img2, heroDescription);
+              if (v2.ok) img = img2;
+              else console.warn(`[Gemini QA] scene ${scene.index}: redraw still imperfect (${v2.problems}) — keeping first`);
+            } catch {}
+          }
+        }
+        return img;
       } catch (e) {
         lastErr = e instanceof Error ? e : new Error(String(e));
         console.error(`[Gemini] scene ${scene.index} model=${m} attempt ${attempt}/${MAX_ATTEMPTS}: ${lastErr.message}`);
