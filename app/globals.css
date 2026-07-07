@@ -1720,6 +1720,8 @@ button:disabled {
 
 .history-wrap.del-armed .history-item {
   transform: translateX(-108px);
+  /* neprůhledné pozadí — červené tlačítko nesmí prosvítat skrz text */
+  background: rgba(26, 17, 55, 0.97);
 }
 
 .history-del-action {
@@ -1727,6 +1729,7 @@ button:disabled {
   top: 0;
   right: 0;
   bottom: 0;
+  z-index: 0;
   width: 108px;
   border: none;
   border-radius: 0;

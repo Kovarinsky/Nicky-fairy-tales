@@ -1631,12 +1631,18 @@ export default function Home() {
   // Stylové mazání bez systémového dialogu: ťuknutí na 🗑️ nebo swipe doleva
   // „odjistí" položku (odsune se a ukáže červené Smazat), druhé ťuknutí maže.
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  // Ref drží stav synchronně: syntetizovaný click po touchend přijde DŘÍV,
+  // než React stihne překreslit — stavová proměnná by byla stará (a klik by
+  // omylem spustil přehrávání pohádky)
+  const confirmDeleteIdRef = useRef<string | null>(null);
   const delArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swipeXRef = useRef<number | null>(null);
+  const swipeHandledRef = useRef(false); // právě proběhl swipe → ignorovat syntetizovaný click
   function armDelete(id: string | null) {
+    confirmDeleteIdRef.current = id;
     setConfirmDeleteId(id);
     if (delArmTimerRef.current) clearTimeout(delArmTimerRef.current);
-    if (id) delArmTimerRef.current = setTimeout(() => setConfirmDeleteId(null), 5000);
+    if (id) delArmTimerRef.current = setTimeout(() => { confirmDeleteIdRef.current = null; setConfirmDeleteId(null); }, 5000);
   }
   function deleteStory(e: React.MouseEvent, entry: HistoryEntry) {
     e.stopPropagation();
@@ -2346,14 +2352,19 @@ export default function Home() {
               {storyHistory.map(entry => (
                 <div key={entry.id} className={`history-wrap${confirmDeleteId === entry.id ? " del-armed" : ""}`}>
                   <button type="button" className="history-item"
-                    onClick={() => { if (confirmDeleteId) { armDelete(null); return; } replayStory(entry); }}
+                    onClick={() => {
+                      // Swipe za sebou nechává syntetizovaný click — ignorovat
+                      if (swipeHandledRef.current) { swipeHandledRef.current = false; return; }
+                      if (confirmDeleteIdRef.current) { armDelete(null); return; }
+                      replayStory(entry);
+                    }}
                     onTouchStart={e => { swipeXRef.current = e.touches[0].clientX; }}
                     onTouchEnd={e => {
                       const x0 = swipeXRef.current; swipeXRef.current = null;
                       if (x0 === null) return;
                       const dx = e.changedTouches[0].clientX - x0;
-                      if (dx < -50) armDelete(entry.id);        // swipe doleva = odjistit
-                      else if (dx > 50 && confirmDeleteId === entry.id) armDelete(null); // swipe zpět
+                      if (dx < -50) { swipeHandledRef.current = true; armDelete(entry.id); }        // swipe doleva = odjistit
+                      else if (dx > 50 && confirmDeleteIdRef.current === entry.id) { swipeHandledRef.current = true; armDelete(null); } // swipe zpět
                     }}
                     disabled={loading && bgStatus === "idle"}>
                     <div className="history-item-body">
