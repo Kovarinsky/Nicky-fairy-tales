@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.83";
+export const APP_VERSION = "2.84";
 
 // Changelog (newest first)
+// 2.84 - Pravidla konzistence (PRAVIDLA-KONZISTENCE.md): vzhled postav je KANONICKÝ — po napsání příběhu se popis vzhledu serverově přepíše doslovnými popisy z kartotéky (konec „jednou blond, podruhé hnědé"); převleky jen přes zamčený záznam Story outfits; anatomie natvrdo (přesně 2 ruce, 2 nohy, 5 prstů, kolo má 2 kola)
 // 2.83 - Inspirační fotky u pole přání (📷 Foto) zvednuty ze 3 na 8 — sjednoceno s fotkami vlastního světa
 // 2.82 - Vlastní svět pohádky unese až 8 fotek (dřív 1): mřížka náhledů s mazáním ×, vícenásobný výběr najednou, všechny fotky jdou Claudovi jako inspirace; staré světy s jednou fotkou fungují dál
 // 2.81 - Konzistence a kvalita obrázků: primární malíř zpět gemini-3.1-flash-image (2.5 jen záloha při kvótě); styl natvrdo 2D malovaná ilustrace (zákaz 3D renderu, fotorealismu i podpisů); sportovní vybavení (kolo!) a sportovní oblečení se zamyká jako Key object — stejný typ, barvy i dres v každé scéně
