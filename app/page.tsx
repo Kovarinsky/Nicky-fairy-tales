@@ -1593,9 +1593,18 @@ export default function Home() {
   }
 
   // ── Delete a story from history (localStorage + IndexedDB + memory) ──────
+  // Stylové mazání bez systémového dialogu: ťuknutí na 🗑️ nebo swipe doleva
+  // „odjistí" položku (odsune se a ukáže červené Smazat), druhé ťuknutí maže.
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const delArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const swipeXRef = useRef<number | null>(null);
+  function armDelete(id: string | null) {
+    setConfirmDeleteId(id);
+    if (delArmTimerRef.current) clearTimeout(delArmTimerRef.current);
+    if (id) delArmTimerRef.current = setTimeout(() => setConfirmDeleteId(null), 5000);
+  }
   function deleteStory(e: React.MouseEvent, entry: HistoryEntry) {
     e.stopPropagation();
-    if (!window.confirm(t.deleteStoryAsk(entry.title))) return;
     try {
       const next = loadHistory().filter(x => x.id !== entry.id);
       localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
@@ -1603,6 +1612,7 @@ export default function Home() {
       renderedMapRef.current.delete(entry.id);
       evictOldStories(next.map(x => x.id)).catch(() => {});
     } catch {}
+    armDelete(null);
   }
 
   // ── Replay from history ───────────────────────────────────────────────────
@@ -2323,22 +2333,37 @@ export default function Home() {
           {historyOpen && (
             <div className="history-list">
               {storyHistory.map(entry => (
-                <button key={entry.id} type="button" className="history-item"
-                  onClick={() => replayStory(entry)}
-                  disabled={loading && bgStatus === "idle"}>
-                  <div className="history-item-body">
-                    <span className="history-title">{entry.title}</span>
-                    <div className="history-badges">
-                      <span className="history-badge badge-offline">📥 offline</span>
-                      <span className="history-badge badge-size">{estimateStorySize(entry.scenes.length)}</span>
-                      <span className="history-badge badge-scenes">{t.scenesBadge(entry.scenes.length)}</span>
+                <div key={entry.id} className={`history-wrap${confirmDeleteId === entry.id ? " del-armed" : ""}`}>
+                  <button type="button" className="history-item"
+                    onClick={() => { if (confirmDeleteId) { armDelete(null); return; } replayStory(entry); }}
+                    onTouchStart={e => { swipeXRef.current = e.touches[0].clientX; }}
+                    onTouchEnd={e => {
+                      const x0 = swipeXRef.current; swipeXRef.current = null;
+                      if (x0 === null) return;
+                      const dx = e.changedTouches[0].clientX - x0;
+                      if (dx < -50) armDelete(entry.id);        // swipe doleva = odjistit
+                      else if (dx > 50 && confirmDeleteId === entry.id) armDelete(null); // swipe zpět
+                    }}
+                    disabled={loading && bgStatus === "idle"}>
+                    <div className="history-item-body">
+                      <span className="history-title-clip">
+                        <span className={`history-title${entry.title.length > 24 ? " title-roll" : ""}`}>{entry.title}</span>
+                      </span>
+                      <div className="history-badges">
+                        <span className="history-badge badge-offline">📥 offline</span>
+                        <span className="history-badge badge-size">{estimateStorySize(entry.scenes.length)}</span>
+                        <span className="history-badge badge-scenes">{t.scenesBadge(entry.scenes.length)}</span>
+                      </div>
+                      <span className="history-date">{fmtDate(entry.createdAt)}</span>
                     </div>
-                    <span className="history-date">{fmtDate(entry.createdAt)}</span>
-                  </div>
-                  <span className="history-del" role="button" aria-label={t.deleteStory}
-                    onClick={e => deleteStory(e, entry)}>🗑️</span>
-                  <span className="history-play-btn">▶</span>
-                </button>
+                    <span className="history-del" role="button" aria-label={t.deleteStory}
+                      onClick={e => { e.stopPropagation(); armDelete(confirmDeleteId === entry.id ? null : entry.id); }}>🗑️</span>
+                    <span className="history-play-btn">▶</span>
+                  </button>
+                  <button type="button" className="history-del-action" onClick={e => deleteStory(e, entry)}>
+                    🗑️ {t.delBtnShort}
+                  </button>
+                </div>
               ))}
             </div>
           )}

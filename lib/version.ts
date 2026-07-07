@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.84";
+export const APP_VERSION = "2.85";
 
 // Changelog (newest first)
+// 2.85 - Hlubší a dramatičtější příběhy (přímá řeč ve scénách, pocity hrdinů, skutečná sázka, temný okamžik před rozuzlením); dlouhé názvy v Posledních pohádkách rolují tam a zpět (čitelné celé); stylové mazání: swipe doleva nebo ťuknutí na 🗑️ odhalí červené Smazat — konec systémového dialogu
 // 2.84 - Pravidla konzistence (PRAVIDLA-KONZISTENCE.md): vzhled postav je KANONICKÝ — po napsání příběhu se popis vzhledu serverově přepíše doslovnými popisy z kartotéky (konec „jednou blond, podruhé hnědé"); převleky jen přes zamčený záznam Story outfits; anatomie natvrdo (přesně 2 ruce, 2 nohy, 5 prstů, kolo má 2 kola)
 // 2.83 - Inspirační fotky u pole přání (📷 Foto) zvednuty ze 3 na 8 — sjednoceno s fotkami vlastního světa
 // 2.82 - Vlastní svět pohádky unese až 8 fotek (dřív 1): mřížka náhledů s mazáním ×, vícenásobný výběr najednou, všechny fotky jdou Claudovi jako inspirace; staré světy s jednou fotkou fungují dál

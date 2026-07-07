@@ -1656,6 +1656,49 @@ button:disabled {
   border-top: 1px solid rgba(255,255,255,0.12);
 }
 
+/* Obal položky: umožňuje swipe-mazání (položka odjede doleva a odhalí
+   červené tlačítko Smazat) — žádný systémový confirm dialog */
+.history-wrap {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.history-wrap .history-item {
+  position: relative;
+  z-index: 1;
+  transition: transform 0.25s ease;
+}
+
+.history-wrap.del-armed .history-item {
+  transform: translateX(-108px);
+}
+
+.history-del-action {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 108px;
+  border: none;
+  border-radius: 0;
+  background: #dc2626;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.82rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  box-shadow: none;
+}
+
+.history-wrap.del-armed .history-del-action {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .history-item {
   min-width: 0;
   max-width: 100%;
@@ -1698,14 +1741,30 @@ button:disabled {
   min-width: 0;
 }
 
+/* Dlouhý název roluje tam a zpět, aby byl přečitelný celý */
+.history-title-clip {
+  display: block;
+  overflow: hidden;
+  max-width: 100%;
+  container-type: inline-size;
+}
+
 .history-title {
+  display: inline-block;
   color: rgba(255,255,255,0.95);
   font-weight: 800;
   font-size: 0.93rem;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+  max-width: none;
+}
+
+.history-title.title-roll {
+  animation: title-roll 9s linear infinite alternate;
+}
+
+@keyframes title-roll {
+  0%, 18%   { transform: translateX(0); }
+  82%, 100% { transform: translateX(min(0px, calc(100cqw - 100%))); }
 }
 
 .history-badges {
