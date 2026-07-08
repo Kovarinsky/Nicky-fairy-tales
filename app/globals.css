@@ -1967,6 +1967,18 @@ button:disabled {
   color: #c4b5fd;
 }
 
+/* 📖 Pokračování pohádky — jediný klikací odznak v řádce (nový díl příběhu) */
+.badge-sequel {
+  background: rgba(236, 72, 153, 0.18);
+  border: 1px solid rgba(236, 72, 153, 0.5);
+  color: #f9a8d4;
+  cursor: pointer;
+}
+
+.badge-sequel:active {
+  transform: scale(0.94);
+}
+
 .history-date {
   color: rgba(255,255,255,0.45);
   font-size: 0.75rem;

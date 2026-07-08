@@ -120,6 +120,13 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         age: Number(body.age) || 4,
         sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), MAX_SCENES),
         language: String(body.language || "cs") === "en" ? "en" : "cs",
+        moral: body.moral ? String(body.moral).slice(0, 300) : undefined,
+        previousStory: (body.previousStory as { title?: unknown; text?: unknown } | undefined)?.title
+          ? {
+              title: String((body.previousStory as { title: unknown }).title).slice(0, 200),
+              text: String((body.previousStory as { text?: unknown }).text || "").slice(0, 4000),
+            }
+          : undefined,
       };
       const extras: StoryExtras = {
         customCharacters: rawCustom,

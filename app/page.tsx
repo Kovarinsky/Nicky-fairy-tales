@@ -8,6 +8,7 @@ import { APP_VERSION } from "@/lib/version";
 import { UI, UI_LANG_KEY, type UILang } from "@/lib/i18n";
 import { BG_SCENES, bgSceneById, THEME_BG } from "@/lib/backgrounds";
 import { FOLK_TALES, folkTaleById } from "@/lib/folk-tales";
+import { MORALS, moralById } from "@/lib/morals";
 
 // ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; nameEn?: string; }
@@ -1441,6 +1442,12 @@ export default function Home() {
       age: getTargetAge([...selectedIds, ...selectedCustomIds]),
       sceneCount,
       language: voices.find(v => v.id === selectedVoiceId)?.language ?? "cs",
+      moral: (() => {
+        const m = moralById(selectedMoral);
+        if (!m) return undefined;
+        return (voices.find(v => v.id === selectedVoiceId)?.language ?? "cs") === "en" ? m.descEn : m.desc;
+      })(),
+      previousStory: sequelOf ? { title: sequelOf.title, text: sequelOf.text } : undefined,
       customCharacters: selectedCustomObjsForJob.map(c => ({
         id: c.id, name: c.name,
         description: c.description,
@@ -1482,6 +1489,7 @@ export default function Home() {
           if (jobId) {
             saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds });
             addServerJob(jobId);
+            setSequelOf(null); // pokračování je zadané — chip zmizí
             return; // phone is free — the server does the work
           }
         }
@@ -1539,6 +1547,7 @@ export default function Home() {
       };
       saveHistory(entry);
       setStoryHistory(loadHistory());
+      setSequelOf(null); // pokračování je napsané — chip zmizí
 
       const customImageRefs = selectedCustomObjs
         .filter(c => c.photoBase64 && c.photoMimeType)
@@ -1574,6 +1583,12 @@ export default function Home() {
   // jako vlastní svět (posílá se jako customTheme s připraveným dějem)
   const [folkOpen, setFolkOpen] = useState(false);
   const selectedFolk = folkTaleById(selectedTheme);
+  // 💡 Ponaučení pohádky — rolovací výběr; text se předá vypravěči,
+  // který ho vplete do děje (bez kázání)
+  const [moralOpen, setMoralOpen] = useState(false);
+  const [selectedMoral, setSelectedMoral] = useState("");
+  // 📖 Pokračování uložené pohádky: nový díl naváže na minulý děj
+  const [sequelOf, setSequelOf] = useState<{ id: string; title: string; text: string } | null>(null);
   const [addingTheme, setAddingTheme] = useState(false);
   const [newThemeName, setNewThemeName] = useState("");
   const [newThemeDesc, setNewThemeDesc] = useState("");
@@ -1700,7 +1715,15 @@ export default function Home() {
           characterNames: names,
           themeId: override ? undefined : selectedTheme || undefined,
           customTheme: override,
-          hint: topic.trim() || undefined,
+          hint: [
+            topic.trim(),
+            selectedMoral
+              ? (uiLang === "en" ? `Moral: ${moralById(selectedMoral)?.nameEn}` : `Ponaučení: ${moralById(selectedMoral)?.name}`)
+              : "",
+            sequelOf
+              ? (uiLang === "en" ? `Sequel to the tale “${sequelOf.title}”` : `Pokračování pohádky „${sequelOf.title}“`)
+              : "",
+          ].filter(Boolean).join(" — ") || undefined,
         }),
       });
       const d = await safeJson<{ idea?: string }>(res);
@@ -1737,6 +1760,20 @@ export default function Home() {
       evictOldStories(next.map(x => x.id)).catch(() => {});
     } catch {}
     armDelete(null);
+  }
+
+  // ── 📖 Pokračování uložené pohádky ────────────────────────────────────────
+  // Předá minulý děj (text scén) vypravěči a obnoví obsazení + svět z původní
+  // pohádky; uživatel může před generováním cokoli změnit
+  function startSequel(e: React.MouseEvent, entry: HistoryEntry) {
+    e.stopPropagation();
+    if (swipeHandledRef.current || confirmDeleteIdRef.current) return;
+    const text = entry.scenes.map(s => s.narration).join(" ").slice(0, 3500);
+    setSequelOf({ id: entry.id, title: entry.title, text });
+    if (entry.selectedIds?.length) setSelectedIds(entry.selectedIds);
+    if (entry.themeId) setSelectedTheme(entry.themeId);
+    setHistoryOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   // ── Replay from history ───────────────────────────────────────────────────
@@ -1905,7 +1942,7 @@ export default function Home() {
   }
 
   const allSelectedCount = selectedIds.length + selectedCustomIds.length;
-  const hasInspiration = !!selectedTheme || !!topic.trim() || inspImages.length > 0 || !!inspPdf || (inspUrlActive && !!inspUrl.trim());
+  const hasInspiration = !!selectedTheme || !!topic.trim() || inspImages.length > 0 || !!inspPdf || (inspUrlActive && !!inspUrl.trim()) || !!sequelOf;
   const current = scenes[page];
   const hasNext = page < scenes.length - 1;
   const hasPrev = page > 0;
@@ -2091,6 +2128,39 @@ export default function Home() {
           </div>
         )}
 
+        <div className="field">
+          <label>{t.moralLabel}</label>
+          <div className="chips">
+            <button type="button" className={`chip chip-btn ${moralOpen || selectedMoral ? "chip-on" : ""}`}
+              onClick={() => setMoralOpen(p => !p)}>
+              {selectedMoral
+                ? `${moralById(selectedMoral)!.emoji} ${uiLang === "en" ? moralById(selectedMoral)!.nameEn : moralById(selectedMoral)!.name}`
+                : `💡 ${t.moralChip}`}
+            </button>
+          </div>
+          {moralOpen && (
+            <div className="add-char-panel">
+              <p className="panel-title">{t.moralTitle}</p>
+              <div className="folk-list">
+                <button type="button" className={`folk-item ${!selectedMoral ? "folk-on" : ""}`}
+                  onClick={() => { setSelectedMoral(""); setMoralOpen(false); }}>
+                  <span className="folk-emoji">✨</span>
+                  <span>{t.moralNone}</span>
+                </button>
+                {MORALS.map(m => (
+                  <button type="button" key={m.id}
+                    className={`folk-item ${selectedMoral === m.id ? "folk-on" : ""}`}
+                    onClick={() => { setSelectedMoral(p => p === m.id ? "" : m.id); setMoralOpen(false); }}>
+                    <span className="folk-emoji">{m.emoji}</span>
+                    <span>{uiLang === "en" ? m.nameEn : m.name}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="gen-step-hint">{t.moralHint}</p>
+            </div>
+          )}
+        </div>
+
         {voices.length > 1 && (
           <div className="field">
             <label>{t.voiceLabel}</label>
@@ -2109,6 +2179,18 @@ export default function Home() {
 
         <div className="field">
           <label>{t.wishLabel}</label>
+          {sequelOf && (
+            <>
+              <div className="chips">
+                <div className="chip custom-chip chip-on">
+                  <span className="chip-label">📖 {t.sequelChip(sequelOf.title)}</span>
+                  <button type="button" className="chip-remove" aria-label={t.cancel}
+                    onClick={() => setSequelOf(null)}>×</button>
+                </div>
+              </div>
+              <p className="gen-step-hint">{t.sequelHint}</p>
+            </>
+          )}
           <textarea value={topic} onChange={e => setTopic(e.target.value)} placeholder={t.wishPlaceholder} />
           <div className="insp-row">
             <button type="button" className="insp-btn" onClick={suggestIdea} disabled={ideaLoading}>
@@ -2454,6 +2536,8 @@ export default function Home() {
                         <span className="history-badge badge-offline">📥 offline</span>
                         <span className="history-badge badge-size">{estimateStorySize(entry.scenes.length)}</span>
                         <span className="history-badge badge-scenes">{t.scenesBadge(entry.scenes.length)}</span>
+                        <span className="history-badge badge-sequel" role="button"
+                          onClick={e => startSequel(e, entry)}>✨ {t.sequelBtn}</span>
                       </div>
                       <span className="history-date">{fmtDate(entry.createdAt)}</span>
                     </div>

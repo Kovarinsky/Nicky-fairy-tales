@@ -32,6 +32,10 @@ export interface StoryRequest {
   sceneCount: number;
   /** Jazyk (zatím "cs") */
   language: string;
+  /** Ponaučení, které má pohádka přirozeně předat (volitelné) */
+  moral?: string;
+  /** Pokračování dřívější pohádky: název + shrnutí minulého děje */
+  previousStory?: { title: string; text: string };
 }
 
 /** Zvukový svět scény – řídí procedurální ambient hudbu */

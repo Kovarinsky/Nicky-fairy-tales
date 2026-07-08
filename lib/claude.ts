@@ -253,6 +253,27 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
         "a prostředí scény. Výraz tváře musí odpovídat emoci scény (radost, úžas, napětí, klid...).",
       ];
 
+  if (req.moral) {
+    lines.push(
+      "",
+      en
+        ? `MORAL OF THE STORY: the tale must naturally convey this lesson: "${req.moral}" Never preach — the lesson must emerge from the plot and the heroes' own choices. In the final scene the narrator may voice it gently in ONE short sentence at most.`
+        : `PONAUČENÍ: pohádka má přirozeně předat toto ponaučení: „${req.moral}“ Nikdy nekázej — ponaučení musí vyplynout z děje a z vlastních rozhodnutí hrdinů. V poslední scéně ho vypravěč smí jemně vyslovit NEJVÝŠ jednou krátkou větou.`
+    );
+  }
+
+  if (req.previousStory) {
+    lines.push(
+      "",
+      en
+        ? `SEQUEL: this is a new installment of the earlier tale "${req.previousStory.title}". What happened last time: ${req.previousStory.text}`
+        : `POKRAČOVÁNÍ: toto je další díl dřívější pohádky „${req.previousStory.title}“. Co se stalo minule: ${req.previousStory.text}`,
+      en
+        ? "Write a NEW, self-contained adventure that follows on: the heroes remember the previous events and reference them at least once (a callback), but the plot, problem and twist are NEW. Give the story a NEW title — never reuse the previous one."
+        : "Napiš NOVÉ, samostatné dobrodružství, které navazuje: hrdinové si minulé události pamatují a alespoň jednou na ně odkážou (callback), ale zápletka, problém i zvrat jsou NOVÉ. Dej pohádce NOVÝ název — nikdy nepoužij ten minulý."
+    );
+  }
+
   if (extras.inspirationUrlText) {
     lines.push("", "Doplňující kontext z webové stránky:", extras.inspirationUrlText.slice(0, 1500));
   }

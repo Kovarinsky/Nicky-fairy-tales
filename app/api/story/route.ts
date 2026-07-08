@@ -45,7 +45,8 @@ export async function POST(req: NextRequest) {
       theme ||
       (Array.isArray(body.inspirationImages) && body.inspirationImages.length > 0) ||
       body.inspirationPdfBase64 ||
-      body.inspirationUrl;
+      body.inspirationUrl ||
+      body.previousStory?.title; // pokračování dřívější pohádky je samo o sobě zadání
 
     if (!hasInspiration) {
       return NextResponse.json(
@@ -90,6 +91,13 @@ export async function POST(req: NextRequest) {
       age: Number(body.age) || 4,
       sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), 20),
       language,
+      moral: body.moral ? String(body.moral).slice(0, 300) : undefined,
+      previousStory: body.previousStory?.title
+        ? {
+            title: String(body.previousStory.title).slice(0, 200),
+            text: String(body.previousStory.text || "").slice(0, 4000),
+          }
+        : undefined,
     };
 
     const extras: StoryExtras = {
