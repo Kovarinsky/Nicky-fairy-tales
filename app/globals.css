@@ -22,6 +22,10 @@ body {
   color: var(--text);
   min-height: 100vh;
   background: #0d1340;
+  /* Výška otevřené klávesnice (měří visualViewport handler v page.tsx) —
+     obsah jde díky odsazení odscrollovat NAD klávesnici i v prohlížečích,
+     které klávesnicí obsah překrývají místo zmenšení stránky */
+  padding-bottom: var(--kb-pad, 0px);
 }
 
 /* ── Pixelart pozadí přes celý screen ── */

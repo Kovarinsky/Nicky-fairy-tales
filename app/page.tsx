@@ -600,19 +600,61 @@ export default function Home() {
     if (nav) { nav.style.top = ""; nav.style.left = ""; nav.style.width = ""; nav.style.right = ""; }
   }, [viewMode]);
 
-  // Klávesnice na tabletu/telefonu zakrývala psané pole — po fokusu se pole
-  // samo posune do viditelné části (chvilku počká, než klávesnice vyjede)
+  // Klávesnice na tabletu/telefonu zakrývala psané pole. Meta interactive-widget
+  // nestačí (Samsung Internet a WebView klávesnicí PŘEKRÝVAJÍ obsah, nezmenší ho),
+  // proto se řídíme visualViewport API: změříme, kolik pixelů klávesnice zabírá,
+  // o tolik odsadíme spodek stránky (--kb-pad) a psané pole posuneme nad klávesnici.
   useEffect(() => {
+    const vv = window.visualViewport;
+
+    function keyboardHeight(): number {
+      if (!vv) return 0;
+      const h = window.innerHeight - vv.height - vv.offsetTop;
+      return h > 80 ? h : 0; // menší rozdíly = lišty prohlížeče, ne klávesnice
+    }
+
+    function liftFocusedField() {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el || (el.tagName !== "TEXTAREA" && el.tagName !== "INPUT")) return;
+      if ((el as HTMLInputElement).type === "checkbox" || (el as HTMLInputElement).type === "file") return;
+      try {
+        const kb = keyboardHeight();
+        if (kb > 0 && vv) {
+          // Viditelný pruh nad klávesnicí (v souřadnicích layout viewportu)
+          const visibleBottom = vv.offsetTop + vv.height;
+          const r = el.getBoundingClientRect();
+          if (r.bottom > visibleBottom - 16 || r.top < vv.offsetTop) {
+            window.scrollBy({ top: r.top - vv.offsetTop - Math.max(16, (vv.height - r.height) / 3), behavior: "smooth" });
+          }
+        } else {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      } catch {}
+    }
+
+    function onViewportChange() {
+      // Odsazení dole = výška klávesnice → obsah jde odscrollovat nad ni
+      document.documentElement.style.setProperty("--kb-pad", `${keyboardHeight()}px`);
+      liftFocusedField();
+    }
+
     function onFocusIn(e: FocusEvent) {
       const el = e.target as HTMLElement | null;
       if (!el || (el.tagName !== "TEXTAREA" && el.tagName !== "INPUT")) return;
       if ((el as HTMLInputElement).type === "checkbox" || (el as HTMLInputElement).type === "file") return;
-      setTimeout(() => {
-        try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch {}
-      }, 350);
+      // Chvilku počkat, než klávesnice vyjede (a visualViewport se přepočítá)
+      setTimeout(liftFocusedField, 400);
     }
+
     document.addEventListener("focusin", onFocusIn);
-    return () => document.removeEventListener("focusin", onFocusIn);
+    vv?.addEventListener("resize", onViewportChange);
+    vv?.addEventListener("scroll", onViewportChange);
+    return () => {
+      document.removeEventListener("focusin", onFocusIn);
+      vv?.removeEventListener("resize", onViewportChange);
+      vv?.removeEventListener("scroll", onViewportChange);
+      document.documentElement.style.removeProperty("--kb-pad");
+    };
   }, []);
 
   // Stylové potvrzovací okno místo ošklivého systémového window.confirm
