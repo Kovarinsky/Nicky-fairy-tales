@@ -1633,6 +1633,48 @@ button:disabled {
   cursor: pointer;
 }
 
+/* ── Stylové potvrzovací okno (místo systémového confirm) ── */
+.app-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.2rem;
+  background: rgba(8, 5, 25, 0.6);
+  backdrop-filter: blur(6px);
+}
+
+.app-confirm {
+  width: min(420px, 100%);
+  padding: 1.2rem 1.2rem 1rem;
+  border-radius: 20px;
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  background: rgba(24, 16, 52, 0.97);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  animation: confirm-pop 0.18s ease;
+}
+
+@keyframes confirm-pop {
+  from { transform: scale(0.92); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.app-confirm-msg {
+  margin: 0 0 1rem;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.app-confirm-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
 /* Doplňující otázka Clauda při nastudování vlastního světa */
 .world-question {
   color: #fbbf24;

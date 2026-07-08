@@ -600,6 +600,16 @@ export default function Home() {
     if (nav) { nav.style.top = ""; nav.style.left = ""; nav.style.width = ""; nav.style.right = ""; }
   }, [viewMode]);
 
+  // Stylové potvrzovací okno místo ošklivého systémového window.confirm
+  const [confirmBox, setConfirmBox] = useState<{ msg: string; resolve: (ok: boolean) => void } | null>(null);
+  function appConfirm(msg: string): Promise<boolean> {
+    return new Promise(resolve => setConfirmBox({ msg, resolve }));
+  }
+  function answerConfirm(ok: boolean) {
+    confirmBox?.resolve(ok);
+    setConfirmBox(null);
+  }
+
   // Ducking: při mluveném slově se hudební podkres ztiší, v pauzách a mezi
   // scénami se plynule vrátí — realistický podkres, který neruší vyprávění
   useEffect(() => {
@@ -1355,7 +1365,7 @@ export default function Home() {
     try {
       const conn = (navigator as Navigator & { connection?: { type?: string } }).connection;
       if (conn?.type === "cellular" && !sessionStorage.getItem("nicky-cell-ok")) {
-        if (!window.confirm(t.cellularWarn)) return;
+        if (!(await appConfirm(t.cellularWarn))) return;
         sessionStorage.setItem("nicky-cell-ok", "1");
       }
     } catch {}
@@ -2156,11 +2166,11 @@ export default function Home() {
                         style={{ "--pct": `${pct}%` } as React.CSSProperties}
                         onClick={j.phase === "done" ? () => openServerJob(j)
                           : j.phase === "error" ? () => removeServerJob(j.jobId)
-                          : j.stalled ? () => {
+                          : j.stalled ? async () => {
                               const w = stallStateFor(j.jobId);
                               if (w.manualKicks === 0) {
-                                if (window.confirm(t.stuckKickAsk)) { w.manualKicks++; w.lastKick = Date.now(); kickContinue(j.jobId); }
-                              } else if (window.confirm(t.stuckRemoveAsk)) {
+                                if (await appConfirm(t.stuckKickAsk)) { w.manualKicks++; w.lastKick = Date.now(); kickContinue(j.jobId); }
+                              } else if (await appConfirm(t.stuckRemoveAsk)) {
                                 stopJobPolling(j.jobId);
                                 removeServerJob(j.jobId);
                               } else { w.lastKick = Date.now(); kickContinue(j.jobId); }
@@ -2172,10 +2182,10 @@ export default function Home() {
                         <span className="job-seg-fill" />
                         {j.phase !== "done" && (
                           <button type="button" className="job-seg-x" aria-label={t.segCancel} title={t.segCancel}
-                            onClick={e => {
+                            onClick={async e => {
                               e.stopPropagation();
                               // Zaseknutá / chybová: zrušit hned; zdravě běžící: 1× potvrdit
-                              if (j.phase === "error" || j.stalled || window.confirm(t.cancelJobAsk)) {
+                              if (j.phase === "error" || j.stalled || await appConfirm(t.cancelJobAsk)) {
                                 cancelServerJob(j.jobId);
                               }
                             }}>✕</button>
@@ -2503,6 +2513,19 @@ export default function Home() {
               <p className="credits-goodnight">🌙 Dobrou noc, Nicolásku a Valentýnko 🌙</p>
 
               <p className="credits-tap">— klikni pro zavření —</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stylové potvrzovací okno (náhrada systémového confirm) */}
+      {confirmBox && (
+        <div className="app-confirm-overlay" onClick={() => answerConfirm(false)}>
+          <div className="app-confirm" onClick={e => e.stopPropagation()}>
+            <p className="app-confirm-msg">{confirmBox.msg}</p>
+            <div className="app-confirm-btns">
+              <button type="button" className="outline-btn" onClick={() => answerConfirm(false)}>{t.cancel}</button>
+              <button type="button" onClick={() => answerConfirm(true)}>OK</button>
             </div>
           </div>
         </div>

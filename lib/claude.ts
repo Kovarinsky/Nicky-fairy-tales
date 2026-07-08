@@ -46,6 +46,7 @@ function buildSystemPrompt(language: "cs" | "en"): string {
       "═══ CHARACTER APPEARANCE (heroDescription) ═══",
       "- Write heroDescription in ENGLISH as one entry per character: 'Name: [hair style+color], [eye color], [exact clothing with colors], [unique features].'",
       "- Characters that come WITH a description in the 'Characters:' list are CANONICAL: copy their description into heroDescription WORD FOR WORD — never change hair color, clothing or any detail. Base the Heights: entry and imagePrompts on these canonical looks.",
+      "- EVERY character or creature YOU INVENT for the story (Otesánek, a dragon, a robot, a talking fox...) MUST also get a FULL entry in heroDescription: species/what it is made of, body shape, exact colors, distinctive features, size relative to the others — e.g. 'Otesánek: a round wooden baby carved from a tree stump, pale birch-wood body with visible grain, twig-like fingers, two knot-hole eyes, a huge smiling mouth, taller than the grandpa'. NO named entity may appear in any imagePrompt without an entry in heroDescription — this is what keeps it looking the same on every page.",
       "- Separate characters with ' | '",
       "- Be extremely specific — not 'blond hair' but 'straight light-blond hair'; not 'red shirt' but 'white T-shirt with two red horizontal stripes'.",
       "- DO NOT include age numbers or age words ('6-year-old', 'toddler') — only hair, eyes, clothing, accessories, facial features.",
@@ -115,6 +116,7 @@ function buildSystemPrompt(language: "cs" | "en"): string {
     "═══ POPIS POSTAV (heroDescription) ═══",
     "- heroDescription piš ANGLICKY, jeden záznam na postavu: 'Name: [styl+barva vlasů], [barva očí], [přesné oblečení s barvami], [jedinečné rysy].'",
     "- Postavy, které v seznamu 'Postavy:'/'Characters:' MAJÍ popis, jsou KANONICKÉ: jejich popis zkopíruj do heroDescription DOSLOVA — nikdy neměň barvu vlasů, oblečení ani žádný detail. Z těchto kanonických podob vycházej i v Heights: a v imagePromptech.",
+    "- KAŽDÁ postava či tvor, kterého pro příběh VYMYSLÍŠ (Otesánek, drak, robot, mluvící liška…), MUSÍ dostat PLNÝ záznam v heroDescription (anglicky): co to je / z čeho je, tvar těla, přesné barvy, poznávací znaky, velikost vůči ostatním — např. 'Otesánek: a round wooden baby carved from a tree stump, pale birch-wood body with visible grain, twig-like fingers, two knot-hole eyes, a huge smiling mouth, taller than the grandpa'. ŽÁDNÁ pojmenovaná bytost se nesmí objevit v imagePromptu bez záznamu v heroDescription — jen tak vypadá na každé stránce stejně.",
     "- Odděluj postavy pomocí ' | '",
     "- Buď maximálně konkrétní — ne 'blond hair' ale 'straight light-blond hair'; ne 'red shirt' ale 'white T-shirt with two red horizontal stripes'.",
     "- NEZAHRNUJ číselný věk ani slova o věku ('6-year-old', 'toddler') — jen vlasy, oči, oblečení, doplňky, výraz tváře.",
@@ -492,18 +494,37 @@ export async function generateStory(req: StoryRequest, extras: StoryExtras = {})
   throw new Error("Nepodařilo se vygenerovat příběh.");
 }
 
-// Přestaví heroDescription: popisy postav z kartotéky se přebírají DOSLOVA,
-// od Clauda se ponechají jen záznamy vlastních postav (popsal je z fotky),
-// 'Key objects:' (zámek předmětů/kola) a 'Heights:' (relativní výšky).
+// Přestaví heroDescription: popisy postav z kartotéky se přebírají DOSLOVA.
+// VŠECHNO OSTATNÍ od Clauda ZŮSTÁVÁ — záznamy postav vymyšlených příběhem
+// (Otesánek, drak…), vlastních postav, 'Key objects:', 'Story outfits:'
+// i 'Heights:'. (Dřívější verze cizí záznamy vyhazovala → vymyšlené postavy
+// neměly zámek vzhledu a na každé scéně vypadaly jinak.)
 function enforceCanonicalAppearance(hero: string, req: StoryRequest, extras: StoryExtras = {}): string {
   const parts = hero.split("|").map(s => s.trim()).filter(Boolean);
-  const findEntry = (name: string) =>
-    parts.find(p => p.toLowerCase().startsWith(name.toLowerCase() + ":"));
-  const heights = parts.find(p => /^heights\s*:/i.test(p));
-  const keyObjects = parts.find(p => /^key objects\s*:/i.test(p));
-  const outfits = parts.find(p => /^story outfits\s*:/i.test(p));
+  // Jména kanonických postav (cs + en varianta + jméno z popisu)
+  const canonNames = new Set<string>();
+  for (const c of req.characters) {
+    if (c.name) canonNames.add(c.name.toLowerCase());
+    if (c.nameEn) canonNames.add(c.nameEn.toLowerCase());
+    const descName = c.description?.split(":")[0]?.trim().toLowerCase();
+    if (descName) canonNames.add(descName);
+  }
+  const isCanonEntry = (p: string) => {
+    const name = p.split(":")[0]?.trim().toLowerCase() ?? "";
+    if (!name || name.length > 40) return false;
+    for (const cn of canonNames) {
+      if (name === cn || name.endsWith(" " + cn)) return true;
+    }
+    return false;
+  };
+  // Claudovy verze kanonických postav pryč (nahradí je doslovná kartotéka),
+  // vše ostatní v původním pořadí zůstává
+  const kept = parts.filter(p => !isCanonEntry(p));
   const canonical = req.characters.map(c => c.description).filter(Boolean);
-  const customs = (extras.customCharacters || []).map(cc =>
-    findEntry(cc.name) || `${cc.name}: ${cc.description}`);
-  return [...canonical, ...customs, keyObjects, outfits, heights].filter(Boolean).join(" | ");
+  // Vlastní postava bez záznamu → doplnit z jejího popisu
+  for (const cc of extras.customCharacters || []) {
+    const has = kept.some(p => p.toLowerCase().startsWith(cc.name.toLowerCase() + ":"));
+    if (!has && cc.description) kept.push(`${cc.name}: ${cc.description}`);
+  }
+  return [...canonical, ...kept].join(" | ");
 }
