@@ -1776,6 +1776,86 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  // ── 📤 Poslat pohádku ─────────────────────────────────────────────────────
+  // Nahraje obrázky+audio z telefonu do Blob úložiště (po scénách) a pošle
+  // odkaz na přehrávací stránku /s/<id> — příjemce nic neinstaluje
+  const [shareBusyId, setShareBusyId] = useState<string | null>(null);
+
+  function dataUrlParts(u: string): { mime: string; data: string } | null {
+    const m = u.match(/^data:([^;,]+);base64,(.+)$/);
+    return m ? { mime: m[1], data: m[2] } : null;
+  }
+
+  async function uploadShareAsset(shareId: string, kind: "img" | "aud", index: number, dataUrl: string): Promise<string> {
+    const p = dataUrlParts(dataUrl);
+    if (!p) return "";
+    const r = await fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(60_000),
+      body: JSON.stringify({ op: "asset", id: shareId, kind, index, mimeType: p.mime, data: p.data }),
+    });
+    const d = await safeJson<{ url?: string; error?: string }>(r);
+    if (!r.ok || !d.url) throw new Error(d.error || "upload failed");
+    return d.url;
+  }
+
+  async function shareStory(e: React.MouseEvent, entry: HistoryEntry) {
+    e.stopPropagation();
+    if (shareBusyId || swipeHandledRef.current || confirmDeleteIdRef.current) return;
+    setShareBusyId(entry.id);
+    try {
+      // Média pohádky: paměť → IndexedDB cache
+      let media: Array<{ imageUrl?: string; audioUrl?: string }> | undefined =
+        renderedMapRef.current.get(entry.id);
+      if (!media) {
+        const cached = await getCachedStory(entry.id);
+        if (cached) media = cached;
+      }
+      if (!media || !media.some(m => m.imageUrl && !isPlaceholderImg(m.imageUrl))) {
+        await appConfirm(t.shareNoMedia);
+        return;
+      }
+      const shareId = crypto.randomUUID();
+      const scenes: Array<{ narration: string; imageUrl: string; audioUrl: string }> = [];
+      for (let i = 0; i < entry.scenes.length; i++) {
+        const m = media[i] || {};
+        let imageUrl = m.imageUrl || "";
+        let audioUrl = m.audioUrl || "";
+        if (imageUrl.startsWith("data:")) imageUrl = await uploadShareAsset(shareId, "img", i, imageUrl);
+        else if (!/^https:/.test(imageUrl)) imageUrl = "";
+        // Audio je bonus — když se jedna stopa nenahraje, odkaz pošleme i tak
+        try {
+          if (audioUrl.startsWith("data:")) audioUrl = await uploadShareAsset(shareId, "aud", i, audioUrl);
+          else if (!/^https:/.test(audioUrl)) audioUrl = "";
+        } catch { audioUrl = ""; }
+        scenes.push({ narration: entry.scenes[i]?.narration || "", imageUrl, audioUrl });
+      }
+      const res = await fetch("/api/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(30_000),
+        body: JSON.stringify({ op: "publish", id: shareId, title: entry.title, scenes }),
+      });
+      const d = await safeJson<{ ok?: boolean; error?: string }>(res);
+      if (!res.ok || !d.ok) throw new Error(d.error || "publish failed");
+      const url = `${location.origin}/s/${shareId}`;
+      // Nativní sdílení (WhatsApp, e-mail…), jinak zkopírovat odkaz
+      if (navigator.share) {
+        try { await navigator.share({ title: entry.title, url }); }
+        catch (err) { if ((err as Error)?.name !== "AbortError") throw err; }
+      } else {
+        await navigator.clipboard.writeText(url);
+        await appConfirm(t.shareCopied);
+      }
+    } catch (err) {
+      console.error("[share]", err);
+      await appConfirm(t.shareErr);
+    } finally {
+      setShareBusyId(null);
+    }
+  }
+
   // ── Replay from history ───────────────────────────────────────────────────
   async function replayStory(entry: HistoryEntry) {
     // Helper: switch to a set of ready scenes without interrupting bg generation
@@ -2538,6 +2618,8 @@ export default function Home() {
                         <span className="history-badge badge-scenes">{t.scenesBadge(entry.scenes.length)}</span>
                         <span className="history-badge badge-sequel" role="button"
                           onClick={e => startSequel(e, entry)}>✨ {t.sequelBtn}</span>
+                        <span className="history-badge badge-share" role="button"
+                          onClick={e => shareStory(e, entry)}>{shareBusyId === entry.id ? "⏳" : "📤"} {t.shareBtn}</span>
                       </div>
                       <span className="history-date">{fmtDate(entry.createdAt)}</span>
                     </div>

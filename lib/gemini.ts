@@ -67,6 +67,7 @@ async function sanitizeWithGemini(apiKey: string, rawPrompt: string): Promise<st
             "- KEEP relative height/size comparisons between characters (e.g. 'the smallest', 'reaches his waist', 'slightly taller than', 'much taller') — these are allowed and important for consistency",
             "- Replace any element that would show readable text in the image (signs with writing, open books showing text, newspapers with headlines, shop labels, posters with words, billboards) with a purely visual alternative (e.g. 'a colorful sign' instead of 'a sign saying Welcome', 'a closed storybook' instead of 'a book with text')",
             "- Keep ALL character names, hair color/style, eye color, clothing colors and types, scene action, and the style suffix UNCHANGED",
+            "- NEVER shorten, summarize or drop ANY character description — every character entry in the APPEARANCE LOCK must appear in full in the output, including invented creatures, 'Key objects:', 'Story outfits:' and 'Heights:' entries",
             "- Output ONLY the rewritten prompt — no explanation, no quotes, no markdown",
             "",
             "Prompt:",
@@ -74,15 +75,20 @@ async function sanitizeWithGemini(apiKey: string, rawPrompt: string): Promise<st
           ].join("\n"),
         }],
       }],
-      generationConfig: { maxOutputTokens: 600 },
+      // Dost prostoru pro CELÝ zámek vzhledu — nízký strop ořezával popisy
+      // vymyšlených postav na konci (jednou blond, podruhé hnědé vlasy)
+      generationConfig: { maxOutputTokens: 2500 },
     });
 
     const data = JSON.parse(raw) as { candidates?: GeminiCandidate[] };
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    if (text && text.length > 30) {
+    // Výrazně kratší výstup = model zámek vzhledu zkrátil (ořezané postavy)
+    // → radši bezpečný regex fallback nad plným promptem
+    if (text && text.length > rawPrompt.length * 0.55) {
       console.log(`[Gemini sanitize] ${rawPrompt.length} chars → ${text.length} chars`);
       return text;
     }
+    if (text) console.warn(`[Gemini sanitize] output too short (${text.length}/${rawPrompt.length} chars) — using regex fallback`);
   } catch (e) {
     console.warn("[Gemini sanitize] text model failed, using regex fallback:", e instanceof Error ? e.message : e);
   }
@@ -190,14 +196,14 @@ async function verifySceneImage(apiKey: string, img: ImageResult, heroDescriptio
           { text: [
             "You are a strict quality checker for a children's storybook illustration.",
             "CANONICAL CHARACTER SHEET:",
-            heroDescription.slice(0, 1500),
+            heroDescription.slice(0, 4000),
             "",
             "Check the image for these DEFECTS ONLY:",
             "1) DUPLICATE character — the same person drawn twice in one image",
             "2) EXTRA people who are not on the character sheet",
-            "3) CLEARLY WRONG look of a named character (hair color or length obviously different, missing/added beard, completely different clothing colors)",
+            "3) WRONG look of a named character: go through EVERY person in the image ONE BY ONE, match them to a character sheet entry, and compare HAIR COLOR (blond vs brown vs black), hair length/style, beard, and clothing colors. A blond character drawn with brown hair (or vice versa) is ALWAYS a defect — this applies to every entry on the sheet, including invented/side characters, not just the main heroes.",
             "4) ANATOMY errors (three arms, extra or missing limbs, malformed hands)",
-            "Minor style variation is FINE — flag only obvious defects a parent would notice.",
+            "Minor style variation is FINE — flag only obvious defects a parent would notice. Wrong hair color is never minor.",
             'Reply with ONLY JSON: {"ok":true} or {"ok":false,"problems":"short English description of the defects"}',
           ].join("\n") },
         ],

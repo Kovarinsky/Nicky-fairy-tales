@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.98";
+export const APP_VERSION = "2.99";
 
 // Changelog (newest first)
+// 2.99 - 📤 Poslat pohádku: u uložené pohádky tlačítko Poslat — nahraje obrázky i namluvení a pošle odkaz (WhatsApp, e-mail…) na přehrávací stránku, příjemce nic neinstaluje (odkaz platí 90 dní); OPRAVA konzistence vymyšlených postav: úprava promptu měla nízký strop a ořezávala popisy postav na konci (jednou blond, podruhé hnědé) — zvednuto + pojistka, vizuální kontrola čte celou kartotéku a hlídá barvu vlasů postavu po postavě, vymyšlení lidé musí mít popis stejně přísný jako hrdinové
 // 2.98 - 💡 Ponaučení pohádky: rolovací výběr 13 ponaučení (pomáhat druhým, nevzdávat se, mluvit pravdu…) — vplete se přirozeně do děje, bez kázání; 📖 Pokračování: u každé uložené pohádky tlačítko ✨ Pokračování — nový díl naváže na minulý děj, hrdinové si pamatují, co zažili (obnoví se i obsazení a svět); 🎲 námět obojí respektuje
 // 2.97 - Klávesnice na tabletu podruhé: appka si sama změří výšku klávesnice (visualViewport) a psané pole posune NAD ni — funguje i v prohlížečích, které klávesnicí obsah překrývají (Samsung Internet, WebView)
 // 2.96 - Oprava psaní na tabletu: otevřená klávesnice stránku zmenší místo překrytí (interactive-widget) a pole, do kterého píšete, se samo posune do viditelné části obrazovky

@@ -1967,6 +1967,112 @@ button:disabled {
   color: #c4b5fd;
 }
 
+/* 📤 Poslat pohádku — nahraje pohádku a pošle odkaz (WhatsApp, e-mail…) */
+.badge-share {
+  background: rgba(56, 189, 248, 0.16);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  color: #7dd3fc;
+  cursor: pointer;
+}
+
+.badge-share:active {
+  transform: scale(0.94);
+}
+
+/* ── 📤 Sdílená pohádka (/s/<id>) — přehrávač pro příjemce odkazu ── */
+.share-main {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.share-card {
+  width: min(720px, 100%);
+  background: rgba(13, 19, 64, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 22px;
+  padding: 1.1rem 1.1rem 0.9rem;
+  box-shadow: var(--shadow-card);
+  text-align: center;
+}
+
+.share-title {
+  font-size: 1.25rem;
+  font-weight: 900;
+  margin-bottom: 0.75rem;
+}
+
+.share-img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.share-img-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+}
+
+.share-text {
+  margin: 0.8rem 0.2rem;
+  font-size: 1.02rem;
+  line-height: 1.55;
+}
+
+.share-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  margin: 0.4rem 0 0.6rem;
+}
+
+.share-btn {
+  min-width: 52px;
+  height: 48px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  font-size: 1.2rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.share-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.share-play {
+  min-width: 72px;
+  background: linear-gradient(135deg, #7c4dff, #536dfe);
+  border: none;
+}
+
+.share-pagenum {
+  font-weight: 800;
+  opacity: 0.85;
+  min-width: 3.5rem;
+}
+
+.share-footer {
+  font-size: 0.78rem;
+  opacity: 0.6;
+}
+
+.share-error,
+.share-loading {
+  padding: 1.2rem 0.4rem;
+  font-weight: 700;
+}
+
 /* 📖 Pokračování pohádky — jediný klikací odznak v řádce (nový díl příběhu) */
 .badge-sequel {
   background: rgba(236, 72, 153, 0.18);
