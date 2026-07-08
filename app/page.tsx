@@ -1795,6 +1795,30 @@ export default function Home() {
     return m ? { mime: m[1], data: m[2] } : null;
   }
 
+  // Starší uložené pohádky mají obrázky jako velká PNG (~1,5 MB/scéna) —
+  // před posláním je telefon zmenší na WebP/JPEG (~5× menší, stejná knížka)
+  async function compressForShare(dataUrl: string): Promise<string> {
+    if (!dataUrl.startsWith("data:image/")) return dataUrl;
+    try {
+      const img = await new Promise<HTMLImageElement>((res, rej) => {
+        const i = new Image();
+        i.onload = () => res(i);
+        i.onerror = rej;
+        i.src = dataUrl;
+      });
+      const scale = Math.min(1, 1600 / (img.naturalWidth || 1600));
+      const c = document.createElement("canvas");
+      c.width = Math.round((img.naturalWidth || 1600) * scale);
+      c.height = Math.round((img.naturalHeight || 900) * scale);
+      c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+      let out = c.toDataURL("image/webp", 0.8);
+      if (!out.startsWith("data:image/webp")) out = c.toDataURL("image/jpeg", 0.82);
+      return out.length < dataUrl.length ? out : dataUrl;
+    } catch {
+      return dataUrl;
+    }
+  }
+
   // Přímé nahrání do Blob úložiště (binárně, bez 4,5MB limitu serverových
   // requestů — velké obrázky scén přes JSON neprošly). 2 pokusy na soubor.
   async function uploadShareAsset(shareId: string, kind: "img" | "aud", index: number, dataUrl: string): Promise<string> {
@@ -1852,6 +1876,7 @@ export default function Home() {
         const key = `${kind}-${i}`;
         const known = shareCache.urls.get(key);
         if (known) return known;
+        if (kind === "img") dataUrl = await compressForShare(dataUrl);
         const url = await uploadShareAsset(shareId, kind, i, dataUrl);
         if (url) shareCache.urls.set(key, url);
         return url;

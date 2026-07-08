@@ -24,6 +24,26 @@ export interface ImageResult {
   mimeType: string;
 }
 
+// Gemini vrací obrázky jako PNG (~1,5 MB na scénu) — 15stránková pohádka
+// pak má 25 MB+. WebP v plném rozlišení knížky je ~5× menší bez viditelné
+// ztráty; šetří úložiště, stahování do telefonu i posílání pohádky.
+async function compressImage(img: ImageResult): Promise<ImageResult> {
+  try {
+    const sharp = (await import("sharp")).default;
+    const buf = await sharp(img.buffer)
+      .resize({ width: 1600, withoutEnlargement: true })
+      .webp({ quality: 82 })
+      .toBuffer();
+    if (buf.length < img.buffer.length) {
+      console.log(`[Gemini] compress ${Math.round(img.buffer.length / 1024)} kB → ${Math.round(buf.length / 1024)} kB`);
+      return { buffer: buf, mimeType: "image/webp" };
+    }
+  } catch (e) {
+    console.warn("[Gemini] compress failed, keeping original:", e instanceof Error ? e.message : e);
+  }
+  return img;
+}
+
 type GeminiCandidate = {
   content?: { parts?: Array<{ inlineData?: { data?: string; mimeType?: string }; text?: string }> };
   finishReason?: string;
@@ -233,7 +253,7 @@ export async function generateBackgroundImage(prompt: string, refImages: Referen
   let lastErr = new Error("Gemini nevrátil obrázek");
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      return await callGeminiImage(apiKey, model, prompt, aspect, refImages);
+      return await compressImage(await callGeminiImage(apiKey, model, prompt, aspect, refImages));
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e));
       console.error(`[Gemini bg] attempt ${attempt}/3: ${lastErr.message}`);
@@ -312,7 +332,7 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
             } catch {}
           }
         }
-        return img;
+        return await compressImage(img);
       } catch (e) {
         lastErr = e instanceof Error ? e : new Error(String(e));
         console.error(`[Gemini] scene ${scene.index} model=${m} attempt ${attempt}/${MAX_ATTEMPTS}: ${lastErr.message}`);
@@ -360,7 +380,7 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
       ].filter(Boolean).join(" ");
       const safeFallback = await sanitizeWithGemini(apiKey, fallbackRaw);
       console.warn(`[Gemini] scene ${scene.index}: using simplified fallback prompt`);
-      return await callGeminiImage(apiKey, model, safeFallback, withAspect ? "16:9" : null, refImages);
+      return await compressImage(await callGeminiImage(apiKey, model, safeFallback, withAspect ? "16:9" : null, refImages));
     } catch (e2) {
       console.error(`[Gemini] scene ${scene.index} fallback failed: ${e2 instanceof Error ? e2.message : e2}`);
     }
