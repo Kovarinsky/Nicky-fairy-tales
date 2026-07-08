@@ -753,40 +753,33 @@ button:disabled {
 }
 
 /* Controls: hidden; tap → panel pinned to the BOTTOM of the screen */
-/* Reader (portrét): jedna řada 4 tlačítek dole na šířku obrázku, tmavé sklo;
-   ukáže se jen na ťuknutí a po 5 s sám zmizí (řídí page.tsx) */
+/* Reader (portrét): jedna řada 4 tlačítek na spodní hraně, na šířku obrázku.
+   Panel VYJÍŽDÍ zpoza spodní hrany (ťuknutí) a po 5 s zase ZAJEDE. */
 .reader-mode .book-controls {
   position: absolute;
   left: 0.45rem;
   right: 0.45rem;
-  bottom: 0.45rem;
+  bottom: 0;
   margin: 0;
   z-index: 6;
-  display: none;
+  display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 0.4rem;
   padding: 0.45rem 0.5rem;
-  border-radius: 16px;
+  border-radius: 16px 16px 0 0;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(18, 12, 42, 0.9);
+  border-bottom: none;
+  background: rgba(18, 12, 42, 0.92);
   backdrop-filter: blur(8px);
-  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.45);
+  transform: translateY(calc(100% + 4px));
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
 }
 
 .reader-mode .ctrls-open .book-controls {
-  display: grid;
-}
-
-/* Při otevřeném panelu se obrázek plynule zmenší — ovládání NIKDY nepřekrývá
-   obraz (po 5 s panel zmizí a obrázek se vrátí) */
-.reader-mode .book-card {
-  transition: transform 0.25s ease;
-}
-
-.reader-mode .ctrls-open .book-card {
-  transform: translateY(-34px) scale(0.9);
-  transform-origin: center top;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .reader-mode .ctrl-cell {
@@ -860,21 +853,28 @@ button:disabled {
     align-self: center;
     object-fit: cover;
   }
-  /* Landscape (fullscreen): jeden sloupec 4 tlačítek na výšku obrázku,
-     u pravého kraje v tmavém pruhu vedle obrázku */
+  /* Landscape (fullscreen): sloupec 4 tlačítek na výšku obrázku; panel
+     VYJÍŽDÍ zpoza pravé hrany a zase ZAJEDE */
   .reader-mode .book-controls {
     position: absolute;
     margin: 0;
     left: auto;
-    right: 0.4rem;
+    right: 0;
     top: 0.45rem;
     bottom: 3.4rem; /* nad bílým pruhem titulků */
-    transform: none;
     grid-template-columns: 1fr;
     grid-template-rows: repeat(4, 1fr);
     gap: 0.35rem;
     width: 116px;
     padding: 0.4rem;
+    border-radius: 16px 0 0 16px;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: -6px 0 28px rgba(0, 0, 0, 0.45);
+    transform: translateX(calc(100% + 4px));
+  }
+  .reader-mode .ctrls-open .book-controls {
+    transform: translateX(0);
   }
   .reader-mode .ctrl-cell {
     min-height: 0;
@@ -882,11 +882,6 @@ button:disabled {
   }
   .reader-mode .ctrl-ico {
     font-size: 1.15rem;
-  }
-  /* Landscape: obrázek uhne doleva a zmenší se — sloupec tlačítek má místo */
-  .reader-mode .ctrls-open .book-card {
-    transform: translateX(-56px) scale(0.9);
-    transform-origin: left center;
   }
 
   /* Title hidden — image gets the space */
@@ -1787,6 +1782,15 @@ button:disabled {
   transform: translateX(-108px);
   /* neprůhledné pozadí — červené tlačítko nesmí prosvítat skrz text */
   background: rgba(26, 17, 55, 0.97);
+}
+
+/* Odjištěná položka: vlastní 🗑️ a ▶ zmizí — zůstane jen červené Smazat
+   (jinak vypadaly jako dva koše vedle sebe) */
+.history-wrap.del-armed .history-del,
+.history-wrap.del-armed .history-play-btn {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
 }
 
 .history-del-action {

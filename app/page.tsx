@@ -2356,6 +2356,9 @@ export default function Home() {
             {t.historyTitle(storyHistory.length)} {historyOpen ? "▲" : "▼"}
           </button>
           {historyOpen && (
+            <p className="gen-step-hint" style={{ margin: "0.15rem 0 0.4rem" }}>{t.swipeHint}</p>
+          )}
+          {historyOpen && (
             <div className="history-list">
               {storyHistory.map(entry => (
                 <div key={entry.id} className={`history-wrap${confirmDeleteId === entry.id ? " del-armed" : ""}`}>
