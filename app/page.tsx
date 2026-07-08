@@ -9,6 +9,7 @@ import { UI, UI_LANG_KEY, type UILang } from "@/lib/i18n";
 import { BG_SCENES, bgSceneById, THEME_BG } from "@/lib/backgrounds";
 import { FOLK_TALES, folkTaleById } from "@/lib/folk-tales";
 import { MORALS, moralById } from "@/lib/morals";
+import { upload as uploadToBlob } from "@vercel/blob/client";
 
 // ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; nameEn?: string; }
@@ -1785,24 +1786,38 @@ export default function Home() {
   const [shareBusyId, setShareBusyId] = useState<string | null>(null);
   const [shareProg, setShareProg] = useState<{ done: number; total: number } | null>(null);
   const [shareResult, setShareResult] = useState<{ url: string; title: string; copied: boolean } | null>(null);
+  // Už nahrané soubory se pamatují — po chybě naváže další pokus tam, kde
+  // skončil (nezačíná od nuly), a opakované poslání stejné pohádky je hned
+  const shareCacheRef = useRef<Map<string, { shareId: string; urls: Map<string, string> }>>(new Map());
 
   function dataUrlParts(u: string): { mime: string; data: string } | null {
     const m = u.match(/^data:([^;,]+);base64,(.+)$/);
     return m ? { mime: m[1], data: m[2] } : null;
   }
 
+  // Přímé nahrání do Blob úložiště (binárně, bez 4,5MB limitu serverových
+  // requestů — velké obrázky scén přes JSON neprošly). 2 pokusy na soubor.
   async function uploadShareAsset(shareId: string, kind: "img" | "aud", index: number, dataUrl: string): Promise<string> {
     const p = dataUrlParts(dataUrl);
     if (!p) return "";
-    const r = await fetch("/api/share", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(60_000),
-      body: JSON.stringify({ op: "asset", id: shareId, kind, index, mimeType: p.mime, data: p.data }),
-    });
-    const d = await safeJson<{ url?: string; error?: string }>(r);
-    if (!r.ok || !d.url) throw new Error(d.error || "upload failed");
-    return d.url;
+    const bin = atob(p.data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes], { type: p.mime });
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await uploadToBlob(`share/${shareId}/${kind}-${index}`, blob, {
+          access: "public",
+          handleUploadUrl: "/api/share-upload",
+          contentType: p.mime,
+        });
+        return res.url;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error("upload failed");
   }
 
   async function shareStory(e: React.MouseEvent, entry: HistoryEntry) {
@@ -1821,20 +1836,35 @@ export default function Home() {
         await appConfirm(t.shareNoMedia);
         return;
       }
-      const shareId = crypto.randomUUID();
+      let cache = shareCacheRef.current.get(entry.id);
+      if (!cache) {
+        cache = { shareId: crypto.randomUUID(), urls: new Map() };
+        shareCacheRef.current.set(entry.id, cache);
+      }
+      const shareCache = cache;
+      const shareId = shareCache.shareId;
       const total = entry.scenes.length;
       let done = 0;
       setShareProg({ done, total });
       const mediaArr = media;
+      // Nahrát s pamětí: co už jednou prošlo, se znovu nenahrává
+      async function uploadCached(kind: "img" | "aud", i: number, dataUrl: string): Promise<string> {
+        const key = `${kind}-${i}`;
+        const known = shareCache.urls.get(key);
+        if (known) return known;
+        const url = await uploadShareAsset(shareId, kind, i, dataUrl);
+        if (url) shareCache.urls.set(key, url);
+        return url;
+      }
       // Jedna scéna = obrázek (povinný) + audio (bonus, chyba ho jen vynechá)
       async function uploadScene(i: number): Promise<{ narration: string; imageUrl: string; audioUrl: string }> {
         const m = mediaArr[i] || {};
         let imageUrl = m.imageUrl || "";
         let audioUrl = m.audioUrl || "";
-        if (imageUrl.startsWith("data:")) imageUrl = await uploadShareAsset(shareId, "img", i, imageUrl);
+        if (imageUrl.startsWith("data:")) imageUrl = await uploadCached("img", i, imageUrl);
         else if (!/^https:/.test(imageUrl)) imageUrl = "";
         try {
-          if (audioUrl.startsWith("data:")) audioUrl = await uploadShareAsset(shareId, "aud", i, audioUrl);
+          if (audioUrl.startsWith("data:")) audioUrl = await uploadCached("aud", i, audioUrl);
           else if (!/^https:/.test(audioUrl)) audioUrl = "";
         } catch { audioUrl = ""; }
         done += 1;
@@ -1861,7 +1891,8 @@ export default function Home() {
       setShareResult({ url: `${location.origin}/s/${shareId}`, title: entry.title, copied: false });
     } catch (err) {
       console.error("[share]", err);
-      await appConfirm(t.shareErr);
+      const detail = err instanceof Error && err.message ? ` (${err.message.slice(0, 140)})` : "";
+      await appConfirm(t.shareErr + detail);
     } finally {
       setShareBusyId(null);
       setShareProg(null);
