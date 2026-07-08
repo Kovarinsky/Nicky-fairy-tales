@@ -1979,6 +1979,18 @@ button:disabled {
   transform: scale(0.94);
 }
 
+/* Odkaz na sdílenou pohádku v potvrzovacím okně */
+.share-link-box {
+  margin: 0.6rem 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 0.78rem;
+  word-break: break-all;
+  user-select: all;
+}
+
 /* ── 📤 Sdílená pohádka (/s/<id>) — přehrávač pro příjemce odkazu ── */
 .share-main {
   min-height: 100vh;

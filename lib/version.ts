@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.99";
+export const APP_VERSION = "3.00";
 
 // Changelog (newest first)
+// 3.00 - Poslat pohádku v2: nahrávání ukazuje průběh (⏳ 3/15), jede 3 scény najednou (rychlejší) a po dokončení se otevře okno s odkazem a tlačítky Sdílet… / Kopírovat — sdílecí nabídka Androidu se dřív po dlouhém nahrávání nesměla otevřít (vyžaduje čerstvé ťuknutí), proto to vypadalo, že se nic nestalo
 // 2.99 - 📤 Poslat pohádku: u uložené pohádky tlačítko Poslat — nahraje obrázky i namluvení a pošle odkaz (WhatsApp, e-mail…) na přehrávací stránku, příjemce nic neinstaluje (odkaz platí 90 dní); OPRAVA konzistence vymyšlených postav: úprava promptu měla nízký strop a ořezávala popisy postav na konci (jednou blond, podruhé hnědé) — zvednuto + pojistka, vizuální kontrola čte celou kartotéku a hlídá barvu vlasů postavu po postavě, vymyšlení lidé musí mít popis stejně přísný jako hrdinové
 // 2.98 - 💡 Ponaučení pohádky: rolovací výběr 13 ponaučení (pomáhat druhým, nevzdávat se, mluvit pravdu…) — vplete se přirozeně do děje, bez kázání; 📖 Pokračování: u každé uložené pohádky tlačítko ✨ Pokračování — nový díl naváže na minulý děj, hrdinové si pamatují, co zažili (obnoví se i obsazení a svět); 🎲 námět obojí respektuje
 // 2.97 - Klávesnice na tabletu podruhé: appka si sama změří výšku klávesnice (visualViewport) a psané pole posune NAD ni — funguje i v prohlížečích, které klávesnicí obsah překrývají (Samsung Internet, WebView)

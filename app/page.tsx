@@ -1778,8 +1778,13 @@ export default function Home() {
 
   // ── 📤 Poslat pohádku ─────────────────────────────────────────────────────
   // Nahraje obrázky+audio z telefonu do Blob úložiště (po scénách) a pošle
-  // odkaz na přehrávací stránku /s/<id> — příjemce nic neinstaluje
+  // odkaz na přehrávací stránku /s/<id> — příjemce nic neinstaluje.
+  // Nahrávání ukazuje průběh; hotový odkaz se nabídne ve vlastním okně —
+  // sdílecí nabídka prohlížeče vyžaduje ČERSTVÉ ťuknutí (po minutě nahrávání
+  // by ji prohlížeč zablokoval)
   const [shareBusyId, setShareBusyId] = useState<string | null>(null);
+  const [shareProg, setShareProg] = useState<{ done: number; total: number } | null>(null);
+  const [shareResult, setShareResult] = useState<{ url: string; title: string; copied: boolean } | null>(null);
 
   function dataUrlParts(u: string): { mime: string; data: string } | null {
     const m = u.match(/^data:([^;,]+);base64,(.+)$/);
@@ -1817,19 +1822,32 @@ export default function Home() {
         return;
       }
       const shareId = crypto.randomUUID();
-      const scenes: Array<{ narration: string; imageUrl: string; audioUrl: string }> = [];
-      for (let i = 0; i < entry.scenes.length; i++) {
-        const m = media[i] || {};
+      const total = entry.scenes.length;
+      let done = 0;
+      setShareProg({ done, total });
+      const mediaArr = media;
+      // Jedna scéna = obrázek (povinný) + audio (bonus, chyba ho jen vynechá)
+      async function uploadScene(i: number): Promise<{ narration: string; imageUrl: string; audioUrl: string }> {
+        const m = mediaArr[i] || {};
         let imageUrl = m.imageUrl || "";
         let audioUrl = m.audioUrl || "";
         if (imageUrl.startsWith("data:")) imageUrl = await uploadShareAsset(shareId, "img", i, imageUrl);
         else if (!/^https:/.test(imageUrl)) imageUrl = "";
-        // Audio je bonus — když se jedna stopa nenahraje, odkaz pošleme i tak
         try {
           if (audioUrl.startsWith("data:")) audioUrl = await uploadShareAsset(shareId, "aud", i, audioUrl);
           else if (!/^https:/.test(audioUrl)) audioUrl = "";
         } catch { audioUrl = ""; }
-        scenes.push({ narration: entry.scenes[i]?.narration || "", imageUrl, audioUrl });
+        done += 1;
+        setShareProg({ done, total });
+        return { narration: entry.scenes[i]?.narration || "", imageUrl, audioUrl };
+      }
+      // 3 scény najednou — výrazně rychlejší než jedna po druhé
+      const scenes: Array<{ narration: string; imageUrl: string; audioUrl: string }> = new Array(total);
+      for (let i = 0; i < total; i += 3) {
+        const chunk = await Promise.all(
+          Array.from({ length: Math.min(3, total - i) }, (_, j) => uploadScene(i + j))
+        );
+        chunk.forEach((s, j) => { scenes[i + j] = s; });
       }
       const res = await fetch("/api/share", {
         method: "POST",
@@ -1839,21 +1857,31 @@ export default function Home() {
       });
       const d = await safeJson<{ ok?: boolean; error?: string }>(res);
       if (!res.ok || !d.ok) throw new Error(d.error || "publish failed");
-      const url = `${location.origin}/s/${shareId}`;
-      // Nativní sdílení (WhatsApp, e-mail…), jinak zkopírovat odkaz
-      if (navigator.share) {
-        try { await navigator.share({ title: entry.title, url }); }
-        catch (err) { if ((err as Error)?.name !== "AbortError") throw err; }
-      } else {
-        await navigator.clipboard.writeText(url);
-        await appConfirm(t.shareCopied);
-      }
+      // Hotovo → okno s odkazem; sdílení/kopírování až na čerstvé ťuknutí
+      setShareResult({ url: `${location.origin}/s/${shareId}`, title: entry.title, copied: false });
     } catch (err) {
       console.error("[share]", err);
       await appConfirm(t.shareErr);
     } finally {
       setShareBusyId(null);
+      setShareProg(null);
     }
+  }
+
+  async function shareResultNative() {
+    if (!shareResult) return;
+    try {
+      await navigator.share({ title: shareResult.title, url: shareResult.url });
+      setShareResult(null);
+    } catch {} // zrušení nabídky není chyba — okno zůstane otevřené
+  }
+
+  async function shareResultCopy() {
+    if (!shareResult) return;
+    try {
+      await navigator.clipboard.writeText(shareResult.url);
+      setShareResult(p => (p ? { ...p, copied: true } : p));
+    } catch {}
   }
 
   // ── Replay from history ───────────────────────────────────────────────────
@@ -2619,7 +2647,11 @@ export default function Home() {
                         <span className="history-badge badge-sequel" role="button"
                           onClick={e => startSequel(e, entry)}>✨ {t.sequelBtn}</span>
                         <span className="history-badge badge-share" role="button"
-                          onClick={e => shareStory(e, entry)}>{shareBusyId === entry.id ? "⏳" : "📤"} {t.shareBtn}</span>
+                          onClick={e => shareStory(e, entry)}>
+                          {shareBusyId === entry.id
+                            ? `⏳ ${shareProg ? `${shareProg.done}/${shareProg.total}` : ""}`
+                            : `📤 ${t.shareBtn}`}
+                        </span>
                       </div>
                       <span className="history-date">{fmtDate(entry.createdAt)}</span>
                     </div>
@@ -2737,6 +2769,28 @@ export default function Home() {
 
               <p className="credits-tap">— klikni pro zavření —</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📤 Hotový odkaz na sdílenou pohádku — sdílení/kopie na čerstvé ťuknutí */}
+      {shareResult && (
+        <div className="app-confirm-overlay" onClick={() => setShareResult(null)}>
+          <div className="app-confirm" onClick={e => e.stopPropagation()}>
+            <p className="app-confirm-msg">📤 {t.shareReadyTitle}</p>
+            <p className="share-link-box">{shareResult.url}</p>
+            <div className="app-confirm-btns">
+              <button type="button" className="outline-btn" onClick={shareResultCopy}>
+                {shareResult.copied ? `✓ ${t.shareCopiedShort}` : `📋 ${t.shareCopyBtn}`}
+              </button>
+              {typeof navigator !== "undefined" && !!navigator.share && (
+                <button type="button" onClick={shareResultNative}>📤 {t.shareNativeBtn}</button>
+              )}
+            </div>
+            <div className="app-confirm-btns">
+              <button type="button" className="outline-btn" onClick={() => setShareResult(null)}>{t.cancel}</button>
+            </div>
+            <p className="gen-step-hint">{t.shareReadyHint}</p>
           </div>
         </div>
       )}
