@@ -393,7 +393,19 @@ export class AmbientPlayer {
   setVolume(v: number): void {
     this.vol = v;
     if (this.running && this.master && this.ctx) {
-      this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.12);
+      this.master.gain.setTargetAtTime(this.ducked ? v * 0.3 : v, this.ctx.currentTime, 0.12);
+    }
+  }
+
+  private ducked = false;
+
+  /** Ducking: pod mluveným slovem se podkres ztiší (~30 %), mezi scénami
+      a ve finále se plynule vrátí — hudba nikdy nepřehluší vyprávění */
+  duck(active: boolean): void {
+    this.ducked = active;
+    if (this.running && this.master && this.ctx) {
+      const target = active ? this.vol * 0.3 : this.vol;
+      this.master.gain.setTargetAtTime(target, this.ctx.currentTime, active ? 0.35 : 0.9);
     }
   }
 

@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.91";
+export const APP_VERSION = "2.92";
 
 // Changelog (newest first)
+// 2.92 - Pozadí v2: každý svět je celá nová ilustrace s Nicoláskem a Valentýnkou (podle fotek), stará grafika se skryje; výběr světa velkým tlačítkem s rolovací nabídkou; ovládání čtečky nikdy nepřekryje obrázek (při otevření panelu se obraz plynule zmenší); ikona otočení = ležatý/stojící telefon; hudební podkres se ztiší pod hlasem a vrací se mezi scénami (ducking)
 // 2.91 - Ovládání čtečky předěláno: jen 4 velká tlačítka (Přehrát/Pauza, Strana, Na šířku, Domů) — v portrétu jedna řada na šířku obrázku dole, ve fullscreenu jeden sloupec na výšku obrázku vpravo; tlačítka Hlas a Hudba se nastavují v hlavním menu, auto-přechod scén je zapnutý vždy
 // 2.90 - Ovládání čtečky je decentní: kompaktní tmavý panel (na výšku dole ve 2 sloupcích, na šířku úzký sloupek u kraje), nepřekrývá obrázek, objeví se jen ťuknutím na displej a po 5 s sám zmizí
 // 2.89 - Oprava swipe mazání: po swipu už se omylem nespustí pohádka (potlačení syntetizovaného kliku, stav v ref); odjištěná položka má neprůhledné pozadí — červené Smazat neprosvítá skrz text

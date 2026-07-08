@@ -7,13 +7,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { head, put } from "@vercel/blob";
 import { bgSceneById } from "@/lib/backgrounds";
 import { generateBackgroundImage } from "@/lib/gemini";
+import { charactersByIds, loadReferenceImages } from "@/lib/characters";
 import { blobToken } from "@/lib/blob-token";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 // Při změně promptů v lib/backgrounds.ts zvednout — vygenerují se nové obrázky
-const BG_VERSION = "v1";
+// v2: světy nově obsahují Nicoláska a Valentýnku (podle referenčních fotek)
+const BG_VERSION = "v2";
+
+// Děti jsou součástí každého světa pozadí — malé, zezadu/z profilu, u kraje
+const KIDS_SUFFIX =
+  " Include the two children from the reference photos — Nicolas and Valentýna — as SMALL figures in the lower part of the scene, standing together seen from behind or in half-profile, gazing into the world with wonder. Their hair and look must match the reference photos. They occupy at most one quarter of the image height; the scenery remains the main subject.";
 
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("scene") || "";
@@ -30,7 +36,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const img = await generateBackgroundImage(scene.prompt);
+    const refs = loadReferenceImages(charactersByIds(["nicolas", "valentyna"]));
+    const img = await generateBackgroundImage(scene.prompt + KIDS_SUFFIX, refs);
     const blob = await put(path, img.buffer, {
       access: "public",
       addRandomSuffix: false,

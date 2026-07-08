@@ -131,6 +131,11 @@ body {
   opacity: 1;
 }
 
+/* Ilustrovaný svět už Nicoláska a Valentýnku obsahuje — stará pixelart
+   vrstva se skryje, ať se děti nezdvojují */
+.photo-bg-img { transition: opacity 0.8s ease; }
+:root[style*="--bg-img"] .photo-bg-img { opacity: 0; }
+
 /* Dark gradient overlay for readability */
 .photo-bg::after {
   content: "";
@@ -189,9 +194,18 @@ body {
   margin-bottom: 0.2rem;
 }
 
-/* Tlačítko rolování pozadí — vlevo, jazyky zůstávají vpravo */
+/* Tlačítko výběru světa pozadí — vlevo, větší, jazyky zůstávají vpravo */
 .bg-cycle-btn {
   margin-right: auto;
+  font-size: 0.92rem;
+  padding: 0.5rem 0.95rem;
+  font-weight: 800;
+}
+
+/* Rolovací nabídka světů pozadí (styl jako 📜 klasické pohádky) */
+.bg-picker {
+  margin: 0.35rem 0 0.5rem;
+  max-height: 280px;
 }
 
 .lang-btn {
@@ -764,6 +778,17 @@ button:disabled {
   display: grid;
 }
 
+/* Při otevřeném panelu se obrázek plynule zmenší — ovládání NIKDY nepřekrývá
+   obraz (po 5 s panel zmizí a obrázek se vrátí) */
+.reader-mode .book-card {
+  transition: transform 0.25s ease;
+}
+
+.reader-mode .ctrls-open .book-card {
+  transform: translateY(-34px) scale(0.9);
+  transform-origin: center top;
+}
+
 .reader-mode .ctrl-cell {
   min-height: 56px;
   font-size: 0.72rem;
@@ -857,6 +882,11 @@ button:disabled {
   }
   .reader-mode .ctrl-ico {
     font-size: 1.15rem;
+  }
+  /* Landscape: obrázek uhne doleva a zmenší se — sloupec tlačítek má místo */
+  .reader-mode .ctrls-open .book-card {
+    transform: translateX(-56px) scale(0.9);
+    transform-origin: left center;
   }
 
   /* Title hidden — image gets the space */
@@ -1037,6 +1067,12 @@ button:disabled {
 .ctrl-ico {
   font-size: 1.35rem;
   line-height: 1;
+}
+
+/* Ležatý telefon = „otoč na šířku" */
+.ico-rot {
+  display: inline-block;
+  transform: rotate(90deg);
 }
 
 .ctrl-txt {

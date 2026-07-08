@@ -216,9 +216,10 @@ async function verifySceneImage(apiKey: string, img: ImageResult, heroDescriptio
 }
 
 // Pozadí aplikace — ilustrovaná scenérie ve stejném stylu jako pohádky,
-// na výšku (telefon), bez postav a bez textu. Prompt je bezpečný a pevně
+// na výšku (telefon). Volitelně s referenčními fotkami postav (Nicolásek
+// a Valentýnka bývají součástí každého světa). Prompt je bezpečný a pevně
 // daný (lib/backgrounds.ts), sanitizace není potřeba.
-export async function generateBackgroundImage(prompt: string): Promise<ImageResult> {
+export async function generateBackgroundImage(prompt: string, refImages: ReferenceImage[] = []): Promise<ImageResult> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
   const model = IMAGE_MODEL.trim();
@@ -226,7 +227,7 @@ export async function generateBackgroundImage(prompt: string): Promise<ImageResu
   let lastErr = new Error("Gemini nevrátil obrázek");
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      return await callGeminiImage(apiKey, model, prompt, aspect);
+      return await callGeminiImage(apiKey, model, prompt, aspect, refImages);
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e));
       console.error(`[Gemini bg] attempt ${attempt}/3: ${lastErr.message}`);

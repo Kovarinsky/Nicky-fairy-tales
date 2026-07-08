@@ -16,7 +16,7 @@ export interface BgScene {
 // pro pozadí: prázdná scenérie bez postav, ztlumená, ať je bílý text čitelný.
 const BG_STYLE =
   "Walt Disney animated style, painterly storybook illustration, warm cinematic lighting, rich saturated colors, portrait orientation. " +
-  "An empty dreamy scenery backdrop for a children's fairy-tale app: NO people, NO animals, NO characters, NO creatures anywhere. " +
+  "A dreamy scenery backdrop for a children's fairy-tale app: no people or creatures OTHER than the two children specified separately. " +
   "Slightly dark and muted overall so white text on top stays readable. " +
   "Absolutely no text, letters, words, signs, labels or writing of any kind anywhere in the image.";
 

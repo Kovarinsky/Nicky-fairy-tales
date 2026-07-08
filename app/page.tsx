@@ -599,6 +599,12 @@ export default function Home() {
     if (nav) { nav.style.top = ""; nav.style.left = ""; nav.style.width = ""; nav.style.right = ""; }
   }, [viewMode]);
 
+  // Ducking: při mluveném slově se hudební podkres ztiší, v pauzách a mezi
+  // scénami se plynule vrátí — realistický podkres, který neruší vyprávění
+  useEffect(() => {
+    ambientRef.current?.duck(isPlaying);
+  }, [isPlaying]);
+
   // Ovládací panel se v readeru objeví jen ťuknutím a po 5 s sám zmizí —
   // nesmí zakrývat obrázek během čtení
   useEffect(() => {
@@ -1591,11 +1597,12 @@ export default function Home() {
     }
     return () => { dead = true; };
   }, [activeBg]);
-  function cycleBg() {
-    const order = ["auto", ...BG_SCENES.map(s => s.id)];
-    const next = order[(order.indexOf(bgChoice) + 1) % order.length];
-    setBgChoice(next);
-    try { localStorage.setItem(BG_KEY, next); } catch {}
+  // Výběr světa pozadí: velké tlačítko otevře rolovací nabídku (jako 📜 pohádky)
+  const [bgPickerOpen, setBgPickerOpen] = useState(false);
+  function pickBg(id: string) {
+    setBgChoice(id);
+    try { localStorage.setItem(BG_KEY, id); } catch {}
+    setBgPickerOpen(false);
   }
   const bgLabel = bgChoice === "auto"
     ? `🎨 ${t.bgAuto}`
@@ -1842,10 +1849,25 @@ export default function Home() {
       {!readerMode && (
       <>
       <div className="lang-switch">
-        <button type="button" className="lang-btn bg-cycle-btn" onClick={cycleBg} title={t.bgTitle}>{bgLabel}</button>
+        <button type="button" className={`lang-btn bg-cycle-btn${bgPickerOpen ? " lang-on" : ""}`}
+          onClick={() => setBgPickerOpen(p => !p)} title={t.bgTitle}>{bgLabel} ▾</button>
         <button type="button" className={`lang-btn ${uiLang === "cs" ? "lang-on" : ""}`} onClick={() => switchLang("cs")}>🇨🇿 CZ</button>
         <button type="button" className={`lang-btn ${uiLang === "en" ? "lang-on" : ""}`} onClick={() => switchLang("en")}>🇬🇧 EN</button>
       </div>
+      {bgPickerOpen && (
+        <div className="folk-list bg-picker">
+          <button type="button" className={`folk-item ${bgChoice === "auto" ? "folk-on" : ""}`} onClick={() => pickBg("auto")}>
+            <span className="folk-emoji">🎨</span>
+            <span>{t.bgAuto} — {t.bgAutoHint}</span>
+          </button>
+          {BG_SCENES.map(s => (
+            <button type="button" key={s.id} className={`folk-item ${bgChoice === s.id ? "folk-on" : ""}`} onClick={() => pickBg(s.id)}>
+              <span className="folk-emoji">{s.emoji}</span>
+              <span>{uiLang === "en" ? s.nameEn : s.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <h1>📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"} <span className="version-badge">v{APP_VERSION}</span></h1>
       <p className="subtitle">{t.subtitle}</p>
 
@@ -2294,7 +2316,8 @@ export default function Home() {
 
               <button type="button" className={`ctrl-cell${forcedLs ? " ctrl-cell-on" : ""}`}
                 onClick={toggleForcedLandscape}>
-                <span className="ctrl-ico">{forcedLs ? "📱" : "🔄"}</span>
+                {/* ikona ukazuje CÍLOVOU polohu: ležatý telefon = přepni na šířku */}
+                <span className={`ctrl-ico${forcedLs ? "" : " ico-rot"}`}>📱</span>
                 <span className="ctrl-txt">{forcedLs ? t.rotateBack : t.rotate}</span>
               </button>
 
