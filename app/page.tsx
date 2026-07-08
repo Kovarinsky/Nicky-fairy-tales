@@ -600,6 +600,21 @@ export default function Home() {
     if (nav) { nav.style.top = ""; nav.style.left = ""; nav.style.width = ""; nav.style.right = ""; }
   }, [viewMode]);
 
+  // Klávesnice na tabletu/telefonu zakrývala psané pole — po fokusu se pole
+  // samo posune do viditelné části (chvilku počká, než klávesnice vyjede)
+  useEffect(() => {
+    function onFocusIn(e: FocusEvent) {
+      const el = e.target as HTMLElement | null;
+      if (!el || (el.tagName !== "TEXTAREA" && el.tagName !== "INPUT")) return;
+      if ((el as HTMLInputElement).type === "checkbox" || (el as HTMLInputElement).type === "file") return;
+      setTimeout(() => {
+        try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch {}
+      }, 350);
+    }
+    document.addEventListener("focusin", onFocusIn);
+    return () => document.removeEventListener("focusin", onFocusIn);
+  }, []);
+
   // Stylové potvrzovací okno místo ošklivého systémového window.confirm
   const [confirmBox, setConfirmBox] = useState<{ msg: string; resolve: (ok: boolean) => void } | null>(null);
   function appConfirm(msg: string): Promise<boolean> {

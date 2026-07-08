@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.95";
+export const APP_VERSION = "2.96";
 
 // Changelog (newest first)
+// 2.96 - Oprava psaní na tabletu: otevřená klávesnice stránku zmenší místo překrytí (interactive-widget) a pole, do kterého píšete, se samo posune do viditelné části obrazovky
 // 2.95 - Stylové potvrzovací okno appky místo systémových dialogů (mobilní data, zrušení/nakopnutí pohádky); OPRAVA konzistence vymyšlených postav: zámek vzhledu omylem vyhazoval postavy z příběhu (Otesánek…) — teď v něm zůstávají a Claude jim musí psát plný popis (co to je, barvy, velikost) → stejná podoba na všech stránkách
 // 2.94 - Panel 💰 Spotřeba nově počítá Gemini a hlas: appka si po každé pohádce zapíše počet obrázků a znaků (usage/ v Blobu) — „🎨 Gemini: N obrázků ≈ $ ≈ Kč" a „🎙️ Namluveno ~N znaků" za 30 dní; ElevenLabs kredity se ukážou po povolení oprávnění User→Read u API klíče
 // 2.93 - Panel čtečky vyjíždí zpoza spodní hrany (na výšku) / pravé hrany (na šířku) s plynulým efektem — obraz se už nezmenšuje; mazání: po odjištění zmizí vlastní 🗑️ a ▶ (konec dvou košů) + nápověda „přejeďte doleva pro smazání"

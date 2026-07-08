@@ -23,6 +23,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#0a0520",
   viewportFit: "cover",
+  // Otevřená klávesnice ZMENŠÍ stránku (místo překrytí) — psané pole
+  // tak jde odscrollovat do viditelné části (tablet na šířku)
+  interactiveWidget: "resizes-content",
 };
 
 function FairyBackground() {
