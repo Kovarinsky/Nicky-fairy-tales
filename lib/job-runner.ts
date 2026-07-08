@@ -145,6 +145,11 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     st.done = Object.keys(st.sceneUrls).length;
     await write();
 
+    // Měření spotřeby: kolik obrázků a znaků hlasu vznikne V TOMTO běhu
+    // (při navázání se už hotové scény nepočítají znovu)
+    const imagesAtStart = Object.keys(st.sceneUrls).length;
+    let voiceChars = 0;
+
     // ── 2) Scenes (Gemini + ElevenLabs) with the consistency anchor ──
     const ids: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
     const refBase: ReferenceImage[] = loadReferenceImages(charactersByIds(ids));
@@ -186,6 +191,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           return null;
         }),
       ]);
+      if (audio) voiceChars += scene.narration.length;
       if (!img) { await write(); return; } // retry rounds below; chybu vidí klient
       st.imgError = undefined;
       const payload = {
@@ -222,6 +228,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       st.phase = "error";
       st.error = `Vyčerpán denní limit kreslení Gemini (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo). Resetuje se kolem 9:00 ráno — pak pohádku zadejte znovu.`;
       await write();
+      await writeUsageRecord(Object.keys(st.sceneUrls!).length - imagesAtStart, voiceChars);
       return;
     }
 
@@ -236,9 +243,27 @@ export async function runJob(id: string, body: Record<string, unknown>) {
 
     st.phase = "done";
     await write();
+    await writeUsageRecord(Object.keys(st.sceneUrls!).length - imagesAtStart, voiceChars);
   } catch (e) {
     st.phase = "error";
     st.error = e instanceof Error ? e.message : String(e);
     await write();
+  }
+}
+
+// Záznam spotřeby pro panel 💰: počet obrázků a znaků hlasu z tohoto běhu.
+// Data jsou v NÁZVU souboru (usage/u<ts>-i<obrázky>-c<znaky>.json) — /api/usage
+// je sečte pouhým výpisem, bez stahování obsahu. Úklid jobs/ se jich nedotkne.
+async function writeUsageRecord(images: number, chars: number): Promise<void> {
+  if (images <= 0 && chars <= 0) return;
+  try {
+    await put(`usage/u${Date.now()}-i${images}-c${chars}.json`, "1", {
+      access: "public",
+      addRandomSuffix: false,
+      contentType: "application/json",
+      token: blobToken(),
+    });
+  } catch (e) {
+    console.warn("[usage] record failed:", e instanceof Error ? e.message : e);
   }
 }

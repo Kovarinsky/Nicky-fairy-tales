@@ -5,9 +5,48 @@
 // Gemini: Google útratu přes API klíč nevydává — v UI jen odkaz na konzoli.
 
 import { NextRequest, NextResponse } from "next/server";
+import { list, del } from "@vercel/blob";
+import { blobToken } from "@/lib/blob-token";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
+
+// Ceny za 1 vygenerovaný obrázek (USD, rozlišení 1K)
+const IMAGE_PRICES: Record<string, number> = {
+  "gemini-3.1-flash-image": 0.067,
+  "gemini-2.5-flash-image": 0.039,
+};
+
+// Vlastní počítadlo Gemini + hlasu: sečte záznamy usage/u<ts>-i<img>-c<chars>
+// zapsané job-runnerem (data jsou v názvu souboru — stačí výpis, nic se
+// nestahuje). Záznamy starší 90 dní se rovnou promažou.
+async function ownUsage(days: number): Promise<{ images: number; chars: number; usd: number; days: number } | { error: string }> {
+  if (!blobToken()) return { error: "blob-not-configured" };
+  const cutoff = Date.now() - days * 86_400_000;
+  const pruneBefore = Date.now() - 90 * 86_400_000;
+  const model = (process.env.GEMINI_IMAGE_MODEL_PRIMARY || process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image").trim();
+  const price = IMAGE_PRICES[model] ?? 0.05;
+  let images = 0, chars = 0;
+  const stale: string[] = [];
+  try {
+    let cursor: string | undefined;
+    do {
+      const page = await list({ prefix: "usage/", cursor, limit: 1000, token: blobToken() });
+      for (const b of page.blobs) {
+        const m = b.pathname.match(/^usage\/u(\d+)-i(\d+)-c(\d+)\.json$/);
+        if (!m) continue;
+        const ts = Number(m[1]);
+        if (ts < pruneBefore) { stale.push(b.url); continue; }
+        if (ts >= cutoff) { images += Number(m[2]); chars += Number(m[3]); }
+      }
+      cursor = page.cursor;
+    } while (cursor);
+    if (stale.length) del(stale, { token: blobToken() }).catch(() => {});
+    return { images, chars, usd: Math.round(images * price * 100) / 100, days };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "fetch failed" };
+  }
+}
 
 function sanitizeKey(key: string | undefined): string {
   return (key || "").replace(/[^\x20-\x7E]/g, "").trim();
@@ -94,6 +133,8 @@ async function elevenLabsCredits(): Promise<
 
 export async function GET(req: NextRequest) {
   const days = Math.min(Math.max(Number(req.nextUrl.searchParams.get("days")) || 30, 1), 365);
-  const [claude, elevenlabs, czkRate] = await Promise.all([claudeCost(days), elevenLabsCredits(), usdToCzkRate()]);
-  return NextResponse.json({ claude, elevenlabs, czkRate }, { headers: { "Cache-Control": "no-store" } });
+  const [claude, elevenlabs, czkRate, own] = await Promise.all([
+    claudeCost(days), elevenLabsCredits(), usdToCzkRate(), ownUsage(days),
+  ]);
+  return NextResponse.json({ claude, elevenlabs, czkRate, own }, { headers: { "Cache-Control": "no-store" } });
 }

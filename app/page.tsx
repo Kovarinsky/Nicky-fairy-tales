@@ -210,6 +210,7 @@ export default function Home() {
   type UsageData = {
     claude?: { usd?: number; days?: number; error?: string };
     elevenlabs?: { used?: number; limit?: number; tier?: string; error?: string };
+    own?: { images?: number; chars?: number; usd?: number; days?: number; error?: string };
     czkRate?: number;
   };
   // Which queued story the gen-cards preview (tap a segment to switch)
@@ -2429,7 +2430,18 @@ export default function Home() {
                     : usage.elevenlabs?.error === "missing-permission"
                       ? t.usageElevenPerm
                       : `🎙️ ElevenLabs: ${usage.elevenlabs?.error ?? "?"}`}</p>
-                  <p>{t.usageGemini}</p>
+                  {usage.own && typeof usage.own.images === "number" ? (
+                    <>
+                      <p>{t.usageGeminiOwn(
+                        usage.own.images.toLocaleString("cs-CZ"),
+                        (usage.own.usd ?? 0).toFixed(2),
+                        Math.round((usage.own.usd ?? 0) * (usage.czkRate ?? 23)).toLocaleString("cs-CZ"),
+                        usage.own.days ?? 30)}</p>
+                      <p>{t.usageVoiceOwn((usage.own.chars ?? 0).toLocaleString("cs-CZ"), usage.own.days ?? 30)}</p>
+                    </>
+                  ) : (
+                    <p>{t.usageGemini}</p>
+                  )}
                 </>
               )}
             </div>

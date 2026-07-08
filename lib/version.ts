@@ -1,6 +1,7 @@
-export const APP_VERSION = "2.93";
+export const APP_VERSION = "2.94";
 
 // Changelog (newest first)
+// 2.94 - Panel 💰 Spotřeba nově počítá Gemini a hlas: appka si po každé pohádce zapíše počet obrázků a znaků (usage/ v Blobu) — „🎨 Gemini: N obrázků ≈ $ ≈ Kč" a „🎙️ Namluveno ~N znaků" za 30 dní; ElevenLabs kredity se ukážou po povolení oprávnění User→Read u API klíče
 // 2.93 - Panel čtečky vyjíždí zpoza spodní hrany (na výšku) / pravé hrany (na šířku) s plynulým efektem — obraz se už nezmenšuje; mazání: po odjištění zmizí vlastní 🗑️ a ▶ (konec dvou košů) + nápověda „přejeďte doleva pro smazání"
 // 2.92 - Pozadí v2: každý svět je celá nová ilustrace s Nicoláskem a Valentýnkou (podle fotek), stará grafika se skryje; výběr světa velkým tlačítkem s rolovací nabídkou; ovládání čtečky nikdy nepřekryje obrázek (při otevření panelu se obraz plynule zmenší); ikona otočení = ležatý/stojící telefon; hudební podkres se ztiší pod hlasem a vrací se mezi scénami (ducking)
 // 2.91 - Ovládání čtečky předěláno: jen 4 velká tlačítka (Přehrát/Pauza, Strana, Na šířku, Domů) — v portrétu jedna řada na šířku obrázku dole, ve fullscreenu jeden sloupec na výšku obrázku vpravo; tlačítka Hlas a Hudba se nastavují v hlavním menu, auto-přechod scén je zapnutý vždy
