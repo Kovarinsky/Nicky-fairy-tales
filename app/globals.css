@@ -1967,6 +1967,16 @@ button:disabled {
   color: #c4b5fd;
 }
 
+/* Akční tlačítka u uložené pohádky (Pokračování/Poslat/Soubor) — větší,
+   ať se dají na tabletu pohodlně nahmatat (informační odznaky zůstávají malé) */
+.badge-sequel,
+.badge-share,
+.badge-export {
+  font-size: 0.92rem;
+  padding: 0.5rem 0.85rem;
+  min-height: 42px;
+}
+
 /* 📤 Poslat pohádku — nahraje pohádku a pošle odkaz (WhatsApp, e-mail…) */
 .badge-share {
   background: rgba(56, 189, 248, 0.16);
@@ -2418,8 +2428,8 @@ button:disabled {
 /* Koš v historii — mazání testovacích pohádek */
 .history-del {
   flex: 0 0 auto;
-  font-size: 1.05rem;
-  padding: 0.5rem 0.45rem;
+  font-size: 1.3rem;
+  padding: 0.6rem 0.6rem;
   border-radius: 10px;
   opacity: 0.65;
   cursor: pointer;

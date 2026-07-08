@@ -94,7 +94,7 @@ export default function SharedStoryPage() {
           <div className="share-controls">
             <button type="button" className="share-btn" onClick={() => go(-1)} disabled={page === 0} aria-label="Předchozí">←</button>
             <button type="button" className="share-btn share-play" onClick={togglePlay} disabled={!scene.audioUrl}>
-              {isPlaying ? "⏸" : "▶"}
+              {isPlaying ? "⏸\uFE0E" : "▶\uFE0E"}
             </button>
             <span className="share-pagenum">{page + 1} / {story.scenes.length}</span>
             <button type="button" className="share-btn" onClick={() => go(1)} disabled={page >= story.scenes.length - 1} aria-label="Další">→</button>

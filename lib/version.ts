@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.03";
+export const APP_VERSION = "3.04";
 
 // Changelog (newest first)
+// 3.04 - Offline soubor s pohádkou předělán na čtečku jako v appce: obrázek přes celý displej, text v čitelném pruhu dole (bílá na tmavé), velká viditelná tlačítka ← ▶ →; na šířku se schová titulek, ať má obrázek maximum místa; větší tlačítka u uložených pohádek (Pokračování/Poslat/Soubor + koš) — na tabletu se lépe trefují
 // 3.03 - 💾 Pohádka jako soubor: u uložené pohádky tlačítko Soubor — zabalí obrázky, text i namluvení do jednoho HTML souboru s přehrávačem; pošlete ho Quick Share/Bluetooth BEZ internetu a příjemci se přehraje offline (bez platnosti 90 dní)
 // 3.02 - Pohádky jsou ~5× menší: nové obrázky se ukládají jako WebP místo PNG (15 stránek ≈ 5–8 MB místo 25+ MB — méně místa v telefonu, rychlejší stažení i poslání); starší uložené pohádky zmenší telefon automaticky při posílání
 // 3.01 - OPRAVA posílání pohádky: obrázky se nahrávají rovnou z prohlížeče do úložiště (binárně) — velké scény přes server narážely na limit 4,5 MB na request a nahrávání se točilo dokola; po chybě naváže další pokus tam, kde skončil (nenahrává od začátku); 2 pokusy na soubor a případná chyba se ukáže i s důvodem

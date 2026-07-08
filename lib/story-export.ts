@@ -1,6 +1,8 @@
 // 💾 Export pohádky do JEDNOHO samostatného HTML souboru: obrázky, text
 // i namluvení jsou vložené přímo v něm (data URL). Soubor jde poslat
 // Quick Share / Bluetooth bez internetu a přehraje se v prohlížeči offline.
+// Přehrávač vypadá jako čtečka v appce: obrázek přes celý displej,
+// titulky v čitelném pruhu dole, velká viditelná tlačítka.
 
 export interface ExportScene {
   narration: string;
@@ -18,51 +20,66 @@ export function buildStoryHtml(title: string, scenes: ExportScene[]): string {
 <html lang="cs">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
 <title>${safeTitle} — Nickyho pohádky</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
   body {
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    background: linear-gradient(180deg, #0d1340, #1a237e 60%, #2e1a5e);
-    color: #f5f3ff; min-height: 100vh;
-    display: flex; align-items: center; justify-content: center; padding: 1rem;
+    background: #0a0e2e; color: #ffffff; overflow: hidden;
   }
-  .card {
-    width: min(720px, 100%); background: rgba(13, 19, 64, .88);
-    border: 1px solid rgba(255,255,255,.18); border-radius: 22px;
-    padding: 1.1rem 1.1rem .9rem; text-align: center;
-    box-shadow: 0 12px 56px rgba(0,0,0,.3);
+  #stage { position: fixed; inset: 0; display: flex; flex-direction: column; }
+  #title {
+    color: #ffffff; font-weight: 900; font-size: 1.05rem; text-align: center;
+    padding: .55rem .8rem .35rem; text-shadow: 0 2px 8px rgba(0,0,0,.8);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  h1 { font-size: 1.25rem; font-weight: 900; margin-bottom: .75rem; }
-  .img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 14px; background: rgba(255,255,255,.06); }
-  .img-empty { display: flex; align-items: center; justify-content: center; font-size: 2.5rem; }
-  .text { margin: .8rem .2rem; font-size: 1.02rem; line-height: 1.55; min-height: 3.2em; }
-  .controls { display: flex; align-items: center; justify-content: center; gap: .7rem; margin: .4rem 0 .6rem; }
-  button {
-    min-width: 52px; height: 48px; border-radius: 14px;
-    border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.1);
-    color: #f5f3ff; font-size: 1.2rem; font-weight: 800; cursor: pointer;
+  #imgwrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  #img { max-width: 100%; max-height: 100%; width: auto; height: auto; display: block; }
+  #imgEmpty { font-size: 3rem; display: none; }
+  #bar {
+    background: rgba(6, 8, 28, .94); border-top: 1px solid rgba(255,255,255,.15);
+    padding: .55rem .9rem calc(.6rem + env(safe-area-inset-bottom));
   }
-  button:disabled { opacity: .35; }
-  .play { min-width: 72px; background: linear-gradient(135deg, #7c4dff, #536dfe); border: none; }
-  .num { font-weight: 800; opacity: .85; min-width: 3.5rem; }
-  .foot { font-size: .78rem; opacity: .6; }
+  #text {
+    color: #ffffff; font-size: 1.05rem; line-height: 1.5; text-align: center;
+    margin-bottom: .55rem; max-height: 4.6em; overflow-y: auto;
+  }
+  #controls { display: flex; align-items: center; justify-content: center; gap: .9rem; }
+  .btn {
+    min-width: 64px; height: 52px; border-radius: 15px; border: 2px solid rgba(255,255,255,.55);
+    background: #262c55; color: #ffffff; font-size: 1.35rem; font-weight: 900; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .btn:disabled { opacity: .3; }
+  #play { min-width: 88px; background: linear-gradient(135deg, #7c4dff, #536dfe); border-color: transparent; font-size: 1.5rem; }
+  #num { color: #ffffff; font-weight: 800; font-size: 1rem; min-width: 4rem; text-align: center; }
+  /* Na šířku: titulek zmizí, ať má obrázek celý displej */
+  @media (orientation: landscape) and (max-height: 620px) {
+    #title { display: none; }
+    #text { font-size: .95rem; max-height: 3em; margin-bottom: .4rem; }
+    .btn { height: 46px; }
+  }
 </style>
 </head>
 <body>
-<div class="card">
-  <h1 id="t"></h1>
-  <img id="img" class="img" alt="" style="display:none">
-  <div id="imgEmpty" class="img img-empty" style="display:none">🖼️</div>
-  <p id="text" class="text"></p>
-  <div class="controls">
-    <button id="prev" aria-label="Předchozí">←</button>
-    <button id="play" class="play">▶</button>
-    <span id="num" class="num"></span>
-    <button id="next" aria-label="Další">→</button>
+<div id="stage">
+  <div id="title"></div>
+  <div id="imgwrap">
+    <img id="img" alt="">
+    <div id="imgEmpty">🖼️</div>
   </div>
-  <p class="foot">✨ Vytvořeno v appce Nickyho pohádky — funguje i bez internetu</p>
+  <div id="bar">
+    <p id="text"></p>
+    <div id="controls">
+      <button type="button" class="btn" id="prev" aria-label="Předchozí">←</button>
+      <button type="button" class="btn" id="play">▶&#xFE0E;</button>
+      <span id="num"></span>
+      <button type="button" class="btn" id="next" aria-label="Další">→</button>
+    </div>
+  </div>
 </div>
 <audio id="au"></audio>
 <script id="data" type="application/json">${data}</script>
@@ -72,13 +89,13 @@ export function buildStoryHtml(title: string, scenes: ExportScene[]): string {
   var page = 0, playing = false, auto = false;
   var au = document.getElementById("au");
   var img = document.getElementById("img"), imgEmpty = document.getElementById("imgEmpty");
-  document.getElementById("t").textContent = story.title;
+  document.getElementById("title").textContent = "📖 " + story.title;
   document.title = story.title + " — Nickyho pohádky";
 
   function render() {
     var s = story.scenes[page];
     if (s.imageUrl) { img.src = s.imageUrl; img.style.display = ""; imgEmpty.style.display = "none"; }
-    else { img.style.display = "none"; imgEmpty.style.display = "flex"; }
+    else { img.style.display = "none"; imgEmpty.style.display = "block"; }
     document.getElementById("text").textContent = s.narration;
     document.getElementById("num").textContent = (page + 1) + " / " + story.scenes.length;
     document.getElementById("prev").disabled = page === 0;
@@ -87,7 +104,7 @@ export function buildStoryHtml(title: string, scenes: ExportScene[]): string {
     document.getElementById("play").disabled = !s.audioUrl;
     if (s.audioUrl) { au.src = s.audioUrl; if (auto) { au.play().then(function () { playing = true; updatePlay(); }).catch(function () {}); } }
   }
-  function updatePlay() { document.getElementById("play").textContent = playing ? "⏸" : "▶"; }
+  function updatePlay() { document.getElementById("play").textContent = playing ? "⏸\uFE0E" : "▶\uFE0E"; }
   document.getElementById("play").onclick = function () {
     if (playing) { au.pause(); playing = false; auto = false; }
     else { auto = true; au.play().then(function () { playing = true; updatePlay(); }).catch(function () {}); }
