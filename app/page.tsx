@@ -10,6 +10,7 @@ import { BG_SCENES, bgSceneById, THEME_BG } from "@/lib/backgrounds";
 import { FOLK_TALES, folkTaleById } from "@/lib/folk-tales";
 import { MORALS, moralById } from "@/lib/morals";
 import { upload as uploadToBlob } from "@vercel/blob/client";
+import { buildStoryHtml } from "@/lib/story-export";
 
 // ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; nameEn?: string; }
@@ -1940,6 +1941,68 @@ export default function Home() {
     } catch {}
   }
 
+  // ── 💾 Pohádka jako soubor (offline) ─────────────────────────────────────
+  // Jeden samostatný HTML soubor s vloženými obrázky, textem i namluvením —
+  // jde poslat Quick Share / Bluetooth BEZ internetu a přehraje se offline
+  const [exportBusyId, setExportBusyId] = useState<string | null>(null);
+
+  async function exportStory(e: React.MouseEvent, entry: HistoryEntry) {
+    e.stopPropagation();
+    if (exportBusyId || swipeHandledRef.current || confirmDeleteIdRef.current) return;
+    setExportBusyId(entry.id);
+    try {
+      let media: Array<{ imageUrl?: string; audioUrl?: string }> | undefined =
+        renderedMapRef.current.get(entry.id);
+      if (!media) {
+        const cached = await getCachedStory(entry.id);
+        if (cached) media = cached;
+      }
+      if (!media || !media.some(m => m.imageUrl && !isPlaceholderImg(m.imageUrl))) {
+        await appConfirm(t.shareNoMedia);
+        return;
+      }
+      const scenes = await Promise.all(entry.scenes.map(async (s, i) => {
+        const m = media![i] || {};
+        let imageUrl = m.imageUrl || "";
+        if (imageUrl.startsWith("data:image/")) imageUrl = await compressForShare(imageUrl);
+        else if (!imageUrl.startsWith("data:")) imageUrl = "";
+        const audioUrl = m.audioUrl?.startsWith("data:") ? m.audioUrl : "";
+        return { narration: s.narration || "", imageUrl, audioUrl };
+      }));
+      const html = buildStoryHtml(entry.title, scenes);
+      // Bez diakritiky — jméno s háčky prohlížeč zahodí a stáhne „download"
+      const slug = entry.title.normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+      const fileName = `pohadka-${slug || "nicky"}.html`;
+      const file = new File([html], fileName, { type: "text/html" });
+      // Nejdřív rovnou do sdílecí nabídky (Quick Share, Bluetooth…) — soubor,
+      // ne odkaz; když to prohlížeč neumí, soubor se stáhne do Stažených
+      if (navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: entry.title });
+          return;
+        } catch (err) {
+          if ((err as Error)?.name === "AbortError") return;
+        }
+      }
+      const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      await appConfirm(t.exportDone);
+    } catch (err) {
+      console.error("[export]", err);
+      const detail = err instanceof Error && err.message ? ` (${err.message.slice(0, 140)})` : "";
+      await appConfirm(t.shareErr + detail);
+    } finally {
+      setExportBusyId(null);
+    }
+  }
+
   // ── Replay from history ───────────────────────────────────────────────────
   async function replayStory(entry: HistoryEntry) {
     // Helper: switch to a set of ready scenes without interrupting bg generation
@@ -2707,6 +2770,10 @@ export default function Home() {
                           {shareBusyId === entry.id
                             ? `⏳ ${shareProg ? `${shareProg.done}/${shareProg.total}` : ""}`
                             : `📤 ${t.shareBtn}`}
+                        </span>
+                        <span className="history-badge badge-export" role="button"
+                          onClick={e => exportStory(e, entry)}>
+                          {exportBusyId === entry.id ? "⏳" : `💾 ${t.exportBtn}`}
                         </span>
                       </div>
                       <span className="history-date">{fmtDate(entry.createdAt)}</span>

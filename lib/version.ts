@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.02";
+export const APP_VERSION = "3.03";
 
 // Changelog (newest first)
+// 3.03 - 💾 Pohádka jako soubor: u uložené pohádky tlačítko Soubor — zabalí obrázky, text i namluvení do jednoho HTML souboru s přehrávačem; pošlete ho Quick Share/Bluetooth BEZ internetu a příjemci se přehraje offline (bez platnosti 90 dní)
 // 3.02 - Pohádky jsou ~5× menší: nové obrázky se ukládají jako WebP místo PNG (15 stránek ≈ 5–8 MB místo 25+ MB — méně místa v telefonu, rychlejší stažení i poslání); starší uložené pohádky zmenší telefon automaticky při posílání
 // 3.01 - OPRAVA posílání pohádky: obrázky se nahrávají rovnou z prohlížeče do úložiště (binárně) — velké scény přes server narážely na limit 4,5 MB na request a nahrávání se točilo dokola; po chybě naváže další pokus tam, kde skončil (nenahrává od začátku); 2 pokusy na soubor a případná chyba se ukáže i s důvodem
 // 3.00 - Poslat pohádku v2: nahrávání ukazuje průběh (⏳ 3/15), jede 3 scény najednou (rychlejší) a po dokončení se otevře okno s odkazem a tlačítky Sdílet… / Kopírovat — sdílecí nabídka Androidu se dřív po dlouhém nahrávání nesměla otevřít (vyžaduje čerstvé ťuknutí), proto to vypadalo, že se nic nestalo
