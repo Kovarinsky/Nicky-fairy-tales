@@ -2781,13 +2781,24 @@ export default function Home() {
             <button type="button" className="ctrl-btn ctrl-nav" onClick={() => nextVisible !== null && goToPage(nextVisible)} disabled={!hasNext} aria-label={t.next}>→</button>
           </div>
 
-          {/* 🔀 Výběr konce — po dovyprávění poslední společné scény */}
+          {/* 🔀 Výběr konce — po dovyprávění poslední společné scény.
+              Dvě grafické karty: obrázek první scény dané cesty + popisek */}
           {storyChoice && branch === null && page === storyChoice.common - 1 && !isPlaying && (
             <div className="choice-panel">
               <p className="choice-title">🔀 {t.choiceTitle}</p>
-              <div className="choice-btns">
-                <button type="button" onClick={() => pickBranch("A")}>1️⃣ {storyChoice.options[0]}</button>
-                <button type="button" onClick={() => pickBranch("B")}>2️⃣ {storyChoice.options[1]}</button>
+              <div className="choice-cards">
+                {(["A", "B"] as const).map((b, bi) => {
+                  const idx = b === "A" ? storyChoice.common : storyChoice.altFrom;
+                  const img = scenes[idx]?.imageUrl;
+                  return (
+                    <button key={b} type="button" className="choice-card" onClick={() => pickBranch(b)}>
+                      {img && !isPlaceholderImg(img)
+                        ? <img src={img} alt={storyChoice.options[bi]} />
+                        : <span className="choice-card-emoji">{bi === 0 ? "🌟" : "🌙"}</span>}
+                      <span className="choice-card-label">{bi === 0 ? "1️⃣" : "2️⃣"} {storyChoice.options[bi]}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

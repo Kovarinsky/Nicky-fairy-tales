@@ -59,15 +59,19 @@ export function buildStoryHtml(title: string, scenes: ExportScene[], choice?: St
   .btn:disabled { opacity: .3; }
   #play { min-width: 88px; background: linear-gradient(135deg, #7c4dff, #536dfe); border-color: transparent; font-size: 1.5rem; }
   #num { color: #ffffff; font-weight: 800; font-size: 1rem; min-width: 4rem; text-align: center; }
-  /* 🔀 Výběr konce */
+  /* 🔀 Výběr konce — dvě grafické karty s náhledem cesty */
   #choiceRow { display: none; flex-direction: column; gap: .5rem; margin-top: .3rem; }
   #choiceRow p { text-align: center; font-weight: 900; margin-bottom: .15rem; }
-  #choiceRow button {
-    width: 100%; min-height: 50px; border: none; border-radius: 14px; cursor: pointer;
-    color: #fff; font-size: 1rem; font-weight: 800; padding: .5rem .9rem;
-    background: linear-gradient(135deg, #7c4dff, #536dfe);
+  .ccards { display: flex; gap: .6rem; }
+  .ccard {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .4rem;
+    padding: .45rem .45rem .55rem; border-radius: 14px; cursor: pointer;
+    border: 2px solid rgba(124, 77, 255, .8); background: rgba(255,255,255,.07);
+    color: #fff; font-size: .92rem; font-weight: 800;
   }
-  #choiceRow button:last-child { background: linear-gradient(135deg, #ec4899, #f97316); }
+  .ccard:last-child { border-color: rgba(236, 72, 153, .8); }
+  .ccard img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 9px; display: block; }
+  .ccard span { text-align: center; line-height: 1.3; }
   /* Na šířku: titulek zmizí, ať má obrázek celý displej */
   @media (orientation: landscape) and (max-height: 620px) {
     #title { display: none; }
@@ -93,8 +97,10 @@ export function buildStoryHtml(title: string, scenes: ExportScene[], choice?: St
     </div>
     <div id="choiceRow">
       <p>🔀 Jak má pohádka pokračovat?</p>
-      <button type="button" id="optA"></button>
-      <button type="button" id="optB"></button>
+      <div class="ccards">
+        <button type="button" class="ccard" id="optA"><img id="optAimg" alt=""><span id="optAtxt"></span></button>
+        <button type="button" class="ccard" id="optB"><img id="optBimg" alt=""><span id="optBtxt"></span></button>
+      </div>
     </div>
   </div>
 </div>
@@ -131,8 +137,13 @@ export function buildStoryHtml(title: string, scenes: ExportScene[], choice?: St
     var atChoice = choice && !branch && page === choice.common - 1;
     document.getElementById("choiceRow").style.display = atChoice ? "flex" : "none";
     if (atChoice) {
-      document.getElementById("optA").textContent = "1️⃣ " + choice.options[0];
-      document.getElementById("optB").textContent = "2️⃣ " + choice.options[1];
+      document.getElementById("optAtxt").textContent = "1️⃣ " + choice.options[0];
+      document.getElementById("optBtxt").textContent = "2️⃣ " + choice.options[1];
+      var imgA = story.scenes[choice.common] && story.scenes[choice.common].imageUrl;
+      var imgB = story.scenes[choice.altFrom] && story.scenes[choice.altFrom].imageUrl;
+      var elA = document.getElementById("optAimg"), elB = document.getElementById("optBimg");
+      if (imgA) { elA.src = imgA; elA.style.display = ""; } else elA.style.display = "none";
+      if (imgB) { elB.src = imgB; elB.style.display = ""; } else elB.style.display = "none";
     }
     au.pause(); playing = false; updatePlay();
     document.getElementById("play").disabled = !s.audioUrl;

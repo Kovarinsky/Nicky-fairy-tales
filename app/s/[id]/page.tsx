@@ -119,9 +119,19 @@ export default function SharedStoryPage() {
             : <div className="share-img share-img-empty">🖼️</div>}
           <p className="share-text">{scene.narration}</p>
           {choicePending && !isPlaying ? (
-            <div className="choice-btns" style={{ margin: "0.4rem 0 0.6rem" }}>
-              <button type="button" onClick={() => pick("A")}>1️⃣ {story.choice!.options[0]}</button>
-              <button type="button" onClick={() => pick("B")}>2️⃣ {story.choice!.options[1]}</button>
+            <div className="choice-cards" style={{ margin: "0.4rem 0 0.6rem" }}>
+              {(["A", "B"] as const).map((b, bi) => {
+                const idx = b === "A" ? story.choice!.common : story.choice!.altFrom;
+                const img = story.scenes[idx]?.imageUrl;
+                return (
+                  <button key={b} type="button" className="choice-card" onClick={() => pick(b)}>
+                    {img
+                      ? <img src={img} alt={story.choice!.options[bi]} />
+                      : <span className="choice-card-emoji">{bi === 0 ? "🌟" : "🌙"}</span>}
+                    <span className="choice-card-label">{bi === 0 ? "1️⃣" : "2️⃣"} {story.choice!.options[bi]}</span>
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="share-controls">

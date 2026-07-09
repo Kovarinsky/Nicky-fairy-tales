@@ -1,4 +1,4 @@
-import type { StoryRequest, StoryScript, Character } from "./types";
+import type { StoryRequest, StoryScript, Character, Scene } from "./types";
 
 // Příběhy píše Sonnet — kvalitou pohádek srovnatelný s Opusem, ~5× levnější.
 // Starší proměnná ANTHROPIC_MODEL (na Vercelu claude-opus-4-8) se už nepoužívá;
@@ -279,20 +279,20 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
       "",
       en
         ? [
-            "TWO ENDINGS (interactive tale): the story has a SHARED plot and TWO different endings.",
-            "- The fork comes at about 60–70% of the story — NEVER right before the last page. 'scenes' = the shared plot (about two thirds) + ENDING A (the remaining ~third, AT LEAST 2 scenes, ideally 3–4).",
-            "- The LAST SHARED scene builds up a real dilemma, and its narration's VERY LAST sentence is the narrator asking the listener a direct question that names BOTH paths (e.g. 'And what do you think — should they follow the firefly deeper into the woods, or run home to tell Dad?'). Nothing comes after the question — the story stops there and waits for the child's choice.",
-            '- Add a top-level field "choice": {"afterScene": <number of the last shared scene>, "options": ["short label of path A (3–5 words)", "short label of path B"], "altScenes": [scenes of ENDING B — SAME number of scenes as ending A, same JSON structure, index continuing after the last scene]}.',
-            "- BOTH endings are warm, complete and satisfying full story arcs — they differ in the path, never in quality. Both honour the moral if one is set.",
-            "- altScenes imagePrompts follow the SAME appearance rules as all other scenes.",
+            "TWO ENDINGS (interactive tale): the story has a SHARED plot and TWO different endings — the listener picks one.",
+            "- 'scenes' = ONLY the shared plot, about two thirds of the requested page count. Its LAST scene builds a real dilemma, and the VERY LAST sentence of its narration is the narrator asking the listener a direct question naming BOTH paths (e.g. 'And what do you think — should they follow the firefly deeper into the woods, or run home to tell Dad?'). Nothing comes after the question.",
+            '- Add THREE top-level fields: "choiceOptions": ["short label of path A (3–5 words)", "short label of path B"], "endingA": [3–4 scenes continuing path A], "endingB": [3–4 scenes continuing path B]. Every scene uses the SAME JSON structure as in scenes.',
+            "- endingA and endingB have the SAME number of scenes. Both are warm, complete, satisfying story arcs — they differ in the path, never in quality. Both honour the moral if one is set.",
+            "- The FIRST scene of each ending must VISUALLY show that path being chosen (its picture is used as the picker thumbnail) — two clearly different images.",
+            "- All ending imagePrompts follow the SAME appearance rules as every other scene.",
           ].join("\n")
         : [
-            "DVA KONCE (interaktivní pohádka): příběh má SPOLEČNÝ děj a DVA různé konce.",
-            "- Rozdvojení přichází zhruba v 60–70 % příběhu — NIKDY až těsně před poslední stránkou. 'scenes' = společný děj (asi dvě třetiny) + KONEC A (zbylá ~třetina, NEJMÉNĚ 2 scény, ideálně 3–4).",
-            "- POSLEDNÍ SPOLEČNÁ scéna vygraduje skutečné dilema a ÚPLNĚ POSLEDNÍ věta její narration je otázka vypravěče přímo posluchači, která jmenuje OBĚ cesty (např. „A co myslíš ty — mají jít za světluškou hlouběji do lesa, nebo běžet domů za tatínkem?“). Po otázce už nic nenásleduje — příběh se tam zastaví a čeká na volbu dítěte.",
-            '- Přidej pole "choice": {"afterScene": <číslo poslední společné scény>, "options": ["krátký popisek cesty A (3–5 slov)", "krátký popisek cesty B"], "altScenes": [scény KONCE B — STEJNÝ počet scén jako konec A, stejná struktura, index navazuje za poslední scénou]}.',
-            "- OBA konce jsou vřelé, uzavřené a plnohodnotné příběhové oblouky — liší se cestou, nikdy kvalitou. Oba ctí ponaučení, pokud je zadané.",
-            "- imagePrompty altScenes dodržují STEJNÁ pravidla vzhledu jako všechny ostatní scény.",
+            "DVA KONCE (interaktivní pohádka): příběh má SPOLEČNÝ děj a DVA různé konce — posluchač si vybere.",
+            "- 'scenes' = POUZE společný děj, asi dvě třetiny požadovaného počtu stránek. Jeho POSLEDNÍ scéna vygraduje skutečné dilema a ÚPLNĚ POSLEDNÍ věta její narration je otázka vypravěče přímo posluchači, která jmenuje OBĚ cesty (např. „A co myslíš ty — mají jít za světluškou hlouběji do lesa, nebo běžet domů za tatínkem?“). Po otázce už nic nenásleduje.",
+            '- Přidej TŘI pole na nejvyšší úrovni: "choiceOptions": ["krátký popisek cesty A (3–5 slov)", "krátký popisek cesty B"], "endingA": [3–4 scény pokračující cestou A], "endingB": [3–4 scény pokračující cestou B]. Každá scéna má STEJNOU JSON strukturu jako ve scenes.',
+            "- endingA a endingB mají STEJNÝ počet scén. Oba konce jsou vřelé, uzavřené a plnohodnotné příběhové oblouky — liší se cestou, nikdy kvalitou. Oba ctí ponaučení, pokud je zadané.",
+            "- PRVNÍ scéna každého konce musí VIZUÁLNĚ ukazovat, že se hrdinové vydali právě touto cestou (její obrázek slouží jako náhled ve výběru) — dva zřetelně odlišné obrázky.",
+            "- imagePrompty obou konců dodržují STEJNÁ pravidla vzhledu jako všechny ostatní scény.",
           ].join("\n")
     );
   }
@@ -354,6 +354,29 @@ function parseScript(raw: string): StoryScript {
     throw new Error("Claude nevrátil žádné scény — zkus to znovu.");
   }
   parsed.scenes = parsed.scenes.map((s, i) => ({ ...s, index: i + 1 }));
+  // 🔀 Dva konce — nový formát: scenes = jen společný děj, endingA/endingB
+  // odděleně (Claude v něm nemůže splést počítání scén). Převede se na
+  // interní choice {afterScene, options, altScenes}.
+  {
+    const p = parsed as StoryScript & { endingA?: Scene[]; endingB?: Scene[]; choiceOptions?: [string, string] };
+    const validScene = (s: Scene) => s && typeof s.narration === "string" && typeof s.imagePrompt === "string";
+    if (Array.isArray(p.endingA) && Array.isArray(p.endingB) && Array.isArray(p.choiceOptions) && p.choiceOptions.length === 2) {
+      const endA = p.endingA.filter(validScene);
+      const endB = p.endingB.filter(validScene);
+      if (endA.length >= 1 && endB.length >= 1) {
+        const common = parsed.scenes.length;
+        parsed.scenes = [...parsed.scenes, ...endA].map((s, i) => ({ ...s, index: i + 1 }));
+        parsed.choice = {
+          afterScene: common,
+          options: [String(p.choiceOptions[0]), String(p.choiceOptions[1])],
+          altScenes: endB,
+        };
+      }
+      delete p.endingA;
+      delete p.endingB;
+      delete p.choiceOptions;
+    }
+  }
   // 🔀 Dva konce: validace — vadná/neúplná větev se tiše zahodí (pohádka
   // pak má normální jeden konec, generování nespadne)
   if (parsed.choice) {
