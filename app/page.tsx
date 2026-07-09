@@ -1305,6 +1305,9 @@ export default function Home() {
     setIsPlaying(false);
     introFiredRef.current = false;
     setTitle(job.title || "Pohádka");
+    // 🔀 Dva konce: meta výběru z uložené historie
+    setStoryChoice(loadHistory().find(e => e.id === job.jobId)?.choice ?? null);
+    setBranch(null);
     setScenes([...rendered]);
     setPage(0);
     setSlideKey(k => k + 1);
@@ -2101,6 +2104,8 @@ export default function Home() {
     setError(""); setLoading(true);
     setHistoryOpen(false);
     setScenes([]); setTitle(""); setPage(0);
+    setStoryChoice(entry.choice ?? null);
+    setBranch(null);
     introFiredRef.current = false;
     try {
       const finalScenes = await generateMedia(entry.title, entry.heroDescription, entry.scenes, [], selectedVoiceId, false, entry.id, partial);

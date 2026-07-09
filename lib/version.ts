@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.05";
+export const APP_VERSION = "3.06";
 
 // Changelog (newest first)
+// 3.06 - Dva konce vylepšeny: rozdvojení přichází v ~2/3 příběhu (ne až před poslední stránkou) a každý konec má aspoň 2–4 plnohodnotné scény; poslední společná scéna KONČÍ hlasovou otázkou se jmenováním obou cest a pohádka se zastaví, dokud dítě nevybere (tlačítka se ukážou po dovyprávění otázky); oprava: výběr konce se neztratil při otevření hotové pohádky z řádku jobu ani při doplnění chybějících obrázků
 // 3.05 - 🔀 Pohádka se dvěma konci: přepínač „Dva konce (na výběr)" ve formuláři (defaultně vypnuto, před generováním se potvrzuje) — vypravěč na konci společného děje položí otázku a čtenář vybere ze dvou tlačítek, jak pohádka skončí; oba konce se předgenerují (obrázky i hlas), takže druhý večer jde vybrat ta druhá cesta; funguje ve čtečce, ve sdíleném odkazu i v offline souboru
 // 3.04 - Offline soubor s pohádkou předělán na čtečku jako v appce: obrázek přes celý displej, text v čitelném pruhu dole (bílá na tmavé), velká viditelná tlačítka ← ▶ →; na šířku se schová titulek, ať má obrázek maximum místa; větší tlačítka u uložených pohádek (Pokračování/Poslat/Soubor + koš) — na tabletu se lépe trefují
 // 3.03 - 💾 Pohádka jako soubor: u uložené pohádky tlačítko Soubor — zabalí obrázky, text i namluvení do jednoho HTML souboru s přehrávačem; pošlete ho Quick Share/Bluetooth BEZ internetu a příjemci se přehraje offline (bez platnosti 90 dní)

@@ -280,18 +280,18 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
       en
         ? [
             "TWO ENDINGS (interactive tale): the story has a SHARED plot and TWO different endings.",
-            "- 'scenes' = the shared plot + ENDING A (the final 2–3 scenes).",
-            "- The LAST SHARED scene (right before ending A begins) must END with the narrator asking the listener a direct question offering two paths (e.g. 'And what do you think — should they follow the firefly deeper into the woods, or run home to tell Dad?'). The question is part of that scene's narration.",
-            '- Add a top-level field "choice": {"afterScene": <number of the last shared scene>, "options": ["short label of path A (3–5 words)", "short label of path B"], "altScenes": [2–3 scenes of ENDING B, same JSON structure as scenes, index continuing after the last scene]}.',
-            "- BOTH endings are warm, complete and satisfying — they differ in the path, never in quality. Both honour the moral if one is set.",
+            "- The fork comes at about 60–70% of the story — NEVER right before the last page. 'scenes' = the shared plot (about two thirds) + ENDING A (the remaining ~third, AT LEAST 2 scenes, ideally 3–4).",
+            "- The LAST SHARED scene builds up a real dilemma, and its narration's VERY LAST sentence is the narrator asking the listener a direct question that names BOTH paths (e.g. 'And what do you think — should they follow the firefly deeper into the woods, or run home to tell Dad?'). Nothing comes after the question — the story stops there and waits for the child's choice.",
+            '- Add a top-level field "choice": {"afterScene": <number of the last shared scene>, "options": ["short label of path A (3–5 words)", "short label of path B"], "altScenes": [scenes of ENDING B — SAME number of scenes as ending A, same JSON structure, index continuing after the last scene]}.',
+            "- BOTH endings are warm, complete and satisfying full story arcs — they differ in the path, never in quality. Both honour the moral if one is set.",
             "- altScenes imagePrompts follow the SAME appearance rules as all other scenes.",
           ].join("\n")
         : [
             "DVA KONCE (interaktivní pohádka): příběh má SPOLEČNÝ děj a DVA různé konce.",
-            "- 'scenes' = společný děj + KONEC A (poslední 2–3 scény).",
-            "- POSLEDNÍ SPOLEČNÁ scéna (těsně před začátkem konce A) musí KONČIT otázkou vypravěče přímo posluchači, která nabízí dvě cesty (např. „A co myslíš ty — mají jít za světluškou hlouběji do lesa, nebo běžet domů za tatínkem?“). Otázka je součástí narration té scény.",
-            '- Přidej pole "choice": {"afterScene": <číslo poslední společné scény>, "options": ["krátký popisek cesty A (3–5 slov)", "krátký popisek cesty B"], "altScenes": [2–3 scény KONCE B, stejná struktura jako scenes, index navazuje za poslední scénou]}.',
-            "- OBA konce jsou vřelé, uzavřené a plnohodnotné — liší se cestou, nikdy kvalitou. Oba ctí ponaučení, pokud je zadané.",
+            "- Rozdvojení přichází zhruba v 60–70 % příběhu — NIKDY až těsně před poslední stránkou. 'scenes' = společný děj (asi dvě třetiny) + KONEC A (zbylá ~třetina, NEJMÉNĚ 2 scény, ideálně 3–4).",
+            "- POSLEDNÍ SPOLEČNÁ scéna vygraduje skutečné dilema a ÚPLNĚ POSLEDNÍ věta její narration je otázka vypravěče přímo posluchači, která jmenuje OBĚ cesty (např. „A co myslíš ty — mají jít za světluškou hlouběji do lesa, nebo běžet domů za tatínkem?“). Po otázce už nic nenásleduje — příběh se tam zastaví a čeká na volbu dítěte.",
+            '- Přidej pole "choice": {"afterScene": <číslo poslední společné scény>, "options": ["krátký popisek cesty A (3–5 slov)", "krátký popisek cesty B"], "altScenes": [scény KONCE B — STEJNÝ počet scén jako konec A, stejná struktura, index navazuje za poslední scénou]}.',
+            "- OBA konce jsou vřelé, uzavřené a plnohodnotné příběhové oblouky — liší se cestou, nikdy kvalitou. Oba ctí ponaučení, pokud je zadané.",
             "- imagePrompty altScenes dodržují STEJNÁ pravidla vzhledu jako všechny ostatní scény.",
           ].join("\n")
     );
