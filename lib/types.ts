@@ -36,6 +36,8 @@ export interface StoryRequest {
   moral?: string;
   /** Pokračování dřívější pohádky: název + shrnutí minulého děje */
   previousStory?: { title: string; text: string };
+  /** 🔀 Interaktivní pohádka se dvěma konci (čtenář si vybere) */
+  twoEndings?: boolean;
 }
 
 /** Zvukový svět scény – řídí procedurální ambient hudbu */
@@ -59,6 +61,26 @@ export interface StoryScript {
   /** Krátký popis vzhledu hrdiny pro konzistenci napříč obrázky */
   heroDescription: string;
   scenes: Scene[];
+  /** 🔀 Dva konce: scenes = společný děj + konec A; altScenes = konec B.
+      Poslední společná scéna (afterScene) končí otázkou na posluchače. */
+  choice?: {
+    /** Číslo (1-based) poslední společné scény */
+    afterScene: number;
+    /** Krátké popisky obou cest pro tlačítka [konec A, konec B] */
+    options: [string, string];
+    /** Scény alternativního konce B */
+    altScenes: Scene[];
+  };
+}
+
+/** Meta výběru konce, jak se ukládá k hotové pohádce (scény už v jednom poli) */
+export interface StoryChoiceMeta {
+  /** Počet společných scén (pozice v poli, kde končí společný děj) */
+  common: number;
+  /** Pozice v poli scén, kde začíná konec B (konec A = common..altFrom-1) */
+  altFrom: number;
+  /** Popisky tlačítek [konec A, konec B] */
+  options: [string, string];
 }
 
 /** Scéna obohacená o vygenerovaná média */

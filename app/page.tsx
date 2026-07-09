@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import type { StoryScript, RenderedScene, Scene } from "@/lib/types";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import type { StoryScript, RenderedScene, Scene, StoryChoiceMeta } from "@/lib/types";
 import { AmbientPlayer } from "@/lib/ambient";
 import { cacheStory, getCachedStory, evictOldStories } from "@/lib/scene-cache";
 import { APP_VERSION } from "@/lib/version";
@@ -31,6 +31,8 @@ interface HistoryEntry {
   selectedIds: string[];
   themeId: string;
   topic: string;
+  /** 🔀 Dva konce: scenes = společný děj + konec A + konec B */
+  choice?: StoryChoiceMeta;
 }
 
 const HISTORY_KEY = "nicky-story-history";
@@ -182,6 +184,9 @@ export default function Home() {
   const [title, setTitle] = useState("");
   const [scenes, setScenes] = useState<RenderedScene[]>([]);
   const [page, setPage] = useState(0);
+  // 🔀 Dva konce: meta výběru + zvolená větev (null = ještě nevybráno)
+  const [storyChoice, setStoryChoice] = useState<StoryChoiceMeta | null>(null);
+  const [branch, setBranch] = useState<"A" | "B" | null>(null);
   const [slideKey, setSlideKey] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
@@ -821,8 +826,8 @@ export default function Home() {
     touchStartRef.current = null;
     // require 30px horizontal movement and horizontal > vertical (2:1 ratio)
     if (Math.abs(dx) < 30 || Math.abs(dx) < Math.abs(dy) * 2) return;
-    if (dx < 0 && hasNext) goToPage(page + 1);
-    else if (dx > 0 && hasPrev) goToPage(page - 1);
+    if (dx < 0 && nextVisible !== null) goToPage(nextVisible);
+    else if (dx > 0 && prevVisible !== null) goToPage(prevVisible);
   }
 
   // ── Reset to form (keeps old story in memory for "go back") ──
@@ -858,6 +863,27 @@ export default function Home() {
   }
 
   // ── Navigation ──
+  // 🔀 Dva konce: pořadí viditelných stránek podle zvolené větve.
+  // Před volbou je vidět jen společný děj; konec A/B se připojí po výběru.
+  const visiblePages = useMemo(() => {
+    const all = scenes.map((_, i) => i);
+    if (!storyChoice) return all;
+    const { common, altFrom } = storyChoice;
+    if (branch === "A") return all.slice(0, altFrom);
+    if (branch === "B") return [...all.slice(0, common), ...all.slice(altFrom)];
+    return all.slice(0, common);
+  }, [scenes, storyChoice, branch]);
+  const pagePos = Math.max(0, visiblePages.indexOf(page));
+  const nextVisible = pagePos + 1 < visiblePages.length ? visiblePages[pagePos + 1] : null;
+  const prevVisible = pagePos > 0 ? visiblePages[pagePos - 1] : null;
+
+  function pickBranch(b: "A" | "B") {
+    if (!storyChoice) return;
+    setBranch(b);
+    isAutoAdvanceRef.current = true; // zvolený konec se rovnou přehraje
+    goToPage(b === "A" ? storyChoice.common : storyChoice.altFrom);
+  }
+
   const goToPage = useCallback((n: number) => {
     if (n < 0 || n >= scenes.length) return;
     audioRef.current?.pause();
@@ -868,9 +894,11 @@ export default function Home() {
 
   function handleAudioEnded() {
     setIsPlaying(false);
+    // 🔀 Konec společného děje — místo otáčení stránky se ukáže výběr konce
+    if (storyChoice && branch === null && page === storyChoice.common - 1) return;
     if (!autoAdvance) return;
-    const next = page + 1;
-    if (next >= scenes.length) {
+    const next = nextVisible;
+    if (next === null) {
       // Last scene — show rolling credits
       setTimeout(() => setShowCredits(true), 800);
       return;
@@ -1198,7 +1226,7 @@ export default function Home() {
     return null;
   }
 
-  async function finalizeServerJob(st: { title?: string; heroDescription?: string; scenesScript?: Scene[]; sceneUrls?: Record<number, string>; total?: number; voiceId?: string }, jobId: string) {
+  async function finalizeServerJob(st: { title?: string; heroDescription?: string; scenesScript?: Scene[]; sceneUrls?: Record<number, string>; total?: number; voiceId?: string; choice?: StoryChoiceMeta }, jobId: string) {
     const script = st.scenesScript || [];
     const urls = st.sceneUrls || {};
     const pre = jobMediaRef.current.get(jobId)?.scenes ?? new Map<number, { imageUrl?: string; audioUrl?: string }>();
@@ -1225,6 +1253,7 @@ export default function Home() {
       selectedIds,
       themeId: selectedTheme,
       topic,
+      choice: st.choice,
     };
     saveHistory(entry);
     setStoryHistory(loadHistory());
@@ -1430,6 +1459,9 @@ export default function Home() {
       }
     } catch {}
 
+    // 🔀 Dva konce se před generováním potvrzují (generuje se ~30 % navíc)
+    if (twoEndings && !(await appConfirm(t.twoEndsAsk))) return;
+
     const selectedCustomObjsForJob = customChars.filter(c => selectedCustomIds.includes(c.id));
     // Vlastní svět nebo klasická pohádka: prompt jde místo themeId, fotka světa jako inspirace
     const activeCustomTheme = customThemes.find(ct => ct.id === selectedTheme);
@@ -1450,6 +1482,7 @@ export default function Home() {
         return (voices.find(v => v.id === selectedVoiceId)?.language ?? "cs") === "en" ? m.descEn : m.desc;
       })(),
       previousStory: sequelOf ? { title: sequelOf.title, text: sequelOf.text } : undefined,
+      twoEndings,
       customCharacters: selectedCustomObjsForJob.map(c => ({
         id: c.id, name: c.name,
         description: c.description,
@@ -1517,6 +1550,7 @@ export default function Home() {
 
     if (!background) {
       setScenes([]); setTitle(""); setPage(0);
+      setStoryChoice(null); setBranch(null);
       introFiredRef.current = false;
     } else {
       setBgStatus("writing");
@@ -1536,16 +1570,25 @@ export default function Home() {
       const script = await safeJson<StoryScript & { error?: string }>(storyRes);
       if (!storyRes.ok) throw new Error(script.error || t.errStory);
 
+      // 🔀 Dva konce: konec B se generuje hned za koncem A (jeden seznam scén)
+      const choiceMeta: StoryChoiceMeta | undefined = script.choice
+        ? { common: script.choice.afterScene, altFrom: script.scenes.length, options: script.choice.options }
+        : undefined;
+      const fullScenes = script.choice ? [...script.scenes, ...script.choice.altScenes] : script.scenes;
+      setStoryChoice(choiceMeta ?? null);
+      setBranch(null);
+
       // Save to history immediately (text only, before slow image generation)
       const entry: HistoryEntry = {
         id: crypto.randomUUID(),
         title: script.title,
         heroDescription: script.heroDescription,
         createdAt: new Date().toISOString(),
-        scenes: script.scenes,
+        scenes: fullScenes,
         selectedIds,
         themeId: selectedTheme,
         topic,
+        choice: choiceMeta,
       };
       saveHistory(entry);
       setStoryHistory(loadHistory());
@@ -1556,7 +1599,7 @@ export default function Home() {
         .map(c => ({ data: c.photoBase64!, mimeType: c.photoMimeType! }));
 
       saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds });
-      const finalScenes = await generateMedia(script.title, script.heroDescription, script.scenes, customImageRefs, selectedVoiceId, background, entry.id);
+      const finalScenes = await generateMedia(script.title, script.heroDescription, fullScenes, customImageRefs, selectedVoiceId, background, entry.id);
       renderedMapRef.current.set(entry.id, finalScenes);
       // Cache even if some audio failed — imageUrl always has SVG fallback
       cacheStory(entry.id, finalScenes).catch(() => {});
@@ -1589,6 +1632,8 @@ export default function Home() {
   // který ho vplete do děje (bez kázání)
   const [moralOpen, setMoralOpen] = useState(false);
   const [selectedMoral, setSelectedMoral] = useState("");
+  // 🔀 Dva konce — defaultně vypnuto, před generováním se potvrzuje
+  const [twoEndings, setTwoEndings] = useState(false);
   // 📖 Pokračování uložené pohádky: nový díl naváže na minulý děj
   const [sequelOf, setSequelOf] = useState<{ id: string; title: string; text: string } | null>(null);
   const [addingTheme, setAddingTheme] = useState(false);
@@ -1909,7 +1954,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: AbortSignal.timeout(30_000),
-        body: JSON.stringify({ op: "publish", id: shareId, title: entry.title, scenes }),
+        body: JSON.stringify({ op: "publish", id: shareId, title: entry.title, scenes, choice: entry.choice }),
       });
       const d = await safeJson<{ ok?: boolean; error?: string }>(res);
       if (!res.ok || !d.ok) throw new Error(d.error || "publish failed");
@@ -1969,7 +2014,7 @@ export default function Home() {
         const audioUrl = m.audioUrl?.startsWith("data:") ? m.audioUrl : "";
         return { narration: s.narration || "", imageUrl, audioUrl };
       }));
-      const html = buildStoryHtml(entry.title, scenes);
+      const html = buildStoryHtml(entry.title, scenes, entry.choice);
       // Bez diakritiky — jméno s háčky prohlížeč zahodí a stáhne „download"
       const slug = entry.title.normalize("NFD").replace(/[̀-ͯ]/g, "")
         .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
@@ -2011,6 +2056,8 @@ export default function Home() {
       setIsPlaying(false);
       introFiredRef.current = false;
       setTitle(entry.title);
+      setStoryChoice(entry.choice ?? null);
+      setBranch(null);
       setScenes([...readyScenes]);
       setPage(0);
       setSlideKey(k => k + 1);
@@ -2171,8 +2218,8 @@ export default function Home() {
   const allSelectedCount = selectedIds.length + selectedCustomIds.length;
   const hasInspiration = !!selectedTheme || !!topic.trim() || inspImages.length > 0 || !!inspPdf || (inspUrlActive && !!inspUrl.trim()) || !!sequelOf;
   const current = scenes[page];
-  const hasNext = page < scenes.length - 1;
-  const hasPrev = page > 0;
+  const hasNext = nextVisible !== null;
+  const hasPrev = prevVisible !== null;
   const totalScenes = scenes.length;
 
   return (
@@ -2471,6 +2518,17 @@ export default function Home() {
         </div>
 
         <div className="field">
+          <label>{t.endingLabel}</label>
+          <div className="chips">
+            <button type="button" className={`chip chip-btn ${twoEndings ? "chip-on" : ""}`}
+              onClick={() => setTwoEndings(p => !p)}>
+              🔀 {twoEndings ? t.twoEndsOn : t.twoEndsOff}
+            </button>
+          </div>
+          {twoEndings && <p className="gen-step-hint">{t.twoEndsHint}</p>}
+        </div>
+
+        <div className="field">
           <label>{t.musicLabel}</label>
           <label className={`chip ${musicOn ? "chip-on" : ""}`} style={{display:"flex", justifyContent:"center"}}>
             <input type="checkbox" checked={musicOn} onChange={() => setMusicOn(p => !p)} />
@@ -2688,7 +2746,7 @@ export default function Home() {
 
               <div className="ctrl-cell ctrl-cell-info">
                 <span className="ctrl-ico">📖</span>
-                <span className="ctrl-txt">{page + 1} / {scenes.length}</span>
+                <span className="ctrl-txt">{pagePos + 1} / {visiblePages.length}{storyChoice && branch === null ? "+" : ""}</span>
               </div>
 
               <button type="button" className={`ctrl-cell${forcedLs ? " ctrl-cell-on" : ""}`}
@@ -2707,16 +2765,27 @@ export default function Home() {
 
           {/* Nav arrows + dots outside the card — no overflow clipping */}
           <div className="book-nav" ref={navRef}>
-            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page - 1)} disabled={!hasPrev} aria-label={t.prev}>←</button>
+            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => prevVisible !== null && goToPage(prevVisible)} disabled={!hasPrev} aria-label={t.prev}>←</button>
             <div className="page-dots">
-              {scenes.map((_, i) => (
+              {visiblePages.map((i, pos) => (
                 <button key={i} type="button"
                   className={`dot ${i === page ? "dot-active" : ""} ${scenes[i]?.audioUrl ? "dot-ready" : ""}`}
-                  onClick={() => goToPage(i)} aria-label={`Strana ${i + 1}`} />
+                  onClick={() => goToPage(i)} aria-label={`Strana ${pos + 1}`} />
               ))}
             </div>
-            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => goToPage(page + 1)} disabled={!hasNext} aria-label={t.next}>→</button>
+            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => nextVisible !== null && goToPage(nextVisible)} disabled={!hasNext} aria-label={t.next}>→</button>
           </div>
+
+          {/* 🔀 Výběr konce — po dovyprávění poslední společné scény */}
+          {storyChoice && branch === null && page === storyChoice.common - 1 && !isPlaying && (
+            <div className="choice-panel">
+              <p className="choice-title">🔀 {t.choiceTitle}</p>
+              <div className="choice-btns">
+                <button type="button" onClick={() => pickBranch("A")}>1️⃣ {storyChoice.options[0]}</button>
+                <button type="button" onClick={() => pickBranch("B")}>2️⃣ {storyChoice.options[1]}</button>
+              </div>
+            </div>
+          )}
 
           {current.audioUrl && (
             <audio ref={audioRef} key={current.audioUrl} src={current.audioUrl}

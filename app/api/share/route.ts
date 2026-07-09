@@ -83,7 +83,17 @@ export async function POST(req: NextRequest) {
       imageUrl: s?.imageUrl && isBlobUrl(String(s.imageUrl)) ? String(s.imageUrl) : "",
       audioUrl: s?.audioUrl && isBlobUrl(String(s.audioUrl)) ? String(s.audioUrl) : "",
     }));
-    const doc = { title, createdAt: new Date().toISOString(), scenes };
+    // 🔀 Dva konce — meta výběru pro přehrávací stránku
+    const rawChoice = (body as { choice?: { common?: unknown; altFrom?: unknown; options?: unknown } }).choice;
+    let choice: { common: number; altFrom: number; options: [string, string] } | undefined;
+    if (rawChoice && Array.isArray(rawChoice.options) && rawChoice.options.length === 2) {
+      const common = Math.floor(Number(rawChoice.common));
+      const altFrom = Math.floor(Number(rawChoice.altFrom));
+      if (Number.isFinite(common) && Number.isFinite(altFrom) && common > 0 && altFrom > common && altFrom < scenes.length) {
+        choice = { common, altFrom, options: [String(rawChoice.options[0]).slice(0, 60), String(rawChoice.options[1]).slice(0, 60)] };
+      }
+    }
+    const doc = { title, createdAt: new Date().toISOString(), scenes, ...(choice ? { choice } : {}) };
     await put(`share/${id}.json`, JSON.stringify(doc), {
       access: "public",
       contentType: "application/json",

@@ -2001,6 +2001,56 @@ button:disabled {
   transform: scale(0.94);
 }
 
+/* ── 🔀 Výběr konce pohádky (dva konce) ── */
+.choice-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 16%;
+  transform: translateX(-50%);
+  z-index: 70;
+  width: min(480px, calc(100vw - 2rem));
+  background: rgba(10, 14, 46, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 20px;
+  padding: 0.9rem 1rem 1rem;
+  box-shadow: 0 16px 60px rgba(0, 0, 0, 0.55);
+  text-align: center;
+  animation: confirm-pop 0.22s ease-out;
+}
+
+.choice-title {
+  font-weight: 900;
+  font-size: 1.05rem;
+  margin-bottom: 0.7rem;
+}
+
+.choice-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.choice-btns button {
+  width: 100%;
+  min-height: 52px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #7c4dff, #536dfe);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0.5rem 0.9rem;
+}
+
+.choice-btns button:last-child {
+  background: linear-gradient(135deg, #ec4899, #f97316);
+}
+
+.choice-btns button:active {
+  transform: scale(0.97);
+}
+
 /* Odkaz na sdílenou pohádku v potvrzovacím okně */
 .share-link-box {
   margin: 0.6rem 0;

@@ -10,7 +10,7 @@ import { generateSceneImage, isDailyQuotaError } from "@/lib/gemini";
 import { narrateScene } from "@/lib/elevenlabs";
 import { charactersByIds, loadCharacters, loadReferenceImages, type ReferenceImage } from "@/lib/characters";
 import { themeById } from "@/lib/themes";
-import type { StoryRequest, Character, Scene } from "@/lib/types";
+import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/types";
 import { blobToken } from "@/lib/blob-token";
 
 const ANCHOR_LABEL =
@@ -32,6 +32,8 @@ export interface JobStatus {
   error?: string;
   /** Poslední chyba kreslení obrázku (429 kvóta, billing…) — ukazuje se v UI */
   imgError?: string;
+  /** 🔀 Dva konce: scenesScript = společný děj + konec A + konec B */
+  choice?: StoryChoiceMeta;
 }
 
 export async function putJson(path: string, data: unknown): Promise<string> {
@@ -120,6 +122,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         age: Number(body.age) || 4,
         sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), MAX_SCENES),
         language: String(body.language || "cs") === "en" ? "en" : "cs",
+        twoEndings: !!body.twoEndings,
         moral: body.moral ? String(body.moral).slice(0, 300) : undefined,
         previousStory: (body.previousStory as { title?: unknown; text?: unknown } | undefined)?.title
           ? {
@@ -138,8 +141,18 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       const script = await generateStory(storyReq, extras);
       st.title = script.title;
       st.heroDescription = script.heroDescription;
-      st.scenesScript = script.scenes;
-      st.total = script.scenes.length;
+      // 🔀 Dva konce: konec B se generuje hned za koncem A (jeden seznam scén)
+      if (script.choice) {
+        st.choice = {
+          common: script.choice.afterScene,
+          altFrom: script.scenes.length,
+          options: script.choice.options,
+        };
+        st.scenesScript = [...script.scenes, ...script.choice.altScenes];
+      } else {
+        st.scenesScript = script.scenes;
+      }
+      st.total = st.scenesScript.length;
       st.done = 0;
       st.sceneUrls = {};
     }

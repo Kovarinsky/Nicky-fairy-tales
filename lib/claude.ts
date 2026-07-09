@@ -274,6 +274,29 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
     );
   }
 
+  if (req.twoEndings) {
+    lines.push(
+      "",
+      en
+        ? [
+            "TWO ENDINGS (interactive tale): the story has a SHARED plot and TWO different endings.",
+            "- 'scenes' = the shared plot + ENDING A (the final 2–3 scenes).",
+            "- The LAST SHARED scene (right before ending A begins) must END with the narrator asking the listener a direct question offering two paths (e.g. 'And what do you think — should they follow the firefly deeper into the woods, or run home to tell Dad?'). The question is part of that scene's narration.",
+            '- Add a top-level field "choice": {"afterScene": <number of the last shared scene>, "options": ["short label of path A (3–5 words)", "short label of path B"], "altScenes": [2–3 scenes of ENDING B, same JSON structure as scenes, index continuing after the last scene]}.',
+            "- BOTH endings are warm, complete and satisfying — they differ in the path, never in quality. Both honour the moral if one is set.",
+            "- altScenes imagePrompts follow the SAME appearance rules as all other scenes.",
+          ].join("\n")
+        : [
+            "DVA KONCE (interaktivní pohádka): příběh má SPOLEČNÝ děj a DVA různé konce.",
+            "- 'scenes' = společný děj + KONEC A (poslední 2–3 scény).",
+            "- POSLEDNÍ SPOLEČNÁ scéna (těsně před začátkem konce A) musí KONČIT otázkou vypravěče přímo posluchači, která nabízí dvě cesty (např. „A co myslíš ty — mají jít za světluškou hlouběji do lesa, nebo běžet domů za tatínkem?“). Otázka je součástí narration té scény.",
+            '- Přidej pole "choice": {"afterScene": <číslo poslední společné scény>, "options": ["krátký popisek cesty A (3–5 slov)", "krátký popisek cesty B"], "altScenes": [2–3 scény KONCE B, stejná struktura jako scenes, index navazuje za poslední scénou]}.',
+            "- OBA konce jsou vřelé, uzavřené a plnohodnotné — liší se cestou, nikdy kvalitou. Oba ctí ponaučení, pokud je zadané.",
+            "- imagePrompty altScenes dodržují STEJNÁ pravidla vzhledu jako všechny ostatní scény.",
+          ].join("\n")
+    );
+  }
+
   if (extras.inspirationUrlText) {
     lines.push("", "Doplňující kontext z webové stránky:", extras.inspirationUrlText.slice(0, 1500));
   }
@@ -331,6 +354,26 @@ function parseScript(raw: string): StoryScript {
     throw new Error("Claude nevrátil žádné scény — zkus to znovu.");
   }
   parsed.scenes = parsed.scenes.map((s, i) => ({ ...s, index: i + 1 }));
+  // 🔀 Dva konce: validace — vadná/neúplná větev se tiše zahodí (pohádka
+  // pak má normální jeden konec, generování nespadne)
+  if (parsed.choice) {
+    const c = parsed.choice;
+    const ok =
+      Number.isFinite(c.afterScene) &&
+      c.afterScene >= 1 && c.afterScene < parsed.scenes.length &&
+      Array.isArray(c.options) && c.options.length === 2 &&
+      c.options.every(o => typeof o === "string" && o.trim()) &&
+      Array.isArray(c.altScenes) && c.altScenes.length >= 1 &&
+      c.altScenes.every(s => s && typeof s.narration === "string" && typeof s.imagePrompt === "string");
+    if (ok) {
+      c.afterScene = Math.round(c.afterScene);
+      c.options = [String(c.options[0]).slice(0, 60), String(c.options[1]).slice(0, 60)];
+      c.altScenes = c.altScenes.map((s, i) => ({ ...s, index: parsed.scenes.length + i + 1 }));
+    } else {
+      console.warn("[Claude] choice branch invalid — falling back to single ending");
+      delete parsed.choice;
+    }
+  }
   return parsed;
 }
 

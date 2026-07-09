@@ -3,6 +3,9 @@
 // Quick Share / Bluetooth bez internetu a přehraje se v prohlížeči offline.
 // Přehrávač vypadá jako čtečka v appce: obrázek přes celý displej,
 // titulky v čitelném pruhu dole, velká viditelná tlačítka.
+// Umí i pohádku se dvěma konci (🔀 choice) — po společném ději se objeví výběr.
+
+import type { StoryChoiceMeta } from "./types";
 
 export interface ExportScene {
   narration: string;
@@ -12,9 +15,9 @@ export interface ExportScene {
   audioUrl: string;
 }
 
-export function buildStoryHtml(title: string, scenes: ExportScene[]): string {
+export function buildStoryHtml(title: string, scenes: ExportScene[], choice?: StoryChoiceMeta): string {
   // </script> uvnitř JSON by ukončil script tag — escapovat <
-  const data = JSON.stringify({ title, scenes }).replace(/</g, "\\u003c");
+  const data = JSON.stringify({ title, scenes, choice: choice ?? null }).replace(/</g, "\\u003c");
   const safeTitle = title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return `<!DOCTYPE html>
 <html lang="cs">
@@ -56,6 +59,15 @@ export function buildStoryHtml(title: string, scenes: ExportScene[]): string {
   .btn:disabled { opacity: .3; }
   #play { min-width: 88px; background: linear-gradient(135deg, #7c4dff, #536dfe); border-color: transparent; font-size: 1.5rem; }
   #num { color: #ffffff; font-weight: 800; font-size: 1rem; min-width: 4rem; text-align: center; }
+  /* 🔀 Výběr konce */
+  #choiceRow { display: none; flex-direction: column; gap: .5rem; margin-top: .3rem; }
+  #choiceRow p { text-align: center; font-weight: 900; margin-bottom: .15rem; }
+  #choiceRow button {
+    width: 100%; min-height: 50px; border: none; border-radius: 14px; cursor: pointer;
+    color: #fff; font-size: 1rem; font-weight: 800; padding: .5rem .9rem;
+    background: linear-gradient(135deg, #7c4dff, #536dfe);
+  }
+  #choiceRow button:last-child { background: linear-gradient(135deg, #ec4899, #f97316); }
   /* Na šířku: titulek zmizí, ať má obrázek celý displej */
   @media (orientation: landscape) and (max-height: 620px) {
     #title { display: none; }
@@ -79,6 +91,11 @@ export function buildStoryHtml(title: string, scenes: ExportScene[]): string {
       <span id="num"></span>
       <button type="button" class="btn" id="next" aria-label="Další">→</button>
     </div>
+    <div id="choiceRow">
+      <p>🔀 Jak má pohádka pokračovat?</p>
+      <button type="button" id="optA"></button>
+      <button type="button" id="optB"></button>
+    </div>
   </div>
 </div>
 <audio id="au"></audio>
@@ -86,35 +103,70 @@ export function buildStoryHtml(title: string, scenes: ExportScene[]): string {
 <script>
 (function () {
   var story = JSON.parse(document.getElementById("data").textContent);
-  var page = 0, playing = false, auto = false;
+  var choice = story.choice || null;
+  var page = 0, playing = false, auto = false, branch = null;
   var au = document.getElementById("au");
   var img = document.getElementById("img"), imgEmpty = document.getElementById("imgEmpty");
   document.getElementById("title").textContent = "📖 " + story.title;
   document.title = story.title + " — Nickyho pohádky";
 
+  function visible() {
+    var all = story.scenes.map(function (_, i) { return i; });
+    if (!choice) return all;
+    if (branch === "A") return all.slice(0, choice.altFrom);
+    if (branch === "B") return all.slice(0, choice.common).concat(all.slice(choice.altFrom));
+    return all.slice(0, choice.common);
+  }
+
   function render() {
+    var vis = visible();
+    var pos = Math.max(0, vis.indexOf(page));
     var s = story.scenes[page];
     if (s.imageUrl) { img.src = s.imageUrl; img.style.display = ""; imgEmpty.style.display = "none"; }
     else { img.style.display = "none"; imgEmpty.style.display = "block"; }
     document.getElementById("text").textContent = s.narration;
-    document.getElementById("num").textContent = (page + 1) + " / " + story.scenes.length;
-    document.getElementById("prev").disabled = page === 0;
-    document.getElementById("next").disabled = page >= story.scenes.length - 1;
+    document.getElementById("num").textContent = (pos + 1) + " / " + vis.length + (choice && !branch ? "+" : "");
+    document.getElementById("prev").disabled = pos === 0;
+    document.getElementById("next").disabled = pos >= vis.length - 1;
+    var atChoice = choice && !branch && page === choice.common - 1;
+    document.getElementById("choiceRow").style.display = atChoice ? "flex" : "none";
+    if (atChoice) {
+      document.getElementById("optA").textContent = "1️⃣ " + choice.options[0];
+      document.getElementById("optB").textContent = "2️⃣ " + choice.options[1];
+    }
     au.pause(); playing = false; updatePlay();
     document.getElementById("play").disabled = !s.audioUrl;
     if (s.audioUrl) { au.src = s.audioUrl; if (auto) { au.play().then(function () { playing = true; updatePlay(); }).catch(function () {}); } }
   }
-  function updatePlay() { document.getElementById("play").textContent = playing ? "⏸\uFE0E" : "▶\uFE0E"; }
+  function updatePlay() { document.getElementById("play").textContent = playing ? "⏸︎" : "▶︎"; }
+  function go(delta) {
+    var vis = visible();
+    var pos = Math.max(0, vis.indexOf(page));
+    var np = pos + delta;
+    if (np < 0 || np >= vis.length) return;
+    page = vis[np]; render();
+  }
+  function pick(b) {
+    branch = b; auto = true;
+    page = b === "A" ? choice.common : choice.altFrom;
+    render();
+  }
   document.getElementById("play").onclick = function () {
     if (playing) { au.pause(); playing = false; auto = false; }
     else { auto = true; au.play().then(function () { playing = true; updatePlay(); }).catch(function () {}); }
     updatePlay();
   };
-  document.getElementById("prev").onclick = function () { if (page > 0) { page--; render(); } };
-  document.getElementById("next").onclick = function () { if (page < story.scenes.length - 1) { page++; render(); } };
+  document.getElementById("prev").onclick = function () { go(-1); };
+  document.getElementById("next").onclick = function () { go(1); };
+  document.getElementById("optA").onclick = function () { pick("A"); };
+  document.getElementById("optB").onclick = function () { pick("B"); };
   au.onended = function () {
     playing = false; updatePlay();
-    if (page < story.scenes.length - 1) { page++; render(); } else auto = false;
+    if (choice && !branch && page === choice.common - 1) return; // čeká na výběr
+    var vis = visible();
+    var pos = vis.indexOf(page);
+    if (pos >= 0 && pos < vis.length - 1) { page = vis[pos + 1]; render(); }
+    else auto = false;
   };
   render();
 })();
