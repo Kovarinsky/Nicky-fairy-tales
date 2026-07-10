@@ -2242,14 +2242,14 @@ button:disabled {
 
 .history-play-btn {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
   background: linear-gradient(135deg, #7c4dff, #5c35cc);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size: 1.45rem;
   color: #fff;
   box-shadow: 0 2px 12px rgba(124, 77, 255, 0.45);
 }
@@ -2366,7 +2366,7 @@ button:disabled {
 
   .history-box { margin: 0.5rem 0.65rem 0; border-radius: 16px; }
   .history-item { gap: 0.5rem; padding: 0.65rem 0.8rem; }
-  .history-play-btn { width: 34px; height: 34px; font-size: 0.85rem; }
+  .history-play-btn { width: 50px; height: 50px; font-size: 1.25rem; }
 
   .status { font-size: 0.9rem; margin-top: 0.9rem; }
   .error { margin: 0.4rem 0.65rem 0; border-radius: 13px; }

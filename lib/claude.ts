@@ -508,6 +508,43 @@ export async function suggestTopicIdea(language: "cs" | "en", characterNames: st
   return raw.trim().replace(/^["'„]|["'"]$/g, "");
 }
 
+/** 🪄 Rozvine stručnou kostru námětu do detailní osnovy pohádky —
+ *  uživatel napíše pár slov a AI doplní postavy, místa, data, kostýmy
+ *  i zápletku; výsledek se vrátí do pole přání k případné úpravě. */
+export async function expandTopicIdea(language: "cs" | "en", characterNames: string[], ctx: TopicIdeaContext = {}): Promise<string> {
+  const model = MODEL.trim();
+  const who = characterNames.length ? characterNames.join(", ") : language === "en" ? "the children" : "děti";
+  const worldPart = ctx.themeName
+    ? language === "en"
+      ? ` The story takes place in this world: ${ctx.themeName}.${ctx.themePrompt ? ` World guide: ${ctx.themePrompt.slice(0, 800)}` : ""}`
+      : ` Příběh se odehrává v tomto světě: ${ctx.themeName}.${ctx.themePrompt ? ` Průvodce světem: ${ctx.themePrompt.slice(0, 800)}` : ""}`
+    : "";
+  const skeleton = (ctx.userHint || "").slice(0, 600);
+  const prompt = language === "en"
+    ? [
+        `The user wrote a brief skeleton of a bedtime-story idea for small children: "${skeleton}". Featured heroes: ${who}.${worldPart}`,
+        "Expand it into a DETAILED story brief (6–10 sentences, max 180 words):",
+        "- Keep EVERYTHING the user specified — make it concrete and richer, never contradict it.",
+        "- Add named characters, exact places, era/dates, costumes, props, and a plot with a twist seed.",
+        "- If the skeleton refers to real history or legends, use faithful facts (names, dates) retold warmly for children.",
+        "- Write it as a brief/outline for the storyteller, NOT as the finished tale. Reply with ONLY the brief text.",
+      ].join("\n")
+    : [
+        `Uživatel napsal stručnou kostru námětu pohádky pro malé děti: „${skeleton}“. Vystupují: ${who}.${worldPart}`,
+        "Rozviň ji do DETAILNÍ osnovy (6–10 vět, max 180 slov):",
+        "- Zachovej VŠECHNO, co uživatel zadal — jen to zkonkretizuj a obohať, nikdy nepopírej.",
+        "- Doplň pojmenované postavy, přesná místa, dobu/letopočty, kostýmy, rekvizity a zápletku se zárodkem zvratu.",
+        "- Pokud kostra odkazuje na skutečnou historii či legendy, použij věrná fakta (jména, data) laskavě převyprávěná pro děti.",
+        "- Piš jako zadání pro vypravěče (osnovu), NE jako hotový příběh. Odpověz POUZE textem osnovy.",
+      ].join("\n");
+  const raw = await callAnthropicApi({
+    model,
+    max_tokens: 900,
+    messages: [{ role: "user", content: prompt }],
+  });
+  return raw.trim();
+}
+
 // Nastudování vlastního světa: z popisu uživatele (a textu stažených odkazů)
 // sestaví průvodce světem ve stylu THEMES promptů (anglicky, s CHARACTER
 // REFERENCE). Když chybí podstatná informace, vrátí i JEDNU doplňující otázku.

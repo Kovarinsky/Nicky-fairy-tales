@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.10";
+export const APP_VERSION = "3.11";
 
 // Changelog (newest first)
+// 3.11 - 🪄 Rozvinout: nové tlačítko u pole přání — z pár slov („legendy z historie Benátek…") AI rozepíše detailní osnovu (pojmenované postavy, místa, letopočty, kostýmy, zápletka), kterou si před generováním můžete upravit; větší tlačítko ▶ u uložených pohádek (58 px — pohodlně se trefí)
 // 3.10 - Diagnostika přímo v appce: když se psaní opakuje, řádek pohádky ukazuje číslo pokusu („✍️ Píšu… (2. pokus)") a žlutě POSLEDNÍ CHYBU, kvůli které předchozí pokus spadl — konec hádání, co se děje
 // 3.09 - Konec maskovaných chyb při psaní: restart jobu dřív smazal chybovou hlášku (věčné „Píšu…") — teď se chyba přenáší dál a po 3. neúspěšném pokusu se pohádka zastaví s viditelnou příčinou; nová diagnostika /api/job/list ukáže stav a chyby všech jobů
 // 3.08 - OPRAVA zasekávání ve fázi „Píšu…": dlouhý scénář (hlavně dva konce ≈ 16+ scén) se nestreamovaný nevešel do 250s limitu jednoho pokusu — psaní teď STREAMUJE (text přitéká průběžně, žádný útes) a job posílá heartbeat i během psaní, takže se neukazuje falešné ⚠ zaseknutí

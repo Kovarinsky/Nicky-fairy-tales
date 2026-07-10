@@ -4,11 +4,11 @@
 // napsaný v poli přání (námět na něm staví).
 
 import { NextRequest, NextResponse } from "next/server";
-import { suggestTopicIdea } from "@/lib/claude";
+import { suggestTopicIdea, expandTopicIdea } from "@/lib/claude";
 import { themeById } from "@/lib/themes";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,11 +21,15 @@ export async function POST(req: NextRequest) {
     const customTheme = body.customTheme && typeof body.customTheme.prompt === "string"
       ? { name: String(body.customTheme.name || "Vlastní svět"), prompt: String(body.customTheme.prompt).slice(0, 1200) }
       : undefined;
-    const idea = await suggestTopicIdea(language, names, {
+    const ctx = {
       themeName: customTheme?.name ?? theme?.name,
       themePrompt: customTheme?.prompt ?? theme?.prompt,
       userHint: typeof body.hint === "string" && body.hint.trim() ? body.hint.trim() : undefined,
-    });
+    };
+    // 🪄 expand: rozvinout kostru uživatele do detailní osnovy (vyžaduje hint)
+    const idea = body.expand && ctx.userHint
+      ? await expandTopicIdea(language, names, ctx)
+      : await suggestTopicIdea(language, names, ctx);
     return NextResponse.json({ idea });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Neznámá chyba";

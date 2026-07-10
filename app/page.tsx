@@ -1744,6 +1744,41 @@ export default function Home() {
 
   // ── 🎲 Vymysli námět — Claude navrhne námět do textového pole ────────────
   const [ideaLoading, setIdeaLoading] = useState(false);
+  // 🪄 Rozvinout — z kostry uživatele udělá detailní osnovu (postavy, místa,
+  // data, kostýmy); výsledek jde do pole přání a dá se před generováním upravit
+  const [expandLoading, setExpandLoading] = useState(false);
+  async function expandIdea() {
+    if (!topic.trim() || expandLoading) return;
+    setExpandLoading(true);
+    try {
+      const names = [
+        ...chars.filter(c => selectedIds.includes(c.id)).map(c => (uiLang === "en" && c.nameEn ? c.nameEn : c.name)),
+        ...customChars.filter(c => selectedCustomIds.includes(c.id)).map(c => c.name),
+      ];
+      const activeCustom = customThemes.find(ct => ct.id === selectedTheme);
+      const folk = folkTaleById(selectedTheme);
+      const override = activeCustom
+        ? { name: activeCustom.name, prompt: activeCustom.prompt }
+        : folk ? { name: folk.name, prompt: folk.prompt } : undefined;
+      const res = await fetch("/api/topic-idea", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(60_000),
+        body: JSON.stringify({
+          expand: true,
+          language: uiLang,
+          characterNames: names,
+          themeId: override ? undefined : selectedTheme || undefined,
+          customTheme: override,
+          hint: topic.trim(),
+        }),
+      });
+      const d = await safeJson<{ idea?: string }>(res);
+      if (res.ok && d.idea) setTopic(d.idea);
+    } catch {} finally {
+      setExpandLoading(false);
+    }
+  }
   async function suggestIdea() {
     setIdeaLoading(true);
     try {
@@ -2476,6 +2511,11 @@ export default function Home() {
             <button type="button" className="insp-btn" onClick={suggestIdea} disabled={ideaLoading}>
               {ideaLoading ? "⏳ " : "🎲 "}{t.ideaBtn}
             </button>
+            {topic.trim() !== "" && (
+              <button type="button" className="insp-btn" onClick={expandIdea} disabled={expandLoading || ideaLoading}>
+                {expandLoading ? "⏳ " : "🪄 "}{t.expandBtn}
+              </button>
+            )}
             {topic.trim() !== "" && (
               <button type="button" className="insp-btn" onClick={() => setTopic("")}>
                 🧹 {t.clearTextBtn}
