@@ -34,6 +34,10 @@ export interface JobStatus {
   imgError?: string;
   /** 🔀 Dva konce: scenesScript = společný děj + konec A + konec B */
   choice?: StoryChoiceMeta;
+  /** Kolikrát se psaní příběhu restartovalo (kick bez hotového scénáře) */
+  restarts?: number;
+  /** Poslední chyba před restartem — jinak ji restart přepsal a nebyla vidět */
+  lastError?: string;
 }
 
 export async function putJson(path: string, data: unknown): Promise<string> {
@@ -88,11 +92,27 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   const st: JobStatus =
     prev && prev.scenesScript?.length
       ? { ...prev, error: undefined, imgError: undefined }
-      : { phase: "writing", createdAt: Date.now(), voiceId: String(body.voiceId || "") };
+      : {
+          phase: "writing",
+          createdAt: prev?.createdAt ?? Date.now(),
+          voiceId: String(body.voiceId || ""),
+          // Restart psaní (kick bez hotového scénáře) dřív MAZAL chybovou
+          // hlášku — job vypadal věčně jako „Píšu…". Teď se chyba přenáší
+          // a po 3. restartu se job zastaví s viditelnou příčinou.
+          restarts: prev ? (prev.restarts ?? 0) + 1 : 0,
+          lastError: prev?.error || prev?.lastError,
+        };
   const write = () => {
     st.updatedAt = Date.now();
     return putJson(statusPath, st).catch(e => console.error(`[job ${id}] status write failed:`, e));
   };
+
+  if (!st.scenesScript?.length && (st.restarts ?? 0) >= 3) {
+    st.phase = "error";
+    st.error = `Psaní příběhu opakovaně selhává${st.lastError ? ` (${st.lastError.slice(0, 200)})` : ""} — zrušte pohádku ✕ a zadejte ji znovu, případně s méně stránkami.`;
+    await write();
+    return;
+  }
 
   try {
     if (!st.scenesScript?.length) {
@@ -276,6 +296,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   } catch (e) {
     st.phase = "error";
     st.error = e instanceof Error ? e.message : String(e);
+    st.lastError = st.error;
     await write();
   }
 }
