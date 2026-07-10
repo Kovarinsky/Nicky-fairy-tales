@@ -1752,8 +1752,42 @@ export default function Home() {
   }, [activeBg]);
   // Výběr světa pozadí: velké tlačítko otevře rolovací nabídku (jako 📜 pohádky)
   const [bgPickerOpen, setBgPickerOpen] = useState(false);
-  // 👁 Náhled pozadí: schová celé UI, ťuknutí kamkoli vrátí zpět
-  const [bgPreview, setBgPreview] = useState(false);
+  // 🔍 Náhled pozadí PODRŽENÍM: po 350 ms se ukáže malá karta s ilustrací,
+  // která se pak plynule roztáhne na celý displej; puštění náhled zavře,
+  // obyčejné ťuknutí svět vybírá (klik po podržení se potlačí)
+  const [bgHold, setBgHold] = useState<{ id: string; url: string | null; full: boolean } | null>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdFullTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdFiredRef = useRef(false);
+
+  function beginBgHold(sceneId: string) {
+    holdFiredRef.current = false;
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = setTimeout(async () => {
+      holdFiredRef.current = true;
+      setBgHold({ id: sceneId, url: bgUrlCacheRef.current[sceneId] ?? null, full: false });
+      holdFullTimerRef.current = setTimeout(
+        () => setBgHold(p => (p && p.id === sceneId ? { ...p, full: true } : p)),
+        700
+      );
+      if (!bgUrlCacheRef.current[sceneId]) {
+        try {
+          const r = await fetch(`/api/bg-image?scene=${sceneId}`, { signal: AbortSignal.timeout(110_000) });
+          const d = r.ok ? ((await r.json()) as { url?: string }) : null;
+          if (d?.url) {
+            bgUrlCacheRef.current[sceneId] = d.url;
+            setBgHold(p => (p && p.id === sceneId ? { ...p, url: d.url! } : p));
+          }
+        } catch {}
+      }
+    }, 350);
+  }
+
+  function endBgHold() {
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    if (holdFullTimerRef.current) clearTimeout(holdFullTimerRef.current);
+    setBgHold(null);
+  }
   function pickBg(id: string) {
     setBgChoice(id);
     try { localStorage.setItem(BG_KEY, id); } catch {}
@@ -2289,14 +2323,7 @@ export default function Home() {
   const totalScenes = scenes.length;
 
   return (
-    <div className={`${readerMode ? "container reader-mode" : "container"}${bgPreview ? " bg-preview-mode" : ""}`}>
-
-      {/* 👁 Náhled pozadí — UI schované, ťuknutí vrátí zpět */}
-      {bgPreview && (
-        <div className="bg-preview-overlay" onClick={() => setBgPreview(false)}>
-          <span className="bg-preview-hint">{t.bgPreviewHint}</span>
-        </div>
-      )}
+    <div className={readerMode ? "container reader-mode" : "container"}>
 
       {!readerMode && (
       <>
@@ -2314,21 +2341,34 @@ export default function Home() {
               onClick={() => setBgPickerOpen(false)}>✕</button>
           </div>
           <div className="folk-list bg-picker">
-            <button type="button" className={`folk-item ${bgChoice === "auto" ? "folk-on" : ""}`} onClick={() => pickBg("auto")}>
-              <span className="folk-emoji">🎨</span>
-              <span className="folk-name">{t.bgAuto} — {t.bgAutoHint}</span>
-              <span className="folk-eye" role="button" aria-label={t.bgPreviewBtn}
-                onClick={e => { e.stopPropagation(); pickBg("auto"); setBgPreview(true); }}>👁️</span>
-            </button>
-            {BG_SCENES.map(s => (
-              <button type="button" key={s.id} className={`folk-item ${bgChoice === s.id ? "folk-on" : ""}`} onClick={() => pickBg(s.id)}>
-                <span className="folk-emoji">{s.emoji}</span>
-                <span className="folk-name">{uiLang === "en" ? s.nameEn : s.name}</span>
-                <span className="folk-eye" role="button" aria-label={t.bgPreviewBtn}
-                  onClick={e => { e.stopPropagation(); pickBg(s.id); setBgPreview(true); }}>👁️</span>
+            {[{ id: "auto", emoji: "🎨", label: `${t.bgAuto} — ${t.bgAutoHint}`, preview: activeBg },
+              ...BG_SCENES.map(s => ({ id: s.id, emoji: s.emoji, label: uiLang === "en" ? s.nameEn : s.name, preview: s.id }))].map(row => (
+              <button type="button" key={row.id}
+                className={`folk-item bg-item ${bgChoice === row.id ? "folk-on" : ""}`}
+                onClick={() => {
+                  if (holdFiredRef.current) { holdFiredRef.current = false; return; }
+                  pickBg(row.id);
+                }}
+                onPointerDown={() => beginBgHold(row.preview)}
+                onPointerUp={endBgHold}
+                onPointerLeave={endBgHold}
+                onPointerCancel={endBgHold}
+                onContextMenu={e => e.preventDefault()}>
+                <span className="folk-emoji">{row.emoji}</span>
+                <span className="folk-name">{row.label}</span>
               </button>
             ))}
           </div>
+          <p className="gen-step-hint">{t.bgHoldHint}</p>
+        </div>
+      )}
+
+      {/* 🔍 Náhled pozadí při podržení: malá karta → plynule celý displej */}
+      {bgHold && (
+        <div className={`bg-hold-overlay${bgHold.full ? " bg-hold-full" : ""}`}>
+          {bgHold.url
+            ? <img src={bgHold.url} alt="" className="bg-hold-img" />
+            : <div className="bg-hold-img bg-hold-loading">🎨</div>}
         </div>
       )}
       <h1>📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"} <span className="version-badge">v{APP_VERSION}</span></h1>

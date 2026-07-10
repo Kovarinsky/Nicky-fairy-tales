@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.19";
+export const APP_VERSION = "3.20";
 
 // Changelog (newest first)
+// 3.20 - Náhled pozadí předělán: žádná oka — PODRŽENÍM světa se ukáže malá karta s ilustrací, která se plynule roztáhne na celý displej; puštěním se náhled zavře, ťuknutím svět vyberete (nápověda přímo v nabídce)
 // 3.19 - Výběr pozadí: náhled 👁 je u KAŽDÉHO světa (ťuknutí vybere pozadí a ukáže ho přes celý displej) a nabídka má záhlaví s oranžovým ✕ — křížek pro odchod mají teď všechny rolovací nabídky
 // 3.18 - Oranžový vycentrovaný křížek ✕ u všech rozbalených panelů; výběr světa je sbalený za tlačítkem „Vybrat svět" a má stejný ✕; v nabídce pozadí nová položka 👁 Ukázat celé pozadí — schová všechna tlačítka, ťuknutí kamkoli vrátí zpět; velký editor přání: světlejší podklad a vynucený bílý text
 // 3.17 - Text ve velkém editoru přání je bílý (byl příliš tmavý na tmavém pozadí), světlejší i kurzor a nápověda

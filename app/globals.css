@@ -226,19 +226,54 @@ body {
   min-width: 0;
 }
 
-.folk-eye {
-  flex: 0 0 auto;
-  margin-left: auto;
-  padding: 0.3rem 0.55rem;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  font-size: 1rem;
-  line-height: 1;
+/* Položky pozadí: podržení = náhled → žádný výběr textu / context menu */
+.bg-item {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: pan-y;
 }
 
-.folk-eye:active {
-  transform: scale(0.9);
+/* 🔍 Náhled pozadí při podržení: malá karta → plynule celý displej */
+.bg-hold-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 6, 20, 0.55);
+  pointer-events: none;
+}
+
+.bg-hold-img {
+  width: min(52vw, 300px);
+  aspect-ratio: 9 / 16;
+  max-height: 60vh;
+  object-fit: cover;
+  border-radius: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.65);
+  transition: width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1),
+    max-height 0.5s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-radius 0.5s, aspect-ratio 0.5s;
+}
+
+.bg-hold-full .bg-hold-img {
+  width: 100vw;
+  max-height: 100vh;
+  height: 100vh;
+  aspect-ratio: auto;
+  border-radius: 0;
+  border: none;
+}
+
+.bg-hold-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .lang-btn {
