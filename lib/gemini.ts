@@ -223,6 +223,7 @@ async function verifySceneImage(apiKey: string, img: ImageResult, heroDescriptio
             "2) EXTRA people who are not on the character sheet",
             "3) WRONG look of a named character: go through EVERY person in the image ONE BY ONE, match them to a character sheet entry, and compare HAIR COLOR (blond vs brown vs black), hair length/style, beard, and clothing colors. A blond character drawn with brown hair (or vice versa) is ALWAYS a defect — this applies to every entry on the sheet, including invented/side characters, not just the main heroes.",
             "4) ANATOMY errors (three arms, extra or missing limbs, malformed hands)",
+            "5) If the sheet contains a 'Story outfits:' entry, characters must wear THAT outfit (it overrides their default clothing) — e.g. winter jacket and hat if the outfit says so. Default clothing instead of the story outfit, or a missing jacket/hat in a snowy scene, is a defect.",
             "Minor style variation is FINE — flag only obvious defects a parent would notice. Wrong hair color is never minor.",
             'Reply with ONLY JSON: {"ok":true} or {"ok":false,"problems":"short English description of the defects"}',
           ].join("\n") },
