@@ -1648,6 +1648,8 @@ export default function Home() {
   // 📜 Klasické (licenčně volné) pohádky — rolovací seznam, vybraná se chová
   // jako vlastní svět (posílá se jako customTheme s připraveným dějem)
   const [folkOpen, setFolkOpen] = useState(false);
+  // 🎡 Roller vestavěných světů — sbalený za tlačítkem, zavírá se ✕ i výběrem
+  const [worldOpen, setWorldOpen] = useState(false);
   const selectedFolk = folkTaleById(selectedTheme);
   // 💡 Ponaučení pohádky — rolovací výběr; text se předá vypravěči,
   // který ho vplete do děje (bez kázání)
@@ -1750,6 +1752,8 @@ export default function Home() {
   }, [activeBg]);
   // Výběr světa pozadí: velké tlačítko otevře rolovací nabídku (jako 📜 pohádky)
   const [bgPickerOpen, setBgPickerOpen] = useState(false);
+  // 👁 Náhled pozadí: schová celé UI, ťuknutí kamkoli vrátí zpět
+  const [bgPreview, setBgPreview] = useState(false);
   function pickBg(id: string) {
     setBgChoice(id);
     try { localStorage.setItem(BG_KEY, id); } catch {}
@@ -2285,7 +2289,14 @@ export default function Home() {
   const totalScenes = scenes.length;
 
   return (
-    <div className={readerMode ? "container reader-mode" : "container"}>
+    <div className={`${readerMode ? "container reader-mode" : "container"}${bgPreview ? " bg-preview-mode" : ""}`}>
+
+      {/* 👁 Náhled pozadí — UI schované, ťuknutí vrátí zpět */}
+      {bgPreview && (
+        <div className="bg-preview-overlay" onClick={() => setBgPreview(false)}>
+          <span className="bg-preview-hint">{t.bgPreviewHint}</span>
+        </div>
+      )}
 
       {!readerMode && (
       <>
@@ -2297,6 +2308,11 @@ export default function Home() {
       </div>
       {bgPickerOpen && (
         <div className="folk-list bg-picker">
+          <button type="button" className="folk-item"
+            onClick={() => { setBgPickerOpen(false); setBgPreview(true); }}>
+            <span className="folk-emoji">👁️</span>
+            <span>{t.bgPreviewBtn}</span>
+          </button>
           <button type="button" className={`folk-item ${bgChoice === "auto" ? "folk-on" : ""}`} onClick={() => pickBg("auto")}>
             <span className="folk-emoji">🎨</span>
             <span>{t.bgAuto} — {t.bgAutoHint}</span>
@@ -2373,22 +2389,40 @@ export default function Home() {
         {themes.length > 0 && (
           <div className="field">
             <label>{t.worldLabel}</label>
-            {/* 🎡 Vestavěné světy jako roller (uložené vlastní světy a
-                + Vlastní svět zůstávají jako tlačítka pod ním) */}
-            <div className="folk-list world-roller">
-              <button type="button" className={`folk-item ${!selectedTheme ? "folk-on" : ""}`}
-                onClick={() => setSelectedTheme("")}>
-                <span className="folk-emoji">✨</span>
-                <span>{t.worldNone}</span>
-              </button>
-              {themes.map(th => (
-                <button type="button" key={th.id} className={`folk-item ${selectedTheme === th.id ? "folk-on" : ""}`}
-                  onClick={() => setSelectedTheme(p => p === th.id ? "" : th.id)}>
-                  <span className="folk-emoji">{th.emoji}</span>
-                  <span>{uiLang === "en" && th.nameEn ? th.nameEn : th.name}</span>
-                </button>
-              ))}
-            </div>
+            {/* 🎡 Vestavěné světy jako roller v panelu s ✕ (uložené vlastní
+                světy a + Vlastní svět zůstávají jako tlačítka pod ním) */}
+            <button type="button" className={`chip chip-btn chip-full ${worldOpen || themes.some(th => th.id === selectedTheme) ? "chip-on" : ""}`}
+              onClick={() => setWorldOpen(p => !p)}>
+              {(() => {
+                const sel = themes.find(th => th.id === selectedTheme);
+                return sel
+                  ? `${sel.emoji} ${uiLang === "en" && sel.nameEn ? sel.nameEn : sel.name}`
+                  : `🌍 ${t.worldPick}`;
+              })()}
+            </button>
+            {worldOpen && (
+              <div className="add-char-panel">
+                <div className="panel-title-row">
+                  <p className="panel-title">🌍 {t.worldPick}</p>
+                  <button type="button" className="panel-close" aria-label={t.cancel}
+                    onClick={() => setWorldOpen(false)}>✕</button>
+                </div>
+                <div className="folk-list world-roller">
+                  <button type="button" className={`folk-item ${!selectedTheme ? "folk-on" : ""}`}
+                    onClick={() => { setSelectedTheme(""); setWorldOpen(false); }}>
+                    <span className="folk-emoji">✨</span>
+                    <span>{t.worldNone}</span>
+                  </button>
+                  {themes.map(th => (
+                    <button type="button" key={th.id} className={`folk-item ${selectedTheme === th.id ? "folk-on" : ""}`}
+                      onClick={() => { setSelectedTheme(p => p === th.id ? "" : th.id); setWorldOpen(false); }}>
+                      <span className="folk-emoji">{th.emoji}</span>
+                      <span>{uiLang === "en" && th.nameEn ? th.nameEn : th.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="chips">
               {customThemes.map(ct => (
                 <div key={ct.id} className={`chip custom-chip ${selectedTheme === ct.id ? "chip-on" : ""}`}>
