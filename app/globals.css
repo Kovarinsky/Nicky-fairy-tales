@@ -2001,6 +2001,37 @@ button:disabled {
   transform: scale(0.94);
 }
 
+/* Tlačítko přes celou šířku pole (Dva konce, Ponaučení) — jako Hudba */
+.chip-full {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+  font-size: 0.98rem;
+}
+
+/* 🎡 3D roller pro rolovací seznamy (ponaučení, klasické pohádky):
+   položky se při rolování naklápí jako na válci (moderní Chrome;
+   starší prohlížeče vidí běžný seznam) */
+@supports (animation-timeline: view()) {
+  .folk-list {
+    perspective: 700px;
+  }
+
+  .folk-list .folk-item {
+    animation: roller-tilt linear both;
+    animation-timeline: view(y);
+    animation-range: cover 0% cover 100%;
+  }
+
+  @keyframes roller-tilt {
+    0% { transform: rotateX(42deg) scale(0.9); opacity: 0.5; }
+    50% { transform: rotateX(0deg) scale(1); opacity: 1; }
+    100% { transform: rotateX(-42deg) scale(0.9); opacity: 0.5; }
+  }
+}
+
 /* Diagnostika psaní: poslední chyba před restartem, viditelná v řádku jobu */
 .job-last-error {
   display: block;

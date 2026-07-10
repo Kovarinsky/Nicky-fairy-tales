@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.12";
+export const APP_VERSION = "3.13";
 
 // Changelog (newest first)
+// 3.13 - Dva konce a Vybrat ponaučení jsou tlačítka přes celou šířku (jako Hudba); rolovací seznamy (ponaučení, klasické pohádky) mají 3D roller efekt — položky se při rolování naklápí jako na válci
 // 3.12 - Logika počasí: postavy se v zimě/na horách obléknou (bunda, čepice, šála, sněhule), v horku odlehčí (kraťasy, sandály, plavky), v dešti pláštěnky — vždy přes zamčený Story outfits (stejný převlek ve všech scénách, bundy nemizí), postavy zůstávají rozpoznatelné podle svých barev; vizuální kontrola hlídá, že převlek na obrázku opravdu je
 // 3.11 - 🪄 Rozvinout: nové tlačítko u pole přání — z pár slov („legendy z historie Benátek…") AI rozepíše detailní osnovu (pojmenované postavy, místa, letopočty, kostýmy, zápletka), kterou si před generováním můžete upravit; větší tlačítko ▶ u uložených pohádek (58 px — pohodlně se trefí)
 // 3.10 - Diagnostika přímo v appce: když se psaní opakuje, řádek pohádky ukazuje číslo pokusu („✍️ Píšu… (2. pokus)") a žlutě POSLEDNÍ CHYBU, kvůli které předchozí pokus spadl — konec hádání, co se děje

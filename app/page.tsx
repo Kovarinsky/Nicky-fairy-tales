@@ -2445,14 +2445,12 @@ export default function Home() {
 
         <div className="field">
           <label>{t.moralLabel}</label>
-          <div className="chips">
-            <button type="button" className={`chip chip-btn ${moralOpen || selectedMoral ? "chip-on" : ""}`}
-              onClick={() => setMoralOpen(p => !p)}>
-              {selectedMoral
-                ? `${moralById(selectedMoral)!.emoji} ${uiLang === "en" ? moralById(selectedMoral)!.nameEn : moralById(selectedMoral)!.name}`
-                : `💡 ${t.moralChip}`}
-            </button>
-          </div>
+          <button type="button" className={`chip chip-btn chip-full ${moralOpen || selectedMoral ? "chip-on" : ""}`}
+            onClick={() => setMoralOpen(p => !p)}>
+            {selectedMoral
+              ? `${moralById(selectedMoral)!.emoji} ${uiLang === "en" ? moralById(selectedMoral)!.nameEn : moralById(selectedMoral)!.name}`
+              : `💡 ${t.moralChip}`}
+          </button>
           {moralOpen && (
             <div className="add-char-panel">
               <p className="panel-title">{t.moralTitle}</p>
@@ -2565,12 +2563,10 @@ export default function Home() {
 
         <div className="field">
           <label>{t.endingLabel}</label>
-          <div className="chips">
-            <button type="button" className={`chip chip-btn ${twoEndings ? "chip-on" : ""}`}
-              onClick={() => setTwoEndings(p => !p)}>
-              🔀 {twoEndings ? t.twoEndsOn : t.twoEndsOff}
-            </button>
-          </div>
+          <button type="button" className={`chip chip-btn chip-full ${twoEndings ? "chip-on" : ""}`}
+            onClick={() => setTwoEndings(p => !p)}>
+            🔀 {twoEndings ? t.twoEndsOn : t.twoEndsOff}
+          </button>
           {twoEndings && <p className="gen-step-hint">{t.twoEndsHint}</p>}
         </div>
 
