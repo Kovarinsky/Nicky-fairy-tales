@@ -266,7 +266,7 @@ export default function Home() {
 
   // Server jobs — a QUEUE: several fairy tales can generate on Vercel at once,
   // each gets its own toast row and the newest one drives the gen-cards
-  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string };
+  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string; restarts?: number; lastError?: string };
   const MAX_ACTIVE_JOBS = 3;
   const [serverJobs, setServerJobs] = useState<ServerJob[]>([]);
   // The ref is the synchronous source of truth (poll callbacks and the mount
@@ -1407,7 +1407,8 @@ export default function Home() {
           maybeKickContinue(jobId, st, serverJobsRef.current.find(j => j.jobId === jobId)?.stalled);
         }
         if (st.phase === "writing") {
-          updateServerJob(jobId, { phase: "writing" });
+          // restarts/lastError: diagnostika, proč se psaní opakuje (viditelná v řádku)
+          updateServerJob(jobId, { phase: "writing", restarts: st.restarts || 0, lastError: st.lastError || undefined });
         } else if (st.phase === "generating") {
           prefetchJobScenes(jobId, st);
           updateServerJob(jobId, { phase: "generating", done: st.done || 0, total: st.total || 0, title: st.title, imgError: st.imgError || undefined });
@@ -2620,11 +2621,14 @@ export default function Home() {
                             }}>✕</button>
                         )}
                         <span className="job-seg-label">
-                          {idx + 1}. {j.stalled ? "⚠️ " : ""}{j.phase === "writing" ? t.segWriting
+                          {idx + 1}. {j.stalled ? "⚠️ " : ""}{j.phase === "writing" ? `${t.segWriting}${(j.restarts ?? 0) > 0 ? ` (${(j.restarts ?? 0) + 1}. pokus)` : ""}`
                             : j.phase === "generating" ? `🎨 ${j.done}/${j.total}`
                             : j.phase === "done" ? t.segOpen
                             : t.segError}
                         </span>
+                        {j.phase === "writing" && j.lastError && (
+                          <span className="job-last-error">⚠️ {j.lastError.slice(0, 160)}</span>
+                        )}
                       </div>
                     );
                   })}

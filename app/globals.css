@@ -2001,6 +2001,17 @@ button:disabled {
   transform: scale(0.94);
 }
 
+/* Diagnostika psaní: poslední chyba před restartem, viditelná v řádku jobu */
+.job-last-error {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fcd34d;
+  opacity: 0.9;
+  margin-top: 0.2rem;
+  line-height: 1.35;
+}
+
 /* ── 🔀 Výběr konce pohádky (dva konce) ── */
 .choice-panel {
   position: fixed;

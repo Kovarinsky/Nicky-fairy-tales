@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.09";
+export const APP_VERSION = "3.10";
 
 // Changelog (newest first)
+// 3.10 - Diagnostika přímo v appce: když se psaní opakuje, řádek pohádky ukazuje číslo pokusu („✍️ Píšu… (2. pokus)") a žlutě POSLEDNÍ CHYBU, kvůli které předchozí pokus spadl — konec hádání, co se děje
 // 3.09 - Konec maskovaných chyb při psaní: restart jobu dřív smazal chybovou hlášku (věčné „Píšu…") — teď se chyba přenáší dál a po 3. neúspěšném pokusu se pohádka zastaví s viditelnou příčinou; nová diagnostika /api/job/list ukáže stav a chyby všech jobů
 // 3.08 - OPRAVA zasekávání ve fázi „Píšu…": dlouhý scénář (hlavně dva konce ≈ 16+ scén) se nestreamovaný nevešel do 250s limitu jednoho pokusu — psaní teď STREAMUJE (text přitéká průběžně, žádný útes) a job posílá heartbeat i během psaní, takže se neukazuje falešné ⚠ zaseknutí
 // 3.07 - Výběr konce předělán na dvě velké grafické karty: obrázek první scény každé cesty + popisek (jasně vidět, kam která vede) — v appce, ve sdíleném odkazu i v offline souboru; OPRAVA: Claude vrací konce v novém jednoznačném formátu (endingA/endingB) — dřív se větev občas zahodila a tlačítka se vůbec neukázala (otázka zůstala jen v textu)
