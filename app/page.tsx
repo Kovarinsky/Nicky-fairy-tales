@@ -1759,6 +1759,10 @@ export default function Home() {
     ? `🎨 ${t.bgAuto}`
     : `${bgSceneById(bgChoice)!.emoji} ${uiLang === "en" ? bgSceneById(bgChoice)!.nameEn : bgSceneById(bgChoice)!.name}`;
 
+  // 📝 Velký editor přání — ťuknutí do pole otevře okno přes displej,
+  // kde je vidět celý text (dlouhé osnovy z 🪄 Rozvinout)
+  const [topicEditorOpen, setTopicEditorOpen] = useState(false);
+
   // ── 🎲 Vymysli námět — Claude navrhne námět do textového pole ────────────
   const [ideaLoading, setIdeaLoading] = useState(false);
   // 🪄 Rozvinout — z kostry uživatele udělá detailní osnovu (postavy, místa,
@@ -2369,13 +2373,23 @@ export default function Home() {
         {themes.length > 0 && (
           <div className="field">
             <label>{t.worldLabel}</label>
-            <div className="chips">
+            {/* 🎡 Vestavěné světy jako roller (uložené vlastní světy a
+                + Vlastní svět zůstávají jako tlačítka pod ním) */}
+            <div className="folk-list world-roller">
+              <button type="button" className={`folk-item ${!selectedTheme ? "folk-on" : ""}`}
+                onClick={() => setSelectedTheme("")}>
+                <span className="folk-emoji">✨</span>
+                <span>{t.worldNone}</span>
+              </button>
               {themes.map(th => (
-                <button type="button" key={th.id} className={`chip chip-btn ${selectedTheme === th.id ? "chip-on" : ""}`}
+                <button type="button" key={th.id} className={`folk-item ${selectedTheme === th.id ? "folk-on" : ""}`}
                   onClick={() => setSelectedTheme(p => p === th.id ? "" : th.id)}>
-                  <span>{th.emoji}</span> {uiLang === "en" && th.nameEn ? th.nameEn : th.name}
+                  <span className="folk-emoji">{th.emoji}</span>
+                  <span>{uiLang === "en" && th.nameEn ? th.nameEn : th.name}</span>
                 </button>
               ))}
+            </div>
+            <div className="chips">
               {customThemes.map(ct => (
                 <div key={ct.id} className={`chip custom-chip ${selectedTheme === ct.id ? "chip-on" : ""}`}>
                   {ct.previewUrl && <img src={ct.previewUrl} alt={ct.name} className="chip-avatar" />}
@@ -2521,7 +2535,10 @@ export default function Home() {
               <p className="gen-step-hint">{t.sequelHint}</p>
             </>
           )}
-          <textarea value={topic} onChange={e => setTopic(e.target.value)} placeholder={t.wishPlaceholder} />
+          {/* Ťuknutí otevře velký editor — celý text viditelný, pohodlné psaní */}
+          <textarea value={topic} readOnly placeholder={t.wishPlaceholder}
+            onClick={() => setTopicEditorOpen(true)}
+            onFocus={e => { e.target.blur(); setTopicEditorOpen(true); }} />
           <div className="insp-row">
             <button type="button" className="insp-btn" onClick={suggestIdea} disabled={ideaLoading}>
               {ideaLoading ? "⏳ " : "🎲 "}{t.ideaBtn}
@@ -2580,9 +2597,11 @@ export default function Home() {
 
         <div className="field">
           <label>{t.endingLabel}</label>
-          <button type="button" className={`chip chip-btn chip-full ${twoEndings ? "chip-on" : ""}`}
-            onClick={() => setTwoEndings(p => !p)}>
-            🔀 {twoEndings ? t.twoEndsOn : t.twoEndsOff}
+          {/* Klasický přepínač (jako starý vypínač zleva doprava) */}
+          <button type="button" className={`switch ${twoEndings ? "switch-on" : ""}`}
+            onClick={() => setTwoEndings(p => !p)} aria-pressed={twoEndings}>
+            <span className="switch-label">🔀 {t.twoEndsOff}</span>
+            <span className="switch-track" aria-hidden="true" />
           </button>
           {twoEndings && <p className="gen-step-hint">{t.twoEndsHint}</p>}
         </div>
@@ -3033,6 +3052,23 @@ export default function Home() {
               <p className="credits-goodnight">🌙 Dobrou noc, Nicolásku a Valentýnko 🌙</p>
 
               <p className="credits-tap">— klikni pro zavření —</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📝 Velký editor přání & inspirace — celý text viditelný */}
+      {topicEditorOpen && (
+        <div className="app-confirm-overlay" onClick={() => setTopicEditorOpen(false)}>
+          <div className="app-confirm topic-editor" onClick={e => e.stopPropagation()}>
+            <p className="app-confirm-msg">📝 {t.wishLabel}</p>
+            <textarea className="topic-editor-ta" value={topic} autoFocus
+              onChange={e => setTopic(e.target.value)} placeholder={t.wishPlaceholder} />
+            <div className="app-confirm-btns">
+              {topic.trim() !== "" && (
+                <button type="button" className="outline-btn" onClick={() => setTopic("")}>🧹 {t.clearTextBtn}</button>
+              )}
+              <button type="button" onClick={() => setTopicEditorOpen(false)}>✓ OK</button>
             </div>
           </div>
         </div>

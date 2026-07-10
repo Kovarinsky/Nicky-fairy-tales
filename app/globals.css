@@ -2001,6 +2001,84 @@ button:disabled {
   transform: scale(0.94);
 }
 
+/* 🎚️ Klasický přepínač (starý vypínač zleva doprava) — Dva konce */
+.switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.55rem 0.35rem;
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.switch-label {
+  font-weight: 800;
+  font-size: 0.98rem;
+  text-align: left;
+}
+
+.switch-track {
+  flex: 0 0 auto;
+  position: relative;
+  width: 60px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  transition: background 0.2s;
+}
+
+.switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s;
+}
+
+.switch-on .switch-track {
+  background: linear-gradient(135deg, #7c4dff, #536dfe);
+  border-color: transparent;
+}
+
+.switch-on .switch-track::after {
+  transform: translateX(28px);
+}
+
+/* 🎡 Roller vestavěných světů (vlastní světy zůstávají jako tlačítka) */
+.world-roller {
+  margin-bottom: 0.6rem;
+}
+
+/* 📝 Velký editor přání & inspirace */
+.topic-editor {
+  width: min(680px, calc(100vw - 1.4rem));
+}
+
+.topic-editor-ta {
+  width: 100%;
+  min-height: 42vh;
+  resize: vertical;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.55;
+  padding: 0.7rem 0.8rem;
+  margin: 0.3rem 0 0.7rem;
+}
+
 /* Tlačítko přes celou šířku pole (Dva konce, Ponaučení) — jako Hudba */
 .chip-full {
   display: flex;

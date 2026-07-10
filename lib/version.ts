@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.14";
+export const APP_VERSION = "3.15";
 
 // Changelog (newest first)
+// 3.15 - Svět pohádky jako 3D roller (vestavěné světy; vlastní světy a Vlastní svět zůstávají tlačítka, první položka „Bez světa"); Dva konce jako klasický přepínač zleva doprava; Přání & inspirace se po ťuknutí otevře ve velkém okně přes displej — celý text viditelný, mazání i OK po ruce
 // 3.14 - Rozepsané zadání pohádky se neztratí: text v poli Přání se průběžně ukládá do telefonu a přežije aktualizaci appky i přepnutí do jiné aplikace; smaže se tlačítkem 🧹
 // 3.13 - Dva konce a Vybrat ponaučení jsou tlačítka přes celou šířku (jako Hudba); rolovací seznamy (ponaučení, klasické pohádky) mají 3D roller efekt — položky se při rolování naklápí jako na válci
 // 3.12 - Logika počasí: postavy se v zimě/na horách obléknou (bunda, čepice, šála, sněhule), v horku odlehčí (kraťasy, sandály, plavky), v dešti pláštěnky — vždy přes zamčený Story outfits (stejný převlek ve všech scénách, bundy nemizí), postavy zůstávají rozpoznatelné podle svých barev; vizuální kontrola hlídá, že převlek na obrázku opravdu je
