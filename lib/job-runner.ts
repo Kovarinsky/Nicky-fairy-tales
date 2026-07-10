@@ -138,7 +138,16 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         inspirationUrlText: urlText || undefined,
       };
 
-      const script = await generateStory(storyReq, extras);
+      // Heartbeat během psaní: stream průběžně obnovuje updatedAt, takže
+      // klient nehlásí falešné zaseknutí u dlouhých scénářů (dva konce)
+      let lastBeat = Date.now();
+      const script = await generateStory(storyReq, extras, () => {
+        const now = Date.now();
+        if (now - lastBeat > 20_000) {
+          lastBeat = now;
+          write();
+        }
+      });
       st.title = script.title;
       st.heroDescription = script.heroDescription;
       // 🔀 Dva konce: konec B se generuje hned za koncem A (jeden seznam scén)

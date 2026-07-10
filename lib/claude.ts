@@ -410,15 +410,18 @@ function sanitizeApiKey(key: string | undefined): string {
   return (key || "").replace(/[^\x20-\x7E]/g, "").trim();
 }
 
-async function callAnthropicApi(body: object): Promise<string> {
+async function callAnthropicApi(body: object, onDelta?: (chars: number) => void): Promise<string> {
   const apiKey = sanitizeApiKey(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) throw new Error("Chybí ANTHROPIC_API_KEY.");
 
   // Use native fetch (Node 18+) — avoids node:https header-char validation quirks.
   // 429/529 (rate limit / overload) se zkouší znovu — fronta pohádek posílá
   // víc požadavků najednou.
+  // STREAMOVÁNÍ: dlouhý scénář (dva konce ≈ 16+ scén) se nestreamovaný
+  // nemusel vejít do 250s timeoutu jednoho pokusu — job pak umíral ve fázi
+  // „Píšu…" a točil se dokola. Se streamem text přitéká průběžně a onDelta
+  // umožňuje heartbeat (appka nehlásí falešné zaseknutí).
   let res: Response | null = null;
-  let text = "";
   for (let attempt = 0; attempt < 3; attempt++) {
     res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -427,28 +430,49 @@ async function callAnthropicApi(body: object): Promise<string> {
         "x-api-key": apiKey,
         "anthropic-version": ANTHROPIC_VERSION,
       },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(250_000),
+      body: JSON.stringify({ ...body, stream: true }),
+      signal: AbortSignal.timeout(280_000),
     });
-    text = await res.text();
     if (res.status !== 429 && res.status !== 529) break;
+    await res.text().catch(() => "");
     const retryAfter = Number(res.headers.get("retry-after"));
     const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter, 30) * 1000 : 12_000;
     console.warn(`[Claude] ${res.status}, retry in ${waitMs / 1000}s (attempt ${attempt + 1})`);
     await new Promise(r => setTimeout(r, waitMs));
   }
   if (!res) throw new Error("Anthropic: no response");
-  if (!res.ok) throw new Error(`Anthropic ${res.status}: ${text.slice(0, 400)}`);
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Anthropic ${res.status}: ${errText.slice(0, 400)}`);
+  }
+  if (!res.body) throw new Error("Anthropic: empty stream");
 
-  let data: { content?: Array<{ type: string; text?: string }>; error?: { message?: string } };
-  try { data = JSON.parse(text); }
-  catch { throw new Error("Anthropic JSON parse error: " + text.slice(0, 200)); }
-
-  if (data.error) throw new Error(`Anthropic error: ${data.error.message}`);
-
-  const textBlock = (data.content || []).find((b) => b.type === "text");
-  if (!textBlock?.text) throw new Error("Claude nevrátil text. Odpověď: " + text.slice(0, 200));
-  return textBlock.text;
+  // SSE: posbírat text_delta kousky; event error → výjimka
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let out = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? ""; // poslední (možná neúplný) řádek nechat v bufferu
+    for (const line of lines) {
+      if (!line.startsWith("data:")) continue;
+      const payload = line.slice(5).trim();
+      if (!payload) continue;
+      let ev: { type?: string; delta?: { type?: string; text?: string }; error?: { message?: string } };
+      try { ev = JSON.parse(payload); } catch { continue; }
+      if (ev.type === "error" || ev.error) throw new Error(`Anthropic stream error: ${ev.error?.message || "unknown"}`);
+      if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) {
+        out += ev.delta.text;
+        onDelta?.(out.length);
+      }
+    }
+  }
+  if (!out) throw new Error("Claude nevrátil text (prázdný stream).");
+  return out;
 }
 
 /** Vymyslí jeden hravý námět na pohádku (1–2 věty) — pro tlačítko 🎲 v UI. */
@@ -525,7 +549,7 @@ export async function studyWorld(
   return { prompt: parsed.prompt, question: parsed.question || null };
 }
 
-export async function generateStory(req: StoryRequest, extras: StoryExtras = {}): Promise<StoryScript> {
+export async function generateStory(req: StoryRequest, extras: StoryExtras = {}, onDelta?: (chars: number) => void): Promise<StoryScript> {
   const model = MODEL.trim();
   const parts: AnthropicPart[] = [];
 
@@ -565,7 +589,7 @@ export async function generateStory(req: StoryRequest, extras: StoryExtras = {})
       max_tokens: 16384, // 20 scén s vyprávěním a popisy obrázků se do 8k nevešlo
       system: buildSystemPrompt(language),
       messages: [{ role: "user", content }],
-    });
+    }, onDelta);
     try {
       const script = parseScript(raw);
       // PRAVIDLO KONZISTENCE #1: vzhled známých postav je KANONICKÝ — vždy
