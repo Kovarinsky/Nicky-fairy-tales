@@ -212,6 +212,35 @@ body {
   max-height: 280px;
 }
 
+/* Panel výběru pozadí: záhlaví s ✕ + roller; 👁 u každého světa */
+.bg-picker-panel {
+  margin: 0.35rem 0 0.5rem;
+  padding: 0.55rem 0.6rem 0.35rem;
+  border-radius: 16px;
+  background: rgba(10, 14, 46, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.folk-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.folk-eye {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0.3rem 0.55rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.folk-eye:active {
+  transform: scale(0.9);
+}
+
 .lang-btn {
   background: rgba(255, 255, 255, 0.08);
   border: 1.5px solid rgba(255, 255, 255, 0.18);

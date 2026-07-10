@@ -2307,22 +2307,28 @@ export default function Home() {
         <button type="button" className={`lang-btn ${uiLang === "en" ? "lang-on" : ""}`} onClick={() => switchLang("en")}>🇬🇧 EN</button>
       </div>
       {bgPickerOpen && (
-        <div className="folk-list bg-picker">
-          <button type="button" className="folk-item"
-            onClick={() => { setBgPickerOpen(false); setBgPreview(true); }}>
-            <span className="folk-emoji">👁️</span>
-            <span>{t.bgPreviewBtn}</span>
-          </button>
-          <button type="button" className={`folk-item ${bgChoice === "auto" ? "folk-on" : ""}`} onClick={() => pickBg("auto")}>
-            <span className="folk-emoji">🎨</span>
-            <span>{t.bgAuto} — {t.bgAutoHint}</span>
-          </button>
-          {BG_SCENES.map(s => (
-            <button type="button" key={s.id} className={`folk-item ${bgChoice === s.id ? "folk-on" : ""}`} onClick={() => pickBg(s.id)}>
-              <span className="folk-emoji">{s.emoji}</span>
-              <span>{uiLang === "en" ? s.nameEn : s.name}</span>
+        <div className="bg-picker-panel">
+          <div className="panel-title-row">
+            <p className="panel-title">🖼️ {t.bgTitle}</p>
+            <button type="button" className="panel-close" aria-label={t.cancel}
+              onClick={() => setBgPickerOpen(false)}>✕</button>
+          </div>
+          <div className="folk-list bg-picker">
+            <button type="button" className={`folk-item ${bgChoice === "auto" ? "folk-on" : ""}`} onClick={() => pickBg("auto")}>
+              <span className="folk-emoji">🎨</span>
+              <span className="folk-name">{t.bgAuto} — {t.bgAutoHint}</span>
+              <span className="folk-eye" role="button" aria-label={t.bgPreviewBtn}
+                onClick={e => { e.stopPropagation(); pickBg("auto"); setBgPreview(true); }}>👁️</span>
             </button>
-          ))}
+            {BG_SCENES.map(s => (
+              <button type="button" key={s.id} className={`folk-item ${bgChoice === s.id ? "folk-on" : ""}`} onClick={() => pickBg(s.id)}>
+                <span className="folk-emoji">{s.emoji}</span>
+                <span className="folk-name">{uiLang === "en" ? s.nameEn : s.name}</span>
+                <span className="folk-eye" role="button" aria-label={t.bgPreviewBtn}
+                  onClick={e => { e.stopPropagation(); pickBg(s.id); setBgPreview(true); }}>👁️</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
       <h1>📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"} <span className="version-badge">v{APP_VERSION}</span></h1>
