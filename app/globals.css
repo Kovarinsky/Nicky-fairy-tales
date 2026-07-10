@@ -2098,12 +2098,17 @@ button:disabled {
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
+  color: #ffffff; /* text musí být světlý — var(--text) tu tmavl */
+  caret-color: #ffffff;
   font: inherit;
   font-size: 1rem;
   line-height: 1.55;
   padding: 0.7rem 0.8rem;
   margin: 0.3rem 0 0.7rem;
+}
+
+.topic-editor-ta::placeholder {
+  color: rgba(255, 255, 255, 0.55);
 }
 
 /* Tlačítko přes celou šířku pole (Dva konce, Ponaučení) — jako Hudba */

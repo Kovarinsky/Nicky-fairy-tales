@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.16";
+export const APP_VERSION = "3.17";
 
 // Changelog (newest first)
+// 3.17 - Text ve velkém editoru přání je bílý (byl příliš tmavý na tmavém pozadí), světlejší i kurzor a nápověda
 // 3.16 - Přejmenováno na „Alternativní konce"; popisek přepínače zůstává bílý i po zapnutí; rozbalené rollery (ponaučení, klasické pohádky) mají křížek ✕ — jdou zavřít i bez výběru
 // 3.15 - Svět pohádky jako 3D roller (vestavěné světy; vlastní světy a Vlastní svět zůstávají tlačítka, první položka „Bez světa"); Dva konce jako klasický přepínač zleva doprava; Přání & inspirace se po ťuknutí otevře ve velkém okně přes displej — celý text viditelný, mazání i OK po ruce
 // 3.14 - Rozepsané zadání pohádky se neztratí: text v poli Přání se průběžně ukládá do telefonu a přežije aktualizaci appky i přepnutí do jiné aplikace; smaže se tlačítkem 🧹
