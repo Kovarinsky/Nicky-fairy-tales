@@ -43,6 +43,7 @@ const SERVER_JOB_KEY = "nicky-server-job";
 const HISTORY_MAX = 20; // offline zásoba: posledních 20 pohádek v telefonu
 const SETTINGS_KEY = "nicky-settings";
 const DRAFT_KEY = "nicky-story-draft";
+const TOPIC_DRAFT_KEY = "nicky-topic-draft"; // rozepsané zadání přežije reload i přepnutí jinam
 const BG_KEY = "nicky-bg"; // "auto" | id světa pozadí (lib/backgrounds.ts)
 
 function loadHistory(): HistoryEntry[] {
@@ -664,6 +665,22 @@ export default function Home() {
       document.documentElement.style.removeProperty("--kb-pad");
     };
   }, []);
+
+  // ── Rozepsané zadání pohádky přežije aktualizaci appky i přepnutí jinam ──
+  // Text se průběžně ukládá do telefonu a po otevření se vrátí do pole;
+  // smaže se jen tlačítkem 🧹 (vyprázdněním pole)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(TOPIC_DRAFT_KEY);
+      if (saved) setTopic(prev => prev || saved);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      if (topic.trim()) localStorage.setItem(TOPIC_DRAFT_KEY, topic);
+      else localStorage.removeItem(TOPIC_DRAFT_KEY);
+    } catch {}
+  }, [topic]);
 
   // Stylové potvrzovací okno místo ošklivého systémového window.confirm
   const [confirmBox, setConfirmBox] = useState<{ msg: string; resolve: (ok: boolean) => void } | null>(null);
