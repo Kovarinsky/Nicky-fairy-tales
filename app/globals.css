@@ -2019,6 +2019,7 @@ button:disabled {
   font-weight: 800;
   font-size: 0.98rem;
   text-align: left;
+  color: #ffffff; /* popisek zůstává bílý i po zapnutí (nesmí ztmavnout) */
 }
 
 .switch-track {
@@ -2052,6 +2053,32 @@ button:disabled {
 
 .switch-on .switch-track::after {
   transform: translateX(28px);
+}
+
+/* Záhlaví rozbaleného panelu s křížkem na zavření (rollery jde opustit
+   i bez výběru) */
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.panel-title-row .panel-title {
+  margin-bottom: 0;
+}
+
+.panel-close {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 /* 🎡 Roller vestavěných světů (vlastní světy zůstávají jako tlačítka) */

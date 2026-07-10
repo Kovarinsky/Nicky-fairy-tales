@@ -2407,7 +2407,11 @@ export default function Home() {
             </div>
             {folkOpen && (
               <div className="add-char-panel">
-                <p className="panel-title">{t.folkTitle}</p>
+                <div className="panel-title-row">
+                  <p className="panel-title">{t.folkTitle}</p>
+                  <button type="button" className="panel-close" aria-label={t.cancel}
+                    onClick={() => setFolkOpen(false)}>✕</button>
+                </div>
                 <div className="folk-list">
                   {FOLK_TALES.map(ft => (
                     <button type="button" key={ft.id}
@@ -2484,7 +2488,11 @@ export default function Home() {
           </button>
           {moralOpen && (
             <div className="add-char-panel">
-              <p className="panel-title">{t.moralTitle}</p>
+              <div className="panel-title-row">
+                <p className="panel-title">{t.moralTitle}</p>
+                <button type="button" className="panel-close" aria-label={t.cancel}
+                  onClick={() => setMoralOpen(false)}>✕</button>
+              </div>
               <div className="folk-list">
                 <button type="button" className={`folk-item ${!selectedMoral ? "folk-on" : ""}`}
                   onClick={() => { setSelectedMoral(""); setMoralOpen(false); }}>
