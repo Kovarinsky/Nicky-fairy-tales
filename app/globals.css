@@ -2274,6 +2274,8 @@ button:disabled {
   font-weight: 900;
   font-size: 1.05rem;
   margin-bottom: 0.7rem;
+  color: #ffffff; /* na tmavém panelu tmavl — natvrdo bílý */
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
 }
 
 .choice-btns {

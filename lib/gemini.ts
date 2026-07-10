@@ -223,7 +223,7 @@ async function verifySceneImage(apiKey: string, img: ImageResult, heroDescriptio
             "2) EXTRA people who are not on the character sheet",
             "3) WRONG look of a named character: go through EVERY person in the image ONE BY ONE, match them to a character sheet entry, and compare HAIR COLOR (blond vs brown vs black), hair length/style, beard, and clothing colors. A blond character drawn with brown hair (or vice versa) is ALWAYS a defect — this applies to every entry on the sheet, including invented/side characters, not just the main heroes.",
             "4) ANATOMY errors (three arms, extra or missing limbs, malformed hands)",
-            "5) If the sheet contains a 'Story outfits:' entry, characters must wear THAT outfit (it overrides their default clothing) — e.g. winter jacket and hat if the outfit says so. Default clothing instead of the story outfit, or a missing jacket/hat in a snowy scene, is a defect.",
+            "5) If the sheet contains a 'Story outfits:' entry, characters must wear the outfit VARIANT matching the scene (outdoors → outdoor clothes, indoors → indoor clothes with jackets off). A missing jacket/hat in a snowy outdoor scene, winter coats inside a warm room, or MIXED dressing levels (one child bundled up while another wears a T-shirt in the same place) are defects.",
             "Minor style variation is FINE — flag only obvious defects a parent would notice. Wrong hair color is never minor.",
             'Reply with ONLY JSON: {"ok":true} or {"ok":false,"problems":"short English description of the defects"}',
           ].join("\n") },
@@ -280,6 +280,7 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
         `⚠ APPEARANCE LOCK — IMMUTABLE across every image in this story:`,
         heroDescription,
         `Every named character MUST look IDENTICAL to this description in EVERY image: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes — AND the same AGE, same BODY SIZE and PROPORTIONS. Relative heights between characters NEVER change: a toddler stays toddler-sized, a child stays child-sized, adults stay adult-sized. Any recurring OBJECT listed above (vehicle, magic item, toy) keeps IDENTICAL type, shape and colors in every scene — the same car stays the same car. These are LOCKED — do NOT change anything between scenes.`,
+        `If 'Story outfits:' defines outdoor/indoor variants, draw the variant stated at the end of the scene description — and ALL characters in the scene share the SAME dressing level (never one in a winter coat while another wears a T-shirt).`,
         `ONLY the characters named in the scene are visible — zero additional people, strangers, or background human figures. Each named character appears EXACTLY ONCE in the image — NEVER draw two copies of the same person.`,
       ].join(" ")
     : "";

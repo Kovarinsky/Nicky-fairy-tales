@@ -2946,8 +2946,9 @@ export default function Home() {
           </div>
 
           {/* 🔀 Výběr konce — po dovyprávění poslední společné scény.
-              Dvě grafické karty: obrázek první scény dané cesty + popisek */}
-          {storyChoice && branch === null && page === storyChoice.common - 1 && !isPlaying && (
+              Dvě grafické karty: obrázek první scény dané cesty + popisek.
+              JEN ve čtečce — jinak plaval nad formulářem */}
+          {viewMode === "reader" && storyChoice && branch === null && page === storyChoice.common - 1 && !isPlaying && (
             <div className="choice-panel">
               <p className="choice-title">🔀 {t.choiceTitle}</p>
               <div className="choice-cards">
