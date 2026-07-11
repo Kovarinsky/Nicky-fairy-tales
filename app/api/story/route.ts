@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
       theme ||
       (Array.isArray(body.inspirationImages) && body.inspirationImages.length > 0) ||
       body.inspirationPdfBase64 ||
+      body.inspirationPdfUrl ||
       body.inspirationUrl ||
       body.previousStory?.title; // pokračování dřívější pohádky je samo o sobě zadání
 
@@ -76,6 +77,21 @@ export async function POST(req: NextRequest) {
     // Fetch URL content
     const urlText = body.inspirationUrl ? await fetchUrlText(String(body.inspirationUrl)) : "";
 
+    // Velké PDF přišlo jako odkaz do vlastního Blob úložiště → stáhnout
+    let pdfBase64: string | undefined = body.inspirationPdfBase64 || undefined;
+    if (!pdfBase64 && typeof body.inspirationPdfUrl === "string") {
+      try {
+        const u = new URL(body.inspirationPdfUrl);
+        if (u.protocol === "https:" && u.hostname.endsWith(".blob.vercel-storage.com")) {
+          const r = await fetch(u, { signal: AbortSignal.timeout(30_000) });
+          if (r.ok) {
+            const buf = Buffer.from(await r.arrayBuffer());
+            if (buf.length <= 11 * 1024 * 1024) pdfBase64 = buf.toString("base64");
+          }
+        }
+      } catch {}
+    }
+
     const language = String(body.language || "cs") === "en" ? "en" : "cs";
 
     // Vlastní svět (téma podle fotky/popisu) má přednost před předdefinovaným
@@ -104,7 +120,7 @@ export async function POST(req: NextRequest) {
     const extras: StoryExtras = {
       customCharacters,
       inspirationImages: Array.isArray(body.inspirationImages) ? body.inspirationImages : [],
-      inspirationPdfBase64: body.inspirationPdfBase64 || undefined,
+      inspirationPdfBase64: pdfBase64,
       inspirationUrlText: urlText || undefined,
     };
 

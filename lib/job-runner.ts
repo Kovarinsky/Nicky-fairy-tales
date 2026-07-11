@@ -128,6 +128,21 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       const rawCustom = Array.isArray(body.customCharacters) ? (body.customCharacters as StoryExtras["customCharacters"]) : [];
       const urlText = body.inspirationUrl ? await fetchUrlText(String(body.inspirationUrl)) : "";
 
+      // Velké PDF přišlo jako odkaz do vlastního Blob úložiště → stáhnout
+      let pdfBase64 = (body.inspirationPdfBase64 as string) || undefined;
+      if (!pdfBase64 && typeof body.inspirationPdfUrl === "string") {
+        try {
+          const u = new URL(body.inspirationPdfUrl);
+          if (u.protocol === "https:" && u.hostname.endsWith(".blob.vercel-storage.com")) {
+            const r = await fetch(u, { signal: AbortSignal.timeout(30_000) });
+            if (r.ok) {
+              const buf = Buffer.from(await r.arrayBuffer());
+              if (buf.length <= 11 * 1024 * 1024) pdfBase64 = buf.toString("base64");
+            }
+          }
+        } catch {}
+      }
+
       // Vlastní svět (téma podle fotky/popisu) má přednost před předdefinovaným
       const rawCustomTheme = body.customTheme as { name?: unknown; prompt?: unknown } | undefined;
       const customTheme = rawCustomTheme && typeof rawCustomTheme.prompt === "string"
@@ -154,7 +169,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       const extras: StoryExtras = {
         customCharacters: rawCustom,
         inspirationImages: Array.isArray(body.inspirationImages) ? (body.inspirationImages as StoryExtras["inspirationImages"]) : [],
-        inspirationPdfBase64: (body.inspirationPdfBase64 as string) || undefined,
+        inspirationPdfBase64: pdfBase64,
         inspirationUrlText: urlText || undefined,
       };
 

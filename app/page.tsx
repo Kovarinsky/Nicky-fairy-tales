@@ -162,7 +162,8 @@ export default function Home() {
   const [inspImages, setInspImages] = useState<InspImage[]>([]);
   const [inspUrlActive, setInspUrlActive] = useState(false);
   const [inspUrl, setInspUrl] = useState("");
-  const [inspPdf, setInspPdf] = useState<{ base64: string; name: string } | null>(null);
+  const [inspPdf, setInspPdf] = useState<{ base64?: string; url?: string; name: string } | null>(null);
+  const [pdfUploading, setPdfUploading] = useState(false);
   const inspImageRef = useRef<HTMLInputElement>(null);
   const inspPdfRef = useRef<HTMLInputElement>(null);
   const [sceneCount, setSceneCount] = useState(6);
@@ -683,9 +684,13 @@ export default function Home() {
   }, [topic]);
 
   // Stylové potvrzovací okno místo ošklivého systémového window.confirm
-  const [confirmBox, setConfirmBox] = useState<{ msg: string; resolve: (ok: boolean) => void } | null>(null);
+  const [confirmBox, setConfirmBox] = useState<{ msg: string; resolve: (ok: boolean) => void; alert?: boolean } | null>(null);
   function appConfirm(msg: string): Promise<boolean> {
     return new Promise(resolve => setConfirmBox({ msg, resolve }));
+  }
+  // Stylová hláška jen s OK (náhrada systémového window.alert)
+  function appAlert(msg: string): Promise<boolean> {
+    return new Promise(resolve => setConfirmBox({ msg, resolve, alert: true }));
   }
   function answerConfirm(ok: boolean) {
     confirmBox?.resolve(ok);
@@ -1520,6 +1525,7 @@ export default function Home() {
             ? [{ data: activeCustomTheme.photoBase64, mimeType: activeCustomTheme.photoMimeType }] : []),
       ],
       inspirationPdfBase64: inspPdf?.base64 || undefined,
+      inspirationPdfUrl: inspPdf?.url || undefined,
     };
 
     // Try the SERVER job first — generation survives app switches & screen off.
@@ -2310,9 +2316,28 @@ export default function Home() {
     setSelectedTheme(p => (p === id ? "" : p));
   }
   async function handleInspPdf(file: File) {
-    if (file.size > 3.5 * 1024 * 1024) { alert(t.pdfTooBig); return; }
-    const b = await fileToBase64(file).catch(() => null);
-    if (b) setInspPdf({ base64: b, name: file.name });
+    if (file.size > 10 * 1024 * 1024) { await appAlert(t.pdfTooBig); return; }
+    if (file.size <= 3.5 * 1024 * 1024) {
+      const b = await fileToBase64(file).catch(() => null);
+      if (b) setInspPdf({ base64: b, name: file.name });
+      return;
+    }
+    // Větší PDF se nevejde do requestu na server (limit 4,5 MB) —
+    // nahraje se rovnou do úložiště a serveru se pošle jen odkaz
+    setPdfUploading(true);
+    try {
+      const res = await uploadToBlob(`insp/${crypto.randomUUID()}.pdf`, file, {
+        access: "public",
+        handleUploadUrl: "/api/share-upload",
+        contentType: "application/pdf",
+      });
+      setInspPdf({ url: res.url, name: file.name });
+    } catch (e) {
+      console.error("[pdf upload]", e);
+      await appAlert(t.pdfUploadErr);
+    } finally {
+      setPdfUploading(false);
+    }
   }
 
   const allSelectedCount = selectedIds.length + selectedCustomIds.length;
@@ -2646,7 +2671,9 @@ export default function Home() {
               📷 {t.photoBtn}{inspImages.length > 0 ? ` (${inspImages.length})` : ""}
             </button>
             <button type="button" className={`insp-btn ${inspUrlActive ? "chip-on" : ""}`} onClick={() => setInspUrlActive(p => !p)}>🔗 {t.webBtn}</button>
-            <button type="button" className={`insp-btn ${inspPdf ? "chip-on" : ""}`} onClick={() => inspPdfRef.current?.click()}>📄 PDF{inspPdf ? " ✓" : ""}</button>
+            <button type="button" className={`insp-btn ${inspPdf ? "chip-on" : ""}`} onClick={() => inspPdfRef.current?.click()} disabled={pdfUploading}>
+              📄 PDF{inspPdf ? " ✓" : pdfUploading ? " ⏳" : ""}
+            </button>
           </div>
           <input ref={inspImageRef} type="file" accept="image/*" multiple style={{ display: "none" }}
             onChange={async e => { for (const f of Array.from(e.target.files || []).slice(0, 8 - inspImages.length)) await handleInspImage(f); e.target.value = ""; }} />
@@ -3191,7 +3218,9 @@ export default function Home() {
           <div className="app-confirm" onClick={e => e.stopPropagation()}>
             <p className="app-confirm-msg">{confirmBox.msg}</p>
             <div className="app-confirm-btns">
-              <button type="button" className="outline-btn" onClick={() => answerConfirm(false)}>{t.cancel}</button>
+              {!confirmBox.alert && (
+                <button type="button" className="outline-btn" onClick={() => answerConfirm(false)}>{t.cancel}</button>
+              )}
               <button type="button" onClick={() => answerConfirm(true)}>OK</button>
             </div>
           </div>

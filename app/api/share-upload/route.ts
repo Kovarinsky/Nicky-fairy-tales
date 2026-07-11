@@ -11,7 +11,9 @@ import { blobToken } from "@/lib/blob-token";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-const PATH_RE = /^share\/[a-z0-9-]{10,60}\/(img|aud)-\d{1,2}$/i;
+// share/… = média sdílené pohádky; insp/….pdf = velké inspirační PDF
+// (nevejde se do 4,5MB requestu na server, jde rovnou do úložiště)
+const PATH_RE = /^(share\/[a-z0-9-]{10,60}\/(img|aud)-\d{1,2}|insp\/[a-z0-9-]{10,60}\.pdf)$/i;
 
 export async function POST(request: Request): Promise<NextResponse> {
   if (!blobToken()) {
@@ -31,10 +33,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       onBeforeGenerateToken: async (pathname) => {
         if (!PATH_RE.test(pathname)) throw new Error("Neplatná cesta souboru.");
         return {
-          allowedContentTypes: ["image/*", "audio/*"],
+          allowedContentTypes: pathname.startsWith("insp/") ? ["application/pdf"] : ["image/*", "audio/*"],
           addRandomSuffix: false,
           allowOverwrite: true,
-          maximumSizeInBytes: 15 * 1024 * 1024,
+          maximumSizeInBytes: pathname.startsWith("insp/") ? 10 * 1024 * 1024 : 15 * 1024 * 1024,
         };
       },
       // Média mažeme s celou sdílenou pohádkou (prune v /api/share)
