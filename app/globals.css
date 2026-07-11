@@ -2485,6 +2485,26 @@ button:disabled {
   line-height: 1.35;
 }
 
+/* 🔀 Návrat k rozbočce — malý pilulkový button vlevo nahoře ve čtečce */
+.choice-return {
+  position: fixed;
+  top: 0.6rem;
+  left: 0.6rem;
+  z-index: 65;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  background: rgba(10, 14, 46, 0.82);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.choice-return:active {
+  transform: scale(0.95);
+}
+
 /* ── 🔀 Výběr konce pohádky (dva konce) ── */
 .choice-panel {
   position: fixed;

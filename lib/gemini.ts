@@ -214,18 +214,23 @@ async function verifySceneImage(apiKey: string, img: ImageResult, heroDescriptio
         parts: [
           { inlineData: { data: img.buffer.toString("base64"), mimeType: img.mimeType } },
           { text: [
-            "You are a strict quality checker for a children's storybook illustration.",
+            "You are a STRICT quality inspector for a children's storybook illustration.",
             "CANONICAL CHARACTER SHEET:",
             heroDescription.slice(0, 4000),
             "",
-            "Check the image for these DEFECTS ONLY:",
-            "1) DUPLICATE character — the same person drawn twice in one image",
-            "2) EXTRA people who are not on the character sheet",
-            "3) WRONG look of a named character: go through EVERY person in the image ONE BY ONE, match them to a character sheet entry, and compare HAIR COLOR (blond vs brown vs black), hair length/style, beard, and clothing colors. A blond character drawn with brown hair (or vice versa) is ALWAYS a defect — this applies to every entry on the sheet, including invented/side characters, not just the main heroes.",
-            "4) ANATOMY errors (three arms, extra or missing limbs, malformed hands)",
-            "5) If the sheet contains a 'Story outfits:' entry, characters must wear the outfit VARIANT matching the scene (outdoors → outdoor clothes, indoors → indoor clothes with jackets off). A missing jacket/hat in a snowy outdoor scene, winter coats inside a warm room, or MIXED dressing levels (one child bundled up while another wears a T-shirt in the same place) are defects.",
-            "Minor style variation is FINE — flag only obvious defects a parent would notice. Wrong hair color is never minor.",
-            'Reply with ONLY JSON: {"ok":true} or {"ok":false,"problems":"short English description of the defects"}',
+            "Run this TEN-RULE checklist and FAIL the image on ANY violation:",
+            "1) COUNT the human figures: more people than named characters on the sheet (including background strangers) = FAIL.",
+            "2) Each named character appears EXACTLY ONCE — two similar children or two similar adults = FAIL.",
+            "3) HAIR COLOR of EVERY person matches their sheet entry (blond stays blond, brown stays brown, dark stays dark) — check person by person.",
+            "4) Hair LENGTH and STYLE match the sheet (short stays short, long stays long; beard per sheet).",
+            "5) CLOTHING: each character wears THEIR OWN outfit (or their 'Story outfits:' variant for this scene). A signature outfit on the WRONG person (e.g. a different child wearing Nicolas's white T-shirt with red stripes) = FAIL.",
+            "6) Dressing level is UNIFORM for the scene: no winter coat next to a T-shirt; indoors without jackets/hats; never summer clothes in snow.",
+            "7) BODY PROPORTIONS: children child-sized, adults adult-sized, relative heights per the 'Heights:' entry.",
+            "8) ANATOMY: exactly two arms, two legs, five fingers per hand, natural faces; bicycles have two wheels.",
+            "9) KEY OBJECTS identical to their sheet entry — the same vehicle/boat/toy type and colors as stated.",
+            "10) NO text, letters, numbers, watermarks or signatures anywhere in the image.",
+            "Minor painterly variation is fine — but violations of the ten rules above are NEVER minor.",
+            'Reply with ONLY JSON: {"ok":true} or {"ok":false,"problems":"numbered violated rules with short English reasons"}',
           ].join("\n") },
         ],
       }],
@@ -319,20 +324,22 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
         // Vision QA: vadný obrázek (dvojitá postava, špatné vlasy, anatomie)
         // se JEDNOU překreslí s konkrétním popisem chyby
         if (heroDescription) {
-          const v = await verifySceneImage(apiKey, img, heroDescription);
-          if (!v.ok && v.problems) {
-            console.warn(`[Gemini QA] scene ${scene.index}: REJECTED (${v.problems}) → redraw`);
+          // Desatero konzistence: až DVĚ opravná překreslení s popisem
+          // porušených pravidel; použije se poslední (opravené) provedení
+          let v = await verifySceneImage(apiKey, img, heroDescription);
+          for (let fix = 1; fix <= 2 && !v.ok && v.problems; fix++) {
+            console.warn(`[Gemini QA] scene ${scene.index}: REJECTED (${v.problems}) → redraw ${fix}/2`);
             try {
               const img2 = await callGeminiImage(
                 apiKey, m,
-                `${safePrompt} ⚠ CORRECTION: the previous attempt was rejected because: ${v.problems}. Fix exactly these issues — follow the APPEARANCE LOCK precisely and draw each named character EXACTLY ONCE.`,
+                `${safePrompt} ⚠ CORRECTION ${fix}: the previous attempt violated these rules: ${v.problems}. Fix EXACTLY these issues — follow the APPEARANCE LOCK precisely, draw ONLY the named characters, each EXACTLY ONCE, with their own hair colors and outfits.`,
                 withAspect ? "16:9" : null, refImages
               );
-              const v2 = await verifySceneImage(apiKey, img2, heroDescription);
-              if (v2.ok) img = img2;
-              else console.warn(`[Gemini QA] scene ${scene.index}: redraw still imperfect (${v2.problems}) — keeping first`);
-            } catch {}
+              img = img2;
+              v = await verifySceneImage(apiKey, img2, heroDescription);
+            } catch { break; }
           }
+          if (!v.ok && v.problems) console.warn(`[Gemini QA] scene ${scene.index}: still imperfect after redraws (${v.problems})`);
         }
         return await compressImage(img);
       } catch (e) {

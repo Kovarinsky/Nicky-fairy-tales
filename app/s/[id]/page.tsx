@@ -135,6 +135,12 @@ export default function SharedStoryPage() {
             </div>
           ) : (
             <div className="share-controls">
+              {story.choice && branch !== null && (
+                <button type="button" className="share-btn" aria-label="Zpět k rozbočce"
+                  onClick={() => { audioRef.current?.pause(); setIsPlaying(false); isAutoRef.current = false; setBranch(null); setPage(story.choice!.common - 1); }}>
+                  🔀
+                </button>
+              )}
               <button type="button" className="share-btn" onClick={() => go(prevIdx)} disabled={prevIdx === null} aria-label="Předchozí">←</button>
               <button type="button" className="share-btn share-play" onClick={togglePlay} disabled={!scene.audioUrl}>
                 {isPlaying ? "⏸︎" : "▶︎"}

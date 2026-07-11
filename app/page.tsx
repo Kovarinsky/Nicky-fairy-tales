@@ -1834,7 +1834,14 @@ export default function Home() {
   // 🌐 Přeložit — toggle do OPAČNÉHO jazyka, než kterým je text napsaný
   // (česky psané → EN, anglicky psané → CZ); směr ukazuje popisek tlačítka
   const [translateLoading, setTranslateLoading] = useState(false);
-  const topicLangTarget: "cs" | "en" = /[ěščřžýáíéúůďťňĚŠČŘŽÝÁÍÉÚŮĎŤŇ]/.test(topic) ? "en" : "cs";
+  // Jazyk textu se pozná podle SLOV, ne jen diakritiky — anglický překlad
+  // s českými jmény (Valentýna…) jinak vypadal pořád jako čeština
+  const topicLangTarget: "cs" | "en" = (() => {
+    const enWords = (topic.match(/\b(the|and|with|his|her|their|they|was|were|is|are|of|to|into|for)\b/gi) || []).length;
+    const csWords = (topic.match(/\b(se|na|je|že|do|pro|když|aby|jsem|byl|byla|přes|jako|který|která)\b/gi) || []).length;
+    if (enWords >= 2 && enWords > csWords) return "cs"; // text je anglicky → přeložit do češtiny
+    return "en"; // jinak česky (nebo krátký text) → přeložit do angličtiny
+  })();
   async function translateTopic() {
     if (!topic.trim() || translateLoading) return;
     setTranslateLoading(true);
@@ -3058,6 +3065,21 @@ export default function Home() {
             </div>
             <button type="button" className="ctrl-btn ctrl-nav" onClick={() => nextVisible !== null && goToPage(nextVisible)} disabled={!hasNext} aria-label={t.next}>→</button>
           </div>
+
+          {/* 🔀 Návrat k rozbočce — vyzkoušet druhou variantu konce */}
+          {viewMode === "reader" && storyChoice && branch !== null && (
+            <button type="button" className="choice-return"
+              onClick={() => {
+                audioRef.current?.pause();
+                setIsPlaying(false);
+                setBranch(null);
+                isAutoAdvanceRef.current = false;
+                goToPage(storyChoice.common - 1);
+                setShowCredits(false);
+              }}>
+              🔀 {t.choiceReturn}
+            </button>
+          )}
 
           {/* 🔀 Výběr konce — po dovyprávění poslední společné scény.
               Dvě grafické karty: obrázek první scény dané cesty + popisek.

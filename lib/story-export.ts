@@ -90,6 +90,7 @@ export function buildStoryHtml(title: string, scenes: ExportScene[], choice?: St
   <div id="bar">
     <p id="text"></p>
     <div id="controls">
+      <button type="button" class="btn" id="fork" aria-label="Zpět k rozbočce" style="display:none">🔀</button>
       <button type="button" class="btn" id="prev" aria-label="Předchozí">←</button>
       <button type="button" class="btn" id="play">▶&#xFE0E;</button>
       <span id="num"></span>
@@ -135,6 +136,7 @@ export function buildStoryHtml(title: string, scenes: ExportScene[], choice?: St
     document.getElementById("prev").disabled = pos === 0;
     document.getElementById("next").disabled = pos >= vis.length - 1;
     var atChoice = choice && !branch && page === choice.common - 1;
+    document.getElementById("fork").style.display = choice && branch ? "" : "none";
     document.getElementById("choiceRow").style.display = atChoice ? "flex" : "none";
     if (atChoice) {
       document.getElementById("optAtxt").textContent = "1️⃣ " + choice.options[0];
@@ -171,6 +173,10 @@ export function buildStoryHtml(title: string, scenes: ExportScene[], choice?: St
   document.getElementById("next").onclick = function () { go(1); };
   document.getElementById("optA").onclick = function () { pick("A"); };
   document.getElementById("optB").onclick = function () { pick("B"); };
+  document.getElementById("fork").onclick = function () {
+    if (!choice || !branch) return;
+    branch = null; auto = false; page = choice.common - 1; render();
+  };
   au.onended = function () {
     playing = false; updatePlay();
     if (choice && !branch && page === choice.common - 1) return; // čeká na výběr
