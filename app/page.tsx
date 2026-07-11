@@ -1857,6 +1857,17 @@ export default function Home() {
     if (enWords >= 2 && enWords > csWords) return "cs"; // text je anglicky → přeložit do češtiny
     return "en"; // jinak česky (nebo krátký text) → přeložit do angličtiny
   })();
+  // Přepínač 🌐 CZ|EN s jezdcem: jezdec stojí na jazyku, kterým je text
+  // napsaný; ťuknutí text přeloží a jezdec přejede na druhou stranu
+  const translateToggle = (
+    <button type="button" className={`lang-toggle translate-toggle ${topicLangTarget === "cs" ? "lang-en" : ""}`}
+      onClick={translateTopic} disabled={translateLoading || !topic.trim()}
+      aria-label={t.translateBtn} title={t.translateBtn}>
+      <span className="lang-thumb" aria-hidden="true" />
+      <span className={`lang-opt ${topicLangTarget === "en" ? "on" : ""}`}>{translateLoading && topicLangTarget === "cs" ? "⏳" : "🌐"} CZ</span>
+      <span className={`lang-opt ${topicLangTarget === "cs" ? "on" : ""}`}>{translateLoading && topicLangTarget === "en" ? "⏳" : "🌐"} EN</span>
+    </button>
+  );
   async function translateTopic() {
     if (!topic.trim() || translateLoading) return;
     setTranslateLoading(true);
@@ -2760,12 +2771,7 @@ export default function Home() {
                 {expandLoading ? "⏳ " : "✨ "}{t.expandBtn}
               </button>
             )}
-            {topic.trim() !== "" && (
-              <button type="button" className="insp-btn" onClick={translateTopic}
-                disabled={translateLoading || expandLoading || ideaLoading}>
-                {translateLoading ? "⏳ " : "🌐 "}{t.translateBtn} → {topicLangTarget === "en" ? "EN" : "CZ"}
-              </button>
-            )}
+            {topic.trim() !== "" && translateToggle}
             <button type="button" className={`insp-btn ${inspImages.length > 0 ? "chip-on" : ""}`}
               onClick={() => inspImageRef.current?.click()} disabled={inspImages.length >= 8}>
               📷 {t.photoBtn}{inspImages.length > 0 ? ` (${inspImages.length})` : ""}
@@ -3325,8 +3331,7 @@ export default function Home() {
                 onClick={() => { setTopic(topicBeforeEditRef.current); setTopicEditorOpen(false); }}>
                 ✕ {t.cancel}
               </button>
-              <button type="button" className="outline-btn" disabled={!topic.trim() || translateLoading || expandLoading}
-                onClick={translateTopic}>{translateLoading ? "⏳" : "🌐"} {t.translateBtn} → {topicLangTarget === "en" ? "EN" : "CZ"}</button>
+              {translateToggle}
               <button type="button" className="outline-btn" disabled={!topic.trim() || expandLoading || ideaLoading}
                 onClick={expandIdea}>{expandLoading ? "⏳" : "✨"} {t.expandBtn}</button>
               <button type="button" onClick={() => setTopicEditorOpen(false)}>✓ OK</button>

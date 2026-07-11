@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.37";
+export const APP_VERSION = "3.38";
 
 // Changelog (newest first)
+// 3.38 - 🌐 Přeložit je skutečný přepínač s jezdcem (jako CZ/EN nahoře): oranžový jezdec stojí na jazyku, kterým je text napsaný, ťuknutím přejede na druhou stranu a text se přeloží — ve formuláři i ve velkém editoru
 // 3.37 - 💰 Spotřeba přehledněji: čtyři karty se statistikami — 📚 počet pohádek, 📱 kolik zařízení tvořilo, 🎨 obrázky s cenou v Kč, 🎙️ namluvené znaky; každé zařízení dostává anonymní ID, takže po nasdílení uvidíte, kolik lidí appku používá (počítá se u nově vytvořených pohádek)
 // 3.36 - 🔟 Desatero konzistence (DESATERO-KONZISTENCE.md): vizuální kontrola projíždí 10 pravidel — počet lidí, každý právě jednou, vlasy postavu po postavě, oblečení na správné postavě, jednotné oblečení scény, proporce, anatomie, klíčové předměty, žádný text — a vadný obrázek se překreslí až 2×; 🔀 návrat k rozbočce: tlačítko „Druhý konec" ve čtečce (i ve sdíleném odkazu a offline souboru) vrátí pohádku k výběru; Přeložit správně pozná anglický text s českými jmény (skutečný toggle)
 // 3.35 - 🌐 Přeložit funguje jako toggle do opačného jazyka, než kterým je text napsaný (česky → EN, anglicky → CZ) — tlačítko ukazuje směr („Přeložit → EN")
