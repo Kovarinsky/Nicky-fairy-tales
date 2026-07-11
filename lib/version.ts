@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.39";
+export const APP_VERSION = "3.40";
 
 // Changelog (newest first)
+// 3.40 - Zjednodušení: hlas vypravěče se vybírá AUTOMATICKY podle jazyka prostředí CZ/EN (tlačítka hlasu zmizela); tlačítko Přeložit odstraněno — pohádka se píše v jazyce prostředí bez ohledu na jazyk zadání (appka si to přebere sama); podtitul bez zmínky o tatínkově hlasu; 🎬 úvodní obrazovka při otevření appky: pokaždé jiný pohádkový motiv (vesmír, džungle, moře…), nadpis, verze a slogan „Svět pohádek podle vašich přání" — sama zmizí, ťuknutím se přeskočí
 // 3.39 - Pod přepínačem 🌐 CZ|EN je malý popisek „přeložit text pohádky", aby bylo na první pohled jasné, co přepínač dělá (ve formuláři i ve velkém editoru)
 // 3.38 - 🌐 Přeložit je skutečný přepínač s jezdcem (jako CZ/EN nahoře): oranžový jezdec stojí na jazyku, kterým je text napsaný, ťuknutím přejede na druhou stranu a text se přeloží — ve formuláři i ve velkém editoru
 // 3.37 - 💰 Spotřeba přehledněji: čtyři karty se statistikami — 📚 počet pohádek, 📱 kolik zařízení tvořilo, 🎨 obrázky s cenou v Kč, 🎙️ namluvené znaky; každé zařízení dostává anonymní ID, takže po nasdílení uvidíte, kolik lidí appku používá (počítá se u nově vytvořených pohádek)

@@ -4,13 +4,12 @@ export const UI_LANG_KEY = "nicky-ui-lang";
 
 export const UI = {
   cs: {
-    subtitle: "Vyber postavy, téma a inspiraci – pohádka s obrázky a tatínkovým hlasem.",
+    subtitle: "Vyber postavy, téma a inspiraci – pohádka s obrázky a vyprávěním.",
     whoLabel: "Kdo v pohádce vystupuje?",
     cancelChip: "✕ Zrušit",
     ideaBtn: "Vymysli námět",
     clearTextBtn: "Smazat text",
-    translateBtn: "Přeložit",
-    translateHint: "přeložit text pohádky",
+    introTag: "Svět pohádek podle vašich přání",
     expandBtn: "Rozvinout",
     bgAuto: "Auto",
     bgAutoHint: "podle tématu pohádky",
@@ -158,13 +157,12 @@ export const UI = {
     rotateBack: "Na výšku",
   },
   en: {
-    subtitle: "Pick characters, a theme and inspiration – a fairy tale with pictures and Daddy's voice.",
+    subtitle: "Pick characters, a theme and inspiration – a fairy tale with pictures and narration.",
     whoLabel: "Who is in the story?",
     cancelChip: "✕ Cancel",
     ideaBtn: "Suggest an idea",
     clearTextBtn: "Clear text",
-    translateBtn: "Translate",
-    translateHint: "translate the story text",
+    introTag: "A world of fairy tales made from your wishes",
     expandBtn: "Enrich",
     bgAuto: "Auto",
     bgAutoHint: "follows the story theme",

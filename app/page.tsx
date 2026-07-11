@@ -273,10 +273,14 @@ export default function Home() {
   function switchLang(l: UILang) {
     setUiLang(l);
     try { localStorage.setItem(UI_LANG_KEY, l); } catch {}
-    // Match the narrator voice to the UI language when one exists
-    const match = voices.find(v => v.language === (l === "cs" ? "cs" : "en"));
-    if (match) setSelectedVoiceId(match.id);
   }
+  // 🎙️ Hlas vypravěče se vybírá AUTOMATICKY podle jazyka prostředí (CZ/EN) —
+  // tlačítka pro ruční výběr hlasu už ve formuláři nejsou
+  useEffect(() => {
+    const match = voices.find(v => v.language === uiLang);
+    if (match) setSelectedVoiceId(match.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voices, uiLang]);
 
   // Background generation state (LOCAL in-browser pipeline)
   const [bgStatus, setBgStatus] = useState<"idle" | "writing" | "generating" | "done">("idle");
@@ -1828,6 +1832,28 @@ export default function Home() {
     ? `🎨 ${t.bgAuto}`
     : `${bgSceneById(bgChoice)!.emoji} ${uiLang === "en" ? bgSceneById(bgChoice)!.nameEn : bgSceneById(bgChoice)!.name}`;
 
+  // 🎬 Úvodní obrazovka — při každém otevření appky jiný pohádkový motiv
+  // (vesmír, džungle, moře…), nadpis, verze a slogan; sama zmizí, ťuknutí přeskočí
+  const [intro, setIntro] = useState<{ scene: string; url: string | null; closing: boolean } | null>(null);
+  useEffect(() => {
+    const scene = BG_SCENES[Math.floor(Math.random() * BG_SCENES.length)];
+    setIntro({ scene: scene.id, url: bgUrlCacheRef.current[scene.id] ?? null, closing: false });
+    let dead = false;
+    if (!bgUrlCacheRef.current[scene.id]) {
+      fetch(`/api/bg-image?scene=${scene.id}`, { signal: AbortSignal.timeout(15_000) })
+        .then(r => (r.ok ? r.json() : null))
+        .then((d: { url?: string } | null) => {
+          if (dead || !d?.url) return;
+          bgUrlCacheRef.current[scene.id] = d.url;
+          setIntro(p => (p && p.scene === scene.id && !p.closing ? { ...p, url: d.url! } : p));
+        })
+        .catch(() => {});
+    }
+    const t1 = setTimeout(() => setIntro(p => (p ? { ...p, closing: true } : p)), 3300);
+    const t2 = setTimeout(() => setIntro(null), 4100);
+    return () => { dead = true; clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
   // 📝 Velký editor přání — ťuknutí do pole otevře okno přes displej,
   // kde je vidět celý text (dlouhé osnovy z 🪄 Rozvinout).
   // ✕ Zrušit vrátí text do podoby před otevřením editoru.
@@ -1845,49 +1871,6 @@ export default function Home() {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, [topicEditorOpen]);
-
-  // 🌐 Přeložit — toggle do OPAČNÉHO jazyka, než kterým je text napsaný
-  // (česky psané → EN, anglicky psané → CZ); směr ukazuje popisek tlačítka
-  const [translateLoading, setTranslateLoading] = useState(false);
-  // Jazyk textu se pozná podle SLOV, ne jen diakritiky — anglický překlad
-  // s českými jmény (Valentýna…) jinak vypadal pořád jako čeština
-  const topicLangTarget: "cs" | "en" = (() => {
-    const enWords = (topic.match(/\b(the|and|with|his|her|their|they|was|were|is|are|of|to|into|for)\b/gi) || []).length;
-    const csWords = (topic.match(/\b(se|na|je|že|do|pro|když|aby|jsem|byl|byla|přes|jako|který|která)\b/gi) || []).length;
-    if (enWords >= 2 && enWords > csWords) return "cs"; // text je anglicky → přeložit do češtiny
-    return "en"; // jinak česky (nebo krátký text) → přeložit do angličtiny
-  })();
-  // Přepínač 🌐 CZ|EN s jezdcem: jezdec stojí na jazyku, kterým je text
-  // napsaný; ťuknutí text přeloží a jezdec přejede na druhou stranu
-  const translateToggle = (
-    <div className="translate-wrap">
-      <button type="button" className={`lang-toggle translate-toggle ${topicLangTarget === "cs" ? "lang-en" : ""}`}
-        onClick={translateTopic} disabled={translateLoading || !topic.trim()}
-        aria-label={t.translateBtn} title={t.translateBtn}>
-        <span className="lang-thumb" aria-hidden="true" />
-        <span className={`lang-opt ${topicLangTarget === "en" ? "on" : ""}`}>{translateLoading && topicLangTarget === "cs" ? "⏳" : "🌐"} CZ</span>
-        <span className={`lang-opt ${topicLangTarget === "cs" ? "on" : ""}`}>{translateLoading && topicLangTarget === "en" ? "⏳" : "🌐"} EN</span>
-      </button>
-      <span className="translate-hint">{t.translateHint}</span>
-    </div>
-  );
-  async function translateTopic() {
-    if (!topic.trim() || translateLoading) return;
-    setTranslateLoading(true);
-    try {
-      const target = topicLangTarget;
-      const res = await fetch("/api/topic-idea", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(60_000),
-        body: JSON.stringify({ translate: true, language: target, hint: topic.trim() }),
-      });
-      const d = await safeJson<{ idea?: string }>(res);
-      if (res.ok && d.idea) setTopic(d.idea);
-    } catch {} finally {
-      setTranslateLoading(false);
-    }
-  }
 
   // ── 🎲 Vymysli námět — Claude navrhne námět do textového pole ────────────
   const [ideaLoading, setIdeaLoading] = useState(false);
@@ -2724,22 +2707,6 @@ export default function Home() {
           )}
         </div>
 
-        {voices.length > 1 && (
-          <div className="field">
-            <label>{t.voiceLabel}</label>
-            <div className="chips">
-              {voices.map(v => (
-                <button type="button" key={v.id}
-                  className={`chip chip-btn ${selectedVoiceId === v.id ? "chip-on" : ""}`}
-                  onClick={() => setSelectedVoiceId(v.id)}
-                  title={v.description}>
-                  <span>{v.emoji}</span> {v.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         <div className="field">
           <label>{t.wishLabel}</label>
           {sequelOf && (
@@ -2774,7 +2741,6 @@ export default function Home() {
                 {expandLoading ? "⏳ " : "✨ "}{t.expandBtn}
               </button>
             )}
-            {topic.trim() !== "" && translateToggle}
             <button type="button" className={`insp-btn ${inspImages.length > 0 ? "chip-on" : ""}`}
               onClick={() => inspImageRef.current?.click()} disabled={inspImages.length >= 8}>
               📷 {t.photoBtn}{inspImages.length > 0 ? ` (${inspImages.length})` : ""}
@@ -3334,12 +3300,22 @@ export default function Home() {
                 onClick={() => { setTopic(topicBeforeEditRef.current); setTopicEditorOpen(false); }}>
                 ✕ {t.cancel}
               </button>
-              {translateToggle}
               <button type="button" className="outline-btn" disabled={!topic.trim() || expandLoading || ideaLoading}
                 onClick={expandIdea}>{expandLoading ? "⏳" : "✨"} {t.expandBtn}</button>
-              <button type="button" onClick={() => setTopicEditorOpen(false)}>✓ OK</button>
+              <button type="button" className="btn-span2" onClick={() => setTopicEditorOpen(false)}>✓ OK</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 🎬 Úvodní obrazovka — náhodný pohádkový motiv, nadpis, verze a slogan */}
+      {intro && (
+        <div className={`intro-splash${intro.closing ? " closing" : ""}`}
+          style={intro.url ? { backgroundImage: `linear-gradient(rgba(12, 9, 38, 0.32), rgba(12, 9, 38, 0.58)), url("${intro.url}")` } : undefined}
+          onClick={() => setIntro(null)}>
+          <h1 className="intro-title">📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"}</h1>
+          <p className="intro-version">v{APP_VERSION}</p>
+          <p className="intro-tag">{t.introTag}</p>
         </div>
       )}
 
