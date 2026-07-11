@@ -658,8 +658,10 @@ export default function Home() {
           // Viditelný pruh nad klávesnicí (v souřadnicích layout viewportu)
           const visibleBottom = vv.offsetTop + vv.height;
           const r = el.getBoundingClientRect();
-          if (r.bottom > visibleBottom - 16 || r.top < vv.offsetTop) {
-            window.scrollBy({ top: r.top - vv.offsetTop - Math.max(16, (vv.height - r.height) / 3), behavior: "smooth" });
+          // Zvedat s rezervou (pole nesmí končit těsně nad klávesnicí) a posadit
+          // ho VYSOKO nad ni — do horní pětiny viditelného pruhu
+          if (r.bottom > visibleBottom - 90 || r.top < vv.offsetTop) {
+            window.scrollBy({ top: r.top - vv.offsetTop - Math.max(12, (vv.height - r.height) / 5), behavior: "smooth" });
           }
         } else {
           el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1863,14 +1865,22 @@ export default function Home() {
     topicBeforeEditRef.current = topic;
     setTopicEditorOpen(true);
   }
+  // 🌍 Stejný velký editor i pro POPIS VLASTNÍHO SVĚTA
+  const [worldEditorOpen, setWorldEditorOpen] = useState(false);
+  const worldDescBeforeEditRef = useRef("");
+  function openWorldEditor() {
+    worldDescBeforeEditRef.current = newThemeDesc;
+    setWorldEditorOpen(true);
+  }
+  const anyBigEditorOpen = topicEditorOpen || worldEditorOpen;
   // Při otevřeném editoru zamknout rolování stránky pod ním — okno jinak
   // s klávesnicí „ujíždělo" do strany
   useEffect(() => {
-    if (!topicEditorOpen) return;
+    if (!anyBigEditorOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
-  }, [topicEditorOpen]);
+  }, [anyBigEditorOpen]);
 
   // ── 🎲 Vymysli námět — Claude navrhne námět do textového pole ────────────
   const [ideaLoading, setIdeaLoading] = useState(false);
@@ -2628,7 +2638,16 @@ export default function Home() {
                 </div>
                 <div className="field">
                   <label>{t.worldDescLabel}</label>
-                  <textarea value={newThemeDesc} onChange={e => setNewThemeDesc(e.target.value)} placeholder={t.worldDescPlaceholder} />
+                  {/* Ťuknutí otevře velký editor přes celý displej — stejně jako u zadání pohádky */}
+                  <div className="ta-wrap">
+                    <textarea className="ta-accent" value={newThemeDesc} readOnly placeholder={t.worldDescPlaceholder}
+                      onClick={openWorldEditor}
+                      onFocus={e => { e.target.blur(); openWorldEditor(); }} />
+                    {newThemeDesc.trim() !== "" && (
+                      <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
+                        onClick={e => { e.stopPropagation(); setNewThemeDesc(""); }}>✕</button>
+                    )}
+                  </div>
                   <div className="insp-row">
                     <button type="button" className="insp-btn" onClick={studyNewWorld}
                       disabled={worldStudyLoading || (!newThemeName.trim() && !newThemeDesc.trim())}>
@@ -2724,7 +2743,7 @@ export default function Home() {
           {/* Ťuknutí otevře velký editor — celý text viditelný, pohodlné psaní.
               Oranžový ✕ v rohu pole maže text */}
           <div className="ta-wrap">
-            <textarea value={topic} readOnly placeholder={t.wishPlaceholder}
+            <textarea className="ta-accent" value={topic} readOnly placeholder={t.wishPlaceholder}
               onClick={openTopicEditor}
               onFocus={e => { e.target.blur(); openTopicEditor(); }} />
             {topic.trim() !== "" && (
@@ -3303,6 +3322,30 @@ export default function Home() {
               <button type="button" className="outline-btn" disabled={!topic.trim() || expandLoading || ideaLoading}
                 onClick={expandIdea}>{expandLoading ? "⏳" : "✨"} {t.expandBtn}</button>
               <button type="button" className="btn-span2" onClick={() => setTopicEditorOpen(false)}>✓ OK</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🌍 Velký editor popisu vlastního světa — stejné okno jako u přání */}
+      {worldEditorOpen && (
+        <div className="app-confirm-overlay" onClick={() => setWorldEditorOpen(false)}>
+          <div className="app-confirm topic-editor" onClick={e => e.stopPropagation()}>
+            <p className="app-confirm-msg">🌍 {t.worldDescLabel}</p>
+            <div className="ta-wrap">
+              <textarea className="topic-editor-ta" value={newThemeDesc} autoFocus
+                onChange={e => setNewThemeDesc(e.target.value)} placeholder={t.worldDescPlaceholder} />
+              {newThemeDesc.trim() !== "" && (
+                <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
+                  onClick={() => setNewThemeDesc("")}>✕</button>
+              )}
+            </div>
+            <div className="app-confirm-btns topic-editor-btns">
+              <button type="button" className="cancel-btn"
+                onClick={() => { setNewThemeDesc(worldDescBeforeEditRef.current); setWorldEditorOpen(false); }}>
+                ✕ {t.cancel}
+              </button>
+              <button type="button" onClick={() => setWorldEditorOpen(false)}>✓ OK</button>
             </div>
           </div>
         </div>

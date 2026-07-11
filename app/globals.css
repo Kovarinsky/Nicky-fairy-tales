@@ -2243,6 +2243,17 @@ button:disabled {
   position: relative;
 }
 
+/* Hlavní pole na vyplnění (zadání pohádky, popis světa) — tenká oranžová linka */
+textarea.ta-accent {
+  border: 1.5px solid rgba(255, 152, 0, 0.65);
+  box-shadow: 0 0 0 1px rgba(244, 81, 30, 0.12);
+}
+
+textarea.ta-accent:focus {
+  border-color: rgba(255, 152, 0, 0.9);
+  outline: none;
+}
+
 .ta-wrap textarea {
   width: 100%;
 }
