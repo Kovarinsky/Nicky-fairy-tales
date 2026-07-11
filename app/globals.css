@@ -17,6 +17,16 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Pole s písmem <16 px spouští na Androidu/iOS auto-zoom celé stránky,
+   který se sám nevrátí — všechna pole proto mají minimálně 16 px */
+input[type="text"],
+input[type="url"],
+input[type="number"],
+textarea,
+select {
+  font-size: max(1em, 16px);
+}
+
 body {
   font-family: inherit;
   color: var(--text);

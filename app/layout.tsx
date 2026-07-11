@@ -26,6 +26,9 @@ export const viewport: Viewport = {
   // Otevřená klávesnice ZMENŠÍ stránku (místo překrytí) — psané pole
   // tak jde odscrollovat do viditelné části (tablet na šířku)
   interactiveWidget: "resizes-content",
+  // Zákaz auto-zoomu při fokusu pole — přiblížení se samo nevracelo
+  // a celá appka zůstala zvětšená
+  maximumScale: 1,
 };
 
 function FairyBackground() {

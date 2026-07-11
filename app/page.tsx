@@ -631,6 +631,9 @@ export default function Home() {
       const el = document.activeElement as HTMLElement | null;
       if (!el || (el.tagName !== "TEXTAREA" && el.tagName !== "INPUT")) return;
       if ((el as HTMLInputElement).type === "checkbox" || (el as HTMLInputElement).type === "file") return;
+      // Pole uvnitř pevných modálních oken (velký editor…) neposouvat —
+      // rolování stránky pod oknem s ním hýbalo do strany
+      if (el.closest(".app-confirm-overlay")) return;
       try {
         const kb = keyboardHeight();
         if (kb > 0 && vv) {
@@ -1819,6 +1822,14 @@ export default function Home() {
     topicBeforeEditRef.current = topic;
     setTopicEditorOpen(true);
   }
+  // Při otevřeném editoru zamknout rolování stránky pod ním — okno jinak
+  // s klávesnicí „ujíždělo" do strany
+  useEffect(() => {
+    if (!topicEditorOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [topicEditorOpen]);
 
   // ── 🎲 Vymysli námět — Claude navrhne námět do textového pole ────────────
   const [ideaLoading, setIdeaLoading] = useState(false);
