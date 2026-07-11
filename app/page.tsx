@@ -2421,7 +2421,7 @@ export default function Home() {
                   <button type="button" className="chip-remove" onClick={() => removeCustomChar(c.id)}>×</button>
                 </div>
               ))}
-              <button type="button" className={`chip chip-btn ${addingChar ? "chip-on" : ""}`} onClick={() => setAddingChar(p => !p)}>
+              <button type="button" className={`chip chip-btn ${addingChar ? "chip-cancel" : ""}`} onClick={() => setAddingChar(p => !p)}>
                 {addingChar ? t.cancelChip : t.addCharChip}
               </button>
             </div>
@@ -2452,7 +2452,7 @@ export default function Home() {
             </div>
             <div className="file-row">
               <button type="button" onClick={addCustomChar} disabled={!newCharName.trim()}>{t.addCharBtn}</button>
-              <button type="button" className="outline-btn" onClick={() => { setAddingChar(false); setNewCharName(""); setNewCharDesc(""); setNewCharPhoto(null); }}>{t.cancel}</button>
+              <button type="button" className="cancel-btn" onClick={() => { setAddingChar(false); setNewCharName(""); setNewCharDesc(""); setNewCharPhoto(null); }}>✕ {t.cancel}</button>
             </div>
           </div>
         )}
@@ -2506,7 +2506,7 @@ export default function Home() {
                 onClick={() => setFolkOpen(p => !p)}>
                 📜 {selectedFolk ? (uiLang === "en" ? selectedFolk.nameEn : selectedFolk.name) : t.folkChip}
               </button>
-              <button type="button" className={`chip chip-btn ${addingTheme ? "chip-on" : ""}`} onClick={() => setAddingTheme(p => !p)}>
+              <button type="button" className={`chip chip-btn ${addingTheme ? "chip-cancel" : ""}`} onClick={() => setAddingTheme(p => !p)}>
                 {addingTheme ? t.cancelChip : t.addWorldChip}
               </button>
             </div>
@@ -2576,7 +2576,7 @@ export default function Home() {
                 </div>
                 <div className="panel-actions">
                   <button type="button" onClick={addCustomTheme} disabled={!newThemeName.trim() && !newThemeDesc.trim()}>{t.saveWorld}</button>
-                  <button type="button" className="outline-btn" onClick={() => { setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]); setWorldQuestion(null); setWorldStudyError(false); }}>{t.cancel}</button>
+                  <button type="button" className="cancel-btn" onClick={() => { setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]); setWorldQuestion(null); setWorldStudyError(false); }}>✕ {t.cancel}</button>
                 </div>
               </div>
             )}
@@ -3205,7 +3205,7 @@ export default function Home() {
               )}
             </div>
             <div className="app-confirm-btns">
-              <button type="button" className="outline-btn" onClick={() => setShareResult(null)}>{t.cancel}</button>
+              <button type="button" className="cancel-btn" onClick={() => setShareResult(null)}>✕ {t.cancel}</button>
             </div>
             <p className="gen-step-hint">{t.shareReadyHint}</p>
           </div>
@@ -3219,7 +3219,7 @@ export default function Home() {
             <p className="app-confirm-msg">{confirmBox.msg}</p>
             <div className="app-confirm-btns">
               {!confirmBox.alert && (
-                <button type="button" className="outline-btn" onClick={() => answerConfirm(false)}>{t.cancel}</button>
+                <button type="button" className="cancel-btn" onClick={() => answerConfirm(false)}>✕ {t.cancel}</button>
               )}
               <button type="button" onClick={() => answerConfirm(true)}>OK</button>
             </div>
