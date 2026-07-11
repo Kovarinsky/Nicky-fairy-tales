@@ -23,9 +23,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#0a0520",
   viewportFit: "cover",
-  // Otevřená klávesnice ZMENŠÍ stránku (místo překrytí) — psané pole
-  // tak jde odscrollovat do viditelné části (tablet na šířku)
-  interactiveWidget: "resizes-content",
+  // Klávesnice stránku PŘEKRÝVÁ (nemění její velikost — layout se
+  // „nezvětšoval/nezmenšoval"); viditelnost psaného pole řeší visualViewport
+  // handler v page.tsx (--kb-pad + posun pole nad klávesnici)
+  interactiveWidget: "overlays-content",
   // Zákaz auto-zoomu při fokusu pole — přiblížení se samo nevracelo
   // a celá appka zůstala zvětšená
   maximumScale: 1,

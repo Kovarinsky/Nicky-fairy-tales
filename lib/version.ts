@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.30";
+export const APP_VERSION = "3.31";
 
 // Changelog (newest first)
+// 3.31 - Appka se při psaní už nezvětšuje/nezmenšuje: klávesnice stránku jen překryje (nemění její velikost) — viditelnost psaného pole dál zajišťuje automatický posun nad klávesnici
 // 3.30 - OPRAVA přiblížené appky: fokus pole s malým písmem spouštěl auto-zoom celé stránky, který se nevracel (proto „ujíždění" editoru i posunutý jazykový přepínač) — všechna pole mají min. 16px písmo a viewport zoom zakazuje; velký editor navíc zamyká stránku pod sebou a je vyjmutý z posunu pod klávesnicí
 // 3.29 - ✨ Rozvinout vychází i z vloženého PDF (hlavní zdroj: konkrétní místa, jména, data a program z dokumentu) a z aktuálně vybraného světa — respektuje přepínač použití PDF; tlačítka editoru zpět na plnou velikost (64 px, stejná); jazykový toggle vpravo nahoře s oranžovým jezdcem
 // 3.28 - Tlačítka ve velkém editoru přání jsou přesně stejně velká (pevná výška 54 px, text na jeden řádek)
