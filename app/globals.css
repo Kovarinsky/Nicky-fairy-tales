@@ -1782,6 +1782,32 @@ button:disabled {
 
 .folk-emoji { font-size: 1.15rem; width: 1.6rem; text-align: center; }
 
+/* 🧒 Zaškrtávátko postavy v rolleru — oranžové ✓ při výběru */
+.char-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.char-check.on {
+  background: linear-gradient(135deg, #ff9800, #f4511e);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(244, 81, 30, 0.4);
+}
+
+.folk-remove { margin-left: auto; }
+
 /* ── Fotky vlastního světa (až 8, mřížka náhledů s ×) ── */
 .world-photo-grid {
   display: grid;
@@ -2243,8 +2269,10 @@ button:disabled {
   position: relative;
 }
 
-/* Hlavní pole na vyplnění (zadání pohádky, popis světa) — tenká oranžová linka */
+/* Hlavní pole na vyplnění (zadání pohádky, popis světa) — tenká oranžová linka;
+   je to významná část formuláře, proto je pole VELKÉ */
 textarea.ta-accent {
+  min-height: 175px;
   border: 1.5px solid rgba(255, 152, 0, 0.65);
   box-shadow: 0 0 0 1px rgba(244, 81, 30, 0.12);
 }

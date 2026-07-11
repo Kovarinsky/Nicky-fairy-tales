@@ -1687,6 +1687,8 @@ export default function Home() {
   const [folkOpen, setFolkOpen] = useState(false);
   // 🎡 Roller vestavěných světů — sbalený za tlačítkem, zavírá se ✕ i výběrem
   const [worldOpen, setWorldOpen] = useState(false);
+  // 🧒 Výběr postav jako roller se zaškrtávátky (vícero postav najednou)
+  const [charOpen, setCharOpen] = useState(false);
   const selectedFolk = folkTaleById(selectedTheme);
   // 💡 Ponaučení pohádky — rolovací výběr; text se předá vypravěči,
   // který ho vplete do děje (bez kázání)
@@ -2492,20 +2494,53 @@ export default function Home() {
         {(chars.length > 0 || customChars.length > 0) && (
           <div className="field">
             <label>{t.whoLabel}</label>
-            <div className="chips">
-              {chars.map(c => (
-                <label key={c.id} className={`chip ${selectedIds.includes(c.id) ? "chip-on" : ""}`}>
-                  <input type="checkbox" checked={selectedIds.includes(c.id)} onChange={() => toggleChar(c.id)} />
-                  {uiLang === "en" && c.nameEn ? c.nameEn : c.name}
-                </label>
-              ))}
-              {customChars.map(c => (
-                <div key={c.id} className={`chip custom-chip ${selectedCustomIds.includes(c.id) ? "chip-on" : ""}`}>
-                  {c.previewUrl && <img src={c.previewUrl} alt={c.name} className="chip-avatar" />}
-                  <span className="chip-label" onClick={() => toggleCustomChar(c.id)}>{c.name}</span>
-                  <button type="button" className="chip-remove" onClick={() => removeCustomChar(c.id)}>×</button>
+            {/* 🎡 Postavy jako roller se zaškrtávátky — vícero postav najednou;
+                + Vlastní postava zůstává jako tlačítko pod ním */}
+            <button type="button" className={`chip chip-btn chip-full ${charOpen || selectedIds.length + selectedCustomIds.length > 0 ? "chip-on" : ""}`}
+              onClick={() => setCharOpen(p => !p)}>
+              {(() => {
+                const names = [
+                  ...chars.filter(c => selectedIds.includes(c.id)).map(c => (uiLang === "en" && c.nameEn ? c.nameEn : c.name)),
+                  ...customChars.filter(c => selectedCustomIds.includes(c.id)).map(c => c.name),
+                ];
+                if (names.length === 0) return `🧒 ${t.charPick}`;
+                return names.length > 3
+                  ? `🧒 ${names.slice(0, 2).join(", ")} +${names.length - 2}`
+                  : `🧒 ${names.join(", ")}`;
+              })()}
+            </button>
+            {charOpen && (
+              <div className="add-char-panel">
+                <div className="panel-title-row">
+                  <p className="panel-title">🧒 {t.charPick}</p>
+                  <button type="button" className="panel-close" aria-label={t.cancel}
+                    onClick={() => setCharOpen(false)}>✕</button>
                 </div>
-              ))}
+                <div className="folk-list world-roller">
+                  {chars.map(c => (
+                    <button type="button" key={c.id}
+                      className={`folk-item ${selectedIds.includes(c.id) ? "folk-on" : ""}`}
+                      onClick={() => toggleChar(c.id)}>
+                      <span className={`char-check ${selectedIds.includes(c.id) ? "on" : ""}`} aria-hidden="true">✓</span>
+                      <span>{uiLang === "en" && c.nameEn ? c.nameEn : c.name}</span>
+                    </button>
+                  ))}
+                  {customChars.map(c => (
+                    <div key={c.id} role="button" tabIndex={0}
+                      className={`folk-item ${selectedCustomIds.includes(c.id) ? "folk-on" : ""}`}
+                      onClick={() => toggleCustomChar(c.id)}
+                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") toggleCustomChar(c.id); }}>
+                      <span className={`char-check ${selectedCustomIds.includes(c.id) ? "on" : ""}`} aria-hidden="true">✓</span>
+                      {c.previewUrl && <img src={c.previewUrl} alt={c.name} className="chip-avatar" />}
+                      <span>{c.name}</span>
+                      <button type="button" className="chip-remove folk-remove" aria-label="Odebrat"
+                        onClick={e => { e.stopPropagation(); removeCustomChar(c.id); }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="chips">
               <button type="button" className={`chip chip-btn ${addingChar ? "chip-on" : ""}`} onClick={() => setAddingChar(p => !p)}>
                 {t.addCharChip}
               </button>
