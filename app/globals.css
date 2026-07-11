@@ -2188,6 +2188,14 @@ button:disabled {
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.22);
+  /* Dlouhý název souboru nesmí roztáhnout kartu (a s ní celý formulář) */
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.pdf-info {
+  overflow: hidden;
 }
 
 .pdf-ico {
