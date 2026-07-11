@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.23";
+export const APP_VERSION = "3.24";
 
 // Changelog (newest first)
+// 3.24 - Velký editor přání má oranžové ✕ Zrušit — zavře okno a vrátí text do podoby před otevřením (OK změny nechá, 🧹 maže)
 // 3.23 - Jednotné tlačítko Zrušit napříč aplikací: oranžové s křížkem (✕ Zrušit) — v potvrzovacích oknech, u přidávání postavy/světa i u okna s odkazem na poslanou pohádku
 // 3.22 - PDF inspirace až 10 MB (větší soubory jdou rovnou do úložiště — dřív končily na limitu 3,5 MB, tlačítko ukazuje ⏳ při nahrávání); systémové hlášky (alert) nahrazeny stylovým oknem appky s tlačítkem OK
 // 3.21 - Oblečení podle počasí KONKRÉTNÍ SCÉNY: šatník má venkovní a vnitřní variantu (venku bundy, uvnitř sundané) a všechny postavy v jedné scéně jsou oblečené stejně — nikdo nabalený vedle někoho v tričku (hlídá i vizuální kontrola); nadpis výběru pokračování je bílý (byl tmavý); výběr konce se už neukazuje mimo čtečku (plaval nad formulářem)

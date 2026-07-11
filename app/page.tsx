@@ -1804,8 +1804,14 @@ export default function Home() {
     : `${bgSceneById(bgChoice)!.emoji} ${uiLang === "en" ? bgSceneById(bgChoice)!.nameEn : bgSceneById(bgChoice)!.name}`;
 
   // 📝 Velký editor přání — ťuknutí do pole otevře okno přes displej,
-  // kde je vidět celý text (dlouhé osnovy z 🪄 Rozvinout)
+  // kde je vidět celý text (dlouhé osnovy z 🪄 Rozvinout).
+  // ✕ Zrušit vrátí text do podoby před otevřením editoru.
   const [topicEditorOpen, setTopicEditorOpen] = useState(false);
+  const topicBeforeEditRef = useRef("");
+  function openTopicEditor() {
+    topicBeforeEditRef.current = topic;
+    setTopicEditorOpen(true);
+  }
 
   // ── 🎲 Vymysli námět — Claude navrhne námět do textového pole ────────────
   const [ideaLoading, setIdeaLoading] = useState(false);
@@ -2650,8 +2656,8 @@ export default function Home() {
           )}
           {/* Ťuknutí otevře velký editor — celý text viditelný, pohodlné psaní */}
           <textarea value={topic} readOnly placeholder={t.wishPlaceholder}
-            onClick={() => setTopicEditorOpen(true)}
-            onFocus={e => { e.target.blur(); setTopicEditorOpen(true); }} />
+            onClick={openTopicEditor}
+            onFocus={e => { e.target.blur(); openTopicEditor(); }} />
           <div className="insp-row">
             <button type="button" className="insp-btn" onClick={suggestIdea} disabled={ideaLoading}>
               {ideaLoading ? "⏳ " : "🎲 "}{t.ideaBtn}
@@ -3181,6 +3187,10 @@ export default function Home() {
             <textarea className="topic-editor-ta" value={topic} autoFocus
               onChange={e => setTopic(e.target.value)} placeholder={t.wishPlaceholder} />
             <div className="app-confirm-btns">
+              <button type="button" className="cancel-btn"
+                onClick={() => { setTopic(topicBeforeEditRef.current); setTopicEditorOpen(false); }}>
+                ✕ {t.cancel}
+              </button>
               {topic.trim() !== "" && (
                 <button type="button" className="outline-btn" onClick={() => setTopic("")}>🧹 {t.clearTextBtn}</button>
               )}
