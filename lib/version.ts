@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.32";
+export const APP_VERSION = "3.33";
 
 // Changelog (newest first)
+// 3.33 - OPRAVA zasekávání psaní s vloženým PDF: velký dokument se při psaní četl celý a pohádka se nevešla do časového limitu („Píšu… (3. pokus)") — PDF se teď JEDNOU shrne do podkladu (místa, jména, data, program), který se uloží k pohádce; psaní pak běží rychle a případný restart už PDF znovu nečte
 // 3.32 - OPRAVA rozhozeného formuláře po vložení PDF: dlouhý název souboru roztahoval kartu (a s ní celou stránku do šířky) — název se teď zkracuje trojtečkou a karta drží šířku formuláře
 // 3.31 - Appka se při psaní už nezvětšuje/nezmenšuje: klávesnice stránku jen překryje (nemění její velikost) — viditelnost psaného pole dál zajišťuje automatický posun nad klávesnici
 // 3.30 - OPRAVA přiblížené appky: fokus pole s malým písmem spouštěl auto-zoom celé stránky, který se nevracel (proto „ujíždění" editoru i posunutý jazykový přepínač) — všechna pole mají min. 16px písmo a viewport zoom zakazuje; velký editor navíc zamyká stránku pod sebou a je vyjmutý z posunu pod klávesnicí

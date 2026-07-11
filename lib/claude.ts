@@ -19,6 +19,8 @@ export interface StoryExtras {
   inspirationImages?: Array<{ data: string; mimeType: string }>;
   inspirationPdfBase64?: string;
   inspirationUrlText?: string;
+  /** Krátký souhrn vloženého PDF (nahrazuje celé PDF při psaní — rychlejší) */
+  pdfBriefText?: string;
 }
 
 function buildSystemPrompt(language: "cs" | "en"): string {
@@ -303,6 +305,14 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
     );
   }
 
+  if (extras.pdfBriefText) {
+    lines.push(
+      "",
+      en ? "Summary of the attached PDF (MAIN inspiration — use its places, names, dates and events):" : "Souhrn přiloženého PDF (HLAVNÍ inspirace — použij jeho místa, jména, data a události):",
+      extras.pdfBriefText.slice(0, 2000)
+    );
+  }
+
   if (extras.inspirationUrlText) {
     lines.push("", "Doplňující kontext z webové stránky:", extras.inspirationUrlText.slice(0, 1500));
   }
@@ -564,6 +574,27 @@ export async function expandTopicIdea(
     model,
     max_tokens: 900,
     messages: [{ role: "user", content }],
+  });
+  return raw.trim();
+}
+
+/** 📄 Jednorázový souhrn PDF pro vypravěče — psaní pohádky pak nečte celé
+ *  PDF (velký dokument se do časového limitu psaní nevešel a job umíral). */
+export async function extractPdfBrief(language: "cs" | "en", pdfBase64: string): Promise<string> {
+  const model = MODEL.trim();
+  const prompt = language === "en"
+    ? "Extract a storyteller brief from the attached PDF (max 250 words): concrete places, people/names, dates, itinerary/program, and fun curiosities usable in a children's tale. Reply with ONLY the brief text."
+    : "Vytáhni z přiloženého PDF podklad pro vypravěče (max 250 slov): konkrétní místa, osoby/jména, data, itinerář/program a zajímavosti použitelné v dětské pohádce. Odpověz POUZE textem podkladu.";
+  const raw = await callAnthropicApi({
+    model,
+    max_tokens: 800,
+    messages: [{
+      role: "user",
+      content: [
+        { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
+        { type: "text", text: prompt },
+      ],
+    }],
   });
   return raw.trim();
 }

@@ -5,7 +5,7 @@
 // napsaný příběh i hotové scény a dodělá jen chybějící.
 
 import { put, head } from "@vercel/blob";
-import { generateStory, type StoryExtras } from "@/lib/claude";
+import { generateStory, extractPdfBrief, type StoryExtras } from "@/lib/claude";
 import { generateSceneImage, isDailyQuotaError } from "@/lib/gemini";
 import { narrateScene } from "@/lib/elevenlabs";
 import { charactersByIds, loadCharacters, loadReferenceImages, type ReferenceImage } from "@/lib/characters";
@@ -36,6 +36,8 @@ export interface JobStatus {
   choice?: StoryChoiceMeta;
   /** Kolikrát se psaní příběhu restartovalo (kick bez hotového scénáře) */
   restarts?: number;
+  /** Souhrn vloženého PDF — dělá se jednou, restarty ho už nečtou znovu */
+  pdfBrief?: string;
   /** Poslední chyba před restartem — jinak ji restart přepsal a nebyla vidět */
   lastError?: string;
 }
@@ -101,6 +103,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           // a po 3. restartu se job zastaví s viditelnou příčinou.
           restarts: prev ? (prev.restarts ?? 0) + 1 : 0,
           lastError: prev?.error || prev?.lastError,
+          pdfBrief: prev?.pdfBrief,
         };
   const write = () => {
     st.updatedAt = Date.now();
@@ -166,10 +169,22 @@ export async function runJob(id: string, body: Record<string, unknown>) {
             }
           : undefined,
       };
+      // PDF se do psaní nedává celé (velký dokument nepustil psaní do limitu
+      // funkce) — jednou se shrne do briefu, který se uloží k jobu
+      if (pdfBase64 && !st.pdfBrief) {
+        await write();
+        try {
+          st.pdfBrief = await extractPdfBrief(storyReq.language === "en" ? "en" : "cs", pdfBase64);
+          await write();
+        } catch (e) {
+          console.warn(`[job ${id}] pdf brief failed:`, e instanceof Error ? e.message : e);
+        }
+      }
+
       const extras: StoryExtras = {
         customCharacters: rawCustom,
         inspirationImages: Array.isArray(body.inspirationImages) ? (body.inspirationImages as StoryExtras["inspirationImages"]) : [],
-        inspirationPdfBase64: pdfBase64,
+        pdfBriefText: st.pdfBrief || undefined,
         inspirationUrlText: urlText || undefined,
       };
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateStory, type StoryExtras } from "@/lib/claude";
+import { generateStory, extractPdfBrief, type StoryExtras } from "@/lib/claude";
 import { charactersByIds, loadCharacters } from "@/lib/characters";
 import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character } from "@/lib/types";
@@ -121,10 +121,18 @@ export async function POST(req: NextRequest) {
         : undefined,
     };
 
+    // PDF se shrne do briefu — celé PDF v psaní nestíhalo časový limit
+    let pdfBrief: string | undefined;
+    if (pdfBase64) {
+      try {
+        pdfBrief = await extractPdfBrief(language, pdfBase64);
+      } catch {}
+    }
+
     const extras: StoryExtras = {
       customCharacters,
       inspirationImages: Array.isArray(body.inspirationImages) ? body.inspirationImages : [],
-      inspirationPdfBase64: pdfBase64,
+      pdfBriefText: pdfBrief,
       inspirationUrlText: urlText || undefined,
     };
 
