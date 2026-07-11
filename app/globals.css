@@ -276,6 +276,53 @@ body {
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* 🌐 Přepínač jazyků — velký toggle s jezdcem (jako Alternativní konce) */
+.lang-toggle {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  height: 44px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+
+.lang-opt {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0 0.85rem;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+.lang-opt.on {
+  color: #fff;
+}
+
+.lang-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7c4dff, #536dfe);
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.lang-toggle.lang-en .lang-thumb {
+  transform: translateX(100%);
+}
+
 .lang-btn {
   background: rgba(255, 255, 255, 0.08);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
@@ -2314,6 +2361,24 @@ button:disabled {
 
 .topic-editor-ta::placeholder {
   color: rgba(255, 255, 255, 0.55);
+}
+
+/* Tlačítka editoru: mřížka 2×2, všechna stejně velká */
+.topic-editor-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+}
+
+.topic-editor-btns button {
+  width: 100%;
+  min-height: 52px;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.topic-editor-btns button:disabled {
+  opacity: 0.45;
 }
 
 /* Tlačítko přes celou šířku pole (Dva konce, Ponaučení) — jako Hudba */

@@ -66,13 +66,17 @@ export async function POST(req: NextRequest) {
     // Custom characters sent from browser
     const rawCustom: Array<{ id: string; name: string; description?: string }> =
       Array.isArray(body.customCharacters) ? body.customCharacters : [];
-    const customCharacters: StoryExtras["customCharacters"] = rawCustom.map((cc) => ({
-      id: cc.id,
-      name: cc.name,
-      description: cc.description || `a character named ${cc.name}`,
-      photoBase64: body.customCharacters?.find((c: { id: string }) => c.id === cc.id)?.photoBase64,
-      photoMimeType: body.customCharacters?.find((c: { id: string }) => c.id === cc.id)?.photoMimeType,
-    }));
+    const customCharacters: StoryExtras["customCharacters"] = rawCustom.map((cc) => {
+      const src = body.customCharacters?.find((c: { id: string }) => c.id === cc.id);
+      return {
+        id: cc.id,
+        name: cc.name,
+        description: cc.description || `a character named ${cc.name}`,
+        photoBase64: src?.photoBase64,
+        photoMimeType: src?.photoMimeType,
+        photos: Array.isArray(src?.photos) ? src.photos.slice(0, 5) : undefined,
+      };
+    });
 
     // Fetch URL content
     const urlText = body.inspirationUrl ? await fetchUrlText(String(body.inspirationUrl)) : "";

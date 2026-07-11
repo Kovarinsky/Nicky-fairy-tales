@@ -19,6 +19,8 @@ interface VoiceOption { id: string; name: string; emoji: string; description: st
 interface CustomChar {
   id: string; name: string; description: string;
   photoBase64?: string; photoMimeType?: string; previewUrl?: string;
+  /** Více fotek postavy (až 5) — photoBase64 zůstává první z nich (zpětná kompatibilita) */
+  photos?: Array<{ data: string; mimeType: string }>;
 }
 interface InspImage { data: string; mimeType: string; previewUrl: string; name: string; }
 
@@ -156,7 +158,7 @@ export default function Home() {
   const [addingChar, setAddingChar] = useState(false);
   const [newCharName, setNewCharName] = useState("");
   const [newCharDesc, setNewCharDesc] = useState("");
-  const [newCharPhoto, setNewCharPhoto] = useState<{ data: string; mimeType: string; previewUrl: string } | null>(null);
+  const [newCharPhotos, setNewCharPhotos] = useState<Array<{ data: string; mimeType: string; previewUrl: string }>>([]);
   const charPhotoRef = useRef<HTMLInputElement>(null);
   const [topic, setTopic] = useState("");
   const [inspImages, setInspImages] = useState<InspImage[]>([]);
@@ -1516,6 +1518,7 @@ export default function Home() {
         description: c.description,
         photoBase64: c.photoBase64,
         photoMimeType: c.photoMimeType,
+        photos: c.photos,
       })),
       inspirationUrl: inspUrlActive && inspUrl.trim() ? inspUrl.trim() : undefined,
       inspirationImages: [
@@ -1537,8 +1540,9 @@ export default function Home() {
       ...storyPayload,
       voiceId: selectedVoiceId || "",
       customCharacterImages: selectedCustomObjsForJob
-        .filter(c => c.photoBase64 && c.photoMimeType)
-        .map(c => ({ data: c.photoBase64!, mimeType: c.photoMimeType! })),
+        .flatMap(c => c.photos?.length
+          ? c.photos
+          : c.photoBase64 && c.photoMimeType ? [{ data: c.photoBase64, mimeType: c.photoMimeType }] : []),
     });
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
@@ -1624,8 +1628,9 @@ export default function Home() {
       setSequelOf(null); // pokračování je napsané — chip zmizí
 
       const customImageRefs = selectedCustomObjs
-        .filter(c => c.photoBase64 && c.photoMimeType)
-        .map(c => ({ data: c.photoBase64!, mimeType: c.photoMimeType! }));
+        .flatMap(c => c.photos?.length
+          ? c.photos
+          : c.photoBase64 && c.photoMimeType ? [{ data: c.photoBase64, mimeType: c.photoMimeType }] : []);
 
       saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds });
       const finalScenes = await generateMedia(script.title, script.heroDescription, fullScenes, customImageRefs, selectedVoiceId, background, entry.id);
@@ -2238,9 +2243,10 @@ export default function Home() {
   function toggleCustomChar(id: string) {
     setSelectedCustomIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   }
+  const MAX_CHAR_PHOTOS = 5;
   async function handleCharPhoto(file: File) {
     const r = await resizeAndEncode(file, 800).catch(() => null);
-    if (r) setNewCharPhoto(r);
+    if (r) setNewCharPhotos(p => (p.length >= MAX_CHAR_PHOTOS ? p : [...p, r]));
   }
   // Persist custom characters — they stay until explicitly deleted (×)
   function saveCustomChars(list: CustomChar[]) {
@@ -2265,13 +2271,14 @@ export default function Home() {
       const next = [...p, {
         id, name: newCharName.trim(),
         description: newCharDesc.trim() || `a character named ${newCharName.trim()}`,
-        photoBase64: newCharPhoto?.data, photoMimeType: newCharPhoto?.mimeType, previewUrl: newCharPhoto?.previewUrl,
+        photoBase64: newCharPhotos[0]?.data, photoMimeType: newCharPhotos[0]?.mimeType, previewUrl: newCharPhotos[0]?.previewUrl,
+        photos: newCharPhotos.map(ph => ({ data: ph.data, mimeType: ph.mimeType })),
       }];
       saveCustomChars(next);
       return next;
     });
     setSelectedCustomIds(p => [...p, id]);
-    setAddingChar(false); setNewCharName(""); setNewCharDesc(""); setNewCharPhoto(null);
+    setAddingChar(false); setNewCharName(""); setNewCharDesc(""); setNewCharPhotos([]);
   }
   function removeCustomChar(id: string) {
     setCustomChars(p => {
@@ -2364,8 +2371,12 @@ export default function Home() {
       <div className="lang-switch">
         <button type="button" className={`lang-btn bg-cycle-btn${bgPickerOpen ? " lang-on" : ""}`}
           onClick={() => setBgPickerOpen(p => !p)} title={t.bgTitle}>{bgLabel} ▾</button>
-        <button type="button" className={`lang-btn ${uiLang === "cs" ? "lang-on" : ""}`} onClick={() => switchLang("cs")}>🇨🇿 CZ</button>
-        <button type="button" className={`lang-btn ${uiLang === "en" ? "lang-on" : ""}`} onClick={() => switchLang("en")}>🇬🇧 EN</button>
+        <button type="button" className={`lang-toggle ${uiLang === "en" ? "lang-en" : ""}`}
+          onClick={() => switchLang(uiLang === "cs" ? "en" : "cs")} aria-label="Jazyk / Language">
+          <span className="lang-thumb" aria-hidden="true" />
+          <span className={`lang-opt ${uiLang === "cs" ? "on" : ""}`}>🇨🇿 CZ</span>
+          <span className={`lang-opt ${uiLang === "en" ? "on" : ""}`}>🇬🇧 EN</span>
+        </button>
       </div>
       {bgPickerOpen && (
         <div className="bg-picker-panel">
@@ -2451,17 +2462,31 @@ export default function Home() {
             <div className="field">
               <label>{t.photoLabel}</label>
               <div className="file-row">
-                <button type="button" className="outline-btn" onClick={() => charPhotoRef.current?.click()}>
-                  📷 {newCharPhoto ? t.changePhoto : t.uploadPhoto}
+                <button type="button" className="outline-btn" onClick={() => charPhotoRef.current?.click()}
+                  disabled={newCharPhotos.length >= MAX_CHAR_PHOTOS}>
+                  📷 {t.uploadPhoto} ({newCharPhotos.length}/{MAX_CHAR_PHOTOS})
                 </button>
-                {newCharPhoto && <img src={newCharPhoto.previewUrl} alt="náhled" className="mini-preview" />}
               </div>
-              <input ref={charPhotoRef} type="file" accept="image/*" style={{ display: "none" }}
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleCharPhoto(f); e.target.value = ""; }} />
+              {newCharPhotos.length > 0 && (
+                <div className="world-photo-grid">
+                  {newCharPhotos.map((ph, i) => (
+                    <div key={i} className="world-photo-thumb">
+                      <img src={ph.previewUrl} alt={`fotka ${i + 1}`} />
+                      <button type="button" className="chip-remove world-photo-x" aria-label="Odebrat"
+                        onClick={() => setNewCharPhotos(p => p.filter((_, j) => j !== i))}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <input ref={charPhotoRef} type="file" accept="image/*" multiple style={{ display: "none" }}
+                onChange={async e => {
+                  for (const f of Array.from(e.target.files || []).slice(0, MAX_CHAR_PHOTOS - newCharPhotos.length)) await handleCharPhoto(f);
+                  e.target.value = "";
+                }} />
             </div>
             <div className="file-row">
               <button type="button" onClick={addCustomChar} disabled={!newCharName.trim()}>{t.addCharBtn}</button>
-              <button type="button" className="cancel-btn" onClick={() => { setAddingChar(false); setNewCharName(""); setNewCharDesc(""); setNewCharPhoto(null); }}>✕ {t.cancel}</button>
+              <button type="button" className="cancel-btn" onClick={() => { setAddingChar(false); setNewCharName(""); setNewCharDesc(""); setNewCharPhotos([]); }}>✕ {t.cancel}</button>
             </div>
           </div>
         )}
@@ -2667,7 +2692,7 @@ export default function Home() {
             </button>
             {topic.trim() !== "" && (
               <button type="button" className="insp-btn" onClick={expandIdea} disabled={expandLoading || ideaLoading}>
-                {expandLoading ? "⏳ " : "🪄 "}{t.expandBtn}
+                {expandLoading ? "⏳ " : "✨ "}{t.expandBtn}
               </button>
             )}
             {topic.trim() !== "" && (
@@ -3198,14 +3223,15 @@ export default function Home() {
             <p className="app-confirm-msg">📝 {t.wishLabel}</p>
             <textarea className="topic-editor-ta" value={topic} autoFocus
               onChange={e => setTopic(e.target.value)} placeholder={t.wishPlaceholder} />
-            <div className="app-confirm-btns">
+            <div className="app-confirm-btns topic-editor-btns">
               <button type="button" className="cancel-btn"
                 onClick={() => { setTopic(topicBeforeEditRef.current); setTopicEditorOpen(false); }}>
                 ✕ {t.cancel}
               </button>
-              {topic.trim() !== "" && (
-                <button type="button" className="outline-btn" onClick={() => setTopic("")}>🧹 {t.clearTextBtn}</button>
-              )}
+              <button type="button" className="outline-btn" disabled={!topic.trim()}
+                onClick={() => setTopic("")}>🧹 {t.clearTextBtn}</button>
+              <button type="button" className="outline-btn" disabled={!topic.trim() || expandLoading || ideaLoading}
+                onClick={expandIdea}>{expandLoading ? "⏳" : "✨"} {t.expandBtn}</button>
               <button type="button" onClick={() => setTopicEditorOpen(false)}>✓ OK</button>
             </div>
           </div>

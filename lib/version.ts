@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.25";
+export const APP_VERSION = "3.26";
 
 // Changelog (newest first)
+// 3.26 - Vlastní postava může mít až 5 fotek (lepší podoba tváře na obrázcích — fotky jdou do psaní i kreslení); velký editor přání: 4 stejně velká tlačítka v mřížce (✕ Zrušit, 🧹 Smazat, ✨ Rozvinout, ✓ OK); přepínač jazyků CZ/EN jako velký toggle s jezdcem
 // 3.25 - Vložené PDF jako hezká karta: světlý název, popisek stavu, přepínač „použít v pohádce" (PDF zůstane nahrané, jen se dočasně vypne) a oranžové ✕ pro odebrání
 // 3.24 - Velký editor přání má oranžové ✕ Zrušit — zavře okno a vrátí text do podoby před otevřením (OK změny nechá, 🧹 maže)
 // 3.23 - Jednotné tlačítko Zrušit napříč aplikací: oranžové s křížkem (✕ Zrušit) — v potvrzovacích oknech, u přidávání postavy/světa i u okna s odkazem na poslanou pohádku

@@ -13,6 +13,8 @@ export interface StoryExtras {
     description: string;
     photoBase64?: string;
     photoMimeType?: string;
+    /** Více fotek postavy (až 5) — mají přednost před photoBase64 */
+    photos?: Array<{ data: string; mimeType: string }>;
   }>;
   inspirationImages?: Array<{ data: string; mimeType: string }>;
   inspirationPdfBase64?: string;
@@ -314,7 +316,7 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
     lines.push("", "Přiložené PDF použij jako inspiraci pro obsah nebo styl příběhu.");
   }
   if (extras.customCharacters && extras.customCharacters.length > 0) {
-    const withPhoto = extras.customCharacters.filter((c) => c.photoBase64);
+    const withPhoto = extras.customCharacters.filter((c) => c.photoBase64 || c.photos?.length);
     if (withPhoto.length > 0) {
       lines.push(
         "",
@@ -609,7 +611,14 @@ export async function generateStory(req: StoryRequest, extras: StoryExtras = {},
   }
 
   for (const cc of extras.customCharacters || []) {
-    if (cc.photoBase64 && cc.photoMimeType) {
+    if (cc.photos?.length) {
+      for (const ph of cc.photos.slice(0, 5)) {
+        parts.push({
+          type: "image",
+          source: { type: "base64", media_type: ph.mimeType, data: ph.data },
+        });
+      }
+    } else if (cc.photoBase64 && cc.photoMimeType) {
       parts.push({
         type: "image",
         source: { type: "base64", media_type: cc.photoMimeType, data: cc.photoBase64 },
