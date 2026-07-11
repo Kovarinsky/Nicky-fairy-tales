@@ -2363,18 +2363,25 @@ button:disabled {
   color: rgba(255, 255, 255, 0.55);
 }
 
-/* Tlačítka editoru: mřížka 2×2, všechna stejně velká */
+/* Tlačítka editoru: mřížka 2×2, všechna PŘESNĚ stejně velká */
 .topic-editor-btns {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 54px;
   gap: 0.55rem;
 }
 
 .topic-editor-btns button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  min-height: 52px;
+  height: 54px;
+  min-height: 0;
   margin: 0;
-  font-size: 0.95rem;
+  padding: 0 0.5rem;
+  font-size: 0.92rem;
+  white-space: nowrap;
 }
 
 .topic-editor-btns button:disabled {

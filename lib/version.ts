@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.27";
+export const APP_VERSION = "3.28";
 
 // Changelog (newest first)
+// 3.28 - Tlačítka ve velkém editoru přání jsou přesně stejně velká (pevná výška 54 px, text na jeden řádek)
 // 3.27 - Odstraněno dvojité Zrušit u přidávání postavy/světa: chip nahoře zůstává „+ Vlastní postava/svět" (jen se zvýrazní), rušení má jen jedno oranžové tlačítko v panelu
 // 3.26 - Vlastní postava může mít až 5 fotek (lepší podoba tváře na obrázcích — fotky jdou do psaní i kreslení); velký editor přání: 4 stejně velká tlačítka v mřížce (✕ Zrušit, 🧹 Smazat, ✨ Rozvinout, ✓ OK); přepínač jazyků CZ/EN jako velký toggle s jezdcem
 // 3.25 - Vložené PDF jako hezká karta: světlý název, popisek stavu, přepínač „použít v pohádce" (PDF zůstane nahrané, jen se dočasně vypne) a oranžové ✕ pro odebrání
