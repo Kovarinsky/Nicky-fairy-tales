@@ -164,6 +164,8 @@ export default function Home() {
   const [inspUrl, setInspUrl] = useState("");
   const [inspPdf, setInspPdf] = useState<{ base64?: string; url?: string; name: string } | null>(null);
   const [pdfUploading, setPdfUploading] = useState(false);
+  // Přepínač: PDF zůstává nahrané, ale dá se dočasně vypnout z generování
+  const [inspPdfUse, setInspPdfUse] = useState(true);
   const inspImageRef = useRef<HTMLInputElement>(null);
   const inspPdfRef = useRef<HTMLInputElement>(null);
   const [sceneCount, setSceneCount] = useState(6);
@@ -1524,8 +1526,8 @@ export default function Home() {
           : activeCustomTheme?.photoBase64 && activeCustomTheme.photoMimeType
             ? [{ data: activeCustomTheme.photoBase64, mimeType: activeCustomTheme.photoMimeType }] : []),
       ],
-      inspirationPdfBase64: inspPdf?.base64 || undefined,
-      inspirationPdfUrl: inspPdf?.url || undefined,
+      inspirationPdfBase64: inspPdfUse ? inspPdf?.base64 || undefined : undefined,
+      inspirationPdfUrl: inspPdfUse ? inspPdf?.url || undefined : undefined,
     };
 
     // Try the SERVER job first — generation survives app switches & screen off.
@@ -2325,7 +2327,7 @@ export default function Home() {
     if (file.size > 10 * 1024 * 1024) { await appAlert(t.pdfTooBig); return; }
     if (file.size <= 3.5 * 1024 * 1024) {
       const b = await fileToBase64(file).catch(() => null);
-      if (b) setInspPdf({ base64: b, name: file.name });
+      if (b) { setInspPdf({ base64: b, name: file.name }); setInspPdfUse(true); }
       return;
     }
     // Větší PDF se nevejde do requestu na server (limit 4,5 MB) —
@@ -2338,6 +2340,7 @@ export default function Home() {
         contentType: "application/pdf",
       });
       setInspPdf({ url: res.url, name: file.name });
+      setInspPdfUse(true);
     } catch (e) {
       console.error("[pdf upload]", e);
       await appAlert(t.pdfUploadErr);
@@ -2347,7 +2350,7 @@ export default function Home() {
   }
 
   const allSelectedCount = selectedIds.length + selectedCustomIds.length;
-  const hasInspiration = !!selectedTheme || !!topic.trim() || inspImages.length > 0 || !!inspPdf || (inspUrlActive && !!inspUrl.trim()) || !!sequelOf;
+  const hasInspiration = !!selectedTheme || !!topic.trim() || inspImages.length > 0 || (!!inspPdf && inspPdfUse) || (inspUrlActive && !!inspUrl.trim()) || !!sequelOf;
   const current = scenes[page];
   const hasNext = nextVisible !== null;
   const hasPrev = prevVisible !== null;
@@ -2678,7 +2681,7 @@ export default function Home() {
             </button>
             <button type="button" className={`insp-btn ${inspUrlActive ? "chip-on" : ""}`} onClick={() => setInspUrlActive(p => !p)}>🔗 {t.webBtn}</button>
             <button type="button" className={`insp-btn ${inspPdf ? "chip-on" : ""}`} onClick={() => inspPdfRef.current?.click()} disabled={pdfUploading}>
-              📄 PDF{inspPdf ? " ✓" : pdfUploading ? " ⏳" : ""}
+              📄 PDF{inspPdf && inspPdfUse ? " ✓" : pdfUploading ? " ⏳" : ""}
             </button>
           </div>
           <input ref={inspImageRef} type="file" accept="image/*" multiple style={{ display: "none" }}
@@ -2697,9 +2700,18 @@ export default function Home() {
             </div>
           )}
           {inspPdf && (
-            <div className="insp-pdf-row">
-              <span>📄 {inspPdf.name}</span>
-              <button type="button" className="preview-remove-inline" onClick={() => setInspPdf(null)}>×</button>
+            <div className="pdf-card">
+              <span className="pdf-ico">📄</span>
+              <div className="pdf-info">
+                <span className="pdf-name">{inspPdf.name}</span>
+                <span className="pdf-sub">{inspPdfUse ? t.pdfUseOn : t.pdfUseOff}</span>
+              </div>
+              <button type="button" className={`switch pdf-switch ${inspPdfUse ? "switch-on" : ""}`}
+                onClick={() => setInspPdfUse(p => !p)} aria-pressed={inspPdfUse} aria-label={t.pdfUseOn}>
+                <span className="switch-track" aria-hidden="true" />
+              </button>
+              <button type="button" className="pdf-remove" aria-label={t.cancel}
+                onClick={() => setInspPdf(null)}>✕</button>
             </div>
           )}
         </div>

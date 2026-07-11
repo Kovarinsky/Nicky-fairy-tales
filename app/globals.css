@@ -2119,6 +2119,87 @@ button:disabled {
   transform: translateX(28px);
 }
 
+/* 📄 Karta vloženého PDF: světlé písmo, přepínač použití, oranžové ✕ */
+.pdf-card {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.pdf-ico {
+  font-size: 1.4rem;
+  flex: 0 0 auto;
+}
+
+.pdf-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.pdf-name {
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pdf-sub {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.75rem;
+}
+
+.pdf-switch {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 0;
+}
+
+.pdf-switch .switch-track {
+  width: 48px;
+  height: 26px;
+}
+
+.pdf-switch .switch-track::after {
+  width: 20px;
+  height: 20px;
+}
+
+.pdf-switch.switch-on .switch-track::after {
+  transform: translateX(22px);
+}
+
+.pdf-remove {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ff9800, #f4511e);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pdf-remove:active {
+  transform: scale(0.92);
+}
+
 /* ✕ Zrušit — jednotné oranžové tlačítko napříč aplikací (jako panel-close) */
 .cancel-btn {
   border: none;
