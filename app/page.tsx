@@ -3315,12 +3315,12 @@ export default function Home() {
               )}
             </div>
             <div className="app-confirm-btns topic-editor-btns">
+              <button type="button" className="outline-btn" disabled={!topic.trim() || expandLoading || ideaLoading}
+                onClick={expandIdea}>{expandLoading ? "⏳" : "✨"} {t.expandBtn}</button>
               <button type="button" className="cancel-btn"
                 onClick={() => { setTopic(topicBeforeEditRef.current); setTopicEditorOpen(false); }}>
                 ✕ {t.cancel}
               </button>
-              <button type="button" className="outline-btn" disabled={!topic.trim() || expandLoading || ideaLoading}
-                onClick={expandIdea}>{expandLoading ? "⏳" : "✨"} {t.expandBtn}</button>
               <button type="button" className="btn-span2" onClick={() => setTopicEditorOpen(false)}>✓ OK</button>
             </div>
           </div>

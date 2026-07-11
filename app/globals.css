@@ -2467,6 +2467,9 @@ textarea.ta-accent:focus {
 /* 📝 Velký editor přání & inspirace */
 .topic-editor {
   width: min(680px, calc(100vw - 1.4rem));
+  /* Okno sedí NAHOŘE u okraje displeje, ať pod ním zbývá místo na klávesnici */
+  align-self: flex-start;
+  margin-top: max(0.6rem, env(safe-area-inset-top));
 }
 
 .topic-editor-ta {
