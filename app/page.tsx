@@ -2441,8 +2441,8 @@ export default function Home() {
                   <button type="button" className="chip-remove" onClick={() => removeCustomChar(c.id)}>×</button>
                 </div>
               ))}
-              <button type="button" className={`chip chip-btn ${addingChar ? "chip-cancel" : ""}`} onClick={() => setAddingChar(p => !p)}>
-                {addingChar ? t.cancelChip : t.addCharChip}
+              <button type="button" className={`chip chip-btn ${addingChar ? "chip-on" : ""}`} onClick={() => setAddingChar(p => !p)}>
+                {t.addCharChip}
               </button>
             </div>
           </div>
@@ -2540,8 +2540,8 @@ export default function Home() {
                 onClick={() => setFolkOpen(p => !p)}>
                 📜 {selectedFolk ? (uiLang === "en" ? selectedFolk.nameEn : selectedFolk.name) : t.folkChip}
               </button>
-              <button type="button" className={`chip chip-btn ${addingTheme ? "chip-cancel" : ""}`} onClick={() => setAddingTheme(p => !p)}>
-                {addingTheme ? t.cancelChip : t.addWorldChip}
+              <button type="button" className={`chip chip-btn ${addingTheme ? "chip-on" : ""}`} onClick={() => setAddingTheme(p => !p)}>
+                {t.addWorldChip}
               </button>
             </div>
             {folkOpen && (
