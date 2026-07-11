@@ -8,7 +8,7 @@ import { suggestTopicIdea, expandTopicIdea } from "@/lib/claude";
 import { themeById } from "@/lib/themes";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120; // rozvinutí s PDF potřebuje čas na přečtení dokumentu
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,9 +26,23 @@ export async function POST(req: NextRequest) {
       themePrompt: customTheme?.prompt ?? theme?.prompt,
       userHint: typeof body.hint === "string" && body.hint.trim() ? body.hint.trim() : undefined,
     };
-    // 🪄 expand: rozvinout kostru uživatele do detailní osnovy (vyžaduje hint)
+    // ✨ expand: rozvinout kostru uživatele do detailní osnovy (vyžaduje hint).
+    // Vychází i z vloženého PDF — malé přijde base64, velké odkazem do Blobu.
+    let pdfBase64: string | undefined = typeof body.inspirationPdfBase64 === "string" ? body.inspirationPdfBase64 : undefined;
+    if (!pdfBase64 && typeof body.inspirationPdfUrl === "string") {
+      try {
+        const u = new URL(body.inspirationPdfUrl);
+        if (u.protocol === "https:" && u.hostname.endsWith(".blob.vercel-storage.com")) {
+          const r = await fetch(u, { signal: AbortSignal.timeout(30_000) });
+          if (r.ok) {
+            const buf = Buffer.from(await r.arrayBuffer());
+            if (buf.length <= 11 * 1024 * 1024) pdfBase64 = buf.toString("base64");
+          }
+        }
+      } catch {}
+    }
     const idea = body.expand && ctx.userHint
-      ? await expandTopicIdea(language, names, ctx)
+      ? await expandTopicIdea(language, names, ctx, pdfBase64)
       : await suggestTopicIdea(language, names, ctx);
     return NextResponse.json({ idea });
   } catch (err) {

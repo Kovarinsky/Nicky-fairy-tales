@@ -517,7 +517,12 @@ export async function suggestTopicIdea(language: "cs" | "en", characterNames: st
 /** 🪄 Rozvine stručnou kostru námětu do detailní osnovy pohádky —
  *  uživatel napíše pár slov a AI doplní postavy, místa, data, kostýmy
  *  i zápletku; výsledek se vrátí do pole přání k případné úpravě. */
-export async function expandTopicIdea(language: "cs" | "en", characterNames: string[], ctx: TopicIdeaContext = {}): Promise<string> {
+export async function expandTopicIdea(
+  language: "cs" | "en",
+  characterNames: string[],
+  ctx: TopicIdeaContext = {},
+  pdfBase64?: string
+): Promise<string> {
   const model = MODEL.trim();
   const who = characterNames.length ? characterNames.join(", ") : language === "en" ? "the children" : "děti";
   const worldPart = ctx.themeName
@@ -534,6 +539,9 @@ export async function expandTopicIdea(language: "cs" | "en", characterNames: str
         "- Add named characters, exact places, era/dates, costumes, props, and a plot with a twist seed.",
         "- If the skeleton refers to real history or legends, use faithful facts (names, dates) retold warmly for children.",
         "- Write it as a brief/outline for the storyteller, NOT as the finished tale. Reply with ONLY the brief text.",
+        ...(pdfBase64
+          ? ["- The attached PDF is the MAIN source: pull concrete places, names, dates, itinerary and highlights from it and build the outline on them."]
+          : []),
       ].join("\n")
     : [
         `Uživatel napsal stručnou kostru námětu pohádky pro malé děti: „${skeleton}“. Vystupují: ${who}.${worldPart}`,
@@ -542,11 +550,20 @@ export async function expandTopicIdea(language: "cs" | "en", characterNames: str
         "- Doplň pojmenované postavy, přesná místa, dobu/letopočty, kostýmy, rekvizity a zápletku se zárodkem zvratu.",
         "- Pokud kostra odkazuje na skutečnou historii či legendy, použij věrná fakta (jména, data) laskavě převyprávěná pro děti.",
         "- Piš jako zadání pro vypravěče (osnovu), NE jako hotový příběh. Odpověz POUZE textem osnovy.",
+        ...(pdfBase64
+          ? ["- Přiložené PDF je HLAVNÍ zdroj: vytáhni z něj konkrétní místa, jména, data, program a zajímavosti a postav na nich osnovu."]
+          : []),
       ].join("\n");
+  const content: string | AnthropicPart[] = pdfBase64
+    ? [
+        { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
+        { type: "text", text: prompt },
+      ]
+    : prompt;
   const raw = await callAnthropicApi({
     model,
     max_tokens: 900,
-    messages: [{ role: "user", content: prompt }],
+    messages: [{ role: "user", content }],
   });
   return raw.trim();
 }

@@ -1841,7 +1841,7 @@ export default function Home() {
       const res = await fetch("/api/topic-idea", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(60_000),
+        signal: AbortSignal.timeout(110_000),
         body: JSON.stringify({
           expand: true,
           language: uiLang,
@@ -1849,6 +1849,9 @@ export default function Home() {
           themeId: override ? undefined : selectedTheme || undefined,
           customTheme: override,
           hint: topic.trim(),
+          // Osnova vychází i z vloženého PDF (když je zapnuté přepínačem)
+          inspirationPdfBase64: inspPdfUse ? inspPdf?.base64 || undefined : undefined,
+          inspirationPdfUrl: inspPdfUse ? inspPdf?.url || undefined : undefined,
         }),
       });
       const d = await safeJson<{ idea?: string }>(res);
