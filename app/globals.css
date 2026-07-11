@@ -2474,6 +2474,40 @@ button:disabled {
   }
 }
 
+/* 💰 Spotřeba — přehledná mřížka statistik */
+.usage-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+}
+
+.usage-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.6rem 0.4rem;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  text-align: center;
+}
+
+.usage-num {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.usage-lbl {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.3;
+}
+
 /* Diagnostika psaní: poslední chyba před restartem, viditelná v řádku jobu */
 .job-last-error {
   display: block;

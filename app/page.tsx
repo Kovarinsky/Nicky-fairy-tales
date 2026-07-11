@@ -46,6 +46,20 @@ const HISTORY_MAX = 20; // offline zásoba: posledních 20 pohádek v telefonu
 const SETTINGS_KEY = "nicky-settings";
 const DRAFT_KEY = "nicky-story-draft";
 const TOPIC_DRAFT_KEY = "nicky-topic-draft"; // rozepsané zadání přežije reload i přepnutí jinam
+const DEVICE_KEY = "nicky-device-id"; // anonymní ID zařízení pro panel Spotřeba
+
+function deviceId(): string {
+  try {
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id) {
+      id = Math.random().toString(36).slice(2, 10);
+      localStorage.setItem(DEVICE_KEY, id);
+    }
+    return id;
+  } catch {
+    return "";
+  }
+}
 const BG_KEY = "nicky-bg"; // "auto" | id světa pozadí (lib/backgrounds.ts)
 
 function loadHistory(): HistoryEntry[] {
@@ -224,7 +238,7 @@ export default function Home() {
   type UsageData = {
     claude?: { usd?: number; days?: number; error?: string };
     elevenlabs?: { used?: number; limit?: number; tier?: string; error?: string };
-    own?: { images?: number; chars?: number; usd?: number; days?: number; error?: string };
+    own?: { images?: number; chars?: number; usd?: number; days?: number; stories?: number; devices?: number; error?: string };
     czkRate?: number;
   };
   // Which queued story the gen-cards preview (tap a segment to switch)
@@ -1542,6 +1556,7 @@ export default function Home() {
     const jobBody = JSON.stringify({
       ...storyPayload,
       voiceId: selectedVoiceId || "",
+      deviceId: deviceId(),
       customCharacterImages: selectedCustomObjsForJob
         .flatMap(c => c.photos?.length
           ? c.photos
@@ -3205,14 +3220,24 @@ export default function Home() {
                       ? t.usageElevenPerm
                       : `🎙️ ElevenLabs: ${usage.elevenlabs?.error ?? "?"}`}</p>
                   {usage.own && typeof usage.own.images === "number" ? (
-                    <>
-                      <p>{t.usageGeminiOwn(
-                        usage.own.images.toLocaleString("cs-CZ"),
-                        (usage.own.usd ?? 0).toFixed(2),
-                        Math.round((usage.own.usd ?? 0) * (usage.czkRate ?? 23)).toLocaleString("cs-CZ"),
-                        usage.own.days ?? 30)}</p>
-                      <p>{t.usageVoiceOwn((usage.own.chars ?? 0).toLocaleString("cs-CZ"), usage.own.days ?? 30)}</p>
-                    </>
+                    <div className="usage-grid">
+                      <div className="usage-stat">
+                        <span className="usage-num">📚 {(usage.own.stories ?? 0).toLocaleString("cs-CZ")}</span>
+                        <span className="usage-lbl">{t.statStories(usage.own.days ?? 30)}</span>
+                      </div>
+                      <div className="usage-stat">
+                        <span className="usage-num">📱 {(usage.own.devices ?? 0).toLocaleString("cs-CZ")}</span>
+                        <span className="usage-lbl">{t.statDevices}</span>
+                      </div>
+                      <div className="usage-stat">
+                        <span className="usage-num">🎨 {usage.own.images.toLocaleString("cs-CZ")}</span>
+                        <span className="usage-lbl">{t.statImages(Math.round((usage.own.usd ?? 0) * (usage.czkRate ?? 23)).toLocaleString("cs-CZ"))}</span>
+                      </div>
+                      <div className="usage-stat">
+                        <span className="usage-num">🎙️ {(usage.own.chars ?? 0).toLocaleString("cs-CZ")}</span>
+                        <span className="usage-lbl">{t.statVoice}</span>
+                      </div>
+                    </div>
                   ) : (
                     <p>{t.usageGemini}</p>
                   )}

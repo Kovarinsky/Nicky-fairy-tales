@@ -307,7 +307,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       st.phase = "error";
       st.error = `Vyčerpán denní limit kreslení Gemini (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo). Resetuje se kolem 9:00 ráno — pak pohádku zadejte znovu.`;
       await write();
-      await writeUsageRecord(Object.keys(st.sceneUrls!).length - imagesAtStart, voiceChars);
+      await writeUsageRecord(Object.keys(st.sceneUrls!).length - imagesAtStart, voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined);
       return;
     }
 
@@ -322,7 +322,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
 
     st.phase = "done";
     await write();
-    await writeUsageRecord(Object.keys(st.sceneUrls!).length - imagesAtStart, voiceChars);
+    await writeUsageRecord(Object.keys(st.sceneUrls!).length - imagesAtStart, voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined);
   } catch (e) {
     st.phase = "error";
     st.error = e instanceof Error ? e.message : String(e);
@@ -334,10 +334,11 @@ export async function runJob(id: string, body: Record<string, unknown>) {
 // Záznam spotřeby pro panel 💰: počet obrázků a znaků hlasu z tohoto běhu.
 // Data jsou v NÁZVU souboru (usage/u<ts>-i<obrázky>-c<znaky>.json) — /api/usage
 // je sečte pouhým výpisem, bez stahování obsahu. Úklid jobs/ se jich nedotkne.
-async function writeUsageRecord(images: number, chars: number): Promise<void> {
+async function writeUsageRecord(images: number, chars: number, device?: string): Promise<void> {
   if (images <= 0 && chars <= 0) return;
+  const dev = (device || "").replace(/[^a-z0-9]/gi, "").slice(0, 12);
   try {
-    await put(`usage/u${Date.now()}-i${images}-c${chars}.json`, "1", {
+    await put(`usage/u${Date.now()}-i${images}-c${chars}${dev ? `-d${dev}` : ""}.json`, "1", {
       access: "public",
       addRandomSuffix: false,
       contentType: "application/json",

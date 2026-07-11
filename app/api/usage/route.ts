@@ -20,29 +20,35 @@ const IMAGE_PRICES: Record<string, number> = {
 // Vlastní počítadlo Gemini + hlasu: sečte záznamy usage/u<ts>-i<img>-c<chars>
 // zapsané job-runnerem (data jsou v názvu souboru — stačí výpis, nic se
 // nestahuje). Záznamy starší 90 dní se rovnou promažou.
-async function ownUsage(days: number): Promise<{ images: number; chars: number; usd: number; days: number } | { error: string }> {
+async function ownUsage(days: number): Promise<{ images: number; chars: number; usd: number; days: number; stories: number; devices: number } | { error: string }> {
   if (!blobToken()) return { error: "blob-not-configured" };
   const cutoff = Date.now() - days * 86_400_000;
   const pruneBefore = Date.now() - 90 * 86_400_000;
   const model = (process.env.GEMINI_IMAGE_MODEL_PRIMARY || process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image").trim();
   const price = IMAGE_PRICES[model] ?? 0.05;
-  let images = 0, chars = 0;
+  let images = 0, chars = 0, stories = 0;
+  const devices = new Set<string>();
   const stale: string[] = [];
   try {
     let cursor: string | undefined;
     do {
       const page = await list({ prefix: "usage/", cursor, limit: 1000, token: blobToken() });
       for (const b of page.blobs) {
-        const m = b.pathname.match(/^usage\/u(\d+)-i(\d+)-c(\d+)\.json$/);
+        const m = b.pathname.match(/^usage\/u(\d+)-i(\d+)-c(\d+)(?:-d([a-z0-9]{1,16}))?\.json$/i);
         if (!m) continue;
         const ts = Number(m[1]);
         if (ts < pruneBefore) { stale.push(b.url); continue; }
-        if (ts >= cutoff) { images += Number(m[2]); chars += Number(m[3]); }
+        if (ts >= cutoff) {
+          images += Number(m[2]);
+          chars += Number(m[3]);
+          stories += 1;
+          if (m[4]) devices.add(m[4].toLowerCase());
+        }
       }
       cursor = page.cursor;
     } while (cursor);
     if (stale.length) del(stale, { token: blobToken() }).catch(() => {});
-    return { images, chars, usd: Math.round(images * price * 100) / 100, days };
+    return { images, chars, usd: Math.round(images * price * 100) / 100, days, stories, devices: devices.size };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "fetch failed" };
   }
