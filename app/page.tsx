@@ -1860,13 +1860,16 @@ export default function Home() {
   // Přepínač 🌐 CZ|EN s jezdcem: jezdec stojí na jazyku, kterým je text
   // napsaný; ťuknutí text přeloží a jezdec přejede na druhou stranu
   const translateToggle = (
-    <button type="button" className={`lang-toggle translate-toggle ${topicLangTarget === "cs" ? "lang-en" : ""}`}
-      onClick={translateTopic} disabled={translateLoading || !topic.trim()}
-      aria-label={t.translateBtn} title={t.translateBtn}>
-      <span className="lang-thumb" aria-hidden="true" />
-      <span className={`lang-opt ${topicLangTarget === "en" ? "on" : ""}`}>{translateLoading && topicLangTarget === "cs" ? "⏳" : "🌐"} CZ</span>
-      <span className={`lang-opt ${topicLangTarget === "cs" ? "on" : ""}`}>{translateLoading && topicLangTarget === "en" ? "⏳" : "🌐"} EN</span>
-    </button>
+    <div className="translate-wrap">
+      <button type="button" className={`lang-toggle translate-toggle ${topicLangTarget === "cs" ? "lang-en" : ""}`}
+        onClick={translateTopic} disabled={translateLoading || !topic.trim()}
+        aria-label={t.translateBtn} title={t.translateBtn}>
+        <span className="lang-thumb" aria-hidden="true" />
+        <span className={`lang-opt ${topicLangTarget === "en" ? "on" : ""}`}>{translateLoading && topicLangTarget === "cs" ? "⏳" : "🌐"} CZ</span>
+        <span className={`lang-opt ${topicLangTarget === "cs" ? "on" : ""}`}>{translateLoading && topicLangTarget === "en" ? "⏳" : "🌐"} EN</span>
+      </button>
+      <span className="translate-hint">{t.translateHint}</span>
+    </div>
   );
   async function translateTopic() {
     if (!topic.trim() || translateLoading) return;
