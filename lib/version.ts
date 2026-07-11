@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.34";
+export const APP_VERSION = "3.35";
 
 // Changelog (newest first)
+// 3.35 - 🌐 Přeložit funguje jako toggle do opačného jazyka, než kterým je text napsaný (česky → EN, anglicky → CZ) — tlačítko ukazuje směr („Přeložit → EN")
 // 3.34 - 🌐 Přeložit místo Smazat text: zadání se přeloží do jazyka vybraného vypravěče (pro anglickou pohádku do angličtiny, jména zůstávají) — ve formuláři i ve velkém editoru; mazání textu má nově oranžový ✕ přímo v rohu textového pole
 // 3.33 - OPRAVA zasekávání psaní s vloženým PDF: velký dokument se při psaní četl celý a pohádka se nevešla do časového limitu („Píšu… (3. pokus)") — PDF se teď JEDNOU shrne do podkladu (místa, jména, data, program), který se uloží k pohádce; psaní pak běží rychle a případný restart už PDF znovu nečte
 // 3.32 - OPRAVA rozhozeného formuláře po vložení PDF: dlouhý název souboru roztahoval kartu (a s ní celou stránku do šířky) — název se teď zkracuje trojtečkou a karta drží šířku formuláře

@@ -1831,13 +1831,15 @@ export default function Home() {
     return () => { document.body.style.overflow = prev; };
   }, [topicEditorOpen]);
 
-  // 🌐 Přeložit — zadání se přeloží do jazyka vybraného vypravěče (cs↔en)
+  // 🌐 Přeložit — toggle do OPAČNÉHO jazyka, než kterým je text napsaný
+  // (česky psané → EN, anglicky psané → CZ); směr ukazuje popisek tlačítka
   const [translateLoading, setTranslateLoading] = useState(false);
+  const topicLangTarget: "cs" | "en" = /[ěščřžýáíéúůďťňĚŠČŘŽÝÁÍÉÚŮĎŤŇ]/.test(topic) ? "en" : "cs";
   async function translateTopic() {
     if (!topic.trim() || translateLoading) return;
     setTranslateLoading(true);
     try {
-      const target = voices.find(v => v.id === selectedVoiceId)?.language ?? "cs";
+      const target = topicLangTarget;
       const res = await fetch("/api/topic-idea", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2739,7 +2741,7 @@ export default function Home() {
             {topic.trim() !== "" && (
               <button type="button" className="insp-btn" onClick={translateTopic}
                 disabled={translateLoading || expandLoading || ideaLoading}>
-                {translateLoading ? "⏳ " : "🌐 "}{t.translateBtn}
+                {translateLoading ? "⏳ " : "🌐 "}{t.translateBtn} → {topicLangTarget === "en" ? "EN" : "CZ"}
               </button>
             )}
             <button type="button" className={`insp-btn ${inspImages.length > 0 ? "chip-on" : ""}`}
@@ -3277,7 +3279,7 @@ export default function Home() {
                 ✕ {t.cancel}
               </button>
               <button type="button" className="outline-btn" disabled={!topic.trim() || translateLoading || expandLoading}
-                onClick={translateTopic}>{translateLoading ? "⏳" : "🌐"} {t.translateBtn}</button>
+                onClick={translateTopic}>{translateLoading ? "⏳" : "🌐"} {t.translateBtn} → {topicLangTarget === "en" ? "EN" : "CZ"}</button>
               <button type="button" className="outline-btn" disabled={!topic.trim() || expandLoading || ideaLoading}
                 onClick={expandIdea}>{expandLoading ? "⏳" : "✨"} {t.expandBtn}</button>
               <button type="button" onClick={() => setTopicEditorOpen(false)}>✓ OK</button>
