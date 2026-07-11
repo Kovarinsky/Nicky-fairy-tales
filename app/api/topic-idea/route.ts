@@ -4,7 +4,7 @@
 // napsaný v poli přání (námět na něm staví).
 
 import { NextRequest, NextResponse } from "next/server";
-import { suggestTopicIdea, expandTopicIdea } from "@/lib/claude";
+import { suggestTopicIdea, expandTopicIdea, translateTopicText } from "@/lib/claude";
 import { themeById } from "@/lib/themes";
 
 export const runtime = "nodejs";
@@ -41,9 +41,12 @@ export async function POST(req: NextRequest) {
         }
       } catch {}
     }
-    const idea = body.expand && ctx.userHint
-      ? await expandTopicIdea(language, names, ctx, pdfBase64)
-      : await suggestTopicIdea(language, names, ctx);
+    // 🌐 translate: přeložit zadání do jazyka vypravěče (cs↔en)
+    const idea = body.translate && ctx.userHint
+      ? await translateTopicText(language, ctx.userHint)
+      : body.expand && ctx.userHint
+        ? await expandTopicIdea(language, names, ctx, pdfBase64)
+        : await suggestTopicIdea(language, names, ctx);
     return NextResponse.json({ idea });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Neznámá chyba";

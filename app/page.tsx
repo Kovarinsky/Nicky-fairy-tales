@@ -1831,6 +1831,26 @@ export default function Home() {
     return () => { document.body.style.overflow = prev; };
   }, [topicEditorOpen]);
 
+  // 🌐 Přeložit — zadání se přeloží do jazyka vybraného vypravěče (cs↔en)
+  const [translateLoading, setTranslateLoading] = useState(false);
+  async function translateTopic() {
+    if (!topic.trim() || translateLoading) return;
+    setTranslateLoading(true);
+    try {
+      const target = voices.find(v => v.id === selectedVoiceId)?.language ?? "cs";
+      const res = await fetch("/api/topic-idea", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(60_000),
+        body: JSON.stringify({ translate: true, language: target, hint: topic.trim() }),
+      });
+      const d = await safeJson<{ idea?: string }>(res);
+      if (res.ok && d.idea) setTopic(d.idea);
+    } catch {} finally {
+      setTranslateLoading(false);
+    }
+  }
+
   // ── 🎲 Vymysli námět — Claude navrhne námět do textového pole ────────────
   const [ideaLoading, setIdeaLoading] = useState(false);
   // 🪄 Rozvinout — z kostry uživatele udělá detailní osnovu (postavy, místa,
@@ -2696,10 +2716,17 @@ export default function Home() {
               <p className="gen-step-hint">{t.sequelHint}</p>
             </>
           )}
-          {/* Ťuknutí otevře velký editor — celý text viditelný, pohodlné psaní */}
-          <textarea value={topic} readOnly placeholder={t.wishPlaceholder}
-            onClick={openTopicEditor}
-            onFocus={e => { e.target.blur(); openTopicEditor(); }} />
+          {/* Ťuknutí otevře velký editor — celý text viditelný, pohodlné psaní.
+              Oranžový ✕ v rohu pole maže text */}
+          <div className="ta-wrap">
+            <textarea value={topic} readOnly placeholder={t.wishPlaceholder}
+              onClick={openTopicEditor}
+              onFocus={e => { e.target.blur(); openTopicEditor(); }} />
+            {topic.trim() !== "" && (
+              <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
+                onClick={e => { e.stopPropagation(); setTopic(""); }}>✕</button>
+            )}
+          </div>
           <div className="insp-row">
             <button type="button" className="insp-btn" onClick={suggestIdea} disabled={ideaLoading}>
               {ideaLoading ? "⏳ " : "🎲 "}{t.ideaBtn}
@@ -2710,8 +2737,9 @@ export default function Home() {
               </button>
             )}
             {topic.trim() !== "" && (
-              <button type="button" className="insp-btn" onClick={() => setTopic("")}>
-                🧹 {t.clearTextBtn}
+              <button type="button" className="insp-btn" onClick={translateTopic}
+                disabled={translateLoading || expandLoading || ideaLoading}>
+                {translateLoading ? "⏳ " : "🌐 "}{t.translateBtn}
               </button>
             )}
             <button type="button" className={`insp-btn ${inspImages.length > 0 ? "chip-on" : ""}`}
@@ -3235,15 +3263,21 @@ export default function Home() {
         <div className="app-confirm-overlay" onClick={() => setTopicEditorOpen(false)}>
           <div className="app-confirm topic-editor" onClick={e => e.stopPropagation()}>
             <p className="app-confirm-msg">📝 {t.wishLabel}</p>
-            <textarea className="topic-editor-ta" value={topic} autoFocus
-              onChange={e => setTopic(e.target.value)} placeholder={t.wishPlaceholder} />
+            <div className="ta-wrap">
+              <textarea className="topic-editor-ta" value={topic} autoFocus
+                onChange={e => setTopic(e.target.value)} placeholder={t.wishPlaceholder} />
+              {topic.trim() !== "" && (
+                <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
+                  onClick={() => setTopic("")}>✕</button>
+              )}
+            </div>
             <div className="app-confirm-btns topic-editor-btns">
               <button type="button" className="cancel-btn"
                 onClick={() => { setTopic(topicBeforeEditRef.current); setTopicEditorOpen(false); }}>
                 ✕ {t.cancel}
               </button>
-              <button type="button" className="outline-btn" disabled={!topic.trim()}
-                onClick={() => setTopic("")}>🧹 {t.clearTextBtn}</button>
+              <button type="button" className="outline-btn" disabled={!topic.trim() || translateLoading || expandLoading}
+                onClick={translateTopic}>{translateLoading ? "⏳" : "🌐"} {t.translateBtn}</button>
               <button type="button" className="outline-btn" disabled={!topic.trim() || expandLoading || ideaLoading}
                 onClick={expandIdea}>{expandLoading ? "⏳" : "✨"} {t.expandBtn}</button>
               <button type="button" onClick={() => setTopicEditorOpen(false)}>✓ OK</button>

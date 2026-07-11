@@ -2178,6 +2178,41 @@ button:disabled {
   transform: translateX(28px);
 }
 
+/* ✕ v rohu textového pole — smazání textu (oranžové, jako ostatní rušení) */
+.ta-wrap {
+  position: relative;
+}
+
+.ta-wrap textarea {
+  width: 100%;
+}
+
+.ta-clear {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ff9800, #f4511e);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(244, 81, 30, 0.4);
+}
+
+.ta-clear:active {
+  transform: scale(0.9);
+}
+
 /* 📄 Karta vloženého PDF: světlé písmo, přepínač použití, oranžové ✕ */
 .pdf-card {
   display: flex;

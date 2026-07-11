@@ -578,6 +578,20 @@ export async function expandTopicIdea(
   return raw.trim();
 }
 
+/** 🌐 Překlad zadání pohádky do jazyka vybraného vypravěče (cs↔en). */
+export async function translateTopicText(target: "cs" | "en", text: string): Promise<string> {
+  const model = MODEL.trim();
+  const prompt = target === "en"
+    ? `Translate the following fairy-tale brief into natural English. Keep person names (Nicolásek, Valentýnka, Archie…) unchanged. Reply with ONLY the translation:\n\n${text.slice(0, 4000)}`
+    : `Přelož následující zadání pohádky do přirozené češtiny. Jména osob nech beze změny. Odpověz POUZE překladem:\n\n${text.slice(0, 4000)}`;
+  const raw = await callAnthropicApi({
+    model,
+    max_tokens: 2000,
+    messages: [{ role: "user", content: prompt }],
+  });
+  return raw.trim();
+}
+
 /** 📄 Jednorázový souhrn PDF pro vypravěče — psaní pohádky pak nečte celé
  *  PDF (velký dokument se do časového limitu psaní nevešel a job umíral). */
 export async function extractPdfBrief(language: "cs" | "en", pdfBase64: string): Promise<string> {
