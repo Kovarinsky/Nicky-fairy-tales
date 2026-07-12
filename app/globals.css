@@ -335,6 +335,18 @@ body {
   transform: translateX(100%);
 }
 
+/* 🎙️ Text na přečtení při klonování hlasu */
+.clone-script {
+  margin: 0.4rem 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 152, 0, 0.5);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
 /* 🎬 Úvodní obrazovka — pokaždé jiný pohádkový motiv */
 .intro-splash {
   position: fixed;

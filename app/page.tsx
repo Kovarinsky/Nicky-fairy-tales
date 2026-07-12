@@ -40,6 +40,7 @@ const HISTORY_KEY = "nicky-story-history";
 const CUSTOM_CHARS_KEY = "nicky-custom-chars";
 const CUSTOM_THEMES_KEY = "nicky-custom-themes";
 const JOB_KEY = "nicky-pending-job";
+const VOICE_PREF_KEY = "nicky-voice-pref";
 const SERVER_JOB_KEY = "nicky-server-job";
 const HISTORY_MAX = 20; // offline zásoba: posledních 20 pohádek v telefonu
 const SETTINGS_KEY = "nicky-settings";
@@ -311,13 +312,124 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chars, customChars]);
 
-  // 🎙️ Hlas vypravěče se vybírá AUTOMATICKY podle jazyka prostředí (CZ/EN) —
-  // tlačítka pro ruční výběr hlasu už ve formuláři nejsou
+  // 🎙️ Hlas vypravěče: výchozí AUTOMATIKA podle jazyka prostředí (CZ/EN);
+  // v sekci Hlas jde ručně vybrat jiný vypravěč nebo naklonovaný rodičovský hlas
+  const [voicePref, setVoicePref] = useState<string>("auto");
   useEffect(() => {
+    try { const v = localStorage.getItem(VOICE_PREF_KEY); if (v) setVoicePref(v); } catch {}
+  }, []);
+  function pickVoice(id: string) {
+    setVoicePref(id);
+    try { localStorage.setItem(VOICE_PREF_KEY, id); } catch {}
+  }
+  useEffect(() => {
+    if (voicePref !== "auto") {
+      if (voices.some(v => v.id === voicePref)) { setSelectedVoiceId(voicePref); return; }
+      if (voices.length > 0) pickVoice("auto"); // vybraný hlas zmizel (smazaný klon)
+    }
     const match = voices.find(v => v.language === uiLang);
     if (match) setSelectedVoiceId(match.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voices, uiLang]);
+  }, [voices, uiLang, voicePref]);
+
+  // 🎙️ Klon rodičovského hlasu — nahrání, vytvoření, ukázka, smazání
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [cloneInfo, setCloneInfo] = useState<{ id?: string; name?: string } | null>(null);
+  const [recState, setRecState] = useState<"idle" | "ready" | "rec" | "done" | "uploading">("idle");
+  const [recSecs, setRecSecs] = useState(0);
+  const [recUrl, setRecUrl] = useState<string | null>(null);
+  const [cloneTesting, setCloneTesting] = useState(false);
+  const mediaRecRef = useRef<MediaRecorder | null>(null);
+  const recChunksRef = useRef<Blob[]>([]);
+  const recBlobRef = useRef<Blob | null>(null);
+  const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    fetch("/api/voice-clone").then(r => r.json()).then(d => { if (d?.id) setCloneInfo(d); }).catch(() => {});
+  }, []);
+
+  async function startRec() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      mediaRecRef.current = rec;
+      recChunksRef.current = [];
+      rec.ondataavailable = e => { if (e.data.size > 0) recChunksRef.current.push(e.data); };
+      rec.onstop = () => {
+        stream.getTracks().forEach(tr => tr.stop());
+        const blob = new Blob(recChunksRef.current, { type: rec.mimeType || "audio/webm" });
+        recBlobRef.current = blob;
+        setRecUrl(URL.createObjectURL(blob));
+        setRecState("done");
+      };
+      rec.start();
+      setRecSecs(0);
+      setRecState("rec");
+      recTimerRef.current = setInterval(() => {
+        setRecSecs(s => {
+          if (s + 1 >= 120) stopRec(); // strop 2 minuty
+          return s + 1;
+        });
+      }, 1000);
+    } catch {
+      await appAlert(t.cloneMicErr);
+    }
+  }
+  function stopRec() {
+    if (recTimerRef.current) { clearInterval(recTimerRef.current); recTimerRef.current = null; }
+    try { mediaRecRef.current?.stop(); } catch {}
+  }
+  async function createClone() {
+    const blob = recBlobRef.current;
+    if (!blob) return;
+    setRecState("uploading");
+    try {
+      const form = new FormData();
+      form.append("audio", blob, "voice-sample.webm");
+      form.append("name", uiLang === "en" ? "Parent voice" : "Rodičovský hlas");
+      const res = await fetch("/api/voice-clone", { method: "POST", body: form, signal: AbortSignal.timeout(60_000) });
+      const d = await safeJson<{ id?: string; name?: string; error?: string }>(res);
+      if (!res.ok || !d.id) throw new Error(d.error || "clone failed");
+      setCloneInfo(d);
+      setRecState("idle");
+      setRecUrl(null);
+      const vs = await fetch("/api/voices").then(r => r.json()).catch(() => null);
+      if (vs?.voices) setVoices(vs.voices);
+      pickVoice(d.id);
+      testVoice(d.id); // ověření: hned přehrát ukázku klonem
+    } catch (e) {
+      setRecState("done");
+      await appAlert(`${t.cloneErr}${e instanceof Error && e.message ? ` (${e.message.slice(0, 160)})` : ""}`);
+    }
+  }
+  async function testVoice(id: string) {
+    if (cloneTesting) return;
+    setCloneTesting(true);
+    try {
+      const text = uiLang === "en"
+        ? "Good night, Nicolas and Valentina. Sweet dreams!"
+        : "Dobrou noc, Nicolásku a Valentýnko. Sladké sny!";
+      const res = await fetch("/api/scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(45_000),
+        body: JSON.stringify({ scene: { index: 0, narration: text, imagePrompt: "x" }, audioOnly: true, voiceId: id }),
+      });
+      const d = await safeJson<{ audioUrl?: string }>(res);
+      if (res.ok && d.audioUrl) { audioRef.current?.pause(); new Audio(d.audioUrl).play().catch(() => {}); }
+    } catch {} finally {
+      setCloneTesting(false);
+    }
+  }
+  async function deleteClone() {
+    if (!(await appConfirm(t.cloneDeleteAsk))) return;
+    try {
+      await fetch("/api/voice-clone", { method: "DELETE", signal: AbortSignal.timeout(30_000) });
+      setCloneInfo(null);
+      pickVoice("auto");
+      const vs = await fetch("/api/voices").then(r => r.json()).catch(() => null);
+      if (vs?.voices) setVoices(vs.voices);
+    } catch {}
+  }
 
   // Background generation state (LOCAL in-browser pipeline)
   const [bgStatus, setBgStatus] = useState<"idle" | "writing" | "generating" | "done">("idle");
@@ -3043,6 +3155,75 @@ export default function Home() {
             {gpsLoading ? "⏳ " : "📍 "}{t.gpsBtn}
           </button>
           <p className="gen-step-hint">{t.gpsHint}</p>
+        </div>
+
+        {/* 🎙️ Hlas vypravěče — automatika / knihovna hlasů / klon rodiče */}
+        <div className="field">
+          <label>{t.voiceLabel}</label>
+          <button type="button" className={`chip chip-btn chip-full ${voiceOpen || voicePref !== "auto" ? "chip-on" : ""}`}
+            onClick={() => setVoiceOpen(p => !p)}>
+            🎙️ {voicePref === "auto"
+              ? t.voiceAuto
+              : voices.find(v => v.id === voicePref)?.name || t.voiceAuto}
+          </button>
+          {voiceOpen && (
+            <div className="add-char-panel">
+              <div className="panel-title-row">
+                <p className="panel-title">🎙️ {t.voiceLabel}</p>
+                <button type="button" className="panel-close" aria-label={t.cancel}
+                  onClick={() => setVoiceOpen(false)}>✕</button>
+              </div>
+              <div className="folk-list">
+                <button type="button" className={`folk-item ${voicePref === "auto" ? "folk-on" : ""}`}
+                  onClick={() => { pickVoice("auto"); setVoiceOpen(false); }}>
+                  <span className="folk-emoji">✨</span>
+                  <span>{t.voiceAuto}</span>
+                </button>
+                {voices.map(v => (
+                  <button type="button" key={v.id} className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
+                    onClick={() => { pickVoice(v.id); setVoiceOpen(false); testVoice(v.id); }}>
+                    <span className="folk-emoji">{v.emoji}</span>
+                    <span>{v.name}</span>
+                  </button>
+                ))}
+              </div>
+              {cloneInfo?.id ? (
+                <div className="file-row">
+                  <button type="button" className="outline-btn" onClick={() => testVoice(cloneInfo.id!)} disabled={cloneTesting}>
+                    {cloneTesting ? "⏳" : "▶︎"} {t.cloneTest}
+                  </button>
+                  <button type="button" className="cancel-btn" onClick={deleteClone}>🗑️ {t.cloneDelete}</button>
+                </div>
+              ) : recState === "idle" ? (
+                <button type="button" className="chip chip-btn chip-full" onClick={() => setRecState("ready")}>
+                  🎙️ {t.cloneStart}
+                </button>
+              ) : (
+                <div className="field">
+                  <p className="gen-step-hint">{t.cloneScriptHint}</p>
+                  <p className="clone-script">{t.cloneScript}</p>
+                  {recState === "ready" && (
+                    <button type="button" onClick={startRec}>⏺ {t.cloneRec}</button>
+                  )}
+                  {recState === "rec" && (
+                    <button type="button" className="cancel-btn" onClick={stopRec}>⏹ {t.cloneStop} ({recSecs}s)</button>
+                  )}
+                  {recState === "done" && (
+                    <>
+                      {recUrl && <audio controls src={recUrl} style={{ width: "100%", marginTop: "0.5rem" }} />}
+                      <div className="file-row">
+                        <button type="button" onClick={createClone}>✨ {t.cloneCreate}</button>
+                        <button type="button" className="outline-btn" onClick={() => { setRecUrl(null); setRecState("ready"); }}>↺ {t.cloneAgain}</button>
+                        <button type="button" className="cancel-btn" onClick={() => { setRecUrl(null); setRecState("idle"); }}>✕ {t.cancel}</button>
+                      </div>
+                    </>
+                  )}
+                  {recState === "uploading" && <p className="gen-step-hint">⏳ {t.cloneCreating}</p>}
+                </div>
+              )}
+              <p className="gen-step-hint">{t.clonePrivacy}</p>
+            </div>
+          )}
         </div>
 
         <div className="field">
