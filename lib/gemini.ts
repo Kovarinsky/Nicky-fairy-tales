@@ -530,53 +530,44 @@ export async function generateSceneSheet(
   const safePrompt = await sanitizeWithGemini(apiKey, rawPrompt);
   console.log(`[Gemini sheet] ${n} scén v mřížce ${grid}×${grid}, model=${model} (${safePrompt.length} chars)`);
 
-  type Attempt = { imgs: Array<ImageResult | null>; badPanels: number; problems: string };
-  let best: Attempt | null = null;
-  let correction = "";
-
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  // ČASOVÝ ROZPOČET: arch se generuje JEDNOU (+1 pokus jen při rozbité
+  // mřížce) a vadné panely jdou rovnou sólo cestou — celoarchová QA
+  // překreslení se nevešla do 5min limitu funkce a job se točil dokola.
+  let slices: ImageResult[] | null = null;
+  for (let attempt = 1; attempt <= 2 && !slices; attempt++) {
     const sheet = await callGeminiImage(
       apiKey, model,
-      correction ? `${safePrompt} ⚠ CORRECTION ${attempt - 1}: the previous sheet had these problems: ${correction}. Fix EXACTLY these issues and keep everything else identical.` : safePrompt,
+      attempt === 1
+        ? safePrompt
+        : `${safePrompt} ⚠ CORRECTION: the previous attempt did not have straight clean white gutters at the exact grid positions — redraw with a PRECISE ${grid}×${grid} grid.`,
       "16:9", refImages, "4K"
     );
-    const slices = await sliceSheet(sheet, grid);
-    if (!slices) {
-      correction = "the white grid gutters were not straight/clean at the exact grid positions — redraw with a precise grid";
-      continue;
-    }
-    // Jedenáctero na každý výřez zvlášť (po 3 najednou)
-    const verdicts: Array<{ ok: boolean; problems: string; badRules: number } | null> = new Array(n).fill(null);
-    for (let i = 0; i < n; i += 3) {
-      const chunk = await Promise.all(
-        Array.from({ length: Math.min(3, n - i) }, (_, j) =>
-          verifySceneImage(apiKey, slices[i + j], heroDescription, scenes[i + j].imagePrompt)
-        )
-      );
-      chunk.forEach((v, j) => { verdicts[i + j] = v; });
-    }
-    const imgs: Array<ImageResult | null> = [];
-    const problems: string[] = [];
-    let badPanels = 0;
-    for (let i = 0; i < n; i++) {
-      const v = verdicts[i];
-      if (v && !v.ok) {
-        badPanels += 1;
-        imgs.push(null);
-        problems.push(`panel ${i + 1}: ${v.problems}`);
-      } else {
-        imgs.push(slices[i]); // prošlý NEBO neověřitelný výřez se přijme
-      }
-    }
-    if (!best || badPanels < best.badPanels) best = { imgs, badPanels, problems: problems.join("; ") };
-    if (badPanels === 0) break;
-    console.warn(`[Gemini sheet] attempt ${attempt}: ${badPanels}/${n} panelů zamítnuto (${best.problems.slice(0, 200)})`);
-    correction = best.problems.slice(0, 500);
+    slices = await sliceSheet(sheet, grid);
+    if (!slices) console.warn(`[Gemini sheet] attempt ${attempt}: mřížka nesedí`);
   }
+  if (!slices) throw new Error("sheet: mřížka se nepodařila nakreslit");
 
-  if (!best) throw new Error("sheet: mřížka se nepodařila nakreslit");
+  // Jedenáctero na každý výřez zvlášť (po 3 najednou); vadný panel → null
+  // → dokreslí ho sólo cesta s vlastní QA a překreslením
+  const verdicts: Array<{ ok: boolean; problems: string; badRules: number } | null> = new Array(n).fill(null);
+  for (let i = 0; i < n; i += 3) {
+    const chunk = await Promise.all(
+      Array.from({ length: Math.min(3, n - i) }, (_, j) =>
+        verifySceneImage(apiKey, slices![i + j], heroDescription, scenes[i + j].imagePrompt)
+      )
+    );
+    chunk.forEach((v, j) => { verdicts[i + j] = v; });
+  }
   const out: Array<ImageResult | null> = [];
-  for (const img of best.imgs) out.push(img ? await compressImage(img) : null);
+  for (let i = 0; i < n; i++) {
+    const v = verdicts[i];
+    if (v && !v.ok) {
+      console.warn(`[Gemini sheet] panel ${i + 1} zamítnut (${v.problems.slice(0, 160)}) → sólo`);
+      out.push(null);
+    } else {
+      out.push(await compressImage(slices[i])); // prošlý NEBO neověřitelný výřez se přijme
+    }
+  }
   console.log(`[Gemini sheet] hotovo: ${out.filter(Boolean).length}/${n} panelů prošlo (zbytek sólo)`);
   return out;
 }

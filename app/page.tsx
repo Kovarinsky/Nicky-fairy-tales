@@ -8,12 +8,11 @@ import { APP_VERSION } from "@/lib/version";
 import { UI, UI_LANG_KEY, type UILang } from "@/lib/i18n";
 import { BG_SCENES, bgSceneById, THEME_BG } from "@/lib/backgrounds";
 import { FOLK_TALES, folkTaleById } from "@/lib/folk-tales";
-import { MORALS, moralById } from "@/lib/morals";
 import { upload as uploadToBlob } from "@vercel/blob/client";
 import { buildStoryHtml } from "@/lib/story-export";
 
 // ── Local types ─────────────────────────────────────────────────────────────
-interface CharOption { id: string; name: string; nameEn?: string; }
+interface CharOption { id: string; name: string; nameEn?: string; photo?: string; }
 interface ThemeOption { id: string; name: string; nameEn?: string; emoji: string; }
 interface VoiceOption { id: string; name: string; emoji: string; description: string; language: string; }
 interface CustomChar {
@@ -277,6 +276,41 @@ export default function Home() {
     setUiLang(l);
     try { localStorage.setItem(UI_LANG_KEY, l); } catch {}
   }
+  // 🧹 Úklid duplicitních postav: vlastní postava se stejným jménem jako
+  // vestavěná (Eva, Jakob) nebo spojená („Eva & Jakob") je zbytečná —
+  // vestavěné mají kanonický popis, portrét z kartotéky a fungují na všech
+  // zařízeních. Duplicita se smaže a výběr přejde na vestavěné postavy.
+  const dedupedCharsRef = useRef(false);
+  useEffect(() => {
+    if (dedupedCharsRef.current || chars.length === 0 || customChars.length === 0) return;
+    dedupedCharsRef.current = true;
+    const canon = new Map<string, string>(); // jméno (lower) → id vestavěné
+    for (const c of chars) {
+      canon.set(c.name.trim().toLowerCase(), c.id);
+      if (c.nameEn) canon.set(c.nameEn.trim().toLowerCase(), c.id);
+    }
+    const dupTargets = (n: string): string[] | null => {
+      const low = n.trim().toLowerCase();
+      if (canon.has(low)) return [canon.get(low)!];
+      const parts = low.split(/\s*(?:[&+]|\ba\b|\band\b)\s*/).map(s => s.trim()).filter(Boolean);
+      if (parts.length >= 2 && parts.every(p => canon.has(p))) return parts.map(p => canon.get(p)!);
+      return null;
+    };
+    const removed = customChars.filter(c => dupTargets(c.name));
+    if (removed.length === 0) return;
+    const keep = customChars.filter(c => !dupTargets(c.name));
+    const promote = new Set<string>();
+    for (const c of removed) {
+      if (selectedCustomIds.includes(c.id)) for (const id of dupTargets(c.name)!) promote.add(id);
+    }
+    console.log(`[dedup] mazu duplicitní vlastní postavy: ${removed.map(c => c.name).join(", ")}`);
+    setCustomChars(keep);
+    saveCustomChars(keep);
+    setSelectedCustomIds(p => p.filter(id => keep.some(c => c.id === id)));
+    if (promote.size > 0) setSelectedIds(p => [...new Set([...p, ...promote])]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chars, customChars]);
+
   // 🎙️ Hlas vypravěče se vybírá AUTOMATICKY podle jazyka prostředí (CZ/EN) —
   // tlačítka pro ruční výběr hlasu už ve formuláři nejsou
   useEffect(() => {
@@ -1750,11 +1784,6 @@ export default function Home() {
       age: getTargetAge([...selectedIds, ...selectedCustomIds]),
       sceneCount,
       language: voices.find(v => v.id === selectedVoiceId)?.language ?? "cs",
-      moral: (() => {
-        const m = moralById(selectedMoral);
-        if (!m) return undefined;
-        return (voices.find(v => v.id === selectedVoiceId)?.language ?? "cs") === "en" ? m.descEn : m.desc;
-      })(),
       previousStory: sequelOf ? { title: sequelOf.title, text: sequelOf.text } : undefined,
       twoEndings,
       customCharacters: selectedCustomObjsForJob.map(c => ({
@@ -1913,8 +1942,6 @@ export default function Home() {
   const selectedFolk = folkTaleById(selectedTheme);
   // 💡 Ponaučení pohádky — rolovací výběr; text se předá vypravěči,
   // který ho vplete do děje (bez kázání)
-  const [moralOpen, setMoralOpen] = useState(false);
-  const [selectedMoral, setSelectedMoral] = useState("");
   // 🔀 Dva konce — defaultně vypnuto, před generováním se potvrzuje
   const [twoEndings, setTwoEndings] = useState(false);
   // 📖 Pokračování uložené pohádky: nový díl naváže na minulý děj
@@ -2145,7 +2172,7 @@ export default function Home() {
       setExpandLoading(false);
     }
   }
-  async function suggestIdea() {
+  async function suggestIdea(locationHint?: string) {
     setIdeaLoading(true);
     try {
       const names = [
@@ -2167,11 +2194,9 @@ export default function Home() {
           characterNames: names,
           themeId: override ? undefined : selectedTheme || undefined,
           customTheme: override,
+          locationHint: locationHint || undefined,
           hint: [
             topic.trim(),
-            selectedMoral
-              ? (uiLang === "en" ? `Moral: ${moralById(selectedMoral)?.nameEn}` : `Ponaučení: ${moralById(selectedMoral)?.name}`)
-              : "",
             sequelOf
               ? (uiLang === "en" ? `Sequel to the tale “${sequelOf.title}”` : `Pokračování pohádky „${sequelOf.title}“`)
               : "",
@@ -2182,6 +2207,36 @@ export default function Home() {
       if (res.ok && d.idea) setTopic(d.idea);
     } catch {} finally {
       setIdeaLoading(false);
+    }
+  }
+
+  // 📍 Námět podle místa: poloha → jméno místa (reverse geocode bez klíče,
+  // s fallbackem na souřadnice — Claude místo pozná) → návrh pohádky z okolí.
+  // Poloha se nikam neukládá, použije se jen pro tento jeden návrh.
+  const [gpsLoading, setGpsLoading] = useState(false);
+  async function suggestFromLocation() {
+    if (gpsLoading || ideaLoading) return;
+    if (!navigator.geolocation) { await appAlert(t.gpsErr); return; }
+    setGpsLoading(true);
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 12_000, maximumAge: 600_000 })
+      );
+      const { latitude, longitude } = pos.coords;
+      let place = "";
+      try {
+        const r = await fetch(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=${uiLang}`,
+          { signal: AbortSignal.timeout(8_000) }
+        );
+        const g = (await r.json()) as { locality?: string; city?: string; principalSubdivision?: string; countryName?: string };
+        place = [g.locality || g.city, g.principalSubdivision, g.countryName].filter(Boolean).join(", ");
+      } catch {}
+      await suggestIdea(place || `GPS ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`);
+    } catch {
+      await appAlert(t.gpsErr);
+    } finally {
+      setGpsLoading(false);
     }
   }
 
@@ -2756,6 +2811,7 @@ export default function Home() {
                       className={`folk-item ${selectedIds.includes(c.id) ? "folk-on" : ""}`}
                       onClick={() => toggleChar(c.id)}>
                       <span className={`char-check ${selectedIds.includes(c.id) ? "on" : ""}`} aria-hidden="true">✓</span>
+                      {c.photo && <img src={c.photo} alt={c.name} className="chip-avatar" loading="lazy" />}
                       <span>{uiLang === "en" && c.nameEn ? c.nameEn : c.name}</span>
                     </button>
                   ))}
@@ -2970,39 +3026,14 @@ export default function Home() {
           </div>
         )}
 
+        {/* 📍 Námět podle místa — appka zjistí polohu a navrhne pohádku z okolí */}
         <div className="field">
-          <label>{t.moralLabel}</label>
-          <button type="button" className={`chip chip-btn chip-full ${moralOpen || selectedMoral ? "chip-on" : ""}`}
-            onClick={() => setMoralOpen(p => !p)}>
-            {selectedMoral
-              ? `${moralById(selectedMoral)!.emoji} ${uiLang === "en" ? moralById(selectedMoral)!.nameEn : moralById(selectedMoral)!.name}`
-              : `💡 ${t.moralChip}`}
+          <label>{t.gpsLabel}</label>
+          <button type="button" className={`chip chip-btn chip-full ${gpsLoading ? "chip-on" : ""}`}
+            onClick={suggestFromLocation} disabled={gpsLoading || ideaLoading}>
+            {gpsLoading ? "⏳ " : "📍 "}{t.gpsBtn}
           </button>
-          {moralOpen && (
-            <div className="add-char-panel">
-              <div className="panel-title-row">
-                <p className="panel-title">{t.moralTitle}</p>
-                <button type="button" className="panel-close" aria-label={t.cancel}
-                  onClick={() => setMoralOpen(false)}>✕</button>
-              </div>
-              <div className="folk-list">
-                <button type="button" className={`folk-item ${!selectedMoral ? "folk-on" : ""}`}
-                  onClick={() => { setSelectedMoral(""); setMoralOpen(false); }}>
-                  <span className="folk-emoji">✨</span>
-                  <span>{t.moralNone}</span>
-                </button>
-                {MORALS.map(m => (
-                  <button type="button" key={m.id}
-                    className={`folk-item ${selectedMoral === m.id ? "folk-on" : ""}`}
-                    onClick={() => { setSelectedMoral(p => p === m.id ? "" : m.id); setMoralOpen(false); }}>
-                    <span className="folk-emoji">{m.emoji}</span>
-                    <span>{uiLang === "en" ? m.nameEn : m.name}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="gen-step-hint">{t.moralHint}</p>
-            </div>
-          )}
+          <p className="gen-step-hint">{t.gpsHint}</p>
         </div>
 
         <div className="field">
@@ -3031,7 +3062,7 @@ export default function Home() {
             )}
           </div>
           <div className="insp-row">
-            <button type="button" className="insp-btn" onClick={suggestIdea} disabled={ideaLoading}>
+            <button type="button" className="insp-btn" onClick={() => suggestIdea()} disabled={ideaLoading}>
               {ideaLoading ? "⏳ " : "🎲 "}{t.ideaBtn}
             </button>
             {topic.trim() !== "" && (

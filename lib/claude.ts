@@ -498,6 +498,8 @@ export interface TopicIdeaContext {
   themePrompt?: string;
   /** Co už má uživatel napsané v poli přání — námět na tom staví */
   userHint?: string;
+  /** 📍 Aktuální místo rodiny (jméno místa nebo GPS) — námět z okolí */
+  locationHint?: string;
 }
 
 export async function suggestTopicIdea(language: "cs" | "en", characterNames: string[], ctx: TopicIdeaContext = {}): Promise<string> {
@@ -513,9 +515,16 @@ export async function suggestTopicIdea(language: "cs" | "en", characterNames: st
       ? ` Build on the user's notes and include them in the idea: "${ctx.userHint.slice(0, 300)}".`
       : ` Vyjdi z poznámek uživatele a zapracuj je do námětu: „${ctx.userHint.slice(0, 300)}".`
     : "";
+  // 📍 Námět z místa, kde rodina právě je — skutečná krajina, moře/hory,
+  // místní zvířata a poznávací prvky okolí (souřadnice Claude umí zařadit)
+  const locationPart = ctx.locationHint
+    ? language === "en"
+      ? ` The family is RIGHT NOW at this real location: ${ctx.locationHint}. The idea MUST be set in this place or its close surroundings — use its real scenery (sea/mountains/forest/town), local animals, landmarks and atmosphere so the children recognize where they are.`
+      : ` Rodina je PRÁVĚ TEĎ na tomto skutečném místě: ${ctx.locationHint}. Námět se MUSÍ odehrávat tady nebo v blízkém okolí — využij skutečnou krajinu (moře/hory/les/město), místní zvířata, poznávací místa a atmosféru, ať děti poznají, kde jsou.`
+    : "";
   const prompt = language === "en"
-    ? `Suggest ONE playful, original bedtime-story idea (1-2 sentences, max 40 words) for small children, featuring: ${who}.${worldPart}${hintPart} Make it concrete and magical (a place, a problem, a twist seed). Reply with ONLY the idea text — no quotes, no intro. Vary wildly: pick an unexpected setting or magical object.`
-    : `Navrhni JEDEN hravý, originální námět na pohádku před spaním (1–2 věty, max 40 slov) pro malé děti, kde vystupují: ${who}.${worldPart}${hintPart} Ať je konkrétní a kouzelný (místo, problém, zárodek překvapení). Odpověz POUZE textem námětu — bez uvozovek, bez úvodu. Buď pokaždé jiný: vyber nečekané prostředí nebo kouzelný předmět.`;
+    ? `Suggest ONE playful, original bedtime-story idea (1-2 sentences, max 40 words) for small children, featuring: ${who}.${worldPart}${locationPart}${hintPart} Make it concrete and magical (a place, a problem, a twist seed). Reply with ONLY the idea text — no quotes, no intro. Vary wildly: pick an unexpected setting or magical object.`
+    : `Navrhni JEDEN hravý, originální námět na pohádku před spaním (1–2 věty, max 40 slov) pro malé děti, kde vystupují: ${who}.${worldPart}${locationPart}${hintPart} Ať je konkrétní a kouzelný (místo, problém, zárodek překvapení). Odpověz POUZE textem námětu — bez uvozovek, bez úvodu. Buď pokaždé jiný: vyber nečekané prostředí nebo kouzelný předmět.`;
   const raw = await callAnthropicApi({
     model,
     max_tokens: 300,

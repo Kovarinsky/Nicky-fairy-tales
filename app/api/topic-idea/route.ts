@@ -25,6 +25,10 @@ export async function POST(req: NextRequest) {
       themeName: customTheme?.name ?? theme?.name,
       themePrompt: customTheme?.prompt ?? theme?.prompt,
       userHint: typeof body.hint === "string" && body.hint.trim() ? body.hint.trim() : undefined,
+      // 📍 námět podle aktuálního místa rodiny (jméno místa nebo GPS souřadnice)
+      locationHint: typeof body.locationHint === "string" && body.locationHint.trim()
+        ? body.locationHint.trim().slice(0, 200)
+        : undefined,
     };
     // ✨ expand: rozvinout kostru uživatele do detailní osnovy (vyžaduje hint).
     // Vychází i z vloženého PDF — malé přijde base64, velké odkazem do Blobu.
