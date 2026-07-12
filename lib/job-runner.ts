@@ -8,7 +8,7 @@ import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, type StoryExtras } from "@/lib/claude";
 import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
-import { loadPortraitRefs } from "@/lib/portraits";
+import { loadPortraitRefEntries, refsForText } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/types";
 import { blobToken } from "@/lib/blob-token";
@@ -260,17 +260,20 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     const madeSheets = () => Math.max(0, genCounter.img4k - genAtStart.img4k);
     const voiceChars = 0;
 
-    // ── 2) Scenes (Gemini + ElevenLabs) with the consistency anchor ──
-    // Referencí postav jsou MALOVANÉ PORTRÉTY z kartotéky (jednou nakreslené,
-    // pak jen čtené) — stejná podoba v každé pohádce + méně QA překreslení
+    // ── 2) Scenes (Gemini) with the consistency anchor ──
+    // Reference postav = MALOVANÉ PORTRÉTY z kartotéky, ale CÍLENĚ: každá
+    // scéna/arch dostane jen portréty postav, které v ní vystupují — 9 portrétů
+    // na každou scénu vedlo k míchání identit
     const ids: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
-    const refBase: ReferenceImage[] = await loadPortraitRefs(charactersByIds(ids));
+    const refEntries = await loadPortraitRefEntries(charactersByIds(ids));
+    const customRefs: ReferenceImage[] = [];
     const customImages = Array.isArray(body.customCharacterImages)
       ? (body.customCharacterImages as Array<{ data?: string; mimeType?: string }>)
       : [];
     for (const ci of customImages) {
-      if (ci?.data && ci?.mimeType) refBase.push({ data: ci.data, mimeType: ci.mimeType, name: "a custom story character" });
+      if (ci?.data && ci?.mimeType) customRefs.push({ data: ci.data, mimeType: ci.mimeType, name: "a custom story character" });
     }
+    const refsFor = (txt: string): ReferenceImage[] => [...refsForText(refEntries, txt), ...customRefs];
 
     let anchor: ReferenceImage | null = null;
     // Navázání: kotva konzistence = už hotová scéna 1 z minulého běhu
@@ -289,7 +292,8 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     async function doScene(i: number): Promise<void> {
       if (st.sceneUrls![i] || quotaExhausted) return; // hotová / kvóta vyčerpaná
       const scene = scenesScript[i];
-      const refs = anchor && i > 0 ? [...refBase, anchor] : refBase;
+      const sceneRefs = refsFor(`${scene.imagePrompt} ${scene.narration}`);
+      const refs = anchor && i > 0 ? [...sceneRefs, anchor] : sceneRefs;
       // 🎙️ Hlas se NEVYRÁBÍ při generování — namluvení vzniká líně až při
       // čtení hotové pohádky (klient si ho vyžádá přes /api/scene audioOnly).
       // Nepřehrané pohádky tak hlas vůbec neplatí.
@@ -329,7 +333,9 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         const group = pending.slice(0, Math.min(maxCells, pending.length));
         await write(); // heartbeat před dlouhým generováním archu
         try {
-          const refs = anchor ? [...refBase, anchor] : refBase;
+          const groupText = group.map(i => `${scenesScript[i].imagePrompt} ${scenesScript[i].narration}`).join(" ");
+          const groupRefs = refsFor(groupText);
+          const refs = anchor ? [...groupRefs, anchor] : groupRefs;
           const results = await generateSceneSheet(group.map(i => scenesScript[i]), heroDescription, refs);
           for (let k = 0; k < group.length; k++) {
             const img = results[k];

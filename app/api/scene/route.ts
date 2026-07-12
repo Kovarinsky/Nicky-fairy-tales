@@ -3,7 +3,7 @@ import { generateSceneImage, genCounter } from "@/lib/gemini";
 import { narrateScene, prepareNarrationText } from "@/lib/elevenlabs";
 import { narrateWithGemini } from "@/lib/gemini-tts";
 import { charactersByIds, type ReferenceImage } from "@/lib/characters";
-import { loadPortraitRefs } from "@/lib/portraits";
+import { loadPortraitRefEntries, refsForText } from "@/lib/portraits";
 import { writeUsageRecord } from "@/lib/job-runner";
 import type { Scene } from "@/lib/types";
 
@@ -43,10 +43,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Reference postav: malované portréty z kartotéky (fallback na fotky)
-    // + fotky vlastních postav
+    // Reference postav: CÍLENĚ jen portréty postav jmenovaných v této scéně
+    // (všech 9 najednou vedlo k míchání identit) + fotky vlastních postav
     const characterIds: string[] = Array.isArray(body.characterIds) ? body.characterIds : [];
-    const refImages: ReferenceImage[] = await loadPortraitRefs(charactersByIds(characterIds));
+    const refEntries = await loadPortraitRefEntries(charactersByIds(characterIds));
+    const refImages: ReferenceImage[] = refsForText(refEntries, `${scene.imagePrompt} ${scene.narration}`);
     const customImages = Array.isArray(body.customCharacterImages) ? body.customCharacterImages : [];
     for (const ci of customImages) {
       if (ci?.data && ci?.mimeType) refImages.push({ data: ci.data, mimeType: ci.mimeType, name: "a custom story character" });

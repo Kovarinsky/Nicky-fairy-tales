@@ -118,3 +118,41 @@ export async function loadPortraitRefs(characters: Character[]): Promise<Referen
   }
   return refs;
 }
+
+// ── Cílené reference: scéna dostane JEN portréty postav, které v ní vystupují ──
+// Při velkém obsazení (9 postav) dostával model 9 portrétů na každou scénu
+// a míchal identity (Janova polokošile na cizím dítěti…). Filtruje se podle
+// jmen v imagePromptu — kdo ve scéně není jmenovaný, jeho portrét se neposílá.
+export interface PortraitRefEntry { keys: string[]; ref: ReferenceImage }
+
+export async function loadPortraitRefEntries(characters: Character[]): Promise<PortraitRefEntry[]> {
+  const out: PortraitRefEntry[] = [];
+  for (const c of characters) {
+    const portrait = await getCharacterPortrait(c);
+    const refs = portrait ? [portrait] : loadReferenceImages([c]);
+    const keys = [c.name, c.nameEn, c.description?.split(":")[0]]
+      .filter(Boolean)
+      .map(s => String(s).trim().toLowerCase())
+      .filter(s => s.length >= 3);
+    for (const ref of refs) out.push({ keys, ref });
+  }
+  return out;
+}
+
+/** Vybere reference postav jmenovaných v textu (celá slova — „Jana" nesmí
+ *  chytit „Jan"); bez jediné shody vrátí všechny (pojistka). */
+export function refsForText(entries: PortraitRefEntry[], text: string): ReferenceImage[] {
+  const low = ` ${text.toLowerCase()} `;
+  const wordHit = (k: string) => {
+    const i = low.indexOf(k);
+    if (i < 0) return false;
+    // hranice slova: před a za klíčem nesmí být písmeno (stačí ASCII+diakritika)
+    const isLetter = (ch: string) => /[a-záčďéěíňóřšťúůýž]/i.test(ch);
+    for (let p = i; p >= 0; p = low.indexOf(k, p + 1)) {
+      if (!isLetter(low[p - 1] || " ") && !isLetter(low[p + k.length] || " ")) return true;
+    }
+    return false;
+  };
+  const hit = entries.filter(e => e.keys.some(wordHit));
+  return (hit.length > 0 ? hit : entries).map(e => e.ref);
+}

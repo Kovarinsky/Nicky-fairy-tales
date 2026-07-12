@@ -34,6 +34,17 @@ pipeline v prohlížeči, obě volají stejnou funkci).
     kdo je ve scéně jmenovaný, nesmí na obrázku CHYBĚT (kontrola dostává
     i popis scény). Pozadí smí přirozeně pokračovat za okraj.
 
+## Malé skupinky (od v3.62)
+
+Největší nepřítel konzistence je MNOHO POSTAV V JEDNÉ SCÉNĚ: při 8–9 lidech
+model míchá identity (podpisové oblečení „rozdá" jiným). Proto:
+- psaní smí do scény jmenovat NEJVÝŠE 4 postavy (finále až 6) — velké
+  obsazení se střídá po skupinkách,
+- každá scéna/arch dostává JEN portréty postav, které v ní vystupují
+  (filtr podle jmen v imagePromptu),
+- kontrola vyžaduje PŘESNOU rovnost počtu lidí a jmenovaných postav
+  a padá i na duplicitní podpisové oblečení (dva fialové hoodie).
+
 ## Režim archů (od v3.51)
 
 Scény se kreslí po skupinách v JEDNOM 4K obrázku (mřížka 3×3, bílé dělicí
