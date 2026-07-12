@@ -7,7 +7,6 @@
 import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, type StoryExtras } from "@/lib/claude";
 import { generateSceneImage, isDailyQuotaError } from "@/lib/gemini";
-import { narrateScene } from "@/lib/elevenlabs";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefs } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
@@ -242,10 +241,10 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     st.done = Object.keys(st.sceneUrls).length;
     await write();
 
-    // Měření spotřeby: kolik obrázků a znaků hlasu vznikne V TOMTO běhu
-    // (při navázání se už hotové scény nepočítají znovu)
+    // Měření spotřeby: kolik obrázků vznikne V TOMTO běhu (při navázání se
+    // hotové scény nepočítají znovu); hlas se účtuje líně v /api/scene
     const imagesAtStart = Object.keys(st.sceneUrls).length;
-    let voiceChars = 0;
+    const voiceChars = 0;
 
     // ── 2) Scenes (Gemini + ElevenLabs) with the consistency anchor ──
     // Referencí postav jsou MALOVANÉ PORTRÉTY z kartotéky (jednou nakreslené,
@@ -268,7 +267,6 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         if (m) anchor = { data: m[2], mimeType: m[1], label: ANCHOR_LABEL };
       } catch {}
     }
-    const voiceId = String(body.voiceId || "") || undefined;
 
     // Denní kvóta Gemini vyčerpaná → STOP celého jobu. Každý další pokus by
     // jen pálil požadavky (limit je 1000/den/model) — reset je až o půlnoci PT.
@@ -278,25 +276,20 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       if (st.sceneUrls![i] || quotaExhausted) return; // hotová / kvóta vyčerpaná
       const scene = scenesScript[i];
       const refs = anchor && i > 0 ? [...refBase, anchor] : refBase;
-      const [img, audio] = await Promise.all([
-        generateSceneImage(scene, heroDescription, refs).catch((e: Error) => {
-          console.error(`[job ${id}] scene ${i + 1} image: ${e.message}`);
-          st.imgError = e.message.slice(0, 220);
-          if (isDailyQuotaError(e.message)) quotaExhausted = true;
-          return null;
-        }),
-        narrateScene(scene, voiceId).catch((e: Error) => {
-          console.error(`[job ${id}] scene ${i + 1} audio: ${e.message}`);
-          return null;
-        }),
-      ]);
-      if (audio) voiceChars += scene.narration.length;
+      // 🎙️ Hlas se NEVYRÁBÍ při generování — namluvení vzniká líně až při
+      // čtení hotové pohádky (klient si ho vyžádá přes /api/scene audioOnly).
+      // Nepřehrané pohádky tak hlas vůbec neplatí.
+      const img = await generateSceneImage(scene, heroDescription, refs).catch((e: Error) => {
+        console.error(`[job ${id}] scene ${i + 1} image: ${e.message}`);
+        st.imgError = e.message.slice(0, 220);
+        if (isDailyQuotaError(e.message)) quotaExhausted = true;
+        return null;
+      });
       if (!img) { await write(); return; } // retry rounds below; chybu vidí klient
       st.imgError = undefined;
       const payload = {
         index: scene.index,
         imageUrl: `data:${img.mimeType};base64,${img.buffer.toString("base64")}`,
-        ...(audio ? { audioUrl: `data:audio/mpeg;base64,${audio.toString("base64")}` } : {}),
       };
       const url = await putJson(`jobs/${id}/scene-${i}.json`, payload);
       st.sceneUrls![i] = url;
@@ -354,7 +347,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
 // Záznam spotřeby pro panel 💰: počet obrázků a znaků hlasu z tohoto běhu.
 // Data jsou v NÁZVU souboru (usage/u<ts>-i<obrázky>-c<znaky>.json) — /api/usage
 // je sečte pouhým výpisem, bez stahování obsahu. Úklid jobs/ se jich nedotkne.
-async function writeUsageRecord(images: number, chars: number, device?: string): Promise<void> {
+export async function writeUsageRecord(images: number, chars: number, device?: string): Promise<void> {
   if (images <= 0 && chars <= 0) return;
   const dev = (device || "").replace(/[^a-z0-9]/gi, "").slice(0, 12);
   try {

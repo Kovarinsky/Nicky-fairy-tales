@@ -533,7 +533,7 @@ export default function Home() {
         imageUrl: cached?.[i]?.imageUrl,
         audioUrl: cached?.[i]?.audioUrl,
       }));
-      if (merged.every(s => !isPlaceholderImg(s.imageUrl) && s.audioUrl)) {
+      if (merged.every(s => !isPlaceholderImg(s.imageUrl))) {
         try { localStorage.removeItem(JOB_KEY); } catch {}
         return;
       }
@@ -960,6 +960,100 @@ export default function Home() {
     }
   }
 
+  // ── 🎙️ Líný hlas — audio se vyrábí AŽ PŘI ČTENÍ hotové pohádky ───────────
+  // Generování pohádky vyrábí jen text a obrázky; namluvení vzniká pro
+  // aktuální stránku + 2 následující (a ukládá se do cache, platí se jednou).
+  // Nepřehrané pohádky tak hlas vůbec neplatí.
+  const readerEntryIdRef = useRef<string | null>(null);
+  // Klíč = pohádka:stránka; po úspěchu se NEMAŽE (state update chodí s malým
+  // zpožděním a smazání hned po fetchi vedlo k duplicitnímu — placenému —
+  // namluvení stejné stránky)
+  const audioFetchRef = useRef<Set<string>>(new Set());
+  async function ensureAudio(i: number) {
+    const s = scenes[i];
+    if (!s || s.audioUrl || !s.narration || isPlaceholderImg(s.imageUrl)) return;
+    const fetchKey = `${readerEntryIdRef.current || "x"}:${i}`;
+    if (audioFetchRef.current.has(fetchKey)) return;
+    audioFetchRef.current.add(fetchKey);
+    let ok = false;
+    try {
+      const res = await fetch("/api/scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(60_000),
+        body: JSON.stringify({
+          scene: { index: s.index, narration: s.narration, imagePrompt: s.imagePrompt || "x" },
+          audioOnly: true,
+          voiceId: selectedVoiceId || undefined,
+          deviceId: deviceId(),
+        }),
+      });
+      const d = await safeJson<{ audioUrl?: string }>(res);
+      if (!res.ok || !d.audioUrl) return;
+      ok = true;
+      setScenes(prev => {
+        const next = [...prev];
+        if (!next[i] || next[i].audioUrl) return prev;
+        next[i] = { ...next[i], audioUrl: d.audioUrl };
+        const eid = readerEntryIdRef.current;
+        if (eid) {
+          renderedMapRef.current.set(eid, next);
+          cacheStory(eid, next).catch(() => {});
+        }
+        return next;
+      });
+    } catch {} finally {
+      // Neúspěch → klíč uvolnit (další pokus povolen); úspěch klíč drží
+      if (!ok) audioFetchRef.current.delete(fetchKey);
+    }
+  }
+  useEffect(() => {
+    if (viewMode !== "reader" || scenes.length === 0) return;
+    ensureAudio(page);
+    // předvyrobit hlas dalších dvou VIDITELNÝCH stránek (respektuje větev)
+    const pos = visiblePages.indexOf(page);
+    for (const i of visiblePages.slice(Math.max(0, pos + 1), Math.max(0, pos + 1) + 2)) ensureAudio(i);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, page, scenes, branch]);
+
+  // Před sdílením/exportem se chybějící namluvení doplní — odeslaná pohádka
+  // („hotový odsouhlasený příběh") je vždy kompletní i s hlasem
+  async function fillMissingAudio(
+    entry: HistoryEntry,
+    media: Array<{ imageUrl?: string; audioUrl?: string }>,
+    onProgress?: (done: number, total: number) => void
+  ): Promise<void> {
+    const missing = entry.scenes.map((s, i) => (!media[i]?.audioUrl && s.narration ? i : -1)).filter(i => i >= 0);
+    if (missing.length === 0) return;
+    let done = 0;
+    let idx = 0;
+    const worker = async () => {
+      while (idx < missing.length) {
+        const i = missing[idx++];
+        try {
+          const s = entry.scenes[i];
+          const res = await fetch("/api/scene", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(60_000),
+            body: JSON.stringify({
+              scene: { index: s.index, narration: s.narration, imagePrompt: s.imagePrompt || "x" },
+              audioOnly: true,
+              voiceId: selectedVoiceId || undefined,
+              deviceId: deviceId(),
+            }),
+          });
+          const d = await safeJson<{ audioUrl?: string }>(res);
+          if (res.ok && d.audioUrl) media[i] = { ...(media[i] || {}), audioUrl: d.audioUrl };
+        } catch {}
+        done += 1;
+        onProgress?.(done, missing.length);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(2, missing.length) }, worker));
+    cacheStory(entry.id, entry.scenes.map((s, i) => ({ ...s, ...(media[i] || {}) })) as RenderedScene[]).catch(() => {});
+  }
+
   // ── Voice switch in reader — audio-only regeneration ──────────────────────
   async function switchVoice(newVoiceId: string) {
     if (newVoiceId === selectedVoiceId || regenAudio) return;
@@ -1075,6 +1169,7 @@ export default function Home() {
       existing && existing.length === scriptScenes.length
         ? existing.map(s => ({ ...s }))
         : scriptScenes.map(s => ({ ...s }));
+    if (!background && entryId) readerEntryIdRef.current = entryId;
     heroDescRef.current = heroDescription;
     imageRefsRef.current = customImageRefs;
 
@@ -1088,7 +1183,8 @@ export default function Home() {
       } catch {}
     }
 
-    const sceneNeedsWork = (s: RenderedScene) => isPlaceholderImg(s.imageUrl) || !s.audioUrl;
+    // Hlas je líný (vyrábí se až při čtení) — scéna je hotová s obrázkem
+    const sceneNeedsWork = (s: RenderedScene) => isPlaceholderImg(s.imageUrl);
     // done = scene has a real (non-placeholder) image
     const realDone = () => localScenes.filter(s => !isPlaceholderImg(s.imageUrl)).length;
 
@@ -1142,6 +1238,7 @@ export default function Home() {
             characterIds: selectedIds,
             customCharacterImages: customImageRefs,
             voiceId: voiceId || undefined,
+            noAudio: true, // hlas líně až při čtení
             ...(i > 0 ? { styleAnchor: anchorFrom(localScenes[0]?.imageUrl) } : {}),
           }),
         });
@@ -1354,6 +1451,7 @@ export default function Home() {
     setIsPlaying(false);
     introFiredRef.current = false;
     setTitle(job.title || "Pohádka");
+    readerEntryIdRef.current = job.jobId;
     // 🔀 Dva konce: meta výběru z uložené historie
     setStoryChoice(loadHistory().find(e => e.id === job.jobId)?.choice ?? null);
     setBranch(null);
@@ -2101,6 +2199,9 @@ export default function Home() {
       let done = 0;
       setShareProg({ done, total });
       const mediaArr = media;
+      // Doplnit chybějící namluvení (hlas je líný) — sdílená pohádka je kompletní
+      await fillMissingAudio(entry, mediaArr, (d, tot) => setShareProg({ done: d, total: tot }));
+      setShareProg({ done: 0, total });
       // Nahrát s pamětí: co už jednou prošlo, se znovu nenahrává
       async function uploadCached(kind: "img" | "aud", i: number, dataUrl: string): Promise<string> {
         const key = `${kind}-${i}`;
@@ -2190,6 +2291,8 @@ export default function Home() {
         await appConfirm(t.shareNoMedia);
         return;
       }
+      // Doplnit chybějící namluvení (hlas je líný) — soubor je kompletní
+      await fillMissingAudio(entry, media);
       const scenes = await Promise.all(entry.scenes.map(async (s, i) => {
         const m = media![i] || {};
         let imageUrl = m.imageUrl || "";
@@ -2240,6 +2343,7 @@ export default function Home() {
       setIsPlaying(false);
       introFiredRef.current = false;
       setTitle(entry.title);
+      readerEntryIdRef.current = entry.id;
       setStoryChoice(entry.choice ?? null);
       setBranch(null);
       setScenes([...readyScenes]);

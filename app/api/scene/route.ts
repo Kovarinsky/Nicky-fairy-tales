@@ -3,6 +3,7 @@ import { generateSceneImage } from "@/lib/gemini";
 import { narrateScene } from "@/lib/elevenlabs";
 import { charactersByIds, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefs } from "@/lib/portraits";
+import { writeUsageRecord } from "@/lib/job-runner";
 import type { Scene } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -21,10 +22,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (audioOnly) {
-      // Audio-only regeneration (voice switch) — skip Gemini
+      // Líný hlas: namluvení jedné stránky až při čtení (a přepnutí hlasu)
       const audio = await narrateScene(scene, voiceId).catch((e: Error) => {
         throw new Error(`[ElevenLabs] ${e.message}`);
       });
+      // Spotřeba hlasu se účtuje tady (generování pohádky už hlas nevyrábí)
+      writeUsageRecord(0, scene.narration.length, typeof body.deviceId === "string" ? body.deviceId : undefined)
+        .catch(() => {});
       return NextResponse.json({
         audioUrl: `data:audio/mpeg;base64,${audio.toString("base64")}`,
       });
@@ -53,17 +57,21 @@ export async function POST(req: NextRequest) {
 
     let imageDebug = "";
     let audioDebug = "";
+    // noAudio: hlas se vyrábí líně až při čtení — scéna generuje jen obrázek
+    const noAudio = body.noAudio === true;
     const [imageResult, audio] = await Promise.all([
       generateSceneImage(scene, heroDescription, refImages).catch((e: Error) => {
         imageDebug = e.message;
         console.error(`[Gemini] ${e.message}`);
         return null; // fallback to SVG placeholder
       }),
-      narrateScene(scene, voiceId).catch((e: Error) => {
-        audioDebug = e.message;
-        console.error(`[ElevenLabs] ${e.message}`);
-        return null; // audio is optional — book works without it
-      }),
+      noAudio
+        ? Promise.resolve(null)
+        : narrateScene(scene, voiceId).catch((e: Error) => {
+            audioDebug = e.message;
+            console.error(`[ElevenLabs] ${e.message}`);
+            return null; // audio is optional — book works without it
+          }),
     ]);
 
     // Build image URL — use SVG placeholder if Gemini failed
