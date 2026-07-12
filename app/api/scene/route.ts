@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateSceneImage, genCounter } from "@/lib/gemini";
-import { narrateScene } from "@/lib/elevenlabs";
+import { narrateScene, prepareNarrationText } from "@/lib/elevenlabs";
+import { narrateWithGemini } from "@/lib/gemini-tts";
 import { charactersByIds, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefs } from "@/lib/portraits";
 import { writeUsageRecord } from "@/lib/job-runner";
@@ -21,16 +22,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Neplatná scéna." }, { status: 400 });
     }
 
+    // TTS router: hlasy "gemini:<jméno>" namluví Gemini TTS (WAV), ostatní ElevenLabs
+    const narrate = async (): Promise<{ buffer: Buffer; mimeType: string }> => {
+      if (voiceId?.startsWith("gemini:")) {
+        return narrateWithGemini(prepareNarrationText(scene.narration), voiceId.slice(7));
+      }
+      return { buffer: await narrateScene(scene, voiceId), mimeType: "audio/mpeg" };
+    };
+
     if (audioOnly) {
       // Líný hlas: namluvení jedné stránky až při čtení (a přepnutí hlasu)
-      const audio = await narrateScene(scene, voiceId).catch((e: Error) => {
-        throw new Error(`[ElevenLabs] ${e.message}`);
+      const audio = await narrate().catch((e: Error) => {
+        throw new Error(`[TTS] ${e.message}`);
       });
       // Spotřeba hlasu se účtuje tady (generování pohádky už hlas nevyrábí)
       writeUsageRecord(0, scene.narration.length, typeof body.deviceId === "string" ? body.deviceId : undefined)
         .catch(() => {});
       return NextResponse.json({
-        audioUrl: `data:audio/mpeg;base64,${audio.toString("base64")}`,
+        audioUrl: `data:${audio.mimeType};base64,${audio.buffer.toString("base64")}`,
       });
     }
 
@@ -68,9 +77,9 @@ export async function POST(req: NextRequest) {
       }),
       noAudio
         ? Promise.resolve(null)
-        : narrateScene(scene, voiceId).catch((e: Error) => {
+        : narrate().catch((e: Error) => {
             audioDebug = e.message;
-            console.error(`[ElevenLabs] ${e.message}`);
+            console.error(`[TTS] ${e.message}`);
             return null; // audio is optional — book works without it
           }),
     ]);
@@ -93,7 +102,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       imageUrl,
-      ...(audio ? { audioUrl: `data:audio/mpeg;base64,${audio.toString("base64")}` } : {}),
+      ...(audio ? { audioUrl: `data:${audio.mimeType};base64,${audio.buffer.toString("base64")}` } : {}),
       ...(imageDebug ? { imageDebug } : {}),
       ...(audioDebug ? { audioDebug } : {}),
     });

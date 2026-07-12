@@ -12,5 +12,19 @@
     "emoji": "🇬🇧",
     "description": "English fairy tale narrator",
     "language": "en"
+  },
+  {
+    "id": "gemini:Charon",
+    "name": "Gemini vypravěč (test)",
+    "emoji": "🧪",
+    "description": "Testovací mužský hlas Google Gemini — porovnání kvality, mluví česky i anglicky",
+    "language": "any"
+  },
+  {
+    "id": "gemini:Aoede",
+    "name": "Gemini vypravěčka (test)",
+    "emoji": "🧪",
+    "description": "Testovací ženský hlas Google Gemini — porovnání kvality, mluví česky i anglicky",
+    "language": "any"
   }
 ]

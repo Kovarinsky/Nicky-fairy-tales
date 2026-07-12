@@ -34,6 +34,9 @@ interface HistoryEntry {
   topic: string;
   /** 🔀 Dva konce: scenes = společný děj + konec A + konec B */
   choice?: StoryChoiceMeta;
+  /** ⏱ Délka přípravy (s) — celkem a z toho psaní */
+  prepSec?: number;
+  writeSec?: number;
 }
 
 const HISTORY_KEY = "nicky-story-history";
@@ -1718,7 +1721,7 @@ export default function Home() {
     return null;
   }
 
-  async function finalizeServerJob(st: { title?: string; heroDescription?: string; scenesScript?: Scene[]; sceneUrls?: Record<number, string>; total?: number; voiceId?: string; choice?: StoryChoiceMeta }, jobId: string) {
+  async function finalizeServerJob(st: { title?: string; heroDescription?: string; scenesScript?: Scene[]; sceneUrls?: Record<number, string>; total?: number; voiceId?: string; choice?: StoryChoiceMeta; createdAt?: number; wroteAt?: number; finishedAt?: number }, jobId: string) {
     const script = st.scenesScript || [];
     const urls = st.sceneUrls || {};
     const pre = jobMediaRef.current.get(jobId)?.scenes ?? new Map<number, { imageUrl?: string; audioUrl?: string }>();
@@ -1746,6 +1749,9 @@ export default function Home() {
       themeId: selectedTheme,
       topic,
       choice: st.choice,
+      // ⏱ Tracker přípravy: celkem / z toho psaní (sekundy)
+      prepSec: st.createdAt && st.finishedAt ? Math.max(0, Math.round((st.finishedAt - st.createdAt) / 1000)) : undefined,
+      writeSec: st.createdAt && st.wroteAt ? Math.max(0, Math.round((st.wroteAt - st.createdAt) / 1000)) : undefined,
     };
     saveHistory(entry);
     setStoryHistory(loadHistory());
@@ -3811,6 +3817,11 @@ export default function Home() {
                         <span className="history-badge badge-offline">📥 offline</span>
                         <span className="history-badge badge-size">{estimateStorySize(entry.scenes.length)}</span>
                         <span className="history-badge badge-scenes">{t.scenesBadge(entry.scenes.length)}</span>
+                        {entry.prepSec !== undefined && (
+                          <span className="history-badge badge-size" title={entry.writeSec !== undefined ? `✍️ psaní ${Math.floor(entry.writeSec / 60)}:${String(entry.writeSec % 60).padStart(2, "0")}` : undefined}>
+                            ⏱ {Math.floor(entry.prepSec / 60)}:{String(entry.prepSec % 60).padStart(2, "0")}
+                          </span>
+                        )}
                         <span className="history-badge badge-sequel" role="button"
                           onClick={e => startSequel(e, entry)}>✨ {t.sequelBtn}</span>
                         <span className="history-badge badge-share" role="button"

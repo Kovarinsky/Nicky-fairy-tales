@@ -44,6 +44,11 @@ function sanitizeText(text: string): string {
     .replace(/​/g, "");     // zero-width space
 }
 
+/** Stejná úprava textu pro jiné TTS (Gemini): fonetika jmen + typografie */
+export function prepareNarrationText(text: string): string {
+  return applyCzechPronunciations(sanitizeText(text));
+}
+
 export async function narrateScene(scene: Scene, overrideVoiceId?: string): Promise<Buffer> {
   const apiKey = sanitizeApiKey(process.env.ELEVENLABS_API_KEY);
   if (!apiKey) throw new Error("Chybi ELEVENLABS_API_KEY.");

@@ -40,6 +40,9 @@ export interface JobStatus {
   pdfBrief?: string;
   /** Poslední chyba před restartem — jinak ji restart přepsal a nebyla vidět */
   lastError?: string;
+  /** ⏱ Tracker přípravy: kdy byl dopsaný příběh a kdy byla pohádka hotová */
+  wroteAt?: number;
+  finishedAt?: number;
 }
 
 export async function putJson(path: string, data: unknown): Promise<string> {
@@ -231,6 +234,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       st.total = st.scenesScript.length;
       st.done = 0;
       st.sceneUrls = {};
+      st.wroteAt = Date.now(); // ⏱ konec psaní
     }
 
     const scenesScript = st.scenesScript!;
@@ -381,6 +385,8 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     }
 
     st.phase = "done";
+    st.finishedAt = Date.now(); // ⏱ pohádka kompletní
+    console.log(`[job ${id}] ⏱ celkem ${Math.round((st.finishedAt - st.createdAt) / 1000)}s (psaní ${st.wroteAt ? Math.round((st.wroteAt - st.createdAt) / 1000) : "?"}s)`);
     await write();
     await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true);
   } catch (e) {

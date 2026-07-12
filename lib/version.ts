@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.60";
+export const APP_VERSION = "3.61";
 
 // Changelog (newest first)
+// 3.61 - 🧪 Dva testovací hlasy Google Gemini ve výběru vypravěče (muž Charon + žena Aoede, mluví česky i anglicky, ~poloviční cena) pro porovnání kvality s ElevenLabs; ⏱ tracker délky přípravy: každá pohádka si měří čas psaní a celkovou dobu do hotova — v historii je odznak ⏱ m:ss (podržením detail psaní)
 // 3.60 - ▶ ČTENÍ HNED PO PRVNÍ SCÉNĚ: na běžící pohádce se objeví zelené tlačítko „Číst" jakmile je nakreslená první stránka (~1,5 min od zadání) — čtete, zatímco se zbytek dokresluje na pozadí a stránky přitékají do čtečky průběžně (na nedokreslenou stránku se nedá přeskočit, sama se otevře, jakmile je hotová); OPRAVA jazyka: pohádka s klonem/vymyšleným hlasem (mluví oběma jazyky) se píše v jazyce prostředí — v EN prostředí anglicky (dřív padala na češtinu)
 // 3.59 - 👨‍👧‍👦 Až 4 pojmenované rodinné klony hlasu (Tatínek, Nicolásek, Babička…): před nahráváním se hlas pojmenuje, každý je v rolleru zvlášť a maže se × po jednom; „vylepšení" = smazat a nahrát delší/čistší nahrávku; dětské hlasy fungují (instant klon bývá u dětí kolísavější — pomáhá klidné čtení po částech)
 // 3.58 - 🪄 Hlas podle popisu (Voice Design): v sekci Hlas napíšete, jak má vypravěč znít („vřelá babička, pomalé tempo…"), appka vygeneruje 3 ukázky, vyberete → hlas se uloží do výběru (max 8, mazání × přímo v rolleru — platí i pro klon); ladění přednesu bez nasazování přes env ELEVEN_STABILITY/STYLE/SIMILARITY/SPEED
