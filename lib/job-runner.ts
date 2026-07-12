@@ -8,7 +8,8 @@ import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, type StoryExtras } from "@/lib/claude";
 import { generateSceneImage, isDailyQuotaError } from "@/lib/gemini";
 import { narrateScene } from "@/lib/elevenlabs";
-import { charactersByIds, loadCharacters, loadReferenceImages, type ReferenceImage } from "@/lib/characters";
+import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
+import { loadPortraitRefs } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/types";
 import { blobToken } from "@/lib/blob-token";
@@ -247,8 +248,10 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     let voiceChars = 0;
 
     // ── 2) Scenes (Gemini + ElevenLabs) with the consistency anchor ──
+    // Referencí postav jsou MALOVANÉ PORTRÉTY z kartotéky (jednou nakreslené,
+    // pak jen čtené) — stejná podoba v každé pohádce + méně QA překreslení
     const ids: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
-    const refBase: ReferenceImage[] = loadReferenceImages(charactersByIds(ids));
+    const refBase: ReferenceImage[] = await loadPortraitRefs(charactersByIds(ids));
     const customImages = Array.isArray(body.customCharacterImages)
       ? (body.customCharacterImages as Array<{ data?: string; mimeType?: string }>)
       : [];
