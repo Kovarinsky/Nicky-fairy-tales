@@ -188,16 +188,33 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         inspirationUrlText: urlText || undefined,
       };
 
-      // Heartbeat během psaní: stream průběžně obnovuje updatedAt, takže
-      // klient nehlásí falešné zaseknutí u dlouhých scénářů (dva konce)
+      // Navázání psaní po restartu: rozepsaný text z minulého běhu se načte
+      // a Claude POKRAČUJE tam, kde funkce umřela (prefill odpovědi) —
+      // dlouhé pohádky (dva konce, hodně stránek) se dřív po timeoutu
+      // psaly pořád znovu OD NULY a nikdy se nedopsaly.
+      let resumeText = "";
+      if ((st.restarts ?? 0) > 0) {
+        const partial = await readJson<{ text?: string }>(`jobs/${id}/partial.json`);
+        if (partial?.text && partial.text.length > 500) {
+          resumeText = partial.text;
+          console.log(`[job ${id}] resuming story from ${resumeText.length} chars`);
+        }
+      }
+
+      // Heartbeat během psaní: stream průběžně obnovuje updatedAt (klient
+      // nehlásí falešné zaseknutí) a UKLÁDÁ rozepsaný text pro navázání
       let lastBeat = Date.now();
-      const script = await generateStory(storyReq, extras, () => {
+      let latestText = resumeText;
+      const script = await generateStory(storyReq, extras, (_chars, fullText) => {
+        latestText = fullText;
         const now = Date.now();
         if (now - lastBeat > 20_000) {
           lastBeat = now;
           write();
+          putJson(`jobs/${id}/partial.json`, { text: latestText })
+            .catch(e => console.warn(`[job ${id}] partial write failed:`, e));
         }
-      });
+      }, resumeText || undefined);
       st.title = script.title;
       st.heroDescription = script.heroDescription;
       // 🔀 Dva konce: konec B se generuje hned za koncem A (jeden seznam scén)

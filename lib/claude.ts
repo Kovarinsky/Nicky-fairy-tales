@@ -426,7 +426,7 @@ function sanitizeApiKey(key: string | undefined): string {
   return (key || "").replace(/[^\x20-\x7E]/g, "").trim();
 }
 
-async function callAnthropicApi(body: object, onDelta?: (chars: number) => void): Promise<string> {
+async function callAnthropicApi(body: object, onDelta?: (chars: number, fullText: string) => void): Promise<string> {
   const apiKey = sanitizeApiKey(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) throw new Error("Chybí ANTHROPIC_API_KEY.");
 
@@ -483,7 +483,7 @@ async function callAnthropicApi(body: object, onDelta?: (chars: number) => void)
       if (ev.type === "error" || ev.error) throw new Error(`Anthropic stream error: ${ev.error?.message || "unknown"}`);
       if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) {
         out += ev.delta.text;
-        onDelta?.(out.length);
+        onDelta?.(out.length, out);
       }
     }
   }
@@ -654,7 +654,14 @@ export async function studyWorld(
   return { prompt: parsed.prompt, question: parsed.question || null };
 }
 
-export async function generateStory(req: StoryRequest, extras: StoryExtras = {}, onDelta?: (chars: number) => void): Promise<StoryScript> {
+export async function generateStory(
+  req: StoryRequest,
+  extras: StoryExtras = {},
+  onDelta?: (chars: number, fullText: string) => void,
+  // Navázání po restartu funkce: rozepsaný text z minulého běhu se pošle
+  // jako prefill asistentovy odpovědi — Claude POKRAČUJE, nepíše od nuly.
+  resumeText?: string
+): Promise<StoryScript> {
   const model = MODEL.trim();
   const parts: AnthropicPart[] = [];
 
@@ -696,12 +703,21 @@ export async function generateStory(req: StoryRequest, extras: StoryExtras = {},
   const language = (req.language === "en" ? "en" : "cs") as "cs" | "en";
 
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const raw = await callAnthropicApi({
+    // Prefill: jen v 1. pokusu — když navázaný text nejde zparsovat,
+    // 2. pokus píše celý příběh od začátku (partial mohl být poškozený)
+    const prefix = attempt === 1 && resumeText ? resumeText.replace(/\s+$/, "") : "";
+    const messages: Array<{ role: string; content: string | AnthropicPart[] }> =
+      [{ role: "user", content }];
+    if (prefix) messages.push({ role: "assistant", content: prefix });
+    const continuation = await callAnthropicApi({
       model,
       max_tokens: 16384, // 20 scén s vyprávěním a popisy obrázků se do 8k nevešlo
       system: buildSystemPrompt(language),
-      messages: [{ role: "user", content }],
-    }, onDelta);
+      messages,
+    }, prefix
+      ? (chars, fullText) => onDelta?.(prefix.length + chars, prefix + fullText)
+      : onDelta);
+    const raw = prefix + continuation;
     try {
       const script = parseScript(raw);
       // PRAVIDLO KONZISTENCE #1: vzhled známých postav je KANONICKÝ — vždy
