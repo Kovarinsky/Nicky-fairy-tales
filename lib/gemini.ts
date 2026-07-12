@@ -26,6 +26,11 @@ export interface ImageResult {
   mimeType: string;
 }
 
+// 💰 Počítadlo SKUTEČNĚ vygenerovaných obrázků (včetně QA překreslení a
+// portrétů) pro přesné účtování: 1K sólo vs. 4K archy se platí jinak.
+// Volající si před prací vezme snímek a po práci zapíše rozdíl.
+export const genCounter = { img1k: 0, img4k: 0 };
+
 // Gemini vrací obrázky jako PNG (~1,5 MB na scénu) — 15stránková pohádka
 // pak má 25 MB+. WebP v plném rozlišení knížky je ~5× menší bez viditelné
 // ztráty; šetří úložiště, stahování do telefonu i posílání pohádky.
@@ -185,6 +190,8 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
           for (const cand of data.candidates || []) {
             for (const part of cand.content?.parts || []) {
               if (part.inlineData?.data) {
+                // 💰 skutečně vygenerovaný (placený) obrázek
+                if (imageSize === "4K") genCounter.img4k += 1; else genCounter.img1k += 1;
                 resolve({ buffer: Buffer.from(part.inlineData.data, "base64"), mimeType: part.inlineData.mimeType || "image/png" });
                 return;
               }

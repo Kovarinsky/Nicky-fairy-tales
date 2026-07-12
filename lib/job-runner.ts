@@ -6,7 +6,7 @@
 
 import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, type StoryExtras } from "@/lib/claude";
-import { generateSceneImage, generateSceneSheet, isDailyQuotaError } from "@/lib/gemini";
+import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefs } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
@@ -248,9 +248,12 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     st.done = Object.keys(st.sceneUrls).length;
     await write();
 
-    // Měření spotřeby: kolik obrázků vznikne V TOMTO běhu (při navázání se
-    // hotové scény nepočítají znovu); hlas se účtuje líně v /api/scene
-    const imagesAtStart = Object.keys(st.sceneUrls).length;
+    // Měření spotřeby: SKUTEČNĚ vygenerované obrázky v tomto běhu (počítadlo
+    // v gemini.ts — zahrnuje QA překreslení, portréty i archy; 1K a 4K se
+    // účtují zvlášť); hlas se účtuje líně v /api/scene
+    const genAtStart = { ...genCounter };
+    const madeImages = () => Math.max(0, genCounter.img1k - genAtStart.img1k);
+    const madeSheets = () => Math.max(0, genCounter.img4k - genAtStart.img4k);
     const voiceChars = 0;
 
     // ── 2) Scenes (Gemini + ElevenLabs) with the consistency anchor ──
@@ -364,7 +367,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       st.phase = "error";
       st.error = `Vyčerpán denní limit kreslení Gemini (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo). Resetuje se kolem 9:00 ráno — pak pohádku zadejte znovu.`;
       await write();
-      await writeUsageRecord(Object.keys(st.sceneUrls!).length - imagesAtStart, voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined);
+      await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true);
       return;
     }
 
@@ -379,7 +382,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
 
     st.phase = "done";
     await write();
-    await writeUsageRecord(Object.keys(st.sceneUrls!).length - imagesAtStart, voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined);
+    await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true);
   } catch (e) {
     st.phase = "error";
     st.error = e instanceof Error ? e.message : String(e);
@@ -388,14 +391,19 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   }
 }
 
-// Záznam spotřeby pro panel 💰: počet obrázků a znaků hlasu z tohoto běhu.
-// Data jsou v NÁZVU souboru (usage/u<ts>-i<obrázky>-c<znaky>.json) — /api/usage
-// je sečte pouhým výpisem, bez stahování obsahu. Úklid jobs/ se jich nedotkne.
-export async function writeUsageRecord(images: number, chars: number, device?: string): Promise<void> {
-  if (images <= 0 && chars <= 0) return;
+// Záznam spotřeby pro panel 💰: SKUTEČNĚ vygenerované obrázky z tohoto běhu
+// (včetně QA překreslení a portrétů — čte se počítadlo v gemini.ts).
+// Data jsou v NÁZVU souboru: usage/u<ts>-i<1K obrázky>-c<znaky>[-s<4K archy>][-t1][-d<zařízení>].json
+// (-t1 = záznam celé pohádky, kvůli počítání pohádek) — /api/usage je sečte
+// pouhým výpisem, bez stahování obsahu. Úklid jobs/ se jich nedotkne.
+export async function writeUsageRecord(
+  images: number, chars: number, device?: string, sheets = 0, story = false
+): Promise<void> {
+  if (images <= 0 && chars <= 0 && sheets <= 0) return;
   const dev = (device || "").replace(/[^a-z0-9]/gi, "").slice(0, 12);
+  const name = `usage/u${Date.now()}-i${images}-c${chars}${sheets > 0 ? `-s${sheets}` : ""}${story ? "-t1" : ""}${dev ? `-d${dev}` : ""}.json`;
   try {
-    await put(`usage/u${Date.now()}-i${images}-c${chars}${dev ? `-d${dev}` : ""}.json`, "1", {
+    await put(name, "1", {
       access: "public",
       addRandomSuffix: false,
       contentType: "application/json",

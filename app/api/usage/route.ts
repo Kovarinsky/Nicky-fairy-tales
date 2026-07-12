@@ -11,22 +11,24 @@ import { blobToken } from "@/lib/blob-token";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-// Ceny za 1 vygenerovaný obrázek (USD, rozlišení 1K)
+// Ceny za 1 vygenerovaný obrázek (USD): 1K sólo a 4K arch (nese až 9 scén)
 const IMAGE_PRICES: Record<string, number> = {
   "gemini-3.1-flash-image": 0.067,
   "gemini-2.5-flash-image": 0.039,
 };
+const SHEET_PRICE_4K = 0.151;
 
-// Vlastní počítadlo Gemini + hlasu: sečte záznamy usage/u<ts>-i<img>-c<chars>
-// zapsané job-runnerem (data jsou v názvu souboru — stačí výpis, nic se
-// nestahuje). Záznamy starší 90 dní se rovnou promažou.
-async function ownUsage(days: number): Promise<{ images: number; chars: number; usd: number; days: number; stories: number; devices: number } | { error: string }> {
+// Vlastní počítadlo Gemini + hlasu: sečte záznamy
+// usage/u<ts>-i<1K obrázky>-c<znaky>[-s<4K archy>][-t1][-d<zařízení>].json
+// (data jsou v názvu souboru — stačí výpis, nic se nestahuje; -t1 značí
+// záznam celé pohádky). Záznamy starší 90 dní se rovnou promažou.
+async function ownUsage(days: number): Promise<{ images: number; sheets: number; chars: number; usd: number; days: number; stories: number; devices: number } | { error: string }> {
   if (!blobToken()) return { error: "blob-not-configured" };
   const cutoff = Date.now() - days * 86_400_000;
   const pruneBefore = Date.now() - 90 * 86_400_000;
   const model = (process.env.GEMINI_IMAGE_MODEL_PRIMARY || process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image").trim();
   const price = IMAGE_PRICES[model] ?? 0.05;
-  let images = 0, chars = 0, stories = 0;
+  let images = 0, sheets = 0, chars = 0, stories = 0;
   const devices = new Set<string>();
   const stale: string[] = [];
   try {
@@ -34,21 +36,28 @@ async function ownUsage(days: number): Promise<{ images: number; chars: number; 
     do {
       const page = await list({ prefix: "usage/", cursor, limit: 1000, token: blobToken() });
       for (const b of page.blobs) {
-        const m = b.pathname.match(/^usage\/u(\d+)-i(\d+)-c(\d+)(?:-d([a-z0-9]{1,16}))?\.json$/i);
+        const m = b.pathname.match(/^usage\/u(\d+)-i(\d+)-c(\d+)(?:-s(\d+))?(-t1)?(?:-d([a-z0-9]{1,16}))?\.json$/i);
         if (!m) continue;
         const ts = Number(m[1]);
         if (ts < pruneBefore) { stale.push(b.url); continue; }
         if (ts >= cutoff) {
           images += Number(m[2]);
           chars += Number(m[3]);
-          stories += 1;
-          if (m[4]) devices.add(m[4].toLowerCase());
+          sheets += m[4] ? Number(m[4]) : 0;
+          // Pohádka = záznam s -t1; starší formát (před značkou): záznam
+          // s obrázky i hlasem najednou byl vždy celý job
+          if (m[5] || (Number(m[2]) > 0 && Number(m[3]) > 0)) stories += 1;
+          if (m[6]) devices.add(m[6].toLowerCase());
         }
       }
       cursor = page.cursor;
     } while (cursor);
     if (stale.length) del(stale, { token: blobToken() }).catch(() => {});
-    return { images, chars, usd: Math.round(images * price * 100) / 100, days, stories, devices: devices.size };
+    return {
+      images, sheets, chars,
+      usd: Math.round((images * price + sheets * SHEET_PRICE_4K) * 100) / 100,
+      days, stories, devices: devices.size,
+    };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "fetch failed" };
   }

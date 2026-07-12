@@ -237,7 +237,7 @@ export default function Home() {
   type UsageData = {
     claude?: { usd?: number; days?: number; error?: string };
     elevenlabs?: { used?: number; limit?: number; tier?: string; error?: string };
-    own?: { images?: number; chars?: number; usd?: number; days?: number; stories?: number; devices?: number; error?: string };
+    own?: { images?: number; sheets?: number; chars?: number; usd?: number; days?: number; stories?: number; devices?: number; error?: string };
     czkRate?: number;
   };
   // Which queued story the gen-cards preview (tap a segment to switch)
@@ -3534,7 +3534,7 @@ export default function Home() {
                         <span className="usage-lbl">{t.statDevices}</span>
                       </div>
                       <div className="usage-stat">
-                        <span className="usage-num">🎨 {usage.own.images.toLocaleString("cs-CZ")}</span>
+                        <span className="usage-num">🎨 {(usage.own.images + (usage.own.sheets ?? 0)).toLocaleString("cs-CZ")}</span>
                         <span className="usage-lbl">{t.statImages(Math.round((usage.own.usd ?? 0) * (usage.czkRate ?? 23)).toLocaleString("cs-CZ"))}</span>
                       </div>
                       <div className="usage-stat">

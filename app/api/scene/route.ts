@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateSceneImage } from "@/lib/gemini";
+import { generateSceneImage, genCounter } from "@/lib/gemini";
 import { narrateScene } from "@/lib/elevenlabs";
 import { charactersByIds, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefs } from "@/lib/portraits";
@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
     let audioDebug = "";
     // noAudio: hlas se vyrábí líně až při čtení — scéna generuje jen obrázek
     const noAudio = body.noAudio === true;
+    const genAtStart = { ...genCounter };
     const [imageResult, audio] = await Promise.all([
       generateSceneImage(scene, heroDescription, refImages).catch((e: Error) => {
         imageDebug = e.message;
@@ -78,8 +79,12 @@ export async function POST(req: NextRequest) {
     let imageUrl: string;
     if (imageResult) {
       // Spotřeba: obrázky kreslené mimo serverovou frontu (líná větev B,
-      // oprava scény, lokální pipeline) se počítají tady
-      writeUsageRecord(1, 0, typeof body.deviceId === "string" ? body.deviceId : undefined).catch(() => {});
+      // oprava scény, lokální pipeline) — skutečný počet generování vč. QA
+      writeUsageRecord(
+        Math.max(1, genCounter.img1k - genAtStart.img1k), 0,
+        typeof body.deviceId === "string" ? body.deviceId : undefined,
+        Math.max(0, genCounter.img4k - genAtStart.img4k)
+      ).catch(() => {});
       imageUrl = `data:${imageResult.mimeType};base64,${imageResult.buffer.toString("base64")}`;
     } else {
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1a1040"/><stop offset="100%" stop-color="#3d1060"/></linearGradient></defs><rect width="800" height="450" fill="url(#g)"/><text x="400" y="190" text-anchor="middle" fill="rgba(255,255,255,0.35)" font-size="72" font-family="serif">✨</text><text x="400" y="270" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="22" font-family="sans-serif">Scéna ${scene.index}</text></svg>`;
