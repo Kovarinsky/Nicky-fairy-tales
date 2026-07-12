@@ -203,6 +203,8 @@ export default function Home() {
   // Story / reader state
   const [title, setTitle] = useState("");
   const [scenes, setScenes] = useState<RenderedScene[]>([]);
+  const scenesRef = useRef<RenderedScene[]>([]);
+  scenesRef.current = scenes;
   const [page, setPage] = useState(0);
   // 🔀 Dva konce: meta výběru + zvolená větev (null = ještě nevybráno)
   const [storyChoice, setStoryChoice] = useState<StoryChoiceMeta | null>(null);
@@ -261,10 +263,9 @@ export default function Home() {
 
   const allScenesReady = scenes.length > 0 && scenes.every(s => s.imageUrl && s.audioUrl);
   // bookReady: all images present (SVG fallback always set) — use for UI display and FS trigger
-  // 🔀 Líná větev B: obrázky druhého konce vznikají až při jeho výběru —
-  // kniha je „hotová", když mají obrázek všechny scény PŘED větví B
-  const bookReady = scenes.length > 0
-    && scenes.slice(0, storyChoice ? storyChoice.altFrom : scenes.length).every(s => s.imageUrl);
+  // ▶ Čtení začíná, jakmile je hotová PRVNÍ scéna — zbytek se dokresluje
+  // na pozadí (čtečka na nedokreslené stránky počká)
+  const bookReady = scenes.length > 0 && !!scenes[0]?.imageUrl;
 
   // Reader mode: explicit switch so old story stays in memory when form opens
   const [viewMode, setViewMode] = useState<"form" | "reader">("form");
@@ -809,7 +810,9 @@ export default function Home() {
       goodnightAudioRef.current = null;
       return;
     }
-    const lang = voices.find(v => v.id === selectedVoiceId)?.language ?? "cs";
+    // Klon/vymyšlený hlas má jazyk „any" (mluví oběma) → rozhoduje jazyk prostředí
+    const vLangG = voices.find(v => v.id === selectedVoiceId)?.language;
+    const lang = vLangG === "cs" || vLangG === "en" ? vLangG : uiLang;
     const text = lang === "en"
       ? "Good night, Nicolas and Valentina. Sweet dreams!"
       : "Dobrou noc, Nicolásku a Valentýnko. Sladké sny!";
@@ -1160,6 +1163,10 @@ export default function Home() {
 
   const goToPage = useCallback((n: number) => {
     if (n < 0 || n >= scenes.length) return;
+    // ▶ Brzké čtení: na stránku, která se ještě kreslí, se nedá přejít ručně
+    // (jen u pohádky, jejíž generování stále běží; jinak by blokla větev B)
+    if (n > 0 && !scenesRef.current[n]?.imageUrl
+        && serverJobsRef.current.some(jb => jb.jobId === readerEntryIdRef.current && jb.phase === "generating")) return;
     audioRef.current?.pause();
     setIsPlaying(false);
     setPage(n);
@@ -1676,6 +1683,8 @@ export default function Home() {
   const jobMediaRef = useRef<Map<string, { scenes: Map<number, { imageUrl?: string; audioUrl?: string }>; fetching: Set<number> }>>(new Map());
   // Per-job scene buffer for the gen-card thumbnails
   const jobBuffersRef = useRef<Map<string, RenderedScene[]>>(new Map());
+  // Meta rozpracované pohádky (nadpis, zámek vzhledu, rozcestí) pro brzké čtení
+  const jobMetaRef = useRef<Map<string, { title?: string; heroDescription?: string; choice?: StoryChoiceMeta }>>(new Map());
   // Stall watch (per job): when the server function dies on the 5-min limit, kick /continue
   const jobStallRef = useRef<Map<string, { lastChange: number; lastSig: string; lastKick: number; fails404: number; manualKicks: number; autoKicks: number }>>(new Map());
 
@@ -1772,6 +1781,28 @@ export default function Home() {
     } catch {}
   }
 
+  // ▶ Brzké čtení: otevřít ROZPRACOVANOU pohádku, jakmile je hotová scéna 1 —
+  // zbytek se dokresluje na pozadí a do čtečky přitéká průběžně
+  function openRunningJob(jobId: string) {
+    const buf = jobBuffersRef.current.get(jobId);
+    if (!buf || !buf[0]?.imageUrl) return;
+    const meta = jobMetaRef.current.get(jobId);
+    audioRef.current?.pause();
+    setIsPlaying(false);
+    introFiredRef.current = false;
+    setTitle(meta?.title || serverJobsRef.current.find(j => j.jobId === jobId)?.title || "Pohádka");
+    readerEntryIdRef.current = jobId;
+    readerHeroRef.current = meta?.heroDescription || "";
+    readerCharIdsRef.current = selectedIds;
+    setStoryChoice(meta?.choice ?? null);
+    setBranch(null);
+    setScenes(buf.map(s => ({ ...s })));
+    setPage(0);
+    setSlideKey(k => k + 1);
+    setViewMode("reader");
+    isAutoAdvanceRef.current = true;
+  }
+
   // Open a finished server story from its toast row
   async function openServerJob(job: ServerJob) {
     let rendered = renderedMapRef.current.get(job.jobId);
@@ -1826,6 +1857,16 @@ export default function Home() {
         jm!.scenes.set(i, m);
         const b = jobBuffersRef.current.get(jobId);
         if (b && b[i]) b[i] = { ...b[i], imageUrl: m.imageUrl, audioUrl: m.audioUrl };
+        // ▶ Brzké čtení: čtečka otevřená na rozpracované pohádce dostává
+        // dokreslené scény průběžně
+        if (readerEntryIdRef.current === jobId) {
+          setScenes(prev => {
+            if (!b || prev.length !== b.length || !prev[i] || prev[i].imageUrl) return prev;
+            const nx = [...prev];
+            nx[i] = { ...nx[i], imageUrl: m.imageUrl, audioUrl: m.audioUrl || nx[i].audioUrl };
+            return nx;
+          });
+        }
       }).catch(() => { jm!.fetching.delete(i); });
     }
   }
@@ -1897,6 +1938,7 @@ export default function Home() {
           // restarts/lastError: diagnostika, proč se psaní opakuje (viditelná v řádku)
           updateServerJob(jobId, { phase: "writing", restarts: st.restarts || 0, lastError: st.lastError || undefined });
         } else if (st.phase === "generating") {
+          jobMetaRef.current.set(jobId, { title: st.title, heroDescription: st.heroDescription, choice: st.choice });
           prefetchJobScenes(jobId, st);
           updateServerJob(jobId, { phase: "generating", done: st.done || 0, total: st.total || 0, title: st.title, imgError: st.imgError || undefined });
         } else if (st.phase === "done") {
@@ -1966,7 +2008,12 @@ export default function Home() {
       characterIds: selectedIds,
       age: getTargetAge([...selectedIds, ...selectedCustomIds]),
       sceneCount,
-      language: voices.find(v => v.id === selectedVoiceId)?.language ?? "cs",
+      // Jazyk pohádky: hlas s pevným jazykem (🇨🇿/🇬🇧) rozhoduje; klon a
+      // vymyšlené hlasy („any") mluví oběma → rozhoduje jazyk prostředí
+      language: (() => {
+        const vl = voices.find(v => v.id === selectedVoiceId)?.language;
+        return vl === "cs" || vl === "en" ? vl : uiLang;
+      })(),
       previousStory: sequelOf ? { title: sequelOf.title, text: sequelOf.text } : undefined,
       twoEndings,
       customCharacters: selectedCustomObjsForJob.map(c => ({
@@ -3500,6 +3547,12 @@ export default function Home() {
                         title={j.title || undefined}
                       >
                         <span className="job-seg-fill" />
+                        {j.phase === "generating" && jobBuffersRef.current.get(j.jobId)?.[0]?.imageUrl && (
+                          <button type="button" className="job-seg-read" title={t.readEarlyHint}
+                            onClick={e => { e.stopPropagation(); openRunningJob(j.jobId); }}>
+                            ▶︎ {t.readEarly}
+                          </button>
+                        )}
                         {j.phase !== "done" && (
                           <button type="button" className="job-seg-x" aria-label={t.segCancel} title={t.segCancel}
                             onClick={async e => {

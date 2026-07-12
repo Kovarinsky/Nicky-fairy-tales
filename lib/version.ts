@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.59";
+export const APP_VERSION = "3.60";
 
 // Changelog (newest first)
+// 3.60 - ▶ ČTENÍ HNED PO PRVNÍ SCÉNĚ: na běžící pohádce se objeví zelené tlačítko „Číst" jakmile je nakreslená první stránka (~1,5 min od zadání) — čtete, zatímco se zbytek dokresluje na pozadí a stránky přitékají do čtečky průběžně (na nedokreslenou stránku se nedá přeskočit, sama se otevře, jakmile je hotová); OPRAVA jazyka: pohádka s klonem/vymyšleným hlasem (mluví oběma jazyky) se píše v jazyce prostředí — v EN prostředí anglicky (dřív padala na češtinu)
 // 3.59 - 👨‍👧‍👦 Až 4 pojmenované rodinné klony hlasu (Tatínek, Nicolásek, Babička…): před nahráváním se hlas pojmenuje, každý je v rolleru zvlášť a maže se × po jednom; „vylepšení" = smazat a nahrát delší/čistší nahrávku; dětské hlasy fungují (instant klon bývá u dětí kolísavější — pomáhá klidné čtení po částech)
 // 3.58 - 🪄 Hlas podle popisu (Voice Design): v sekci Hlas napíšete, jak má vypravěč znít („vřelá babička, pomalé tempo…"), appka vygeneruje 3 ukázky, vyberete → hlas se uloží do výběru (max 8, mazání × přímo v rolleru — platí i pro klon); ladění přednesu bez nasazování přes env ELEVEN_STABILITY/STYLE/SIMILARITY/SPEED
 // 3.57 - 🎙️ Rodičovský hlas a výběr vypravěče: nová sekce Hlas vypravěče — výchozí automatika (podle jazyka), roller hlasů s okamžitou ukázkou po výběru, a KLONOVÁNÍ hlasu rodiče: přečtete ~minutový text (připravený, s intonacemi pohádky), appka vytvoří klon u ElevenLabs (Instant Voice Cloning, tarif Starter+), přehraje ověřovací ukázku a klon pak vypráví pohádky česky i anglicky; vylepšení = nahrát znovu, smazání jedním ťuknutím (vč. nahrávky u ElevenLabs — appka ji neukládá)
