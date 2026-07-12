@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.50";
+export const APP_VERSION = "3.51";
 
 // Changelog (newest first)
+// 3.51 - 🗂️ Archy scén: obrázky se kreslí po skupinách v jednom 4K obrázku (mřížka 3×3, až 9 scén za cenu jednoho = 0,39 Kč/scénu místo 1,56 Kč) a rozřezávají se podle bílých linek; z desatera je JEDENÁCTERO — nové pravidlo: nic důležitého oříznutého okrajem (hlavy, lodě, stavby, měsíc) a nikdo jmenovaný nesmí chybět (kontrola nově dostává i popis scény); každý výřez se kontroluje zvlášť, vadný arch se až 2× překreslí a neprošlé panely se dokreslí sólo; vypnutí přes IMAGE_SHEET_MODE=off
 // 3.50 - 🔀 Líný druhý konec: obrázky větve B se malují AŽ když čtenář na rozcestí druhý konec opravdu vybere (progres okno „Kreslím druhý konec…"), první výběr chvilku počká, pak je konec uložený — úspora ~1/3 obrázků u pohádek s alternativními konci; sdílení a export si oba konce dokreslí automaticky; 💰 prompt caching u psaní příběhu (neměnný systémový prompt se platí ~1/10) a účtování obrázků kreslených mimo frontu
 // 3.49 - 🎙️ Hlas se vyrábí AŽ PŘI ČTENÍ hotové pohádky (úspora ~20–40 % nákladů na hlas): generování dělá jen text a obrázky, namluvení vzniká pro čtenou stránku + 2 další dopředu a ukládá se (platí se jen jednou); před sdílením odkazem a exportem do souboru se chybějící namluvení automaticky doplní, takže odeslaná pohádka je vždy kompletní; spotřeba hlasu se účtuje při namluvení
 // 3.48 - Kartotéka v2 podle zpětné vazby: Valentýnka sahá Nicolasovi po ramena (ne do půli), James je PŘESNĚ stejně vysoký jako Nicolas, táta Jan má víc vlasů (plnější nahoře, kouty jen na spáncích — podle nové fotky) a zamčené bílé tenisky; portréty se překreslí (verze v2) a stejné výšky se učí i psaní příběhu

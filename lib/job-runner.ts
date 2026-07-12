@@ -6,7 +6,7 @@
 
 import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, type StoryExtras } from "@/lib/claude";
-import { generateSceneImage, isDailyQuotaError } from "@/lib/gemini";
+import { generateSceneImage, generateSceneSheet, isDailyQuotaError } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefs } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
@@ -309,6 +309,43 @@ export async function runJob(id: string, body: Record<string, unknown>) {
 
     // Scene 1 first (anchor), then the rest in parallel
     await doScene(0);
+
+    // 🗂️ Režim archů: zbylé scény po skupinách v JEDNOM obrázku (3×3 ve 4K =
+    // až 9 scén za cenu jednoho obrázku), rozřezané a zkontrolované jedenácterem
+    // per panel. Neprošlé/nevygenerované panely dokreslí sólo kola níže.
+    // IMAGE_SHEET_MODE: "3x3" (výchozí) | "2x2" | "off"
+    const sheetMode = (process.env.IMAGE_SHEET_MODE || "3x3").toLowerCase();
+    if (sheetMode !== "off" && !quotaExhausted && st.sceneUrls![0]) {
+      const maxCells = sheetMode === "2x2" ? 4 : 9;
+      let pending = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
+      while (pending.length >= 2 && !quotaExhausted) {
+        const group = pending.slice(0, Math.min(maxCells, pending.length));
+        await write(); // heartbeat před dlouhým generováním archu
+        try {
+          const refs = anchor ? [...refBase, anchor] : refBase;
+          const results = await generateSceneSheet(group.map(i => scenesScript[i]), heroDescription, refs);
+          for (let k = 0; k < group.length; k++) {
+            const img = results[k];
+            if (!img) continue;
+            const i = group[k];
+            const url = await putJson(`jobs/${id}/scene-${i}.json`, {
+              index: scenesScript[i].index,
+              imageUrl: `data:${img.mimeType};base64,${img.buffer.toString("base64")}`,
+            });
+            st.sceneUrls![i] = url;
+          }
+          st.done = Object.keys(st.sceneUrls!).length;
+          await write();
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.warn(`[job ${id}] sheet failed (${msg.slice(0, 160)}) → sólo dokreslení`);
+          if (isDailyQuotaError(msg)) quotaExhausted = true;
+          break; // zbytek dokreslí sólo kola
+        }
+        pending = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
+      }
+    }
+
     let idx = 1;
     async function worker() {
       while (idx < total) { const i = idx++; await doScene(i); }

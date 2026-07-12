@@ -136,10 +136,11 @@ function regexSanitize(text: string): string {
 }
 
 // Step 2: Call Gemini image model with the sanitized prompt (+ reference photos)
-function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: string | null = "16:9", refImages: ReferenceImage[] = []): Promise<ImageResult> {
+function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: string | null = "16:9", refImages: ReferenceImage[] = [], imageSize?: string): Promise<ImageResult> {
   const generationConfig: Record<string, unknown> = { responseModalities: ["IMAGE", "TEXT"] };
   // Uniform aspect ratio (16:9 scenes, 9:16 app backgrounds); null = model default
-  if (aspect) generationConfig.imageConfig = { aspectRatio: aspect };
+  // imageSize "4K" — archy scén (víc scén v jednom obrázku, pak se rozřežou)
+  if (aspect) generationConfig.imageConfig = { aspectRatio: aspect, ...(imageSize ? { imageSize } : {}) };
   // Reference photos go first, each labeled with the character's name,
   // so Gemini can match the likeness when drawing the stylized scene
   const parts: Array<Record<string, unknown>> = [];
@@ -211,7 +212,7 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
 // Vrací null, jen když se kontrola ani na 3. pokus nepovedla — volající pak
 // NEPŘEPISUJE poslední ověřený stav neověřeným obrázkem.
 async function verifySceneImage(
-  apiKey: string, img: ImageResult, heroDescription: string
+  apiKey: string, img: ImageResult, heroDescription: string, scenePrompt = ""
 ): Promise<{ ok: boolean; problems: string; badRules: number } | null> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
@@ -224,9 +225,10 @@ async function verifySceneImage(
               "You are a STRICT quality inspector for a children's storybook illustration.",
               "CANONICAL CHARACTER SHEET:",
               heroDescription.slice(0, 8000),
+              ...(scenePrompt ? ["", "SCENE DESCRIPTION (what THIS image should show):", scenePrompt.slice(0, 700)] : []),
               "",
-              "Run this TEN-RULE checklist and FAIL the image on ANY violation:",
-              "1) COUNT the human figures: more people than named characters on the sheet (including background strangers) = FAIL.",
+              "Run this ELEVEN-RULE checklist and FAIL the image on ANY violation:",
+              "1) COUNT the human figures: more people than the characters named in the scene (including background strangers) = FAIL; a character named in the scene description who is MISSING from the image = FAIL.",
               "2) Each named character appears EXACTLY ONCE — two similar children or two similar adults = FAIL.",
               "3) HAIR COLOR of EVERY person matches their sheet entry (blond stays blond, brown stays brown, dark stays dark) — check person by person.",
               "4) Hair LENGTH and STYLE match the sheet (short stays short, long stays long; beard per sheet).",
@@ -236,7 +238,8 @@ async function verifySceneImage(
               "8) ANATOMY: exactly two arms, two legs, five fingers per hand, natural faces; bicycles have two wheels.",
               "9) KEY OBJECTS identical to their sheet entry — the same vehicle/boat/toy type and colors as stated.",
               "10) NO text, letters, numbers, watermarks or signatures anywhere in the image.",
-              "Minor painterly variation is fine — but violations of the ten rules above are NEVER minor.",
+              "11) FRAMING: nothing important is CUT OFF by the image edges — no cropped heads or faces, no half-cut characters, and no key objects (boat, vehicle, building, the moon…) sliced by the border. Background scenery may naturally continue past the edge.",
+              "Minor painterly variation is fine — but violations of the eleven rules above are NEVER minor.",
               'Reply with ONLY JSON. Passing image: {"ok":true}. Failing image: {"ok":false,"rules":[<numbers of violated rules>],"problems":"<max 60 words: per violated rule a short English reason>"}',
             ].join("\n") },
           ],
@@ -288,27 +291,30 @@ export async function generateBackgroundImage(prompt: string, refImages: Referen
   throw lastErr;
 }
 
+// Sdílené stavební kameny promptů (sólo obrázek i arch scén)
+const STYLE_SUFFIX = "Hand-painted 2D storybook illustration, soft painterly brushwork in classic Disney animated-film style, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. Strictly FLAT 2D painting — NOT a 3D render, no CGI, no plastic skin, no photorealism. Correct natural anatomy: every person has EXACTLY two arms, two legs and five fingers on each hand — no extra, missing or deformed limbs; bicycles have exactly two wheels. Absolutely no text, letters, words, signs, labels, captions, subtitles, watermarks, or artist signatures of any kind anywhere in the image.";
+
+function buildAppearanceLock(heroDescription: string): { open: string; close: string } {
+  if (!heroDescription) return { open: "", close: "" };
+  return {
+    open: [
+      `⚠ APPEARANCE LOCK — IMMUTABLE across every image in this story:`,
+      heroDescription,
+      `Every named character MUST look IDENTICAL to this description in EVERY image: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes — AND the same AGE, same BODY SIZE and PROPORTIONS. Relative heights between characters NEVER change: a toddler stays toddler-sized, a child stays child-sized, adults stay adult-sized. Any recurring OBJECT listed above (vehicle, magic item, toy) keeps IDENTICAL type, shape and colors in every scene — the same car stays the same car. These are LOCKED — do NOT change anything between scenes.`,
+      `If 'Story outfits:' defines outdoor/indoor variants, draw the variant stated at the end of the scene description — and ALL characters in the scene share the SAME dressing level (never one in a winter coat while another wears a T-shirt).`,
+      `ONLY the characters named in the scene are visible — zero additional people, strangers, or background human figures. Each named character appears EXACTLY ONCE in the image — NEVER draw two copies of the same person.`,
+    ].join(" "),
+    close: `⚠ CONSISTENCY REMINDER: match hair, eyes, clothing, age, body size and relative heights EXACTLY as stated above — do NOT alter any detail.`,
+  };
+}
+
 export async function generateSceneImage(scene: Scene, heroDescription: string, refImages: ReferenceImage[] = []): Promise<ImageResult> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
   const model = IMAGE_MODEL.trim();
 
   // Build raw prompt: character lock bookends the scene (start + end = highest model attention)
-  const charLockOpen = heroDescription
-    ? [
-        `⚠ APPEARANCE LOCK — IMMUTABLE across every image in this story:`,
-        heroDescription,
-        `Every named character MUST look IDENTICAL to this description in EVERY image: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes — AND the same AGE, same BODY SIZE and PROPORTIONS. Relative heights between characters NEVER change: a toddler stays toddler-sized, a child stays child-sized, adults stay adult-sized. Any recurring OBJECT listed above (vehicle, magic item, toy) keeps IDENTICAL type, shape and colors in every scene — the same car stays the same car. These are LOCKED — do NOT change anything between scenes.`,
-        `If 'Story outfits:' defines outdoor/indoor variants, draw the variant stated at the end of the scene description — and ALL characters in the scene share the SAME dressing level (never one in a winter coat while another wears a T-shirt).`,
-        `ONLY the characters named in the scene are visible — zero additional people, strangers, or background human figures. Each named character appears EXACTLY ONCE in the image — NEVER draw two copies of the same person.`,
-      ].join(" ")
-    : "";
-
-  const charLockClose = heroDescription
-    ? `⚠ CONSISTENCY REMINDER: match hair, eyes, clothing, age, body size and relative heights EXACTLY as stated above — do NOT alter any detail.`
-    : "";
-
-  const STYLE_SUFFIX = "Hand-painted 2D storybook illustration, soft painterly brushwork in classic Disney animated-film style, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. Strictly FLAT 2D painting — NOT a 3D render, no CGI, no plastic skin, no photorealism. Correct natural anatomy: every person has EXACTLY two arms, two legs and five fingers on each hand — no extra, missing or deformed limbs; bicycles have exactly two wheels. Absolutely no text, letters, words, signs, labels, captions, subtitles, watermarks, or artist signatures of any kind anywhere in the image.";
+  const { open: charLockOpen, close: charLockClose } = buildAppearanceLock(heroDescription);
 
   const rawPrompt = [
     charLockOpen,
@@ -341,7 +347,7 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
         // Drží se NEJLEPŠÍ OVĚŘENÝ pokus (nejméně porušených pravidel) —
         // neověřený obrázek nikdy nenahradí ověřený.
         if (heroDescription) {
-          const v0 = await verifySceneImage(apiKey, img, heroDescription);
+          const v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt);
           if (v0 && !v0.ok) {
             let best = { img, badRules: v0.badRules, problems: v0.problems };
             for (let fix = 1; fix <= 3 && best.badRules > 0; fix++) {
@@ -352,7 +358,7 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
                   ? safePrompt
                   : `${safePrompt} ⚠ CORRECTION ${fix}: the previous attempt violated these rules: ${best.problems}. Fix EXACTLY these issues — follow the APPEARANCE LOCK precisely, draw ONLY the named characters, each EXACTLY ONCE, with their own hair colors and outfits.`;
                 const img2 = await callGeminiImage(apiKey, m, prompt2, withAspect ? "16:9" : null, refImages);
-                const v2 = await verifySceneImage(apiKey, img2, heroDescription);
+                const v2 = await verifySceneImage(apiKey, img2, heroDescription, scene.imagePrompt);
                 if (v2 && (v2.ok || v2.badRules < best.badRules)) {
                   best = { img: img2, badRules: v2.ok ? 0 : v2.badRules, problems: v2.problems };
                 }
@@ -421,4 +427,156 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
   }
 
   throw new Error(`[scene ${scene.index}] ${lastErr.message}`);
+}
+
+// ── 🗂️ Arch scén: víc scén v JEDNOM obrázku, pak rozřezat ────────────────────
+// Gemini účtuje za obrázek (podle rozlišení), ne za obsah — 3×3 arch ve 4K
+// stojí $0,151 a nese až 9 scén (0,39 Kč/scénu místo 1,56 Kč), výřez 1834×1024
+// je nad dnešní kvalitou. Bonus: scény z jednoho tahu jsou přirozeně
+// konzistentní. Pojistky: řez jen když jsou mezery opravdu bílé (jinak se
+// arch zamítne), jedenáctero na KAŽDÝ výřez zvlášť, až 2 překreslení archu
+// s výčtem chyb; panely, které ani pak neprojdou, vrací null a volající je
+// dokreslí sólo cestou (generateSceneImage).
+
+/** Ověří bílé dělicí linky a rozřeže arch na grid×grid výřezů (s malým
+ *  odsazením, ať v obraze nezůstanou zbytky mezer). Vrací null, když mřížka
+ *  nesedí — takový arch se nesmí řezat. */
+async function sliceSheet(img: ImageResult, grid: number): Promise<ImageResult[] | null> {
+  try {
+    const sharp = (await import("sharp")).default;
+    const { data, info } = await sharp(img.buffer).greyscale().raw().toBuffer({ resolveWithObject: true });
+    const lum = (x: number, y: number) => data[y * info.width + x];
+    const lineWhite = (vertical: boolean, pos: number): number => {
+      let sum = 0, cnt = 0;
+      const range = vertical ? info.height : info.width;
+      for (let t = 0; t < range; t += 9) {
+        for (let o = -4; o <= 4; o += 2) {
+          const x = vertical ? pos + o : t;
+          const y = vertical ? t : pos + o;
+          if (x >= 0 && x < info.width && y >= 0 && y < info.height) { sum += lum(x, y); cnt += 1; }
+        }
+      }
+      return cnt ? sum / cnt : 0;
+    };
+    for (let k = 1; k < grid; k++) {
+      const wx = lineWhite(true, Math.round((info.width * k) / grid));
+      const wy = lineWhite(false, Math.round((info.height * k) / grid));
+      if (wx < 210 || wy < 210) {
+        console.warn(`[Gemini sheet] mřížka nesedí (jas linky ${Math.round(wx)}/${Math.round(wy)}) → arch zamítnut`);
+        return null;
+      }
+    }
+    const W = Math.floor(info.width / grid);
+    const H = Math.floor(info.height / grid);
+    const G = Math.round(W * 0.015); // odsazení od bílých mezer
+    const out: ImageResult[] = [];
+    for (let r = 0; r < grid; r++) {
+      for (let c = 0; c < grid; c++) {
+        const buf = await sharp(img.buffer)
+          .extract({ left: c * W + G, top: r * H + G, width: W - 2 * G, height: H - 2 * G })
+          .png()
+          .toBuffer();
+        out.push({ buffer: buf, mimeType: "image/png" });
+      }
+    }
+    return out;
+  } catch (e) {
+    console.warn(`[Gemini sheet] slice failed: ${e instanceof Error ? e.message : e}`);
+    return null;
+  }
+}
+
+/**
+ * Vygeneruje 2–9 scén jedním archem (2×2 pro ≤4, jinak 3×3; volné buňky se
+ * vyplní prázdnou scenérií). Vrací pole délky scenes.length — prošlé výřezy
+ * jako ImageResult, neprošlé/nedokreslené jako null (dokreslí se sólo).
+ * Při nefunkční mřížce / nepodpoře 4K vyhodí chybu → volající jde sólo cestou.
+ */
+export async function generateSceneSheet(
+  scenes: Scene[],
+  heroDescription: string,
+  refImages: ReferenceImage[] = []
+): Promise<Array<ImageResult | null>> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
+  const model = IMAGE_MODEL.trim();
+  const n = scenes.length;
+  if (n < 2 || n > 9) throw new Error(`sheet: nepodporovaný počet scén ${n}`);
+  const grid = n <= 4 ? 2 : 3;
+  const cells = grid * grid;
+
+  const { open: lockOpen, close: lockClose } = buildAppearanceLock(heroDescription);
+  const panelLines: string[] = [];
+  for (let i = 0; i < cells; i++) {
+    const r = Math.floor(i / grid) + 1;
+    const c = (i % grid) + 1;
+    panelLines.push(
+      i < n
+        ? `PANEL ${i + 1} (row ${r}, column ${c}): ${scenes[i].imagePrompt}`
+        : `PANEL ${i + 1} (row ${r}, column ${c}): a quiet, empty scenery view from the same story world — NO people, NO creatures.`
+    );
+  }
+  const gutterPos = grid === 2
+    ? "exactly through the horizontal and vertical center of the image"
+    : "at exactly one-third and two-thirds of the image width and height";
+  const rawPrompt = [
+    `A single image divided into EXACTLY ${cells} equal rectangular panels in a ${grid}×${grid} grid (${grid} columns, ${grid} rows), separated by STRAIGHT, THICK, PURE-WHITE gutters ${gutterPos}. Each panel is one scene of the SAME storybook, drawn edge to edge inside its panel.`,
+    `Compose each panel like a FINISHED book illustration: every character and every key object (boat, vehicle, building, the moon…) FULLY inside its panel with a comfortable breathing margin — nothing important may touch or cross the white gutters or panel edges. No cropped heads, no half-cut characters or objects.`,
+    lockOpen,
+    ...panelLines,
+    lockClose,
+    STYLE_SUFFIX,
+  ].filter(Boolean).join(" ");
+  const safePrompt = await sanitizeWithGemini(apiKey, rawPrompt);
+  console.log(`[Gemini sheet] ${n} scén v mřížce ${grid}×${grid}, model=${model} (${safePrompt.length} chars)`);
+
+  type Attempt = { imgs: Array<ImageResult | null>; badPanels: number; problems: string };
+  let best: Attempt | null = null;
+  let correction = "";
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const sheet = await callGeminiImage(
+      apiKey, model,
+      correction ? `${safePrompt} ⚠ CORRECTION ${attempt - 1}: the previous sheet had these problems: ${correction}. Fix EXACTLY these issues and keep everything else identical.` : safePrompt,
+      "16:9", refImages, "4K"
+    );
+    const slices = await sliceSheet(sheet, grid);
+    if (!slices) {
+      correction = "the white grid gutters were not straight/clean at the exact grid positions — redraw with a precise grid";
+      continue;
+    }
+    // Jedenáctero na každý výřez zvlášť (po 3 najednou)
+    const verdicts: Array<{ ok: boolean; problems: string; badRules: number } | null> = new Array(n).fill(null);
+    for (let i = 0; i < n; i += 3) {
+      const chunk = await Promise.all(
+        Array.from({ length: Math.min(3, n - i) }, (_, j) =>
+          verifySceneImage(apiKey, slices[i + j], heroDescription, scenes[i + j].imagePrompt)
+        )
+      );
+      chunk.forEach((v, j) => { verdicts[i + j] = v; });
+    }
+    const imgs: Array<ImageResult | null> = [];
+    const problems: string[] = [];
+    let badPanels = 0;
+    for (let i = 0; i < n; i++) {
+      const v = verdicts[i];
+      if (v && !v.ok) {
+        badPanels += 1;
+        imgs.push(null);
+        problems.push(`panel ${i + 1}: ${v.problems}`);
+      } else {
+        imgs.push(slices[i]); // prošlý NEBO neověřitelný výřez se přijme
+      }
+    }
+    if (!best || badPanels < best.badPanels) best = { imgs, badPanels, problems: problems.join("; ") };
+    if (badPanels === 0) break;
+    console.warn(`[Gemini sheet] attempt ${attempt}: ${badPanels}/${n} panelů zamítnuto (${best.problems.slice(0, 200)})`);
+    correction = best.problems.slice(0, 500);
+  }
+
+  if (!best) throw new Error("sheet: mřížka se nepodařila nakreslit");
+  const out: Array<ImageResult | null> = [];
+  for (const img of best.imgs) out.push(img ? await compressImage(img) : null);
+  console.log(`[Gemini sheet] hotovo: ${out.filter(Boolean).length}/${n} panelů prošlo (zbytek sólo)`);
+  return out;
 }

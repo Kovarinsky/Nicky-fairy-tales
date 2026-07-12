@@ -29,6 +29,20 @@ pipeline v prohlížeči, obě volají stejnou funkci).
 9. **Klíčové předměty identické.** Stejná loď/auto/hračka (typ i barvy)
    podle záznamu „Key objects:" ve všech scénách.
 10. **Žádný text v obraze.** Žádná písmena, číslice, vodoznaky ani podpisy.
+11. **Nic důležitého oříznutého okrajem.** Žádné useknuté hlavy či půlky
+    postav, žádná napůl uříznutá loď, auto, stavba nebo měsíc; a nikdo,
+    kdo je ve scéně jmenovaný, nesmí na obrázku CHYBĚT (kontrola dostává
+    i popis scény). Pozadí smí přirozeně pokračovat za okraj.
+
+## Režim archů (od v3.51)
+
+Scény se kreslí po skupinách v JEDNOM 4K obrázku (mřížka 3×3, bílé dělicí
+linky) a rozřezávají se — cena ~0,39 Kč/scénu místo 1,56 Kč a scény z jednoho
+tahu jsou přirozeně konzistentní. Pojistky: řez proběhne jen když jsou linky
+skutečně bílé na přesných pozicích (jinak se arch zamítne), jedenáctero se
+pouští na KAŽDÝ výřez zvlášť, arch se až 2× překreslí s výčtem chyb a panely,
+které ani pak neprojdou, se dokreslí sólo cestou. `IMAGE_SHEET_MODE`:
+`3x3` (výchozí) / `2x2` / `off`.
 
 ## Jak se desatero vynucuje (tři vrstvy)
 
