@@ -334,7 +334,8 @@ export default function Home() {
 
   // 🎙️ Klon rodičovského hlasu — nahrání, vytvoření, ukázka, smazání
   const [voiceOpen, setVoiceOpen] = useState(false);
-  const [cloneInfo, setCloneInfo] = useState<{ id?: string; name?: string } | null>(null);
+  const [clones, setClones] = useState<Array<{ id: string; name: string }>>([]);
+  const [cloneName, setCloneName] = useState("");
   const [recState, setRecState] = useState<"idle" | "ready" | "rec" | "done" | "uploading">("idle");
   const [recSecs, setRecSecs] = useState(0);
   const [recUrl, setRecUrl] = useState<string | null>(null);
@@ -344,7 +345,7 @@ export default function Home() {
   const recBlobRef = useRef<Blob | null>(null);
   const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
-    fetch("/api/voice-clone").then(r => r.json()).then(d => { if (d?.id) setCloneInfo(d); }).catch(() => {});
+    fetch("/api/voice-clone").then(r => r.json()).then(d => { if (Array.isArray(d?.clones)) setClones(d.clones); }).catch(() => {});
   }, []);
 
   async function startRec() {
@@ -385,13 +386,14 @@ export default function Home() {
     try {
       const form = new FormData();
       form.append("audio", blob, "voice-sample.webm");
-      form.append("name", uiLang === "en" ? "Parent voice" : "Rodičovský hlas");
+      form.append("name", cloneName.trim() || (uiLang === "en" ? "Family voice" : "Rodinný hlas"));
       const res = await fetch("/api/voice-clone", { method: "POST", body: form, signal: AbortSignal.timeout(60_000) });
       const d = await safeJson<{ id?: string; name?: string; error?: string }>(res);
       if (!res.ok || !d.id) throw new Error(d.error || "clone failed");
-      setCloneInfo(d);
+      setClones(p => [...p, { id: d.id!, name: d.name || "Hlas" }]);
       setRecState("idle");
       setRecUrl(null);
+      setCloneName("");
       const vs = await fetch("/api/voices").then(r => r.json()).catch(() => null);
       if (vs?.voices) setVoices(vs.voices);
       pickVoice(d.id);
@@ -420,12 +422,17 @@ export default function Home() {
       setCloneTesting(false);
     }
   }
-  async function deleteClone() {
+  async function deleteClone(id: string) {
     if (!(await appConfirm(t.cloneDeleteAsk))) return;
     try {
-      await fetch("/api/voice-clone", { method: "DELETE", signal: AbortSignal.timeout(30_000) });
-      setCloneInfo(null);
-      pickVoice("auto");
+      await fetch("/api/voice-clone", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      setClones(p => p.filter(c => c.id !== id));
+      if (voicePref === id) pickVoice("auto");
       const vs = await fetch("/api/voices").then(r => r.json()).catch(() => null);
       if (vs?.voices) setVoices(vs.voices);
     } catch {}
@@ -3251,7 +3258,7 @@ export default function Home() {
                     <span className="folk-emoji">{v.emoji}</span>
                     <span>{v.name}</span>
                     <button type="button" className="chip-remove folk-remove" aria-label="Smazat"
-                      onClick={e => { e.stopPropagation(); if (v.kind === "clone") deleteClone(); else deleteDesigned(v.id); }}>×</button>
+                      onClick={e => { e.stopPropagation(); if (v.kind === "clone") deleteClone(v.id); else deleteDesigned(v.id); }}>×</button>
                   </div>
                 ) : (
                   <button type="button" key={v.id} className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
@@ -3261,19 +3268,16 @@ export default function Home() {
                   </button>
                 ))}
               </div>
-              {cloneInfo?.id ? (
-                <div className="file-row">
-                  <button type="button" className="outline-btn" onClick={() => testVoice(cloneInfo.id!)} disabled={cloneTesting}>
-                    {cloneTesting ? "⏳" : "▶︎"} {t.cloneTest}
+              {recState === "idle" ? (
+                clones.length < 4 && (
+                  <button type="button" className="chip chip-btn chip-full" onClick={() => setRecState("ready")}>
+                    🎙️ {t.cloneStart}
                   </button>
-                  <button type="button" className="cancel-btn" onClick={deleteClone}>🗑️ {t.cloneDelete}</button>
-                </div>
-              ) : recState === "idle" ? (
-                <button type="button" className="chip chip-btn chip-full" onClick={() => setRecState("ready")}>
-                  🎙️ {t.cloneStart}
-                </button>
+                )
               ) : (
                 <div className="field">
+                  <input type="text" value={cloneName} onChange={e => setCloneName(e.target.value)}
+                    placeholder={t.cloneNamePh} maxLength={40} />
                   <p className="gen-step-hint">{t.cloneScriptHint}</p>
                   <p className="clone-script">{t.cloneScript}</p>
                   {recState === "ready" && (

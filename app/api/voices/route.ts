@@ -17,11 +17,16 @@ export async function GET() {
     voices = JSON.parse(readFileSync(join(process.cwd(), "reference", "voices.json"), "utf-8"));
   } catch {}
   if (blobToken()) {
-    const clone = await readJson<{ id?: string; name?: string }>("voices/clone.json").catch(() => null);
+    // Klony: nový formát (pole) s migrací ze starého jednoklonového záznamu
+    let clones = (await readJson<Array<{ id: string; name: string }>>("voices/clones.json").catch(() => null)) || null;
+    if (!Array.isArray(clones)) {
+      const legacy = await readJson<{ id?: string; name?: string }>("voices/clone.json").catch(() => null);
+      clones = legacy?.id ? [{ id: legacy.id, name: legacy.name || "Rodičovský hlas" }] : [];
+    }
     const designed = (await readJson<Array<{ id: string; name: string }>>("voices/designed.json").catch(() => null)) || [];
     const extra: Array<VoiceEntry & { kind?: string }> = [];
-    if (clone?.id) {
-      extra.push({ id: clone.id, name: clone.name || "Rodičovský hlas", emoji: "👨‍👧‍👦", description: "Naklonovaný hlas rodiče (mluví česky i anglicky)", language: "any", kind: "clone" });
+    for (const c of clones) {
+      extra.push({ id: c.id, name: c.name, emoji: "👨‍👧‍👦", description: "Naklonovaný rodinný hlas (mluví česky i anglicky)", language: "any", kind: "clone" });
     }
     for (const d of designed) {
       extra.push({ id: d.id, name: d.name, emoji: "🪄", description: "Hlas vymyšlený podle popisu", language: "any", kind: "designed" });
