@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.43";
+export const APP_VERSION = "3.44";
 
 // Changelog (newest first)
+// 3.44 - OPRAVA konzistence „všude a pořád": kontrola desatera běží na serveru (platí pro všechna zařízení), ale měla tři díry — (1) když samotná kontrola selhala (přetížení), obrázek prošel BEZ prohlídky → teď se kontrola opakuje až 3×; (2) utržená odpověď kontroly prošla jako „ok" → teď JSON režim s velkým limitem; (3) po neúspěšných opravách se posílal vadný obrázek → teď 2 korekce + 1 čerstvé překreslení a drží se NEJLEPŠÍ ověřený pokus; kontrolu dělá silnější model (gemini-2.5-flash) a kartotéka postav se jí předává celá (8 000 znaků místo 4 000)
 // 3.43 - 🧒 Postavy jako rolovací válec (jako světy): tlačítko „Vybrat postavy" ukazuje vybraná jména, uvnitř válce se postavy zaškrtávají oranžovými ✓ (vícero najednou, vlastní postavy s fotkou a ×); „+ Vlastní postava" zůstává tlačítkem pod válcem; pole se zadáním pohádky je výrazně větší (významná součást formuláře)
 // 3.42 - Velký editor sedí u horního okraje displeje (pod ním zůstává místo na klávesnici) a tlačítka ✨ Rozvinout / ✕ Zrušit jsou prohozená (Rozvinout vlevo)
 // 3.41 - Popis vlastního světa se píše ve stejném velkém editoru přes celý displej jako zadání pohádky (ťuknutí do pole ho otevře, ✕ Zrušit vrátí původní text); obě hlavní pole na vyplnění (zadání pohádky, popis světa) mají tenkou oranžovou linku; psané pole se zvedá VÝŠE nad klávesnici (do horní pětiny obrazovky, s větší rezervou)

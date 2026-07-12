@@ -12,6 +12,8 @@ const IMAGE_MODEL = (process.env.GEMINI_IMAGE_MODEL_PRIMARY || process.env.GEMIN
 const FALLBACK_RAW = (process.env.GEMINI_IMAGE_MODEL_FALLBACK || "gemini-2.5-flash-image").trim();
 const FALLBACK_IMAGE_MODEL = FALLBACK_RAW !== IMAGE_MODEL ? FALLBACK_RAW : "gemini-2.5-flash-image";
 const SANITIZE_MODEL = "gemini-2.0-flash"; // fast text model — sanitizes its own image model's prompt
+// Vizuální kontrola desatera — silnější vision model (přepsatelný env proměnnou)
+const VERIFY_MODEL = (process.env.GEMINI_VERIFY_MODEL || "gemini-2.5-flash").trim();
 
 // Denní kvóta / vyčerpaný kredit — okamžité opakování je zbytečné (reset až
 // o půlnoci PT / po dobití). Joby na tuto chybu musí přestat pálit pokusy.
@@ -202,49 +204,61 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
   });
 }
 
-// ── Vision QA: automatická kontrola vygenerovaného obrázku ──────────────────
-// Levný text+vision model zkontroluje typické vady (dvojitá postava, cizí
-// lidé, špatné vlasy/oblečení, anatomie). Vadný obrázek se JEDNOU překreslí
-// s popisem chyby. Kontrola nikdy neblokuje — při výpadku se obrázek přijme.
-async function verifySceneImage(apiKey: string, img: ImageResult, heroDescription: string): Promise<{ ok: boolean; problems: string }> {
-  try {
-    const raw = await geminiPost(apiKey, SANITIZE_MODEL, {
-      contents: [{
-        role: "user",
-        parts: [
-          { inlineData: { data: img.buffer.toString("base64"), mimeType: img.mimeType } },
-          { text: [
-            "You are a STRICT quality inspector for a children's storybook illustration.",
-            "CANONICAL CHARACTER SHEET:",
-            heroDescription.slice(0, 4000),
-            "",
-            "Run this TEN-RULE checklist and FAIL the image on ANY violation:",
-            "1) COUNT the human figures: more people than named characters on the sheet (including background strangers) = FAIL.",
-            "2) Each named character appears EXACTLY ONCE — two similar children or two similar adults = FAIL.",
-            "3) HAIR COLOR of EVERY person matches their sheet entry (blond stays blond, brown stays brown, dark stays dark) — check person by person.",
-            "4) Hair LENGTH and STYLE match the sheet (short stays short, long stays long; beard per sheet).",
-            "5) CLOTHING: each character wears THEIR OWN outfit (or their 'Story outfits:' variant for this scene). A signature outfit on the WRONG person (e.g. a different child wearing Nicolas's white T-shirt with red stripes) = FAIL.",
-            "6) Dressing level is UNIFORM for the scene: no winter coat next to a T-shirt; indoors without jackets/hats; never summer clothes in snow.",
-            "7) BODY PROPORTIONS: children child-sized, adults adult-sized, relative heights per the 'Heights:' entry.",
-            "8) ANATOMY: exactly two arms, two legs, five fingers per hand, natural faces; bicycles have two wheels.",
-            "9) KEY OBJECTS identical to their sheet entry — the same vehicle/boat/toy type and colors as stated.",
-            "10) NO text, letters, numbers, watermarks or signatures anywhere in the image.",
-            "Minor painterly variation is fine — but violations of the ten rules above are NEVER minor.",
-            'Reply with ONLY JSON: {"ok":true} or {"ok":false,"problems":"numbered violated rules with short English reasons"}',
-          ].join("\n") },
-        ],
-      }],
-      generationConfig: { maxOutputTokens: 200 },
-    });
-    const data = JSON.parse(raw) as { candidates?: GeminiCandidate[] };
-    const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) return { ok: true, problems: "" };
-    const v = JSON.parse(m[0]) as { ok?: boolean; problems?: string };
-    return { ok: v.ok !== false, problems: String(v.problems || "").slice(0, 300) };
-  } catch {
-    return { ok: true, problems: "" };
+// ── Vision QA: kontrola desatera na KAŽDÉM obrázku ─────────────────────────
+// Běží na SERVERU, takže platí pro všechna zařízení a všechny cesty generování.
+// Odolnost: až 3 pokusy o samotnou kontrolu (výpadek/429 kontrolu neumlčí),
+// JSON režim + dostatečný limit tokenů (utržená odpověď dřív prošla jako „ok").
+// Vrací null, jen když se kontrola ani na 3. pokus nepovedla — volající pak
+// NEPŘEPISUJE poslední ověřený stav neověřeným obrázkem.
+async function verifySceneImage(
+  apiKey: string, img: ImageResult, heroDescription: string
+): Promise<{ ok: boolean; problems: string; badRules: number } | null> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const raw = await geminiPost(apiKey, VERIFY_MODEL, {
+        contents: [{
+          role: "user",
+          parts: [
+            { inlineData: { data: img.buffer.toString("base64"), mimeType: img.mimeType } },
+            { text: [
+              "You are a STRICT quality inspector for a children's storybook illustration.",
+              "CANONICAL CHARACTER SHEET:",
+              heroDescription.slice(0, 8000),
+              "",
+              "Run this TEN-RULE checklist and FAIL the image on ANY violation:",
+              "1) COUNT the human figures: more people than named characters on the sheet (including background strangers) = FAIL.",
+              "2) Each named character appears EXACTLY ONCE — two similar children or two similar adults = FAIL.",
+              "3) HAIR COLOR of EVERY person matches their sheet entry (blond stays blond, brown stays brown, dark stays dark) — check person by person.",
+              "4) Hair LENGTH and STYLE match the sheet (short stays short, long stays long; beard per sheet).",
+              "5) CLOTHING: each character wears THEIR OWN outfit (or their 'Story outfits:' variant for this scene). A signature outfit on the WRONG person (e.g. a different child wearing Nicolas's white T-shirt with red stripes) = FAIL.",
+              "6) Dressing level is UNIFORM for the scene: no winter coat next to a T-shirt; indoors without jackets/hats; never summer clothes in snow.",
+              "7) BODY PROPORTIONS: children child-sized, adults adult-sized, relative heights per the 'Heights:' entry.",
+              "8) ANATOMY: exactly two arms, two legs, five fingers per hand, natural faces; bicycles have two wheels.",
+              "9) KEY OBJECTS identical to their sheet entry — the same vehicle/boat/toy type and colors as stated.",
+              "10) NO text, letters, numbers, watermarks or signatures anywhere in the image.",
+              "Minor painterly variation is fine — but violations of the ten rules above are NEVER minor.",
+              'Reply with ONLY JSON. Passing image: {"ok":true}. Failing image: {"ok":false,"rules":[<numbers of violated rules>],"problems":"<max 60 words: per violated rule a short English reason>"}',
+            ].join("\n") },
+          ],
+        }],
+        generationConfig: { maxOutputTokens: 500, responseMimeType: "application/json" },
+      });
+      const data = JSON.parse(raw) as { candidates?: GeminiCandidate[] };
+      const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
+      const m = text.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error("QA verdict missing JSON");
+      const v = JSON.parse(m[0]) as { ok?: boolean; rules?: number[]; problems?: string };
+      const ok = v.ok !== false;
+      const badRules = ok ? 0 : Math.max(1, Array.isArray(v.rules) ? v.rules.length : 1);
+      return { ok, problems: String(v.problems || "").slice(0, 400), badRules };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[Gemini QA] verify attempt ${attempt}/3 failed: ${msg}`);
+      if (attempt < 3) await new Promise(r => setTimeout(r, 2500 * attempt));
+    }
   }
+  console.warn("[Gemini QA] verify UNAVAILABLE after 3 attempts — image accepted unchecked");
+  return null;
 }
 
 // Pozadí aplikace — ilustrovaná scenérie ve stejném stylu jako pohádky,
@@ -321,25 +335,36 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
         let img = await callGeminiImage(apiKey, m, safePrompt, withAspect ? "16:9" : null, refImages);
-        // Vision QA: vadný obrázek (dvojitá postava, špatné vlasy, anatomie)
-        // se JEDNOU překreslí s konkrétním popisem chyby
+        // Desatero konzistence: každý obrázek projde kontrolou; vadný se
+        // překresluje — 2 opravná kola s výčtem chyb + 1 ČERSTVÉ překreslení
+        // (nový pokus bez korekce často opraví, co korekce nespraví).
+        // Drží se NEJLEPŠÍ OVĚŘENÝ pokus (nejméně porušených pravidel) —
+        // neověřený obrázek nikdy nenahradí ověřený.
         if (heroDescription) {
-          // Desatero konzistence: až DVĚ opravná překreslení s popisem
-          // porušených pravidel; použije se poslední (opravené) provedení
-          let v = await verifySceneImage(apiKey, img, heroDescription);
-          for (let fix = 1; fix <= 2 && !v.ok && v.problems; fix++) {
-            console.warn(`[Gemini QA] scene ${scene.index}: REJECTED (${v.problems}) → redraw ${fix}/2`);
-            try {
-              const img2 = await callGeminiImage(
-                apiKey, m,
-                `${safePrompt} ⚠ CORRECTION ${fix}: the previous attempt violated these rules: ${v.problems}. Fix EXACTLY these issues — follow the APPEARANCE LOCK precisely, draw ONLY the named characters, each EXACTLY ONCE, with their own hair colors and outfits.`,
-                withAspect ? "16:9" : null, refImages
-              );
-              img = img2;
-              v = await verifySceneImage(apiKey, img2, heroDescription);
-            } catch { break; }
+          const v0 = await verifySceneImage(apiKey, img, heroDescription);
+          if (v0 && !v0.ok) {
+            let best = { img, badRules: v0.badRules, problems: v0.problems };
+            for (let fix = 1; fix <= 3 && best.badRules > 0; fix++) {
+              const fresh = fix === 3; // poslední kolo = čerstvý pokus bez korekce
+              console.warn(`[Gemini QA] scene ${scene.index}: REJECTED [${best.badRules} rules] (${best.problems}) → ${fresh ? "fresh redraw" : `correction ${fix}/2`}`);
+              try {
+                const prompt2 = fresh
+                  ? safePrompt
+                  : `${safePrompt} ⚠ CORRECTION ${fix}: the previous attempt violated these rules: ${best.problems}. Fix EXACTLY these issues — follow the APPEARANCE LOCK precisely, draw ONLY the named characters, each EXACTLY ONCE, with their own hair colors and outfits.`;
+                const img2 = await callGeminiImage(apiKey, m, prompt2, withAspect ? "16:9" : null, refImages);
+                const v2 = await verifySceneImage(apiKey, img2, heroDescription);
+                if (v2 && (v2.ok || v2.badRules < best.badRules)) {
+                  best = { img: img2, badRules: v2.ok ? 0 : v2.badRules, problems: v2.problems };
+                }
+              } catch (e2) {
+                console.warn(`[Gemini QA] scene ${scene.index}: redraw ${fix} failed (${e2 instanceof Error ? e2.message : e2})`);
+                break;
+              }
+            }
+            img = best.img;
+            if (best.badRules > 0) console.warn(`[Gemini QA] scene ${scene.index}: still imperfect after redraws [${best.badRules} rules] (${best.problems})`);
+            else console.log(`[Gemini QA] scene ${scene.index}: fixed after redraw ✓`);
           }
-          if (!v.ok && v.problems) console.warn(`[Gemini QA] scene ${scene.index}: still imperfect after redraws (${v.problems})`);
         }
         return await compressImage(img);
       } catch (e) {
