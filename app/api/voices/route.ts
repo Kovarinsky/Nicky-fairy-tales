@@ -18,12 +18,15 @@ export async function GET() {
   } catch {}
   if (blobToken()) {
     const clone = await readJson<{ id?: string; name?: string }>("voices/clone.json").catch(() => null);
+    const designed = (await readJson<Array<{ id: string; name: string }>>("voices/designed.json").catch(() => null)) || [];
+    const extra: Array<VoiceEntry & { kind?: string }> = [];
     if (clone?.id) {
-      voices = [
-        { id: clone.id, name: clone.name || "Rodičovský hlas", emoji: "👨‍👧‍👦", description: "Naklonovaný hlas rodiče (mluví česky i anglicky)", language: "any" },
-        ...voices,
-      ];
+      extra.push({ id: clone.id, name: clone.name || "Rodičovský hlas", emoji: "👨‍👧‍👦", description: "Naklonovaný hlas rodiče (mluví česky i anglicky)", language: "any", kind: "clone" });
     }
+    for (const d of designed) {
+      extra.push({ id: d.id, name: d.name, emoji: "🪄", description: "Hlas vymyšlený podle popisu", language: "any", kind: "designed" });
+    }
+    voices = [...extra, ...voices];
   }
   return NextResponse.json({ voices }, { headers: { "Cache-Control": "no-store" } });
 }

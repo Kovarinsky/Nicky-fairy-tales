@@ -27,6 +27,11 @@ function applyCzechPronunciations(text: string): string {
   return out;
 }
 
+function envNum(name: string, fallback: number): number {
+  const n = parseFloat(process.env[name] || "");
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : fallback;
+}
+
 function sanitizeText(text: string): string {
   return text
     .replace(/…/g, "...")   // horizontal ellipsis
@@ -63,12 +68,17 @@ export async function narrateScene(scene: Scene, overrideVoiceId?: string): Prom
         model_id: modelId,
         output_format: "mp3_44100_128",
         // Živější přednes: nižší stability = větší intonační rozsah (citoslovce,
-        // zvířecí zvuky), style dodá dramatičnost, speaker_boost drží barvu hlasu
+        // zvířecí zvuky), style dodá dramatičnost, speaker_boost drží barvu hlasu.
+        // Ladění bez nasazování: env ELEVEN_STABILITY / ELEVEN_STYLE /
+        // ELEVEN_SIMILARITY (0–1) a ELEVEN_SPEED (0.7–1.2) ve Vercelu
         voice_settings: {
-          stability: 0.42,
-          similarity_boost: 0.8,
-          style: 0.35,
+          stability: envNum("ELEVEN_STABILITY", 0.42),
+          similarity_boost: envNum("ELEVEN_SIMILARITY", 0.8),
+          style: envNum("ELEVEN_STYLE", 0.35),
           use_speaker_boost: true,
+          ...(process.env.ELEVEN_SPEED
+            ? { speed: Math.min(1.2, Math.max(0.7, parseFloat(process.env.ELEVEN_SPEED) || 1)) }
+            : {}),
         },
       }),
       signal: AbortSignal.timeout(60_000),

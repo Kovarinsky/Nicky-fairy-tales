@@ -14,7 +14,7 @@ import { buildStoryHtml } from "@/lib/story-export";
 // ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; nameEn?: string; photo?: string; }
 interface ThemeOption { id: string; name: string; nameEn?: string; emoji: string; }
-interface VoiceOption { id: string; name: string; emoji: string; description: string; language: string; }
+interface VoiceOption { id: string; name: string; emoji: string; description: string; language: string; kind?: "clone" | "designed"; }
 interface CustomChar {
   id: string; name: string; description: string;
   photoBase64?: string; photoMimeType?: string; previewUrl?: string;
@@ -429,6 +429,70 @@ export default function Home() {
       const vs = await fetch("/api/voices").then(r => r.json()).catch(() => null);
       if (vs?.voices) setVoices(vs.voices);
     } catch {}
+  }
+
+  // 🪄 Hlas podle popisu (ElevenLabs Voice Design): popis → 3 ukázky → uložit
+  const [designDesc, setDesignDesc] = useState("");
+  const [designBusy, setDesignBusy] = useState(false);
+  const [designSaving, setDesignSaving] = useState(false);
+  const [designPreviews, setDesignPreviews] = useState<Array<{ id: string; audioUrl: string }> | null>(null);
+  async function designGenerate() {
+    if (designBusy || designDesc.trim().length < 10) return;
+    setDesignBusy(true);
+    setDesignPreviews(null);
+    try {
+      const res = await fetch("/api/voice-design", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(60_000),
+        body: JSON.stringify({ op: "previews", description: designDesc.trim() }),
+      });
+      const d = await safeJson<{ previews?: Array<{ id: string; audioUrl: string }>; error?: string }>(res);
+      if (!res.ok || !d.previews?.length) throw new Error(d.error || "no previews");
+      setDesignPreviews(d.previews);
+    } catch (e) {
+      await appAlert(`${t.designErr}${e instanceof Error && e.message ? ` (${e.message.slice(0, 160)})` : ""}`);
+    } finally {
+      setDesignBusy(false);
+    }
+  }
+  async function designSave(previewId: string) {
+    if (designSaving) return;
+    setDesignSaving(true);
+    try {
+      const name = (designDesc.split(/[,.;…]/)[0] || "").trim().slice(0, 40) || "Vlastní vypravěč";
+      const res = await fetch("/api/voice-design", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(45_000),
+        body: JSON.stringify({ op: "save", generatedVoiceId: previewId, name, description: designDesc.trim() }),
+      });
+      const d = await safeJson<{ id?: string; error?: string }>(res);
+      if (!res.ok || !d.id) throw new Error(d.error || "save failed");
+      setDesignPreviews(null);
+      setDesignDesc("");
+      const vs = await fetch("/api/voices").then(r => r.json()).catch(() => null);
+      if (vs?.voices) setVoices(vs.voices);
+      pickVoice(d.id);
+    } catch (e) {
+      await appAlert(`${t.designErr}${e instanceof Error && e.message ? ` (${e.message.slice(0, 160)})` : ""}`);
+    } finally {
+      setDesignSaving(false);
+    }
+  }
+  async function deleteDesigned(id: string) {
+    if (!(await appConfirm(t.voiceDelAsk))) return;
+    try {
+      await fetch("/api/voice-design", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(30_000),
+        body: JSON.stringify({ op: "delete", id }),
+      });
+    } catch {}
+    if (voicePref === id) pickVoice("auto");
+    const vs = await fetch("/api/voices").then(r => r.json()).catch(() => null);
+    if (vs?.voices) setVoices(vs.voices);
   }
 
   // Background generation state (LOCAL in-browser pipeline)
@@ -3179,7 +3243,17 @@ export default function Home() {
                   <span className="folk-emoji">✨</span>
                   <span>{t.voiceAuto}</span>
                 </button>
-                {voices.map(v => (
+                {voices.map(v => v.kind ? (
+                  <div key={v.id} role="button" tabIndex={0}
+                    className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
+                    onClick={() => { pickVoice(v.id); setVoiceOpen(false); testVoice(v.id); }}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { pickVoice(v.id); setVoiceOpen(false); } }}>
+                    <span className="folk-emoji">{v.emoji}</span>
+                    <span>{v.name}</span>
+                    <button type="button" className="chip-remove folk-remove" aria-label="Smazat"
+                      onClick={e => { e.stopPropagation(); if (v.kind === "clone") deleteClone(); else deleteDesigned(v.id); }}>×</button>
+                  </div>
+                ) : (
                   <button type="button" key={v.id} className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
                     onClick={() => { pickVoice(v.id); setVoiceOpen(false); testVoice(v.id); }}>
                     <span className="folk-emoji">{v.emoji}</span>
@@ -3221,6 +3295,28 @@ export default function Home() {
                   {recState === "uploading" && <p className="gen-step-hint">⏳ {t.cloneCreating}</p>}
                 </div>
               )}
+              {/* 🪄 Hlas podle popisu — Voice Design */}
+              <div className="field">
+                <label>{t.designTitle}</label>
+                <div className="ta-wrap">
+                  <textarea value={designDesc} onChange={e => setDesignDesc(e.target.value)}
+                    placeholder={t.designPlaceholder} style={{ minHeight: 70 }} />
+                </div>
+                <button type="button" onClick={designGenerate} disabled={designBusy || designDesc.trim().length < 10}>
+                  {designBusy ? "⏳ " : "🪄 "}{t.designGen}
+                </button>
+                {designPreviews && designPreviews.map((p, i) => (
+                  <div key={p.id} className="file-row">
+                    <button type="button" className="outline-btn"
+                      onClick={() => { audioRef.current?.pause(); new Audio(p.audioUrl).play().catch(() => {}); }}>
+                      ▶︎ {t.designSample} {i + 1}
+                    </button>
+                    <button type="button" onClick={() => designSave(p.id)} disabled={designSaving}>
+                      {designSaving ? "⏳" : "✓"} {t.designUse}
+                    </button>
+                  </div>
+                ))}
+              </div>
               <p className="gen-step-hint">{t.clonePrivacy}</p>
             </div>
           )}
