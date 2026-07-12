@@ -77,6 +77,9 @@ export async function POST(req: NextRequest) {
     // Build image URL — use SVG placeholder if Gemini failed
     let imageUrl: string;
     if (imageResult) {
+      // Spotřeba: obrázky kreslené mimo serverovou frontu (líná větev B,
+      // oprava scény, lokální pipeline) se počítají tady
+      writeUsageRecord(1, 0, typeof body.deviceId === "string" ? body.deviceId : undefined).catch(() => {});
       imageUrl = `data:${imageResult.mimeType};base64,${imageResult.buffer.toString("base64")}`;
     } else {
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1a1040"/><stop offset="100%" stop-color="#3d1060"/></linearGradient></defs><rect width="800" height="450" fill="url(#g)"/><text x="400" y="190" text-anchor="middle" fill="rgba(255,255,255,0.35)" font-size="72" font-family="serif">✨</text><text x="400" y="270" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="22" font-family="sans-serif">Scéna ${scene.index}</text></svg>`;

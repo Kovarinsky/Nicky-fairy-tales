@@ -235,7 +235,14 @@ export async function runJob(id: string, body: Record<string, unknown>) {
 
     const scenesScript = st.scenesScript!;
     const heroDescription = st.heroDescription || "";
-    const total = scenesScript.length;
+    // 🔀 Líná větev B: obrázky druhého konce se NEKRESLÍ při generování —
+    // vzniknou až když na něj čtenář na rozcestí opravdu sáhne (klient si je
+    // vyžádá přes /api/scene). Ušetří ~1/3 obrázků u pohádek se dvěma konci.
+    const totalAll = scenesScript.length;
+    const total = st.choice && st.choice.altFrom > 0 && st.choice.altFrom < totalAll
+      ? st.choice.altFrom
+      : totalAll;
+    st.total = total;
     st.phase = "generating";
     st.sceneUrls = st.sceneUrls || {};
     st.done = Object.keys(st.sceneUrls).length;

@@ -712,7 +712,10 @@ export async function generateStory(
     const continuation = await callAnthropicApi({
       model,
       max_tokens: 16384, // 20 scén s vyprávěním a popisy obrázků se do 8k nevešlo
-      system: buildSystemPrompt(language),
+      // Prompt caching: velký systémový prompt (~4k tokenů) je neměnný —
+      // opakovaná čtení (fronta pohádek, restarty, navázání) stojí ~1/10.
+      // Menší prompty (náměty, překlad) jsou pod kešovatelným minimem.
+      system: [{ type: "text", text: buildSystemPrompt(language), cache_control: { type: "ephemeral" } }],
       messages,
     }, prefix
       ? (chars, fullText) => onDelta?.(prefix.length + chars, prefix + fullText)

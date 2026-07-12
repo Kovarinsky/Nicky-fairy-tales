@@ -261,7 +261,10 @@ export default function Home() {
 
   const allScenesReady = scenes.length > 0 && scenes.every(s => s.imageUrl && s.audioUrl);
   // bookReady: all images present (SVG fallback always set) — use for UI display and FS trigger
-  const bookReady = scenes.length > 0 && scenes.every(s => s.imageUrl);
+  // 🔀 Líná větev B: obrázky druhého konce vznikají až při jeho výběru —
+  // kniha je „hotová", když mají obrázek všechny scény PŘED větví B
+  const bookReady = scenes.length > 0
+    && scenes.slice(0, storyChoice ? storyChoice.altFrom : scenes.length).every(s => s.imageUrl);
 
   // Reader mode: explicit switch so old story stays in memory when form opens
   const [viewMode, setViewMode] = useState<"form" | "reader">("form");
@@ -926,8 +929,13 @@ export default function Home() {
   const nextVisible = pagePos + 1 < visiblePages.length ? visiblePages[pagePos + 1] : null;
   const prevVisible = pagePos > 0 ? visiblePages[pagePos - 1] : null;
 
-  function pickBranch(b: "A" | "B") {
+  async function pickBranch(b: "A" | "B") {
     if (!storyChoice) return;
+    // 🔀 Líná větev B: obrázky druhého konce se kreslí až TEĎ (poprvé)
+    if (b === "B") {
+      const ready = await ensureBranchB();
+      if (!ready) return; // kreslení selhalo/běží — zůstat na rozcestí
+    }
     setBranch(b);
     isAutoAdvanceRef.current = true; // zvolený konec se rovnou přehraje
     goToPage(b === "A" ? storyChoice.common : storyChoice.altFrom);
@@ -965,6 +973,87 @@ export default function Home() {
   // aktuální stránku + 2 následující (a ukládá se do cache, platí se jednou).
   // Nepřehrané pohádky tak hlas vůbec neplatí.
   const readerEntryIdRef = useRef<string | null>(null);
+  // Kontext otevřené pohádky pro líné dokreslení větve B (zámek vzhledu + reference)
+  const readerHeroRef = useRef<string>("");
+  const readerCharIdsRef = useRef<string[]>([]);
+
+  // Jedna scéna → obrázek přes /api/scene (kotva = 1. obrázek pohádky)
+  async function drawSceneImage(
+    s: Scene, heroDescription: string, characterIds: string[], anchorUrl?: string
+  ): Promise<string | null> {
+    try {
+      const m = anchorUrl?.match(/^data:(image\/[a-z.+-]+);base64,(.+)$/);
+      const res = await fetch("/api/scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(120_000),
+        body: JSON.stringify({
+          scene: { index: s.index, narration: s.narration, imagePrompt: s.imagePrompt, soundscape: s.soundscape },
+          heroDescription,
+          characterIds,
+          noAudio: true,
+          deviceId: deviceId(),
+          ...(m ? { styleAnchor: { mimeType: m[1], data: m[2] } } : {}),
+        }),
+      });
+      const d = await safeJson<{ imageUrl?: string }>(res);
+      return res.ok && d.imageUrl && !isPlaceholderImg(d.imageUrl) ? d.imageUrl : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // 🔀 Dokreslení větve B při prvním výběru druhého konce (s progres oknem)
+  const branchGenRef = useRef(false);
+  const [branchProg, setBranchProg] = useState<{ done: number; total: number } | null>(null);
+  async function ensureBranchB(): Promise<boolean> {
+    if (!storyChoice) return false;
+    const missing = scenes
+      .map((s, i) => (i >= storyChoice.altFrom && (!s.imageUrl || isPlaceholderImg(s.imageUrl)) ? i : -1))
+      .filter(i => i >= 0);
+    if (missing.length === 0) return true;
+    if (branchGenRef.current) return false;
+    branchGenRef.current = true;
+    setBranchProg({ done: 0, total: missing.length });
+    let done = 0;
+    let okCount = 0;
+    let idx = 0;
+    const anchorUrl = scenes[0]?.imageUrl;
+    const hero = readerHeroRef.current;
+    const charIds = readerCharIdsRef.current;
+    const worker = async () => {
+      while (idx < missing.length) {
+        const i = missing[idx++];
+        const url = await drawSceneImage(scenes[i], hero, charIds, anchorUrl);
+        if (url) {
+          okCount += 1;
+          setScenes(prev => {
+            const next = [...prev];
+            if (next[i]) next[i] = { ...next[i], imageUrl: url };
+            const eid = readerEntryIdRef.current;
+            if (eid) {
+              renderedMapRef.current.set(eid, next);
+              cacheStory(eid, next).catch(() => {});
+            }
+            return next;
+          });
+        }
+        done += 1;
+        setBranchProg({ done, total: missing.length });
+      }
+    };
+    try {
+      await Promise.all([worker(), worker()]);
+    } finally {
+      branchGenRef.current = false;
+      setBranchProg(null);
+    }
+    if (okCount < missing.length) {
+      await appAlert(t.branchDrawErr);
+      return false;
+    }
+    return true;
+  }
   // Klíč = pohádka:stránka; po úspěchu se NEMAŽE (state update chodí s malým
   // zpožděním a smazání hned po fetchi vedlo k duplicitnímu — placenému —
   // namluvení stejné stránky)
@@ -1046,6 +1135,33 @@ export default function Home() {
           const d = await safeJson<{ audioUrl?: string }>(res);
           if (res.ok && d.audioUrl) media[i] = { ...(media[i] || {}), audioUrl: d.audioUrl };
         } catch {}
+        done += 1;
+        onProgress?.(done, missing.length);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(2, missing.length) }, worker));
+    cacheStory(entry.id, entry.scenes.map((s, i) => ({ ...s, ...(media[i] || {}) })) as RenderedScene[]).catch(() => {});
+  }
+
+  // Před sdílením/exportem dokreslit i chybějící obrázky (líná větev B) —
+  // odeslaná pohádka musí mít oba konce kompletní
+  async function fillMissingImages(
+    entry: HistoryEntry,
+    media: Array<{ imageUrl?: string; audioUrl?: string }>,
+    onProgress?: (done: number, total: number) => void
+  ): Promise<void> {
+    const missing = entry.scenes
+      .map((s, i) => (!media[i]?.imageUrl || isPlaceholderImg(media[i]?.imageUrl) ? i : -1))
+      .filter(i => i >= 0);
+    if (missing.length === 0) return;
+    let done = 0;
+    let idx = 0;
+    const anchorUrl = media[0]?.imageUrl;
+    const worker = async () => {
+      while (idx < missing.length) {
+        const i = missing[idx++];
+        const url = await drawSceneImage(entry.scenes[i], entry.heroDescription || "", entry.selectedIds || [], anchorUrl);
+        if (url) media[i] = { ...(media[i] || {}), imageUrl: url };
         done += 1;
         onProgress?.(done, missing.length);
       }
@@ -1170,6 +1286,10 @@ export default function Home() {
         ? existing.map(s => ({ ...s }))
         : scriptScenes.map(s => ({ ...s }));
     if (!background && entryId) readerEntryIdRef.current = entryId;
+    if (!background) {
+      readerHeroRef.current = heroDescription;
+      readerCharIdsRef.current = selectedIds;
+    }
     heroDescRef.current = heroDescription;
     imageRefsRef.current = customImageRefs;
 
@@ -1452,8 +1572,11 @@ export default function Home() {
     introFiredRef.current = false;
     setTitle(job.title || "Pohádka");
     readerEntryIdRef.current = job.jobId;
-    // 🔀 Dva konce: meta výběru z uložené historie
-    setStoryChoice(loadHistory().find(e => e.id === job.jobId)?.choice ?? null);
+    // 🔀 Dva konce: meta výběru z uložené historie + kontext pro línou větev B
+    const hEntry = loadHistory().find(e => e.id === job.jobId);
+    readerHeroRef.current = hEntry?.heroDescription || "";
+    readerCharIdsRef.current = hEntry?.selectedIds || selectedIds;
+    setStoryChoice(hEntry?.choice ?? null);
     setBranch(null);
     setScenes([...rendered]);
     setPage(0);
@@ -2199,7 +2322,9 @@ export default function Home() {
       let done = 0;
       setShareProg({ done, total });
       const mediaArr = media;
-      // Doplnit chybějící namluvení (hlas je líný) — sdílená pohádka je kompletní
+      // Doplnit chybějící obrázky (líná větev B) a namluvení (líný hlas) —
+      // sdílená pohádka je kompletní včetně obou konců
+      await fillMissingImages(entry, mediaArr, (d, tot) => setShareProg({ done: d, total: tot }));
       await fillMissingAudio(entry, mediaArr, (d, tot) => setShareProg({ done: d, total: tot }));
       setShareProg({ done: 0, total });
       // Nahrát s pamětí: co už jednou prošlo, se znovu nenahrává
@@ -2291,7 +2416,8 @@ export default function Home() {
         await appConfirm(t.shareNoMedia);
         return;
       }
-      // Doplnit chybějící namluvení (hlas je líný) — soubor je kompletní
+      // Doplnit chybějící obrázky (líná větev B) a namluvení — soubor je kompletní
+      await fillMissingImages(entry, media);
       await fillMissingAudio(entry, media);
       const scenes = await Promise.all(entry.scenes.map(async (s, i) => {
         const m = media![i] || {};
@@ -2344,6 +2470,8 @@ export default function Home() {
       introFiredRef.current = false;
       setTitle(entry.title);
       readerEntryIdRef.current = entry.id;
+      readerHeroRef.current = entry.heroDescription || "";
+      readerCharIdsRef.current = entry.selectedIds || selectedIds;
       setStoryChoice(entry.choice ?? null);
       setBranch(null);
       setScenes([...readyScenes]);
@@ -2370,7 +2498,9 @@ export default function Home() {
         imageUrl: dbCached[i]?.imageUrl,
         audioUrl: dbCached[i]?.audioUrl,
       }));
-      if (restored.every(s => !isPlaceholderImg(s.imageUrl))) {
+      // Líná větev B se nepočítá — její obrázky vznikají až při výběru konce
+      const needImages = entry.choice ? entry.choice.altFrom : restored.length;
+      if (restored.slice(0, needImages).every(s => !isPlaceholderImg(s.imageUrl))) {
         renderedMapRef.current.set(entry.id, restored);
         showCached(restored);
         return;
@@ -3508,6 +3638,16 @@ export default function Home() {
           <h1 className="intro-title">📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"}</h1>
           <p className="intro-version">v{APP_VERSION}</p>
           <p className="intro-tag">{t.introTag}</p>
+        </div>
+      )}
+
+      {/* 🔀 Kreslení druhého konce po jeho výběru (líná větev B) */}
+      {branchProg && (
+        <div className="app-confirm-overlay">
+          <div className="app-confirm">
+            <p className="app-confirm-msg">🎨 {t.branchDrawing} {branchProg.done}/{branchProg.total}</p>
+            <p className="gen-step-hint">{t.branchDrawingHint}</p>
+          </div>
         </div>
       )}
 
