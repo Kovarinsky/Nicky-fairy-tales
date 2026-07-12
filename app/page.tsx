@@ -2652,7 +2652,17 @@ export default function Home() {
                     onClick={() => setFolkOpen(false)}>✕</button>
                 </div>
                 <div className="folk-list">
-                  {FOLK_TALES.map(ft => (
+                  <p className="folk-group">🇨🇿 {uiLang === "en" ? "Czech & classic" : "České a klasické"}</p>
+                  {FOLK_TALES.filter(ft => ft.group !== "dk").map(ft => (
+                    <button type="button" key={ft.id}
+                      className={`folk-item ${selectedTheme === ft.id ? "folk-on" : ""}`}
+                      onClick={() => { setSelectedTheme(p => p === ft.id ? "" : ft.id); setFolkOpen(false); }}>
+                      <span className="folk-emoji">{ft.emoji}</span>
+                      <span>{uiLang === "en" ? ft.nameEn : ft.name}</span>
+                    </button>
+                  ))}
+                  <p className="folk-group">🇩🇰 {uiLang === "en" ? "Andersen — Danish tales" : "Andersen — dánské pohádky"}</p>
+                  {FOLK_TALES.filter(ft => ft.group === "dk").map(ft => (
                     <button type="button" key={ft.id}
                       className={`folk-item ${selectedTheme === ft.id ? "folk-on" : ""}`}
                       onClick={() => { setSelectedTheme(p => p === ft.id ? "" : ft.id); setFolkOpen(false); }}>

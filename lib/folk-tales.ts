@@ -12,6 +12,8 @@ export interface FolkTale {
   nameEn: string;
   emoji: string;
   prompt: string;  // průvodce světem pro Clauda (děj jako inspirace)
+  /** Skupina ve výběru: "cs" = české a klasické, "dk" = Andersen (Dánsko) */
+  group?: "cs" | "dk";
 }
 
 export const FOLK_TALES: FolkTale[] = [
@@ -59,14 +61,27 @@ export const FOLK_TALES: FolkTale[] = [
     prompt: "Czech classic 'Zvířátka a Petrovští': a rooster, cat, dog and other animals travel together, find a cottage of robbers in the forest and scare them away with their night concert — then live there happily. Animal teamwork, dark forest turned cozy home, comic robbers running away." },
   { id: "folk_kocour", name: "Kocour v botách", nameEn: "Puss in Boots", emoji: "🐱",
     prompt: "Classic tale 'Puss in Boots' (Charles Perrault): a clever cat in fine boots makes his poor master's fortune through wit — greeting the king, outsmarting a shape-shifting ogre in his castle. Elegant trickster cat, royal carriage, grand castle." },
-  { id: "folk_kralovna", name: "Sněhová královna", nameEn: "The Snow Queen", emoji: "🌨️",
+  { id: "folk_kralovna", name: "Sněhová královna", nameEn: "The Snow Queen", emoji: "🌨️", group: "dk",
     prompt: "Classic tale 'The Snow Queen' (H. Ch. Andersen): brave Gerda journeys across the world to free her friend Kai from the icy palace of the Snow Queen, where a splinter of a magic mirror froze his heart — warmth and friendship melt the ice. Ice palace, rose garden, reindeer ride, northern lights." },
-  { id: "folk_kacatko", name: "Ošklivé káčátko", nameEn: "The Ugly Duckling", emoji: "🦢",
+  { id: "folk_kacatko", name: "Ošklivé káčátko", nameEn: "The Ugly Duckling", emoji: "🦢", group: "dk",
     prompt: "Classic tale 'The Ugly Duckling' (H. Ch. Andersen): a duckling mocked for being different wanders through seasons alone — and in spring discovers he is a beautiful swan. Warm message: everyone blooms in their own time. Pond, farmyard, winter reeds, spring lake with swans." },
-  { id: "folk_saty", name: "Císařovy nové šaty", nameEn: "The Emperor's New Clothes", emoji: "👔",
+  { id: "folk_saty", name: "Císařovy nové šaty", nameEn: "The Emperor's New Clothes", emoji: "👔", group: "dk",
     prompt: "Classic tale 'The Emperor's New Clothes' (H. Ch. Andersen): two tricksters weave 'invisible' cloth only clever people can see; everyone pretends — until a child says the truth out loud. Comic royal parade, weaving workshop with empty looms, honest little child." },
-  { id: "folk_hrasek", name: "Princezna na hrášku", nameEn: "The Princess and the Pea", emoji: "🫛",
+  { id: "folk_hrasek", name: "Princezna na hrášku", nameEn: "The Princess and the Pea", emoji: "🫛", group: "dk",
     prompt: "Classic tale 'The Princess and the Pea' (H. Ch. Andersen): on a stormy night a rain-soaked girl claims to be a princess; a single pea under twenty mattresses and twenty featherbeds proves it. Cozy castle, comically tall tower of mattresses, stormy night." },
+  { id: "folk_vila", name: "Malá mořská víla", nameEn: "The Little Mermaid", emoji: "🧜‍♀️", group: "dk",
+    prompt: "Classic tale 'The Little Mermaid' (H. Ch. Andersen): a curious little mermaid from an underwater kingdom dreams of the world above the waves, saves a prince from a storm and bravely follows her heart. GENTLE retelling with a HAPPY ending — courage and kindness are rewarded, no sad sacrifice. Coral palace, sea witch's cave (comic, not scary), ships, glittering surface." },
+  { id: "folk_malenka", name: "Malenka", nameEn: "Thumbelina", emoji: "🌷",
+    group: "dk",
+    prompt: "Classic tale 'Thumbelina' (H. Ch. Andersen, Malenka): a tiny girl born from a tulip blossom journeys through a big world — a lily pad on the stream, a cozy mouse hole in winter, a rescued swallow who carries her to a land of flower people. Tiny heroine, giant flowers, friendly swallow flight." },
+  { id: "folk_vojacek", name: "Cínový vojáček", nameEn: "The Steadfast Tin Soldier", emoji: "🪖", group: "dk",
+    prompt: "Classic tale 'The Steadfast Tin Soldier' (H. Ch. Andersen): a brave one-legged tin soldier loves a paper ballerina; a toy adventure takes him out the window, down a gutter in a paper boat and even into a fish — back to his shelf. GENTLE retelling with a HAPPY ending: the soldier and ballerina end up together, nothing burns. Toy room at night, paper boat rapids, friendly toys." },
+  { id: "folk_labute", name: "Divoké labutě", nameEn: "The Wild Swans", emoji: "🕊️", group: "dk",
+    prompt: "Classic tale 'The Wild Swans' (H. Ch. Andersen): brave Elisa's eleven brothers are enchanted into swans; she quietly knits them shirts of nettles to break the spell — love and patience win. Gentle retelling. Swan flight over the sea, castle garden, starry nights, eleven swans landing at sunset." },
+  { id: "folk_slavik", name: "Slavík", nameEn: "The Nightingale", emoji: "🐦", group: "dk",
+    prompt: "Classic tale 'The Nightingale' (H. Ch. Andersen): a plain little nightingale sings more beautifully than any jewelled mechanical bird; when the emperor is ill, the real bird's song brings him back to health. True friendship beats shiny toys. Chinese emperor's palace and gardens, lantern lights, simple grey bird with a golden voice." },
+  { id: "folk_kufr", name: "Létající kufr", nameEn: "The Flying Trunk", emoji: "🧳", group: "dk",
+    prompt: "Classic tale 'The Flying Trunk' (H. Ch. Andersen): a magic trunk flies its owner over rooftops and far away to a sultan's palace, where he wins hearts by telling wonderful stories. Gentle comic retelling about the power of storytelling. Rooftop flights at dusk, palace gardens, fireworks." },
   { id: "folk_kuzlatka", name: "Vlk a sedm kůzlátek", nameEn: "The Wolf and the Seven Kids", emoji: "🐐",
     prompt: "Classic tale 'The Wolf and the Seven Little Kids' (Grimm): seven little goats home alone must not open the door; the wolf disguises his voice and paws, but the smallest kid hides in the clock case and all ends well. Gentle retelling, kids rescued unharmed. Cottage, clock hiding place." },
   { id: "folk_muzikanti", name: "Brémští muzikanti", nameEn: "The Bremen Town Musicians", emoji: "🎶",

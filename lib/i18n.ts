@@ -20,7 +20,7 @@ export const UI = {
     imgErrHint: "Obrázky hlásí chybu",
     errAutoKicks: "Pohádka se opakovaně zasekává — zastaveno, ať se nepálí kredit. Zrušte ji ✕ a zkuste později.",
     cancelJobAsk: "Zrušit přípravu této pohádky?",
-    folkChip: "České pohádky",
+    folkChip: "Lidové pohádky",
     folkTitle: "📜 Klasické pohádky (licenčně volné)",
     folkHint: "Lidové pohádky a klasici (Erben, Němcová, Andersen, Grimmové) — texty jsou volné, příběh se odehraje s vašimi hrdiny.",
     worldNone: "Bez světa — jen podle přání a postav",

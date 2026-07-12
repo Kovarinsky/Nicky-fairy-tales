@@ -50,5 +50,19 @@
     "description": "Bella: 8-year-old girl with very long straight light-brown hair, blue-grey eyes, bright friendly smile, small shell earrings, cream sweatshirt, blue-grey shorts, pink sneakers; James's big sister, slightly taller than the boys",
     "referenceFile": "bella.jpg",
     "nameEn": "Bella"
+  },
+  {
+    "id": "eva",
+    "name": "Eva",
+    "description": "Eva: adult woman with light-brown hair slicked back into a neat low bun, shaped dark eyebrows, blue-grey eyes, soft gentle smile with mauve lips, white ribbed tank top with a thin blue-striped trim, blue-and-white pinstriped skirt, small gold wristwatch, slim medium height",
+    "referenceFile": "eva.jpg",
+    "nameEn": "Eva"
+  },
+  {
+    "id": "jakob",
+    "name": "Jakob",
+    "description": "Jakob: adult man with short slightly wavy mid-brown hair, bright blue eyes, light brown stubble, big warm friendly smile, plain white T-shirt, slim tall build",
+    "referenceFile": "jakob.jpg",
+    "nameEn": "Jakob"
   }
 ]
