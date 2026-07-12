@@ -235,7 +235,7 @@ async function verifySceneImage(
               ...(scenePrompt ? ["", "SCENE DESCRIPTION (what THIS image should show):", scenePrompt.slice(0, 700)] : []),
               "",
               "Run this ELEVEN-RULE checklist and FAIL the image on ANY violation:",
-              "1) COUNT the human figures: more people than the characters named in the scene (including background strangers) = FAIL; a character named in the scene description who is MISSING from the image = FAIL.",
+              "1) IDENTIFY every visible person one by one and match each to a named character by hair, face and outfit. ANY person you cannot confidently match to a named character (extra child, stranger, background figure) = FAIL. A character named in the scene description who is MISSING = FAIL. A person who mixes features of TWO characters (e.g. one character's face with another's outfit or hairstyle — swapped/merged identities) = FAIL.",
               "2) Each named character appears EXACTLY ONCE — two similar children or two similar adults = FAIL.",
               "3) HAIR COLOR of EVERY person matches their sheet entry (blond stays blond, brown stays brown, dark stays dark) — check person by person.",
               "4) Hair LENGTH and STYLE match the sheet (short stays short, long stays long; beard per sheet).",
@@ -247,7 +247,7 @@ async function verifySceneImage(
               "10) NO text, letters, numbers, watermarks or signatures anywhere in the image.",
               "11) FRAMING: nothing important is CUT OFF by the image edges — no cropped heads or faces, no half-cut characters, and no key objects (boat, vehicle, building, the moon…) sliced by the border. Background scenery may naturally continue past the edge.",
               "Minor painterly variation is fine — but violations of the eleven rules above are NEVER minor.",
-              'Reply with ONLY JSON. Passing image: {"ok":true}. Failing image: {"ok":false,"rules":[<numbers of violated rules>],"problems":"<max 60 words: per violated rule a short English reason>"}',
+              'Reply with ONLY JSON. ALWAYS include a "people" audit — list every visible person as "<who you matched them to or UNKNOWN>". Passing image: {"people":["Nicolas","Valentýna"],"ok":true}. Failing image: {"people":[...],"ok":false,"rules":[<numbers of violated rules>],"problems":"<max 60 words: per violated rule a short English reason>"}. Any UNKNOWN in people means rule 1 failed.',
             ].join("\n") },
           ],
         }],
@@ -257,10 +257,17 @@ async function verifySceneImage(
       const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
       const m = text.match(/\{[\s\S]*\}/);
       if (!m) throw new Error("QA verdict missing JSON");
-      const v = JSON.parse(m[0]) as { ok?: boolean; rules?: number[]; problems?: string };
-      const ok = v.ok !== false;
+      const v = JSON.parse(m[0]) as { ok?: boolean; rules?: number[]; problems?: string; people?: string[] };
+      let ok = v.ok !== false;
+      let problems = String(v.problems || "").slice(0, 400);
+      // Pojistka: inspektor vyjmenoval osobu, kterou nepřiřadil k žádné
+      // postavě (UNKNOWN) — cizí člověk v obraze, i kdyby dal ok:true
+      if (ok && Array.isArray(v.people) && v.people.some(p => /unknown|stranger/i.test(String(p)))) {
+        ok = false;
+        problems = "rule 1: an unmatched person (stranger/extra figure) is present";
+      }
       const badRules = ok ? 0 : Math.max(1, Array.isArray(v.rules) ? v.rules.length : 1);
-      return { ok, problems: String(v.problems || "").slice(0, 400), badRules };
+      return { ok, problems, badRules };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.warn(`[Gemini QA] verify attempt ${attempt}/3 failed: ${msg}`);
@@ -310,6 +317,7 @@ function buildAppearanceLock(heroDescription: string): { open: string; close: st
       `Every named character MUST look IDENTICAL to this description in EVERY image: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes — AND the same AGE, same BODY SIZE and PROPORTIONS. Relative heights between characters NEVER change: a toddler stays toddler-sized, a child stays child-sized, adults stay adult-sized. Any recurring OBJECT listed above (vehicle, magic item, toy) keeps IDENTICAL type, shape and colors in every scene — the same car stays the same car. These are LOCKED — do NOT change anything between scenes.`,
       `If 'Story outfits:' defines outdoor/indoor variants, draw the variant stated at the end of the scene description — and ALL characters in the scene share the SAME dressing level (never one in a winter coat while another wears a T-shirt).`,
       `ONLY the characters named in the scene are visible — zero additional people, strangers, or background human figures. Each named character appears EXACTLY ONCE in the image — NEVER draw two copies of the same person.`,
+      `IDENTITIES ARE SEPARATE: characters who look similar (two adult men, two adult women, two boys) are DIFFERENT people — NEVER merge them, swap them, or mix their features. Each keeps their OWN hair, face, build and signature clothing exactly as listed. A reference portrait may ONLY be used for the character it belongs to.`,
     ].join(" "),
     close: `⚠ CONSISTENCY REMINDER: match hair, eyes, clothing, age, body size and relative heights EXACTLY as stated above — do NOT alter any detail.`,
   };
@@ -531,6 +539,7 @@ export async function generateSceneSheet(
     `Compose each panel like a FINISHED book illustration: every character and every key object (boat, vehicle, building, the moon…) FULLY inside its panel with a comfortable breathing margin — nothing important may touch or cross the white gutters or panel edges. No cropped heads, no half-cut characters or objects.`,
     lockOpen,
     ...panelLines,
+    `⚠ PANEL CAST RULE: each panel shows ONLY the characters explicitly named in ITS OWN description — nobody else. No extra children, adults, or background figures in ANY panel. A character not named in a panel's description must NOT appear in that panel, even though their description or portrait is provided for other panels.`,
     lockClose,
     STYLE_SUFFIX,
   ].filter(Boolean).join(" ");

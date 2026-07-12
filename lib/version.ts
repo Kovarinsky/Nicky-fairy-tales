@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.55";
+export const APP_VERSION = "3.56";
 
 // Changelog (newest first)
+// 3.56 - Ošetření cizích postav a prohazování identit (Jan↔Jakob, Jana↔Eva): (1) zámek vzhledu nově výslovně zakazuje slučování/záměnu podobných postav a použití portrétu na jinou postavu; (2) arch má PANEL CAST RULE — v panelu smí být jen postavy jmenované v JEHO popisu, i když jsou portréty ostatních přiložené; (3) kontrola musí každou viditelnou osobu VYJMENOVAT a přiřadit k postavě — nepřiřazená osoba (UNKNOWN) = zamítnutí, stejně jako míchané rysy dvou postav; pojistka v kódu zamítne i verdikt „ok" s nepřiřazenou osobou
 // 3.55 - 📍 Před systémovým dotazem na polohu se ukáže vlastní okno v designu appky (vysvětlí, že poloha slouží jen na jeden návrh a neukládá se; systémové okno prohlížeč stylovat nedovolí — bezpečnostní pravidlo webu); zamítnutá poloha dá srozumitelnou hlášku
 // 3.54 - Upozornění na mobilní data přepočítáno: výroba pohádky dnes stáhne ~5 MB (WebP scény), ne 30 MB z dob PNG; namluvení se stahuje až při přehrávání (~300 kB na stránku)
 // 3.53 - 💰 Přesné účtování obrázků: počítají se SKUTEČNÁ generování (včetně QA překreslení a portrétů), 1K obrázky a 4K archy zvlášť (arch $0,151 nese až 9 scén) — cena v panelu Spotřeba nově odpovídá realitě; počet pohádek se počítá jen ze záznamů celých pohádek (líné namluvení/dokreslení stránky už falešně nepřičítá pohádku)
