@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.54";
+export const APP_VERSION = "3.55";
 
 // Changelog (newest first)
+// 3.55 - 📍 Před systémovým dotazem na polohu se ukáže vlastní okno v designu appky (vysvětlí, že poloha slouží jen na jeden návrh a neukládá se; systémové okno prohlížeč stylovat nedovolí — bezpečnostní pravidlo webu); zamítnutá poloha dá srozumitelnou hlášku
 // 3.54 - Upozornění na mobilní data přepočítáno: výroba pohádky dnes stáhne ~5 MB (WebP scény), ne 30 MB z dob PNG; namluvení se stahuje až při přehrávání (~300 kB na stránku)
 // 3.53 - 💰 Přesné účtování obrázků: počítají se SKUTEČNÁ generování (včetně QA překreslení a portrétů), 1K obrázky a 4K archy zvlášť (arch $0,151 nese až 9 scén) — cena v panelu Spotřeba nově odpovídá realitě; počet pohádek se počítá jen ze záznamů celých pohádek (líné namluvení/dokreslení stránky už falešně nepřičítá pohádku)
 // 3.52 - 👫 Konec trojité Evy a Jakoba: postavy ve výběru ukazují FOTKY a duplicitní vlastní postavy (stejné jméno jako vestavěná, i spojená „Eva & Jakob") se automaticky uklidí — výběr přejde na vestavěné (kanonický popis + portrét, fungují všude); 💡 Ponaučení nahrazeno 📍 „Pohádka z místa, kde jste": appka zjistí polohu (nikam se neukládá), pozná místo a navrhne námět z okolí; OPRAVA zaseknutí na poslední scéně: arch se nekreslí opakovaně kvůli QA (nevešlo se do 5min limitu) — vadné panely jdou rovnou sólo dokreslení

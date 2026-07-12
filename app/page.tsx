@@ -2217,6 +2217,15 @@ export default function Home() {
   async function suggestFromLocation() {
     if (gpsLoading || ideaLoading) return;
     if (!navigator.geolocation) { await appAlert(t.gpsErr); return; }
+    // Systémové povolovací okno nejde stylovat — před PRVNÍM dotazem se proto
+    // ukáže vlastní okno v designu appky, které vysvětlí, co bude následovat
+    try {
+      const perm = await navigator.permissions?.query?.({ name: "geolocation" as PermissionName });
+      if (!perm || perm.state === "prompt") {
+        if (!(await appConfirm(t.gpsAsk))) return;
+      }
+      if (perm?.state === "denied") { await appAlert(t.gpsErr); return; }
+    } catch {}
     setGpsLoading(true);
     try {
       const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
