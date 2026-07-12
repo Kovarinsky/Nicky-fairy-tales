@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.47";
+export const APP_VERSION = "3.48";
 
 // Changelog (newest first)
+// 3.48 - Kartotéka v2 podle zpětné vazby: Valentýnka sahá Nicolasovi po ramena (ne do půli), James je PŘESNĚ stejně vysoký jako Nicolas, táta Jan má víc vlasů (plnější nahoře, kouty jen na spáncích — podle nové fotky) a zamčené bílé tenisky; portréty se překreslí (verze v2) a stejné výšky se učí i psaní příběhu
 // 3.47 - 🎨 Portrétová kartotéka: každá vestavěná postava se JEDNOU namaluje v pohádkovém stylu (celá postava podle fotek a kanonického popisu) a kreslení scén dostává tento hotový portrét místo fotky — stejná podoba a velikost postav v každé pohádce (konec „jednou vyšší, jednou menší“) a méně opravných překreslení = levnější pohádky; náhled kartotéky na /api/portraits (?redraw=<id> namaluje postavu znovu)
 // 3.46 - 👫 Eva a Jakob jsou vestavěné postavy s fotkami (na všech zařízeních, s kanonickým popisem vzhledu — konzistence jako u rodiny); 🇩🇰 Andersenovy dánské pohádky ve výběru světů (Malá mořská víla, Malenka, Cínový vojáček, Divoké labutě, Slavík, Létající kufr + stávající 4) — válec je rozdělený na skupiny 🇨🇿 České a klasické / 🇩🇰 Andersen; válec vylepšen: krajní položky jdou dorolovat do středu a jsou čitelné (větší odsazení, jemnější náklon a mlžení)
 // 3.45 - OPRAVA věčného „Píšu… (2. pokus)": dlouhá pohádka (alternativní konce, hodně stránek) se nevešla do 5min limitu serverové funkce a po restartu se psala znovu OD NULY — pořád dokola; teď se rozepsaný text každých 20 s ukládá a po restartu psaní NAVÁŽE přesně tam, kde skončilo (Claude pokračuje v rozepsané odpovědi), takže se každá pohádka vždy dopíše

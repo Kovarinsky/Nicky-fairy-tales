@@ -9,17 +9,18 @@
   {
     "id": "valentyna",
     "name": "Valentýnka",
-    "description": "Valentýna: wavy light-blonde hair with large pink fabric bow, sky-blue eyes, yellow dress with small white flower print and white collar, white sandals, very small — roughly half Nicolas's height",
+    "description": "Valentýna: wavy light-blonde hair with large pink fabric bow, sky-blue eyes, yellow dress with small white flower print and white collar, white sandals, small girl — the top of her head reaches Nicolas's shoulders",
     "referenceFile": "valentyna.jpg",
     "nameEn": "Valentina"
   },
   {
     "id": "jan",
     "name": "Táta Jan",
-    "description": "Jan: adult man with very short dark-brown hair and a high receding hairline, short brown stubble beard, warm dark-brown eyes, strong jaw, big warm open smile, navy-blue polo shirt with white horizontal stripes, navy shorts, tall athletic build",
+    "description": "Jan: adult man with short dark-brown hair (fuller on top, slightly receding only at the temples with a widow's peak), short brown stubble beard, warm dark-brown eyes, strong jaw, big warm open smile, navy-blue polo shirt with white horizontal stripes, navy shorts, white sneakers, tall athletic build",
     "referenceFile": "jan.jpg",
     "referenceFiles": [
-      "jan-face.jpg"
+      "jan-face.jpg",
+      "jan-face2.jpg"
     ],
     "nameEn": "Dad Jan"
   },
@@ -40,7 +41,7 @@
   {
     "id": "james",
     "name": "James",
-    "description": "James: 6-year-old boy with straight mid-brown hair with a fringe, dark brown eyes, cheeky warm smile, green T-shirt with cartoon dog print, white shorts, black sneakers with orange laces; Nicolas's best friend from Riverside school, half a head TALLER than Nicolas",
+    "description": "James: 6-year-old boy with straight mid-brown hair with a fringe, dark brown eyes, cheeky warm smile, green T-shirt with cartoon dog print, white shorts, black sneakers with orange laces; Nicolas's best friend from Riverside school, exactly the SAME height as Nicolas",
     "referenceFile": "james.jpg",
     "nameEn": "James"
   },

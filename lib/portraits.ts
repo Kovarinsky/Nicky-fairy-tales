@@ -15,7 +15,7 @@ import { generateBackgroundImage } from "./gemini";
 import { loadReferenceImages, type ReferenceImage } from "./characters";
 import type { Character } from "./types";
 
-const PORTRAIT_VERSION = 1;
+const PORTRAIT_VERSION = 2; // v2: opravené výšky (Valentýnka po ramena, James = Nicolas) a Janovy vlasy
 const memCache = new Map<string, ReferenceImage>();
 
 const PORTRAIT_STYLE =
