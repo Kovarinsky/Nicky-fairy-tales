@@ -40,5 +40,33 @@
     "emoji": "🇭🇷",
     "description": "Testovací mužský chorvatský hlas Google Gemini — klidný pohádkový přednes, vypráví chorvatsky",
     "language": "hr"
+  },
+  {
+    "id": "gemini:Sulafat:da",
+    "name": "Dansk fortæller — kvinde (test)",
+    "emoji": "🇩🇰",
+    "description": "Testovací ženský dánský hlas Google Gemini — vřelá pohádková intonace, vypráví dánsky",
+    "language": "da"
+  },
+  {
+    "id": "gemini:Iapetus:da",
+    "name": "Dansk fortæller — mand (test)",
+    "emoji": "🇩🇰",
+    "description": "Testovací mužský dánský hlas Google Gemini — klidný pohádkový přednes, vypráví dánsky",
+    "language": "da"
+  },
+  {
+    "id": "gemini:Sulafat:sk",
+    "name": "Slovenská rozprávačka (test)",
+    "emoji": "🇸🇰",
+    "description": "Testovací ženský slovenský hlas Google Gemini — vrelá rozprávková intonácia, rozpráva po slovensky",
+    "language": "sk"
+  },
+  {
+    "id": "gemini:Iapetus:sk",
+    "name": "Slovenský rozprávač (test)",
+    "emoji": "🇸🇰",
+    "description": "Testovací mužský slovenský hlas Google Gemini — pokojný rozprávkový prednes, rozpráva po slovensky",
+    "language": "sk"
   }
 ]

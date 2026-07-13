@@ -174,6 +174,12 @@ const STORY_LANGS: Array<{ code: string; flag: string; cs: string; en: string; t
   { code: "sk", flag: "🇸🇰", cs: "Slovenština", en: "Slovak", test: true },
 ];
 
+// ⏱ m:ss z počtu sekund (badge historie, panel Spotřeba)
+function fmtDur(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
 // Krátká ukázková věta (test hlasu, dobrou noc) podle jazyka
 const SAMPLE_BY_LANG: Record<string, string> = {
   cs: "Dobrou noc, Nicolásku a Valentýnko. Sladké sny!",
@@ -275,7 +281,7 @@ export default function Home() {
   type UsageData = {
     claude?: { usd?: number; days?: number; error?: string };
     elevenlabs?: { used?: number; limit?: number; tier?: string; error?: string };
-    own?: { images?: number; sheets?: number; chars?: number; usd?: number; days?: number; stories?: number; devices?: number; error?: string };
+    own?: { images?: number; sheets?: number; chars?: number; usd?: number; days?: number; stories?: number; devices?: number; prepAvgSec?: number; prepMinSec?: number; prepMaxSec?: number; prepCount?: number; error?: string };
     czkRate?: number;
   };
   // Which queued story the gen-cards preview (tap a segment to switch)
@@ -3405,8 +3411,17 @@ export default function Home() {
                   <span>{t.voiceAuto}</span>
                 </button>
                 {/* Ťuknutí hlas vybere a pustí/zastaví ukázku (⏳ nahrávám,
-                    ⏹ hraje) — panel zůstává otevřený kvůli porovnávání */}
-                {voices.map(v => {
+                    ⏹ hraje) — panel zůstává otevřený kvůli porovnávání.
+                    Hlasy jsou seskupené podle jazyka (jazyk hlasu = jazyk
+                    pohádky v automatice); klony a vymyšlené jsou na konci */}
+                {(["cs", "en", "hr", "da", "sk", "any"] as const).flatMap(gl => {
+                  const group = voices.filter(v => (v.kind ? gl === "any" : (v.language === gl || (gl === "any" && !isStoryLang(v.language)))));
+                  if (group.length === 0) return [];
+                  const meta = STORY_LANGS.find(x => x.code === gl);
+                  const head = meta
+                    ? `${meta.flag} ${uiLang === "en" ? meta.en : meta.cs}`
+                    : `🌍 ${uiLang === "en" ? "Multilingual & custom" : "Vícejazyčné a vlastní"}`;
+                  return [<p key={`vg-${gl}`} className="folk-group">{head}</p>, ...group.map(v => {
                   const pk = `voice:${v.id}`;
                   const playIcon = preview?.key === pk ? (preview.phase === "loading" ? "⏳" : "⏹") : "▶";
                   return v.kind ? (
@@ -3427,7 +3442,8 @@ export default function Home() {
                     <span>{v.name}</span>
                     <span className="voice-play" aria-hidden>{playIcon}</span>
                   </button>
-                );})}
+                );})];
+                })}
               </div>
               {recState === "idle" ? (
                 /* Vždy viditelné — vylepšení hlasu = smazat × a nahrát znovu;
@@ -4059,6 +4075,13 @@ export default function Home() {
                         <span className="usage-num">🎙️ {(usage.own.chars ?? 0).toLocaleString("cs-CZ")}</span>
                         <span className="usage-lbl">{t.statVoice}</span>
                       </div>
+                      {/* ⏱ průměrné trvání přípravy pohádky (z -p záznamů) */}
+                      {(usage.own.prepCount ?? 0) > 0 && (
+                        <div className="usage-stat">
+                          <span className="usage-num">⏱ {fmtDur(usage.own.prepAvgSec ?? 0)}</span>
+                          <span className="usage-lbl">{t.statPrep(fmtDur(usage.own.prepMinSec ?? 0), fmtDur(usage.own.prepMaxSec ?? 0))}</span>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <p>{t.usageGemini}</p>

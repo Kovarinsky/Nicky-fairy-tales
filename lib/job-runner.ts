@@ -395,7 +395,8 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     st.finishedAt = Date.now(); // ⏱ pohádka kompletní
     console.log(`[job ${id}] ⏱ celkem ${Math.round((st.finishedAt - st.createdAt) / 1000)}s (psaní ${st.wroteAt ? Math.round((st.wroteAt - st.createdAt) / 1000) : "?"}s)`);
     await write();
-    await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true);
+    await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true,
+      (st.finishedAt - st.createdAt) / 1000); // ⏱ trvání přípravy do panelu Spotřeba
   } catch (e) {
     st.phase = "error";
     st.error = e instanceof Error ? e.message : String(e);
@@ -406,15 +407,16 @@ export async function runJob(id: string, body: Record<string, unknown>) {
 
 // Záznam spotřeby pro panel 💰: SKUTEČNĚ vygenerované obrázky z tohoto běhu
 // (včetně QA překreslení a portrétů — čte se počítadlo v gemini.ts).
-// Data jsou v NÁZVU souboru: usage/u<ts>-i<1K obrázky>-c<znaky>[-s<4K archy>][-t1][-d<zařízení>].json
-// (-t1 = záznam celé pohádky, kvůli počítání pohádek) — /api/usage je sečte
-// pouhým výpisem, bez stahování obsahu. Úklid jobs/ se jich nedotkne.
+// Data jsou v NÁZVU souboru: usage/u<ts>-i<1K obrázky>-c<znaky>[-s<4K archy>][-t1][-p<s trvání>][-d<zařízení>].json
+// (-t1 = záznam celé pohádky, -p = trvání přípravy v sekundách) — /api/usage
+// je sečte pouhým výpisem, bez stahování obsahu. Úklid jobs/ se jich nedotkne.
 export async function writeUsageRecord(
-  images: number, chars: number, device?: string, sheets = 0, story = false
+  images: number, chars: number, device?: string, sheets = 0, story = false, prepSec = 0
 ): Promise<void> {
   if (images <= 0 && chars <= 0 && sheets <= 0) return;
   const dev = (device || "").replace(/[^a-z0-9]/gi, "").slice(0, 12);
-  const name = `usage/u${Date.now()}-i${images}-c${chars}${sheets > 0 ? `-s${sheets}` : ""}${story ? "-t1" : ""}${dev ? `-d${dev}` : ""}.json`;
+  const p = story && prepSec > 0 ? `-p${Math.min(Math.round(prepSec), 86400)}` : "";
+  const name = `usage/u${Date.now()}-i${images}-c${chars}${sheets > 0 ? `-s${sheets}` : ""}${story ? "-t1" : ""}${p}${dev ? `-d${dev}` : ""}.json`;
   try {
     await put(name, "1", {
       access: "public",

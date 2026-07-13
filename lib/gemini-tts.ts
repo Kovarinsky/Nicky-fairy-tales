@@ -19,6 +19,8 @@ const STYLE_BY_LANG: Record<string, string> = {
   cs: "Přečti následující text vřele a klidně, jako vypravěč dětské pohádky před spaním — s přirozenými pauzami, otázky tázavě, zvolání živě:",
   en: "Read the following text warmly and calmly, like a bedtime-story narrator for children — natural pauses, questions inquisitive, exclamations lively:",
   hr: "Pročitaj sljedeći tekst toplo i smireno, kao pripovjedač dječje priče za laku noć — s prirodnim stankama, pitanja upitno, uzvike živahno. Govori standardnim hrvatskim izgovorom:",
+  da: "Læs følgende tekst varmt og roligt, som en fortæller af en godnathistorie for børn — med naturlige pauser, spørgsmål spørgende, udbrud levende. Tal med standard dansk udtale:",
+  sk: "Prečítaj nasledujúci text vrelo a pokojne, ako rozprávač detskej rozprávky pred spaním — s prirodzenými pauzami, otázky opytovacie, zvolania živo. Hovor spisovnou slovenčinou:",
 };
 
 /** Namluví text hlasem Gemini; vrací WAV buffer. Jméno hlasu smí nést jazyk
