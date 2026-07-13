@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.80";
+export const APP_VERSION = "3.81";
 
 // Changelog (newest first)
+// 3.81 - 🔢 KONEC falešného „(2. pokus)": úvodní zápis stavu z /api/job/start (pojistka proti zombie jobům) se počítal jako minulý mrtvý běh a KAŽDÁ pohádka startovala rovnou jako 2. pokus — nově se skutečný běh pozná podle updatedAt; zdravé navázání psaní po 5min limitu funkce se v řádku ukazuje jako „✍️ Píšu… (pokračuji)" místo strašidelného čísla pokusu (pokusy se číslují jen při psaní BEZ pokroku); časovač předání při psaní posunut na 280 s (méně zbytečných řetězů)
 // 3.80 - 👋 Konec nesmrtelného „týpka s kávou": kniha na ploše se obnovovala z rozpracovaného stavu BEZ vazby na historii — smazaná pohádka se tak po každém přepnutí okna vracela donekonečna; nově se rozpracovaný stav páruje s historií (nese id), osiřelý stav smazané pohádky se zahodí a na plochu se místo něj načte POSLEDNÍ pohádka z historie (z offline cache); plocha se doplní o poslední pohádku i po čistém startu appky
 // 3.79 - 📋 Deník se k hotové pohádce doplní i ZPĚTNĚ: když pohádku dokončila starší verze appky nebo jiné zařízení (odznak ⏱ bez 📋), appka si při startu deník stáhne ze serveru, dokud tam ještě žije (~1 hodina po dokončení)
 // 3.78 - 🖌 Překreslit jde KAŽDÝ obrázek: v rohu stránky ve čtečce je štěteček — nový obrázek projde kontrolou a NAHRADÍ starý (uloží se k pohádce, dřív se oprava po reloadu ztratila; oprava starší pohádky navíc používala kontext posledního generování místo té otevřené); kontrola má nové PRAVIDLO STYLU: fotografie/fotorealistický/3D obrázek = okamžité zamítnutí (tudy prošel „týpek s kávou" — vůbec nic nekontrolovalo, jestli je to malovaná ilustrace)

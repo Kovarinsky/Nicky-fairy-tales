@@ -634,7 +634,7 @@ export default function Home() {
   // Server jobs — a QUEUE: several fairy tales can generate on Vercel at once,
   // each gets its own toast row and the newest one drives the gen-cards
   type JobLogEntry = { t: number; m: string };
-  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string; restarts?: number; lastError?: string; log?: JobLogEntry[] };
+  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string; restarts?: number; stuckRestarts?: number; lastError?: string; log?: JobLogEntry[] };
   const MAX_ACTIVE_JOBS = 3;
   // 📋 Otevřený deník běhu jobu (overlay) — entries se berou živě z pollů
   // (jobId → entries živě z pollů; entries → snapshot z hotové pohádky v historii)
@@ -2230,7 +2230,7 @@ export default function Home() {
         }
         if (st.phase === "writing") {
           // restarts/lastError: diagnostika, proč se psaní opakuje (viditelná v řádku)
-          updateServerJob(jobId, { phase: "writing", restarts: st.restarts || 0, lastError: st.lastError || undefined, log: st.log });
+          updateServerJob(jobId, { phase: "writing", restarts: st.restarts || 0, stuckRestarts: st.stuckRestarts || 0, lastError: st.lastError || undefined, log: st.log });
         } else if (st.phase === "generating") {
           jobMetaRef.current.set(jobId, { title: st.title, heroDescription: st.heroDescription, choice: st.choice });
           prefetchJobScenes(jobId, st);
@@ -3893,7 +3893,9 @@ export default function Home() {
                             onClick={e => { e.stopPropagation(); setLogView({ jobId: j.jobId, title: j.title || "" }); }}>📋</button>
                         )}
                         <span className="job-seg-label">
-                          {idx + 1}. {j.stalled ? "⚠️ " : ""}{j.phase === "writing" ? `${t.segWriting}${(j.restarts ?? 0) > 0 ? ` (${(j.restarts ?? 0) + 1}. pokus)` : ""}`
+                          {/* zdravé navázání po limitu funkce ≠ „pokus" — pokusy
+                              se ukazují jen při psaní BEZ pokroku */}
+                          {idx + 1}. {j.stalled ? "⚠️ " : ""}{j.phase === "writing" ? `${t.segWriting}${(j.stuckRestarts ?? 0) > 0 ? ` (${(j.restarts ?? 0) + 1}. pokus)` : (j.restarts ?? 0) > 0 ? ` (${t.segWritingResume})` : ""}`
                             : j.phase === "generating" ? `🎨 ${j.done}/${j.total}`
                             : j.phase === "done" ? t.segOpen
                             : t.segError}

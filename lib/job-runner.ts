@@ -103,17 +103,21 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   // I job ve stavu error se scénami naváže (např. po resetu denní kvóty) —
   // dokreslí jen chybějící obrázky, nepíše a nekreslí celou pohádku znovu.
   const prev = await readJson<JobStatus>(statusPath);
+  // Úvodní zápis z /api/job/start (pojistka proti zombie jobu) NENÍ minulý
+  // běh — pozná se podle chybějícího updatedAt (ten přidává až write()).
+  // Dřív se počítal jako restart a KAŽDÝ job startoval jako „(2. pokus)".
+  const hadRealRun = !!prev?.updatedAt;
   const st: JobStatus =
     prev && prev.scenesScript?.length
       ? { ...prev, error: undefined, imgError: undefined }
       : {
           phase: "writing",
           createdAt: prev?.createdAt ?? Date.now(),
-          voiceId: String(body.voiceId || ""),
+          voiceId: String(body.voiceId || prev?.voiceId || ""),
           // Restart psaní (kick bez hotového scénáře) dřív MAZAL chybovou
           // hlášku — job vypadal věčně jako „Píšu…". Teď se chyba přenáší
-          // a po 3. restartu se job zastaví s viditelnou příčinou.
-          restarts: prev ? (prev.restarts ?? 0) + 1 : 0,
+          // a po 3. restartu BEZ POKROKU se job zastaví s viditelnou příčinou.
+          restarts: hadRealRun ? (prev?.restarts ?? 0) + 1 : (prev?.restarts ?? 0),
           lastError: prev?.error || prev?.lastError,
           pdfBrief: prev?.pdfBrief,
           chains: prev?.chains,
@@ -148,7 +152,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   // funkci přes /api/job/continue (force přeskočí pojistku čerstvého stavu).
   const runStartedAt = Date.now();
   const SELF_KICK_AT = 240_000;   // kontroly mezi scénami/archy
-  const WRITING_KICK_AT = 265_000; // psaní = jeden dlouhý stream → časovač
+  const WRITING_KICK_AT = 280_000; // psaní = jeden dlouhý stream → časovač (zbytečné řetězy stojí čas)
   const timeUp = () => Date.now() - runStartedAt > SELF_KICK_AT;
   let selfKicked = false;
   const selfContinue = async (): Promise<void> => {
