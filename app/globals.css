@@ -3167,6 +3167,34 @@ textarea.ta-accent:focus {
 
 .job-seg-x:active { background: rgba(220, 38, 38, 0.8); }
 
+/* 📋 deník běhu — druhé kolečko pod ✕ v pravém rohu jobu */
+.job-seg-log {
+  top: 26px;
+  font-size: 0.6rem;
+}
+
+.job-seg-log:active { background: rgba(124, 77, 255, 0.8); }
+
+/* 📋 Overlay s deníkem: rolovací seznam kroků s časy */
+.job-log { max-width: 34rem; }
+
+.job-log-list {
+  max-height: 55vh;
+  overflow-y: auto;
+  text-align: left;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 0.4rem 0;
+}
+
+.job-log-list p { margin: 0.22rem 0; }
+
+.job-log-t {
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  margin-right: 0.4rem;
+}
+
 .job-seg-label {
   position: relative;
   z-index: 1;

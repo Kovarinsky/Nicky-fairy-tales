@@ -49,6 +49,9 @@ export interface JobStatus {
   partialLen?: number;
   /** Restarty psaní BEZ pokroku v partial.json — jen ty znamenají zaseknutí */
   stuckRestarts?: number;
+  /** 📋 Deník běhu: posledních ~60 událostí s časem — diagnostika „proč to trvá"
+   *  (jede ve statusu, klient ho vidí při každém pollu; 📋 u jobu ho zobrazí) */
+  log?: Array<{ t: number; m: string }>;
 }
 
 export async function putJson(path: string, data: unknown): Promise<string> {
@@ -113,11 +116,22 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           restarts: prev ? (prev.restarts ?? 0) + 1 : 0,
           lastError: prev?.error || prev?.lastError,
           pdfBrief: prev?.pdfBrief,
+          chains: prev?.chains,
+          partialLen: prev?.partialLen,
+          stuckRestarts: prev?.stuckRestarts,
+          log: prev?.log, // deník přežívá restarty psaní
         };
   const write = () => {
     st.updatedAt = Date.now();
     return putJson(statusPath, st).catch(e => console.error(`[job ${id}] status write failed:`, e));
   };
+  // 📋 Deník: co se kdy stalo (trvání kroků, chyby) — bez await, zapíše se
+  // s nejbližším write(); do konzole jde záznam hned
+  const logEv = (m: string) => {
+    st.log = [...(st.log || []), { t: Date.now(), m: m.slice(0, 200) }].slice(-60);
+    console.log(`[job ${id}] ${m}`);
+  };
+  const secsSince = (t0: number) => Math.round((Date.now() - t0) / 1000);
 
   // Tvrdý strop počtu běhů psaní (zdravé řetězení dlouhého psaní projde,
   // skutečné zaseknutí chytá kontrola pokroku partial.json níže)
@@ -149,8 +163,8 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       await write();
       return;
     }
+    logEv(`♻️ předávám štafetu další funkci (řetěz ${st.chains}, běh ${secsSince(runStartedAt)}s)`);
     await write();
-    console.log(`[job ${id}] ♻️ self-continue #${st.chains} (${Math.round((Date.now() - runStartedAt) / 1000)}s)`);
     try {
       await fetch(`https://${host}/api/job/continue`, {
         method: "POST",
@@ -165,6 +179,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   };
 
   try {
+    logEv(`▶ běh funkce start${(st.chains ?? 0) > 0 ? ` (řetěz ${st.chains})` : ""}${st.scenesScript?.length ? ` — scénář hotový, ${Object.keys(st.sceneUrls || {}).length}/${st.total ?? "?"} scén nakresleno` : (st.restarts ?? 0) > 0 ? ` — psaní pokus ${(st.restarts ?? 0) + 1}` : ""}`);
     if (!st.scenesScript?.length) {
       // ── 1) Story (Claude) — same inputs as /api/story ──
       st.phase = "writing";
@@ -220,12 +235,15 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       // PDF se do psaní nedává celé (velký dokument nepustil psaní do limitu
       // funkce) — jednou se shrne do briefu, který se uloží k jobu
       if (pdfBase64 && !st.pdfBrief) {
+        const tPdf = Date.now();
+        logEv("📄 dělám souhrn vloženého PDF");
         await write();
         try {
           st.pdfBrief = await extractPdfBrief(storyReq.language === "en" ? "en" : "cs", pdfBase64);
+          logEv(`📄 souhrn PDF hotový za ${secsSince(tPdf)}s`);
           await write();
         } catch (e) {
-          console.warn(`[job ${id}] pdf brief failed:`, e instanceof Error ? e.message : e);
+          logEv(`📄 souhrn PDF CHYBA po ${secsSince(tPdf)}s: ${e instanceof Error ? e.message : e}`);
         }
       }
 
@@ -265,6 +283,8 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       // ♻️ Časovač: když psaní přesáhne limit funkce, job se sám předá dál
       // (nová funkce naváže na partial.json prefillovaným pokračováním)
       const writingKick = setTimeout(() => { void selfContinue(); }, WRITING_KICK_AT);
+      const tWrite = Date.now();
+      logEv(`✍️ píšu příběh (${storyReq.sceneCount} scén, ${storyReq.language})${resumeText ? ` — navazuji od ${resumeText.length} znaků` : ""}`);
       let lastBeat = Date.now();
       let latestText = resumeText;
       let script;
@@ -299,6 +319,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       st.done = 0;
       st.sceneUrls = {};
       st.wroteAt = Date.now(); // ⏱ konec psaní
+      logEv(`✍️ příběh dopsán za ${secsSince(tWrite)}s (${st.scenesScript.length} scén, ${latestText.length} znaků)`);
       // ♻️ Psaní přeteklo limit a řetěz už běží: scénář se uloží a tento běh
       // končí — obrázky kreslí (jediná) navazující funkce
       if (selfKicked) {
@@ -363,18 +384,20 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     async function doScene(i: number): Promise<void> {
       if (st.sceneUrls![i] || quotaExhausted) return; // hotová / kvóta vyčerpaná
       const scene = scenesScript[i];
+      const tScene = Date.now();
       const sceneRefs = refsFor(`${scene.imagePrompt} ${scene.narration}`);
       const refs = anchor && i > 0 ? [...sceneRefs, anchor] : sceneRefs;
       // 🎙️ Hlas se NEVYRÁBÍ při generování — namluvení vzniká líně až při
       // čtení hotové pohádky (klient si ho vyžádá přes /api/scene audioOnly).
       // Nepřehrané pohádky tak hlas vůbec neplatí.
       const img = await generateSceneImage(scene, heroDescription, refs).catch((e: Error) => {
-        console.error(`[job ${id}] scene ${i + 1} image: ${e.message}`);
+        logEv(`🎨 scéna ${i + 1} CHYBA po ${secsSince(tScene)}s: ${e.message.slice(0, 140)}`);
         st.imgError = e.message.slice(0, 220);
         if (isDailyQuotaError(e.message)) quotaExhausted = true;
         return null;
       });
       if (!img) { await write(); return; } // retry rounds below; chybu vidí klient
+      logEv(`🎨 scéna ${i + 1} hotová za ${secsSince(tScene)}s`);
       st.imgError = undefined;
       const payload = {
         index: scene.index,
@@ -402,12 +425,15 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       let pending = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
       while (pending.length >= 2 && !quotaExhausted && !timeUp()) {
         const group = pending.slice(0, Math.min(maxCells, pending.length));
+        const tSheet = Date.now();
+        logEv(`🗂️ kreslím arch ${group.length} scén (${group.map(i => i + 1).join(",")})`);
         await write(); // heartbeat před dlouhým generováním archu
         try {
           const groupText = group.map(i => `${scenesScript[i].imagePrompt} ${scenesScript[i].narration}`).join(" ");
           const groupRefs = refsFor(groupText);
           const refs = anchor ? [...groupRefs, anchor] : groupRefs;
           const results = await generateSceneSheet(group.map(i => scenesScript[i]), heroDescription, refs);
+          logEv(`🗂️ arch hotový za ${secsSince(tSheet)}s (prošlo ${results.filter(Boolean).length}/${group.length} panelů)`);
           for (let k = 0; k < group.length; k++) {
             const img = results[k];
             if (!img) continue;
@@ -422,7 +448,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           await write();
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          console.warn(`[job ${id}] sheet failed (${msg.slice(0, 160)}) → sólo dokreslení`);
+          logEv(`🗂️ arch CHYBA po ${secsSince(tSheet)}s: ${msg.slice(0, 140)} → sólo dokreslení`);
           if (isDailyQuotaError(msg)) quotaExhausted = true;
           break; // zbytek dokreslí sólo kola
         }
@@ -454,6 +480,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     if (quotaExhausted && Object.keys(st.sceneUrls!).length < total) {
       st.phase = "error";
       st.error = `Vyčerpán denní limit kreslení Gemini (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo). Resetuje se kolem 9:00 ráno — pak pohádku zadejte znovu.`;
+      logEv(`⛔ STOP: denní kvóta Gemini vyčerpaná (${Object.keys(st.sceneUrls!).length}/${total})`);
       await write();
       await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true);
       return;
@@ -470,7 +497,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
 
     st.phase = "done";
     st.finishedAt = Date.now(); // ⏱ pohádka kompletní
-    console.log(`[job ${id}] ⏱ celkem ${Math.round((st.finishedAt - st.createdAt) / 1000)}s (psaní ${st.wroteAt ? Math.round((st.wroteAt - st.createdAt) / 1000) : "?"}s)`);
+    logEv(`✅ HOTOVO — celkem ${Math.round((st.finishedAt - st.createdAt) / 1000)}s od zadání (psaní ${st.wroteAt ? Math.round((st.wroteAt - st.createdAt) / 1000) : "?"}s, řetězů ${st.chains ?? 0})`);
     await write();
     await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true,
       (st.finishedAt - st.createdAt) / 1000); // ⏱ trvání přípravy do panelu Spotřeba
@@ -478,6 +505,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     st.phase = "error";
     st.error = e instanceof Error ? e.message : String(e);
     st.lastError = st.error;
+    logEv(`💥 CHYBA běhu: ${st.error.slice(0, 160)}`);
     await write();
   }
 }

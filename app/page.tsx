@@ -614,8 +614,11 @@ export default function Home() {
 
   // Server jobs — a QUEUE: several fairy tales can generate on Vercel at once,
   // each gets its own toast row and the newest one drives the gen-cards
-  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string; restarts?: number; lastError?: string };
+  type JobLogEntry = { t: number; m: string };
+  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string; restarts?: number; lastError?: string; log?: JobLogEntry[] };
   const MAX_ACTIVE_JOBS = 3;
+  // 📋 Otevřený deník běhu jobu (overlay) — entries se berou živě z pollů
+  const [logView, setLogView] = useState<{ jobId: string; title: string } | null>(null);
   const [serverJobs, setServerJobs] = useState<ServerJob[]>([]);
   // The ref is the synchronous source of truth (poll callbacks and the mount
   // resume mutate it back-to-back — state alone would race); state mirrors it
@@ -2133,18 +2136,18 @@ export default function Home() {
         }
         if (st.phase === "writing") {
           // restarts/lastError: diagnostika, proč se psaní opakuje (viditelná v řádku)
-          updateServerJob(jobId, { phase: "writing", restarts: st.restarts || 0, lastError: st.lastError || undefined });
+          updateServerJob(jobId, { phase: "writing", restarts: st.restarts || 0, lastError: st.lastError || undefined, log: st.log });
         } else if (st.phase === "generating") {
           jobMetaRef.current.set(jobId, { title: st.title, heroDescription: st.heroDescription, choice: st.choice });
           prefetchJobScenes(jobId, st);
           updateEarlyReady(jobId, st); // ▶ Číst se ukáže, až čtenář nebude muset čekat
-          updateServerJob(jobId, { phase: "generating", done: st.done || 0, total: st.total || 0, title: st.title, imgError: st.imgError || undefined });
+          updateServerJob(jobId, { phase: "generating", done: st.done || 0, total: st.total || 0, title: st.title, imgError: st.imgError || undefined, log: st.log });
         } else if (st.phase === "done") {
           stopJobPolling(jobId);
           await finalizeServerJob(st, jobId);
         } else if (st.phase === "error") {
           stopJobPolling(jobId);
-          updateServerJob(jobId, { phase: "error", error: String(st.error || t.errGeneric) });
+          updateServerJob(jobId, { phase: "error", error: String(st.error || t.errGeneric), log: st.log });
         }
       } catch {}
     };
@@ -3764,6 +3767,11 @@ export default function Home() {
                               }
                             }}>✕</button>
                         )}
+                        {/* 📋 deník běhu — co se kdy stalo a jak dlouho to trvalo */}
+                        {j.phase !== "done" && (j.log?.length ?? 0) > 0 && (
+                          <button type="button" className="job-seg-x job-seg-log" aria-label={t.logTitle} title={t.logTitle}
+                            onClick={e => { e.stopPropagation(); setLogView({ jobId: j.jobId, title: j.title || "" }); }}>📋</button>
+                        )}
                         <span className="job-seg-label">
                           {idx + 1}. {j.stalled ? "⚠️ " : ""}{j.phase === "writing" ? `${t.segWriting}${(j.restarts ?? 0) > 0 ? ` (${(j.restarts ?? 0) + 1}. pokus)` : ""}`
                             : j.phase === "generating" ? `🎨 ${j.done}/${j.total}`
@@ -4216,6 +4224,30 @@ export default function Home() {
                 ✕ {t.cancel}
               </button>
               <button type="button" onClick={() => setWorldEditorOpen(false)}>✓ OK</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📋 Deník běhu pohádky — kroky přípravy s časy a chybami (živě z pollů) */}
+      {logView && (
+        <div className="app-confirm-overlay" onClick={() => setLogView(null)}>
+          <div className="app-confirm job-log" onClick={e => e.stopPropagation()}>
+            <p className="app-confirm-msg">📋 {t.logTitle}{logView.title ? ` — ${logView.title}` : ""}</p>
+            <div className="job-log-list">
+              {(() => {
+                const entries = serverJobs.find(j => j.jobId === logView.jobId)?.log || [];
+                if (entries.length === 0) return <p>{t.logEmpty}</p>;
+                const t0 = entries[0].t;
+                return entries.map((en, i) => (
+                  <p key={i}>
+                    <span className="job-log-t">+{fmtDur((en.t - t0) / 1000)}</span> {en.m}
+                  </p>
+                ));
+              })()}
+            </div>
+            <div className="app-confirm-btns">
+              <button type="button" onClick={() => setLogView(null)}>✓ OK</button>
             </div>
           </div>
         </div>
