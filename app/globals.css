@@ -2732,6 +2732,23 @@ textarea.ta-accent:focus {
   line-height: 1.35;
 }
 
+/* 🔎 živý stav jobu — poslední krok deníku pod ukazatelem průběhu */
+.job-live-note {
+  display: block;
+  position: relative;
+  z-index: 1;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 0.15rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  padding: 0 0.4rem;
+}
+
 /* 🔀 Návrat k rozbočce — malý pilulkový button vlevo nahoře ve čtečce */
 .choice-return {
   position: fixed;

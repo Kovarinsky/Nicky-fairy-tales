@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.84";
+export const APP_VERSION = "3.85";
 
 // Changelog (newest first)
+// 3.85 - 🔎 Konec pocitu „seká se": řádek připravované pohádky ukazuje ŽIVĚ poslední krok deníku („🗂️ kreslím arch 9 scén…", „🎨 scéna 7 hotová za 32s") — je vidět, že job pracuje, i když se čísla zrovna nehýbou (arch se počítá až po dokreslení celku); ⚡ optimalizace: portréty postav se načítají souběžně s psaním (−3–5 s), panely archu se ukládají paralelně (−2–4 s/arch), sólo dokreslení jede ve 4 workerech místo 3 (−20 % času nejpomalejší fáze)
 // 3.84 - 💰 ROZPOČTOVÁ POJISTKA na pohádku: přes všechny běhy smí vzniknout nejvýš ~4 obrázky na stránku (včetně QA překreslení, archů a řetězů — u 15 stránek limit 72) — pak se job zastaví s jasnou chybou místo pálení kreditu; útrata běhu se sčítá do stavu jobu (imgSpent) a hlídá se před scénou, před archem i na konci běhu — smyčka typu „arch dokola" už NIKDY nemůže protéct bez stropu
 // 3.83 - 💳 Vyčerpaný KREDIT Gemini se pozná od denní kvóty: hláška nově říká pravdu („dobijte kredit v Google AI Studio — sám se neobnoví") místo zavádějícího „resetuje se v 9:00"; 📋 deník je ČITELNÝ — text dědil tlumenou barvu odstavců (skoro neviditelný), teď má plný kontrast a dlouhé chybové hlášky se lámou
 // 3.82 - 🔁 KONEC SMYČKY ARCHŮ (nalezeno z 📋 deníku: „arch hotový, prošlo 0/8 panelů" pořád dokola): arch, který nepřinese ANI JEDEN nový panel, ukončuje archovou fázi a zbytek jde rovnou sólo cestou s vlastní QA; max 3 archy na běh funkce; do deníku se nově píší DŮVODY zamítnutí panelů (p1: two identical boys… | p2: NEOVĚŘEN…) — uvidíme, jestli padají na konzistenci, nebo na nedostupnosti kontroly

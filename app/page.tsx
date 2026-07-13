@@ -3900,6 +3900,11 @@ export default function Home() {
                             : j.phase === "done" ? t.segOpen
                             : t.segError}
                         </span>
+                        {/* živý stav: poslední krok z 📋 deníku — ať je vidět,
+                            že job pracuje, i když se čísla zrovna nehýbou */}
+                        {j.phase === "generating" && j.log?.length ? (
+                          <span className="job-live-note">{j.log[j.log.length - 1].m.slice(0, 90)}</span>
+                        ) : null}
                         {j.phase === "writing" && j.lastError && (
                           <span className="job-last-error">⚠️ {j.lastError.slice(0, 160)}</span>
                         )}

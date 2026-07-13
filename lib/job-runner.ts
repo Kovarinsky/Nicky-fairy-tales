@@ -189,6 +189,11 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   let earlyDraw: Promise<{ buffer: Buffer; mimeType: string } | null> | null = null;
   let earlyImg: { buffer: Buffer; mimeType: string } | null = null;
 
+  // ⚡ Portréty postav se načítají SOUBĚŽNĚ s psaním (dřív se na ně čekalo
+  // až po dopsání — u studeného startu ~3–5 s navíc)
+  const refIds: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
+  const refEntriesPromise = loadPortraitRefEntries(charactersByIds(refIds)).catch(() => [] as Awaited<ReturnType<typeof loadPortraitRefEntries>>);
+
   try {
     logEv(`▶ běh funkce start${(st.chains ?? 0) > 0 ? ` (řetěz ${st.chains})` : ""}${st.scenesScript?.length ? ` — scénář hotový, ${Object.keys(st.sceneUrls || {}).length}/${st.total ?? "?"} scén nakresleno` : (st.restarts ?? 0) > 0 ? ` — psaní pokus ${(st.restarts ?? 0) + 1}` : ""}`);
     if (!st.scenesScript?.length) {
@@ -306,7 +311,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         const hero = enforceCanonicalAppearance(peek.heroDescription, storyReq, extras);
         logEv("⚡ scéna 1 se kreslí souběžně s psaním zbytku příběhu");
         earlyDraw = (async () => {
-          const entries = await loadPortraitRefEntries(charactersByIds(ids));
+          const entries = await refEntriesPromise;
           const early: ReferenceImage[] = [...refsForText(entries, `${peek.scene.imagePrompt} ${peek.scene.narration}`)];
           for (const ci of (Array.isArray(body.customCharacterImages) ? (body.customCharacterImages as Array<{ data?: string; mimeType?: string }>) : [])) {
             if (ci?.data && ci?.mimeType) early.push({ data: ci.data, mimeType: ci.mimeType, name: "a custom story character" });
@@ -400,8 +405,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // Reference postav = MALOVANÉ PORTRÉTY z kartotéky, ale CÍLENĚ: každá
     // scéna/arch dostane jen portréty postav, které v ní vystupují — 9 portrétů
     // na každou scénu vedlo k míchání identit
-    const ids: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
-    const refEntries = await loadPortraitRefEntries(charactersByIds(ids));
+    const refEntries = await refEntriesPromise; // načtené souběžně s psaním
     const customRefs: ReferenceImage[] = [];
     const customImages = Array.isArray(body.customCharacterImages)
       ? (body.customCharacterImages as Array<{ data?: string; mimeType?: string }>)
@@ -522,16 +526,16 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           const results = await generateSceneSheet(group.map(i => scenesScript[i]), heroDescription, refs);
           const passed = results.filter(Boolean).length;
           logEv(`🗂️ arch hotový za ${secsSince(tSheet)}s (prošlo ${passed}/${group.length} panelů)${lastSheetReport ? ` — ${lastSheetReport.slice(0, 220)}` : ""}`);
-          for (let k = 0; k < group.length; k++) {
+          // panely se ukládají PARALELNĚ (sériově to stálo ~2–4 s na arch)
+          await Promise.all(group.map(async (i, k) => {
             const img = results[k];
-            if (!img) continue;
-            const i = group[k];
+            if (!img) return;
             const url = await putJson(`jobs/${id}/scene-${i}.json`, {
               index: scenesScript[i].index,
               imageUrl: `data:${img.mimeType};base64,${img.buffer.toString("base64")}`,
             });
             st.sceneUrls![i] = url;
-          }
+          }));
           st.done = Object.keys(st.sceneUrls!).length;
           await write();
           if (passed === 0) {
@@ -553,7 +557,9 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     async function worker() {
       while (idx < total && !timeUp()) { const i = idx++; await doScene(i); }
     }
-    await Promise.all(Array.from({ length: Math.min(3, Math.max(0, total - 1)) }, worker));
+    // 4 souběžní kreslíři (dřív 3) — sólo dokreslení po neprošlém archu je
+    // nejpomalejší fáze; Gemini limity 4 souběhy zvládají
+    await Promise.all(Array.from({ length: Math.min(4, Math.max(0, total - 1)) }, worker));
 
     // Verification rounds — the job is done only when every image exists
     for (let round = 0; round < 2 && !quotaExhausted && !timeUp(); round++) {
