@@ -6,7 +6,7 @@
 
 import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, peekEarlyScene, enforceCanonicalAppearance, type StoryExtras } from "@/lib/claude";
-import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError } from "@/lib/gemini";
+import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, lastSheetReport } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefEntries, refsForText } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
@@ -482,7 +482,12 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     if (sheetMode !== "off" && !quotaExhausted && st.sceneUrls![0]) {
       const maxCells = sheetMode === "2x2" ? 4 : 9;
       let pending = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
-      while (pending.length >= 2 && !quotaExhausted && !timeUp()) {
+      // Pojistky proti SMYČCE ARCHŮ: max 3 archy na běh, a arch BEZ jediného
+      // nového panelu ukončuje archovou fázi (dřív se stejný arch — prošlo
+      // 0/8 — kreslil pořád dokola přes řetězy funkcí a pálil kredit)
+      let sheetRounds = 0;
+      while (pending.length >= 2 && !quotaExhausted && !timeUp() && sheetRounds < 3) {
+        sheetRounds++;
         const group = pending.slice(0, Math.min(maxCells, pending.length));
         const tSheet = Date.now();
         logEv(`🗂️ kreslím arch ${group.length} scén (${group.map(i => i + 1).join(",")})`);
@@ -492,7 +497,8 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           const groupRefs = refsFor(groupText);
           const refs = anchor ? [...groupRefs, anchor] : groupRefs;
           const results = await generateSceneSheet(group.map(i => scenesScript[i]), heroDescription, refs);
-          logEv(`🗂️ arch hotový za ${secsSince(tSheet)}s (prošlo ${results.filter(Boolean).length}/${group.length} panelů)`);
+          const passed = results.filter(Boolean).length;
+          logEv(`🗂️ arch hotový za ${secsSince(tSheet)}s (prošlo ${passed}/${group.length} panelů)${lastSheetReport ? ` — ${lastSheetReport.slice(0, 220)}` : ""}`);
           for (let k = 0; k < group.length; k++) {
             const img = results[k];
             if (!img) continue;
@@ -505,6 +511,10 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           }
           st.done = Object.keys(st.sceneUrls!).length;
           await write();
+          if (passed === 0) {
+            logEv("🗂️ arch nepřinesl žádný panel → zbytek jde sólo cestou");
+            break;
+          }
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           logEv(`🗂️ arch CHYBA po ${secsSince(tSheet)}s: ${msg.slice(0, 140)} → sólo dokreslení`);

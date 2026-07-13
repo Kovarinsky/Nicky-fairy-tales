@@ -519,6 +519,9 @@ async function sliceSheet(img: ImageResult, grid: number): Promise<ImageResult[]
   }
 }
 
+/** Důvody zamítnutí panelů posledního archu — volající je zapíše do 📋 deníku */
+export let lastSheetReport = "";
+
 /**
  * Vygeneruje 2–9 scén jedním archem (2×2 pro ≤4, jinak 3×3; volné buňky se
  * vyplní prázdnou scenérií). Vrací pole délky scenes.length — prošlé výřezy
@@ -608,17 +611,20 @@ export async function generateSceneSheet(
     chunk.forEach((v, j) => { verdicts[i + j] = v; });
   }
   const out: Array<ImageResult | null> = [];
+  const reasons: string[] = [];
   for (let i = 0; i < n; i++) {
     const v = verdicts[i];
     if (!v || !v.ok) {
       // ZPŘÍSNĚNO: neověřitelný panel (kontrola 3× selhala) se NEpřijímá —
       // jde na sólo dokreslení s vlastní QA, stejně jako zamítnutý
+      reasons.push(`p${i + 1}: ${v ? v.problems.slice(0, 70) : "NEOVĚŘEN (kontrola nedostupná)"}`);
       console.warn(`[Gemini sheet] panel ${i + 1} ${v ? `zamítnut (${v.problems.slice(0, 160)})` : "NEOVĚŘEN (kontrola selhala)"} → sólo`);
       out.push(null);
     } else {
       out.push(await compressImage(slices[i]));
     }
   }
+  lastSheetReport = reasons.slice(0, 4).join(" | ");
   console.log(`[Gemini sheet] hotovo: ${out.filter(Boolean).length}/${n} panelů prošlo (zbytek sólo)`);
   return out;
 }
