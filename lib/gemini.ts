@@ -365,7 +365,14 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
         // Drží se NEJLEPŠÍ OVĚŘENÝ pokus (nejméně porušených pravidel) —
         // neověřený obrázek nikdy nenahradí ověřený.
         if (heroDescription) {
-          const v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt);
+          let v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt);
+          if (!v0) {
+            // Kontrola 3× selhala (typicky rate-limit) → po pauze ještě jednou;
+            // teprve pak se obrázek přijme s varováním (jinak by se nic nedokreslilo)
+            await new Promise(r => setTimeout(r, 6000));
+            v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt);
+            if (!v0) console.warn(`[Gemini QA] scene ${scene.index}: kontrola opakovaně selhala — obrázek přijat NEOVĚŘENÝ`);
+          }
           if (v0 && !v0.ok) {
             let best = { img, badRules: v0.badRules, problems: v0.problems };
             for (let fix = 1; fix <= 3 && best.badRules > 0; fix++) {
@@ -587,21 +594,28 @@ export async function generateSceneSheet(
   }
   if (!slices) throw new Error("sheet: mřížka se nepodařila nakreslit");
 
-  // Jedenáctero na každý výřez zvlášť — VŠECHNY panely paralelně (kontrolní
-  // model má volné limity; po 3 to dřív stálo ~3× déle)
-  const verdicts = await Promise.all(
-    Array.from({ length: n }, (_, i) =>
-      verifySceneImage(apiKey, slices![i], heroDescription, scenes[i].imagePrompt)
-    )
-  );
+  // Jedenáctero na každý výřez zvlášť — paralelně po 4 (všech 9 naráz
+  // umělo vyčerpat rate-limit kontrolního modelu → kontrola selhala
+  // a NEOVĚŘENÝ panel dřív proklouzl bez prohlídky)
+  const verdicts: Array<{ ok: boolean; problems: string; badRules: number } | null> = new Array(n).fill(null);
+  for (let i = 0; i < n; i += 4) {
+    const chunk = await Promise.all(
+      Array.from({ length: Math.min(4, n - i) }, (_, j) =>
+        verifySceneImage(apiKey, slices![i + j], heroDescription, scenes[i + j].imagePrompt)
+      )
+    );
+    chunk.forEach((v, j) => { verdicts[i + j] = v; });
+  }
   const out: Array<ImageResult | null> = [];
   for (let i = 0; i < n; i++) {
     const v = verdicts[i];
-    if (v && !v.ok) {
-      console.warn(`[Gemini sheet] panel ${i + 1} zamítnut (${v.problems.slice(0, 160)}) → sólo`);
+    if (!v || !v.ok) {
+      // ZPŘÍSNĚNO: neověřitelný panel (kontrola 3× selhala) se NEpřijímá —
+      // jde na sólo dokreslení s vlastní QA, stejně jako zamítnutý
+      console.warn(`[Gemini sheet] panel ${i + 1} ${v ? `zamítnut (${v.problems.slice(0, 160)})` : "NEOVĚŘEN (kontrola selhala)"} → sólo`);
       out.push(null);
     } else {
-      out.push(await compressImage(slices[i])); // prošlý NEBO neověřitelný výřez se přijme
+      out.push(await compressImage(slices[i]));
     }
   }
   console.log(`[Gemini sheet] hotovo: ${out.filter(Boolean).length}/${n} panelů prošlo (zbytek sólo)`);

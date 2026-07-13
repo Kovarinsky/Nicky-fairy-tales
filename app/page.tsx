@@ -191,6 +191,24 @@ const SAMPLE_BY_LANG: Record<string, string> = {
 };
 const isStoryLang = (l?: string) => !!l && STORY_LANGS.some(x => x.code === l);
 
+// 🌙 Dobrou noc JMENOVITĚ všem postavám aktuální pohádky, v jazyce vyprávění
+const GOODNIGHT_BY_LANG: Record<string, { hello: string; tail: string; and: string }> = {
+  cs: { hello: "Dobrou noc", tail: "Sladké sny!", and: "a" },
+  en: { hello: "Good night", tail: "Sweet dreams!", and: "and" },
+  hr: { hello: "Laku noć", tail: "Slatki snovi!", and: "i" },
+  da: { hello: "Godnat", tail: "Sov godt, søde drømme!", and: "og" },
+  sk: { hello: "Dobrú noc", tail: "Sladké sny!", and: "a" },
+};
+function goodnightText(lang: string, names: string[]): string {
+  const g = GOODNIGHT_BY_LANG[lang] || GOODNIGHT_BY_LANG.cs;
+  const who = names.length === 0
+    ? ""
+    : names.length === 1
+      ? `, ${names[0]}`
+      : `, ${names.slice(0, -1).join(", ")} ${g.and} ${names[names.length - 1]}`;
+  return `${g.hello}${who}. ${g.tail}`;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function Home() {
   // Form state
@@ -256,7 +274,6 @@ export default function Home() {
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [musicOn, setMusicOn] = useState(false); // ambient music/sounds off by default
   const [showCredits, setShowCredits] = useState(false);
-  const [models, setModels] = useState<{ story: string; image: string } | null>(null);
   const goodnightCacheRef = useRef<{ key: string; url: string } | null>(null);
   const goodnightAudioRef = useRef<HTMLAudioElement | null>(null);
   const [regenAudio, setRegenAudio] = useState(false);
@@ -713,9 +730,6 @@ export default function Home() {
         setSelectedVoiceId(list[0].id);
       }
     }).catch(() => {});
-    fetch("/api/models").then(r => r.json()).then(d => {
-      if (d?.story) setModels({ story: d.story, image: d.image });
-    }).catch(() => {});
     setStoryHistory(loadHistory());
 
     // Restore UI language
@@ -923,11 +937,10 @@ export default function Home() {
       goodnightAudioRef.current = null;
       return;
     }
-    // Klon/vymyšlený hlas má jazyk „any" (mluví oběma) → rozhoduje jazyk prostředí
-    const vLangG = voices.find(v => v.id === selectedVoiceId)?.language;
-    const lang = isStoryLang(vLangG) ? vLangG! : uiLang;
-    const text = SAMPLE_BY_LANG[lang] || SAMPLE_BY_LANG.cs;
-    const key = `${selectedVoiceId}|${lang}`;
+    // Dobrou noc JMENOVITĚ všem postavám této pohádky, v jazyce vyprávění
+    const lang = goodnightLang();
+    const text = goodnightText(lang, storyCharNames());
+    const key = `${selectedVoiceId}|${lang}|${text}`;
     let cancelled = false;
     (async () => {
       try {
@@ -1311,6 +1324,20 @@ export default function Home() {
   // Kontext otevřené pohádky pro líné dokreslení větve B (zámek vzhledu + reference)
   const readerHeroRef = useRef<string>("");
   const readerCharIdsRef = useRef<string[]>([]);
+
+  // 🌙 Jména postav AKTUÁLNÍ pohádky (pro titulky a jmenovitou dobrou noc)
+  function storyCharNames(): string[] {
+    const ids = readerCharIdsRef.current?.length ? readerCharIdsRef.current : selectedIds;
+    return [
+      ...chars.filter(c => ids.includes(c.id)).map(c => (uiLang === "en" && c.nameEn ? c.nameEn : c.name)),
+      ...customChars.filter(c => selectedCustomIds.includes(c.id)).map(c => c.name),
+    ];
+  }
+  // Jazyk dobré noci = jazyk vypravěče s pevným jazykem, jinak jazyk prostředí
+  function goodnightLang(): string {
+    const vl = voices.find(v => v.id === selectedVoiceId)?.language;
+    return isStoryLang(vl) ? vl! : uiLang;
+  }
 
   // Jedna scéna → obrázek přes /api/scene (kotva = 1. obrázek pohádky)
   async function drawSceneImage(
@@ -4185,23 +4212,18 @@ export default function Home() {
               <p className="credits-end">✨ Konec ✨</p>
               <p className="credits-title">{title}</p>
 
-              <p className="credits-section">Příběh</p>
-              <p className="credits-item">Anthropic {models?.story ?? "Claude"} — scénář a narace</p>
-              <p className="credits-item">Google {models?.image ?? "Gemini"} — ilustrace</p>
-              <p className="credits-item">ElevenLabs — hlas vypravěče</p>
+              {/* Bez technologií (know-how) — titulky patří hrdinům */}
+              <p className="credits-section">{uiLang === "en" ? "Heroes" : "Hrdinové"}</p>
+              {storyCharNames().map(n => (
+                <p key={n} className="credits-item">{n}</p>
+              ))}
 
-              <p className="credits-section">Hrdinové</p>
-              {scenes.length > 0 && (
-                <p className="credits-item">
-                  Nicolásek &amp; Valentýnka
-                </p>
-              )}
-
-              <p className="credits-section">Vytvořeno s láskou</p>
-              <p className="credits-item">pro Nickyho pohádky</p>
+              <p className="credits-section">{uiLang === "en" ? "Made with love" : "Vytvořeno s láskou"}</p>
+              <p className="credits-item">{uiLang === "en" ? "for Nicky's Fairy Tales" : "pro Nickyho pohádky"}</p>
               <p className="credits-item">© {new Date().getFullYear()}</p>
 
-              <p className="credits-goodnight">🌙 Dobrou noc, Nicolásku a Valentýnko 🌙</p>
+              {/* 🌙 dobrou noc jmenovitě všem postavám pohádky */}
+              <p className="credits-goodnight">🌙 {goodnightText(goodnightLang(), storyCharNames())} 🌙</p>
 
               <p className="credits-tap">— klikni pro zavření —</p>
             </div>
