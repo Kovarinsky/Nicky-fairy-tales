@@ -21,6 +21,11 @@ export function isDailyQuotaError(msg: string): boolean {
   return /per_day|per day|requests_per_model|credits are depleted|QUOTA_DAILY/i.test(msg);
 }
 
+/** Vyčerpaný PŘEDPLACENÝ kredit (nevyprší o půlnoci — je třeba dobít v AI Studio) */
+export function isCreditsDepletedError(msg: string): boolean {
+  return /credits are depleted|prepayment/i.test(msg);
+}
+
 export interface ImageResult {
   buffer: Buffer;
   mimeType: string;

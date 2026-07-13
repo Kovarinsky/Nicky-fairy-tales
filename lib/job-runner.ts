@@ -6,7 +6,7 @@
 
 import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, peekEarlyScene, enforceCanonicalAppearance, type StoryExtras } from "@/lib/claude";
-import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, lastSheetReport } from "@/lib/gemini";
+import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, isCreditsDepletedError, lastSheetReport } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefEntries, refsForText } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
@@ -422,6 +422,9 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // Denní kvóta Gemini vyčerpaná → STOP celého jobu. Každý další pokus by
     // jen pálil požadavky (limit je 1000/den/model) — reset je až o půlnoci PT.
     let quotaExhausted = false;
+    // Vyčerpaný PŘEDPLACENÝ kredit ≠ denní kvóta: nevyprší o půlnoci, je
+    // třeba dobít v Google AI Studio — hláška musí říct pravdu
+    let creditsDepleted = false;
 
     async function doScene(i: number): Promise<void> {
       if (st.sceneUrls![i] || quotaExhausted) return; // hotová / kvóta vyčerpaná
@@ -436,6 +439,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         logEv(`🎨 scéna ${i + 1} CHYBA po ${secsSince(tScene)}s: ${e.message.slice(0, 140)}`);
         st.imgError = e.message.slice(0, 220);
         if (isDailyQuotaError(e.message)) quotaExhausted = true;
+        if (isCreditsDepletedError(e.message)) creditsDepleted = true;
         return null;
       });
       if (!img) { await write(); return; } // retry rounds below; chybu vidí klient
@@ -519,6 +523,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           const msg = e instanceof Error ? e.message : String(e);
           logEv(`🗂️ arch CHYBA po ${secsSince(tSheet)}s: ${msg.slice(0, 140)} → sólo dokreslení`);
           if (isDailyQuotaError(msg)) quotaExhausted = true;
+          if (isCreditsDepletedError(msg)) creditsDepleted = true;
           break; // zbytek dokreslí sólo kola
         }
         pending = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
@@ -548,7 +553,9 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // Denní kvóta vyčerpaná uprostřed práce → jasná chyba, žádné další pokusy
     if (quotaExhausted && Object.keys(st.sceneUrls!).length < total) {
       st.phase = "error";
-      st.error = `Vyčerpán denní limit kreslení Gemini (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo). Resetuje se kolem 9:00 ráno — pak pohádku zadejte znovu.`;
+      st.error = creditsDepleted
+        ? `Vyčerpaný KREDIT Gemini (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo) — dobijte kredit v Google AI Studio (Billing) a pohádku zadejte znovu. Sám se neobnoví.`
+        : `Vyčerpán denní limit kreslení Gemini (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo). Resetuje se kolem 9:00 ráno — pak pohádku zadejte znovu.`;
       logEv(`⛔ STOP: denní kvóta Gemini vyčerpaná (${Object.keys(st.sceneUrls!).length}/${total})`);
       await write();
       await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true);

@@ -3234,12 +3234,17 @@ textarea.ta-accent:focus {
   max-height: 55vh;
   overflow-y: auto;
   text-align: left;
-  font-size: 0.78rem;
-  line-height: 1.45;
+  font-size: 0.82rem;
+  line-height: 1.5;
   margin: 0.4rem 0;
+  color: rgba(255, 255, 255, 0.92); /* p jinak dědí tlumenou barvu → nečitelné */
 }
 
-.job-log-list p { margin: 0.22rem 0; }
+.job-log-list p {
+  margin: 0.3rem 0;
+  color: rgba(255, 255, 255, 0.92);
+  overflow-wrap: anywhere; /* dlouhé chybové hlášky se lámou, nepřetékají */
+}
 
 .job-log-t {
   opacity: 0.6;
