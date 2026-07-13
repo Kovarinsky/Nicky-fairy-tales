@@ -1794,10 +1794,13 @@ export default function Home() {
         signal: AbortSignal.timeout(90_000),
         body: JSON.stringify({
           scene,
-          heroDescription: heroDescRef.current,
-          characterIds: selectedIds,
+          // kontext OTEVŘENÉ pohádky (i starší z historie), ne posledního generování
+          heroDescription: readerHeroRef.current || heroDescRef.current,
+          characterIds: readerCharIdsRef.current?.length ? readerCharIdsRef.current : selectedIds,
           customCharacterImages: imageRefsRef.current,
           voiceId: selectedVoiceId || undefined,
+          noAudio: true,
+          deviceId: deviceId(),
           ...(m ? { styleAnchor: { mimeType: m[1], data: m[2] } } : {}),
         }),
       });
@@ -1806,6 +1809,12 @@ export default function Home() {
         setScenes(prev => {
           const n = [...prev];
           n[i] = { ...n[i], imageUrl: media.imageUrl, audioUrl: n[i].audioUrl || media.audioUrl };
+          // překreslení se ULOŽÍ k pohádce — dřív po reloadu vadný obrázek zůstal
+          const eid = readerEntryIdRef.current;
+          if (eid) {
+            renderedMapRef.current.set(eid, n);
+            cacheStory(eid, n).catch(() => {});
+          }
           return n;
         });
       }
@@ -3919,10 +3928,22 @@ export default function Home() {
             onClick={() => { if (readerMode) setCtrlsOpen(v => !v); }}
           >
             {current.imageUrl && !isPlaceholderImg(current.imageUrl) ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className="page-image" src={current.imageUrl} alt={t.sceneAlt(page + 1)}
-                ref={pageImgRef}
-                onLoad={() => setRollTick(t => t + 1)} />
+              <div className="page-image-wrap">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="page-image" src={current.imageUrl} alt={t.sceneAlt(page + 1)}
+                  ref={pageImgRef}
+                  onLoad={() => setRollTick(t => t + 1)} />
+                {/* 🖌 překreslit i HOTOVÝ obrázek (vadný/nekonzistentní) */}
+                {fixingScene === page ? (
+                  <div className="img-redraw-busy"><div className="placeholder-spinner" /></div>
+                ) : (
+                  <button type="button" className="img-redraw" aria-label={t.regenImg} title={t.regenImg}
+                    onClick={async e => {
+                      e.stopPropagation();
+                      if (await appConfirm(t.redrawAsk)) repairSceneImage(page);
+                    }}>🖌</button>
+                )}
+              </div>
             ) : current.imageUrl ? (
               <div className="page-image placeholder">
                 {fixingScene === page ? (

@@ -1187,6 +1187,44 @@ button:disabled {
   flex-shrink: 0;
 }
 
+/* 🖌 překreslení hotového obrázku přímo ze čtečky */
+.page-image-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.page-image-wrap .page-image { width: 100%; }
+
+.img-redraw {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-size: 0.95rem;
+  line-height: 34px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.img-redraw:active { background: rgba(124, 77, 255, 0.85); opacity: 1; }
+
+.img-redraw-busy {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 6, 32, 0.45);
+}
+
 .page-image.placeholder {
   display: flex;
   flex-direction: column;
