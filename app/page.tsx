@@ -1443,9 +1443,10 @@ export default function Home() {
   useEffect(() => {
     if (viewMode !== "reader" || scenes.length === 0) return;
     ensureAudio(page);
-    // předvyrobit hlas dalších dvou VIDITELNÝCH stránek (respektuje větev)
+    // předvyrobit hlas dalších TŘÍ viditelných stránek (respektuje větev) —
+    // při brzkém čtení nesmí čtenář na hlas čekat
     const pos = visiblePages.indexOf(page);
-    for (const i of visiblePages.slice(Math.max(0, pos + 1), Math.max(0, pos + 1) + 2)) ensureAudio(i);
+    for (const i of visiblePages.slice(Math.max(0, pos + 1), Math.max(0, pos + 1) + 3)) ensureAudio(i);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, page, scenes, branch]);
 
@@ -1994,6 +1995,94 @@ export default function Home() {
     }
   }
 
+  // ── ▶ Brzké čtení BEZ ČEKÁNÍ ──────────────────────────────────────────────
+  // Tlačítko „Číst" se ukáže teprve, když (1) je hotová 1. stránka VČETNĚ
+  // hlasu a (2) odhad říká, že čtenář generování nedožene: zásoba čtení
+  // (souvislé hotové stránky od začátku) ≥ odhad zbývajícího generování
+  // (měřené tempo scén/s tohoto jobu) s rezervou. Hlas 1.–2. stránky se
+  // namlouvá dopředu — po otevření se hraje hned.
+  const READ_CHARS_PER_SEC = 13; // ~tempo předčítání
+  const PAGE_TURN_SEC = 3;       // prodleva mezi stránkami
+  const jobPaceRef = useRef<Map<string, { t0: number; done0: number }>>(new Map());
+  const [earlyReadyJobs, setEarlyReadyJobs] = useState<Set<string>>(new Set());
+
+  async function prefetchJobAudio(jobId: string, i: number) {
+    const buf = jobBuffersRef.current.get(jobId);
+    const s = buf?.[i];
+    if (!s || s.audioUrl || !s.narration || !s.imageUrl) return;
+    const fetchKey = `${jobId}:${i}`; // stejný klíč jako ensureAudio → žádné dvojí namluvení
+    if (audioFetchRef.current.has(fetchKey)) return;
+    audioFetchRef.current.add(fetchKey);
+    let ok = false;
+    try {
+      const res = await fetch("/api/scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(60_000),
+        body: JSON.stringify({
+          scene: { index: s.index, narration: s.narration, imagePrompt: s.imagePrompt || "x" },
+          audioOnly: true,
+          voiceId: selectedVoiceId || undefined,
+          deviceId: deviceId(),
+        }),
+      });
+      const d = await safeJson<{ audioUrl?: string }>(res);
+      if (!res.ok || !d.audioUrl) return;
+      ok = true;
+      const b = jobBuffersRef.current.get(jobId);
+      if (b?.[i]) b[i] = { ...b[i], audioUrl: d.audioUrl };
+      const jm = jobMediaRef.current.get(jobId);
+      const m = jm?.scenes.get(i);
+      if (m) jm!.scenes.set(i, { ...m, audioUrl: d.audioUrl });
+      // otevřená čtečka téhle pohádky dostane hlas okamžitě
+      if (readerEntryIdRef.current === jobId) {
+        setScenes(prev => {
+          if (!prev[i] || prev[i].audioUrl) return prev;
+          const nx = [...prev];
+          nx[i] = { ...nx[i], audioUrl: d.audioUrl };
+          return nx;
+        });
+      }
+    } catch {} finally {
+      if (!ok) audioFetchRef.current.delete(fetchKey);
+    }
+  }
+
+  function updateEarlyReady(jobId: string, st: { phase: string; done?: number; total?: number }) {
+    const buf = jobBuffersRef.current.get(jobId);
+    let ready = false;
+    if (st.phase === "generating" && buf?.[0]?.imageUrl) {
+      const done = st.done ?? 0;
+      const total = st.total || buf.length;
+      // Tempo generování měřené od prvního pozorování této fáze — dokud není
+      // z čeho měřit, počítá se konzervativně (arch dodá scény skokem)
+      let pace = jobPaceRef.current.get(jobId);
+      if (!pace) { pace = { t0: Date.now(), done0: done }; jobPaceRef.current.set(jobId, pace); }
+      const observed = done - pace.done0;
+      const secPerScene = observed >= 1 ? (Date.now() - pace.t0) / 1000 / observed : 40;
+      // Zásoba čtení: souvislé hotové stránky od začátku knihy
+      let readSec = 0;
+      for (const s of buf) {
+        if (!s?.imageUrl) break;
+        readSec += (s.narration?.length || 0) / READ_CHARS_PER_SEC + PAGE_TURN_SEC;
+      }
+      const remainingSec = Math.max(0, total - done) * secPerScene;
+      ready = done >= total || readSec >= remainingSec * 1.2 + 15;
+      if (ready) {
+        // Namluvit 1.–2. stránku dopředu; tlačítko čeká, až je hlas 1. stránky doma
+        void prefetchJobAudio(jobId, 0);
+        void prefetchJobAudio(jobId, 1);
+        if (!jobBuffersRef.current.get(jobId)?.[0]?.audioUrl) ready = false;
+      }
+    }
+    setEarlyReadyJobs(prev => {
+      if (prev.has(jobId) === ready) return prev;
+      const nx = new Set(prev);
+      if (ready) nx.add(jobId); else nx.delete(jobId);
+      return nx;
+    });
+  }
+
   // When done/total stops moving for too long, the server function most
   // likely hit Vercel's 5-minute limit → ask /api/job/continue to resume
   function maybeKickContinue(jobId: string, st: { phase: string; done?: number; total?: number }, stalledNow?: boolean) {
@@ -2063,6 +2152,7 @@ export default function Home() {
         } else if (st.phase === "generating") {
           jobMetaRef.current.set(jobId, { title: st.title, heroDescription: st.heroDescription, choice: st.choice });
           prefetchJobScenes(jobId, st);
+          updateEarlyReady(jobId, st); // ▶ Číst se ukáže, až čtenář nebude muset čekat
           updateServerJob(jobId, { phase: "generating", done: st.done || 0, total: st.total || 0, title: st.title, imgError: st.imgError || undefined });
         } else if (st.phase === "done") {
           stopJobPolling(jobId);
@@ -3733,7 +3823,9 @@ export default function Home() {
                         title={j.title || undefined}
                       >
                         <span className="job-seg-fill" />
-                        {j.phase === "generating" && jobBuffersRef.current.get(j.jobId)?.[0]?.imageUrl && (
+                        {/* ▶ Číst až když čtenář generování nedožene (tempo
+                            čtení vs. tempo kreslení) a hlas 1. stránky je hotový */}
+                        {j.phase === "generating" && earlyReadyJobs.has(j.jobId) && (
                           <button type="button" className="job-seg-read" title={t.readEarlyHint}
                             onClick={e => { e.stopPropagation(); openRunningJob(j.jobId); }}>
                             ▶︎ {t.readEarly}
