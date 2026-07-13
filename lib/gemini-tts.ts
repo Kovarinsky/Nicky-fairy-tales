@@ -13,15 +13,23 @@ function pcmToWav(pcm: Buffer, rate = 24000): Buffer {
   return Buffer.concat([h, pcm]);
 }
 
-/** Namluví text hlasem Gemini; vrací WAV buffer. Jazyk pozná z textu,
- *  režie („čti vřele jako pohádku") se přidává podle jazyka. */
+// Režie přednesu podle jazyka — psaná v cílovém jazyce, ať Gemini drží
+// správnou výslovnost a přízvuk (chorvatský hlas = chorvatská režie)
+const STYLE_BY_LANG: Record<string, string> = {
+  cs: "Přečti následující text vřele a klidně, jako vypravěč dětské pohádky před spaním — s přirozenými pauzami, otázky tázavě, zvolání živě:",
+  en: "Read the following text warmly and calmly, like a bedtime-story narrator for children — natural pauses, questions inquisitive, exclamations lively:",
+  hr: "Pročitaj sljedeći tekst toplo i smireno, kao pripovjedač dječje priče za laku noć — s prirodnim stankama, pitanja upitno, uzvike živahno. Govori standardnim hrvatskim izgovorom:",
+};
+
+/** Namluví text hlasem Gemini; vrací WAV buffer. Jméno hlasu smí nést jazyk
+ *  („Sulafat:hr" → chorvatská režie); bez něj se jazyk pozná z textu. */
 export async function narrateWithGemini(text: string, voiceName: string): Promise<{ buffer: Buffer; mimeType: string }> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
+  const [name, langHint] = voiceName.split(":");
   const czech = /[ěščřžýáíéůúťďňĚŠČŘŽÝÁÍÉŮÚŤĎŇ]/.test(text);
-  const style = czech
-    ? "Přečti následující text vřele a klidně, jako vypravěč dětské pohádky před spaním — s přirozenými pauzami, otázky tázavě, zvolání živě:"
-    : "Read the following text warmly and calmly, like a bedtime-story narrator for children — natural pauses, questions inquisitive, exclamations lively:";
+  const style = STYLE_BY_LANG[langHint] || (czech ? STYLE_BY_LANG.cs : STYLE_BY_LANG.en);
+  voiceName = name;
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(TTS_MODEL)}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {

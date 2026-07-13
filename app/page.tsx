@@ -174,6 +174,16 @@ const STORY_LANGS: Array<{ code: string; flag: string; cs: string; en: string; t
   { code: "sk", flag: "🇸🇰", cs: "Slovenština", en: "Slovak", test: true },
 ];
 
+// Krátká ukázková věta (test hlasu, dobrou noc) podle jazyka
+const SAMPLE_BY_LANG: Record<string, string> = {
+  cs: "Dobrou noc, Nicolásku a Valentýnko. Sladké sny!",
+  en: "Good night, Nicolas and Valentina. Sweet dreams!",
+  hr: "Laku noć, Nicolase i Valentina. Slatki snovi!",
+  da: "Godnat, Nicolas og Valentina. Sov godt, søde drømme!",
+  sk: "Dobrú noc, Nicolas a Valentínka. Sladké sny!",
+};
+const isStoryLang = (l?: string) => !!l && STORY_LANGS.some(x => x.code === l);
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function Home() {
   // Form state
@@ -491,11 +501,11 @@ export default function Home() {
       if (previewTokenRef.current === token) setPreview(null);
     }
   }
-  /** Krátká namluvená ukázka hlasu (text podle jazyka prostředí) */
+  /** Krátká namluvená ukázka hlasu — text v jazyce hlasu (🇭🇷 chorvatsky),
+   *  u vícejazyčných hlasů podle jazyka prostředí */
   async function voiceSampleUrl(id: string): Promise<string | null> {
-    const text = uiLang === "en"
-      ? "Good night, Nicolas and Valentina. Sweet dreams!"
-      : "Dobrou noc, Nicolásku a Valentýnko. Sladké sny!";
+    const vLang = voices.find(v => v.id === id)?.language;
+    const text = SAMPLE_BY_LANG[isStoryLang(vLang) ? vLang! : uiLang] || SAMPLE_BY_LANG.cs;
     const res = await fetch("/api/scene", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -918,10 +928,8 @@ export default function Home() {
     }
     // Klon/vymyšlený hlas má jazyk „any" (mluví oběma) → rozhoduje jazyk prostředí
     const vLangG = voices.find(v => v.id === selectedVoiceId)?.language;
-    const lang = vLangG === "cs" || vLangG === "en" ? vLangG : uiLang;
-    const text = lang === "en"
-      ? "Good night, Nicolas and Valentina. Sweet dreams!"
-      : "Dobrou noc, Nicolásku a Valentýnko. Sladké sny!";
+    const lang = isStoryLang(vLangG) ? vLangG! : uiLang;
+    const text = SAMPLE_BY_LANG[lang] || SAMPLE_BY_LANG.cs;
     const key = `${selectedVoiceId}|${lang}`;
     let cancelled = false;
     (async () => {
@@ -2118,11 +2126,11 @@ export default function Home() {
       age: getTargetAge([...selectedIds, ...selectedCustomIds]),
       sceneCount,
       // Jazyk pohádky: ručně vybraný jazyk z rolleru má přednost; v automatice
-      // rozhoduje hlas s pevným jazykem (🇨🇿/🇬🇧), jinak jazyk prostředí
+      // rozhoduje hlas s pevným jazykem (🇨🇿/🇬🇧/🇭🇷…), jinak jazyk prostředí
       language: (() => {
         if (storyLang !== "auto") return storyLang;
         const vl = voices.find(v => v.id === selectedVoiceId)?.language;
-        return vl === "cs" || vl === "en" ? vl : uiLang;
+        return isStoryLang(vl) ? vl! : uiLang;
       })(),
       previousStory: sequelOf ? { title: sequelOf.title, text: sequelOf.text } : undefined,
       twoEndings,

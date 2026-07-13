@@ -26,5 +26,19 @@
     "emoji": "🧪",
     "description": "Testovací ženský hlas Google Gemini — porovnání kvality, mluví česky i anglicky",
     "language": "any"
+  },
+  {
+    "id": "gemini:Sulafat:hr",
+    "name": "Hrvatska pripovjedačica (test)",
+    "emoji": "🇭🇷",
+    "description": "Testovací ženský chorvatský hlas Google Gemini — vřelá pohádková intonace, vypráví chorvatsky",
+    "language": "hr"
+  },
+  {
+    "id": "gemini:Iapetus:hr",
+    "name": "Hrvatski pripovjedač (test)",
+    "emoji": "🇭🇷",
+    "description": "Testovací mužský chorvatský hlas Google Gemini — klidný pohádkový přednes, vypráví chorvatsky",
+    "language": "hr"
   }
 ]
