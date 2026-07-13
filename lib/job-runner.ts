@@ -45,6 +45,8 @@ export interface JobStatus {
   finishedAt?: number;
   /** Kolikrát se job sám na serveru předal další funkci (řetězení před 5min limitem) */
   chains?: number;
+  /** 💰 Obrázky vygenerované za VŠECHNY běhy jobu (rozpočtová pojistka) */
+  imgSpent?: number;
   /** Délka rozepsaného textu při minulém běhu — restart s delším partial = zdravé navázání */
   partialLen?: number;
   /** Restarty psaní BEZ pokroku v partial.json — jen ty znamenají zaseknutí */
@@ -426,8 +428,24 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // třeba dobít v Google AI Studio — hláška musí říct pravdu
     let creditsDepleted = false;
 
+    // 💰 ROZPOČTOVÁ POJISTKA: pohádka smí přes všechny běhy vygenerovat
+    // nejvýš ~4 obrázky na stránku (QA překreslení, archy, řetězy) — pak
+    // se zastaví s chybou. Smyčka archů dřív pálila kredit bez stropu.
+    const IMG_BUDGET = total * 4 + 12;
+    const spentBase = st.imgSpent ?? 0; // z minulých běhů (řetězy)
+    const spentNow = () => spentBase + madeImages() + madeSheets();
+    const budgetBlown = () => spentNow() > IMG_BUDGET;
+    if (budgetBlown()) {
+      st.phase = "error";
+      st.error = `Ochrana rozpočtu: pohádka už vygenerovala ${st.imgSpent} obrázků (limit ${IMG_BUDGET} pro ${total} stránek) a stále není hotová — zrušte ji ✕ a zadejte znovu, případně s méně stránkami.`;
+      logEv(`⛔ STOP: rozpočet obrázků vyčerpán (${st.imgSpent}/${IMG_BUDGET})`);
+      await write();
+      return;
+    }
+
     async function doScene(i: number): Promise<void> {
-      if (st.sceneUrls![i] || quotaExhausted) return; // hotová / kvóta vyčerpaná
+      if (st.sceneUrls![i] || quotaExhausted || budgetBlown()) return; // hotová / kvóta / rozpočet
+      st.imgSpent = spentNow();
       const scene = scenesScript[i];
       const tScene = Date.now();
       const sceneRefs = refsFor(`${scene.imagePrompt} ${scene.narration}`);
@@ -490,8 +508,9 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       // nového panelu ukončuje archovou fázi (dřív se stejný arch — prošlo
       // 0/8 — kreslil pořád dokola přes řetězy funkcí a pálil kredit)
       let sheetRounds = 0;
-      while (pending.length >= 2 && !quotaExhausted && !timeUp() && sheetRounds < 3) {
+      while (pending.length >= 2 && !quotaExhausted && !timeUp() && sheetRounds < 3 && !budgetBlown()) {
         sheetRounds++;
+        st.imgSpent = spentNow();
         const group = pending.slice(0, Math.min(maxCells, pending.length));
         const tSheet = Date.now();
         logEv(`🗂️ kreslím arch ${group.length} scén (${group.map(i => i + 1).join(",")})`);
@@ -541,6 +560,18 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       const missing = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
       if (missing.length === 0) break;
       for (const i of missing) { if (timeUp()) break; await doScene(i); }
+    }
+
+    st.imgSpent = spentNow(); // 💰 útrata běhu do stavu (řetězy ji sčítají)
+
+    // 💰 Rozpočet vyčerpán a scény chybí → jasná chyba místo dalších běhů
+    if (budgetBlown() && Object.keys(st.sceneUrls!).length < total) {
+      st.phase = "error";
+      st.error = `Ochrana rozpočtu: pohádka už vygenerovala ${st.imgSpent} obrázků (limit ${IMG_BUDGET} pro ${total} stránek, hotovo ${Object.keys(st.sceneUrls!).length}/${total}) — zrušte ji ✕ a zadejte znovu, případně s méně stránkami.`;
+      logEv(`⛔ STOP: rozpočet obrázků vyčerpán (${st.imgSpent}/${IMG_BUDGET})`);
+      await write();
+      await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true);
+      return;
     }
 
     // ♻️ Došel čas funkce a scény ještě chybí → předat štafetu další funkci
