@@ -45,6 +45,7 @@ const CUSTOM_THEMES_KEY = "nicky-custom-themes";
 const JOB_KEY = "nicky-pending-job";
 const VOICE_PREF_KEY = "nicky-voice-pref";
 const STORY_LANG_KEY = "nicky-story-lang";   // pevně vybraný jazyk pohádky ("auto" = podle prostředí/hlasu)
+const AGE_PREF_KEY = "nicky-age-pref";       // ruční věkové pásmo ("auto" = podle vybraných postav)
 const TEST_LANGS_KEY = "nicky-test-langs";   // které testovací jazyky jsou v rolleru (jdou odebrat ×)
 const SERVER_JOB_KEY = "nicky-server-job";
 const HISTORY_MAX = 20; // offline zásoba: posledních 20 pohádek v telefonu
@@ -381,6 +382,23 @@ export default function Home() {
   function pickStoryLang(code: string) {
     setStoryLang(code);
     try { localStorage.setItem(STORY_LANG_KEY, code); } catch {}
+  }
+
+  // 👶🧒👦 Věkové pásmo vyprávění: auto (podle postav) nebo ručně — řídí
+  // věkový profil promptu (délka vět, slovník, napětí, hloubka)
+  const AGE_BANDS: Array<{ id: string; age: number; label: string }> = [
+    { id: "2-3", age: 2, label: "2–3" },
+    { id: "4-5", age: 4, label: "4–5" },
+    { id: "6-7", age: 6, label: "6–7" },
+    { id: "8+", age: 9, label: "8+" },
+  ];
+  const [agePref, setAgePref] = useState("auto");
+  useEffect(() => {
+    try { const a = localStorage.getItem(AGE_PREF_KEY); if (a) setAgePref(a); } catch {}
+  }, []);
+  function pickAge(id: string) {
+    setAgePref(id);
+    try { localStorage.setItem(AGE_PREF_KEY, id); } catch {}
   }
   function removeTestLang(code: string) {
     setTestLangs(p => {
@@ -2219,7 +2237,7 @@ export default function Home() {
       topic, themeId: themeOverride ? undefined : selectedTheme || undefined,
       customTheme: themeOverride,
       characterIds: selectedIds,
-      age: getTargetAge([...selectedIds, ...selectedCustomIds]),
+      age: AGE_BANDS.find(b => b.id === agePref)?.age ?? getTargetAge([...selectedIds, ...selectedCustomIds]),
       sceneCount,
       // Jazyk pohádky: ručně vybraný jazyk z rolleru má přednost; v automatice
       // rozhoduje hlas s pevným jazykem (🇨🇿/🇬🇧/🇭🇷…), jinak jazyk prostředí
@@ -3645,6 +3663,25 @@ export default function Home() {
               <p className="gen-step-hint">{t.langHint}</p>
             </div>
           )}
+        </div>
+
+        {/* 👶🧒👦 Pro jaký věk vyprávět — auto (podle postav) nebo ručně;
+            řídí věkový profil: délku vět, slovník, napětí, hloubku emocí */}
+        <div className="field">
+          <label>{t.ageLabel}</label>
+          <div className="chips">
+            <button type="button" className={`chip chip-btn ${agePref === "auto" ? "chip-on" : ""}`}
+              onClick={() => pickAge("auto")}>
+              ✨ {t.ageAuto}
+            </button>
+            {AGE_BANDS.map(b => (
+              <button type="button" key={b.id} className={`chip chip-btn ${agePref === b.id ? "chip-on" : ""}`}
+                onClick={() => pickAge(agePref === b.id ? "auto" : b.id)}>
+                {b.label}
+              </button>
+            ))}
+          </div>
+          {agePref !== "auto" && <p className="gen-step-hint">{t.ageHint}</p>}
         </div>
 
         <div className="field">

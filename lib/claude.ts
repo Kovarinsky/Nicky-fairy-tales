@@ -189,6 +189,94 @@ function buildSystemPrompt(language: string): string {
   ].join("\n");
 }
 
+// 👶🧒👦 Věkové profily vyprávění — čtyři vývojová pásma podle zavedených
+// rámců dětské literatury (leporela/picture books/early readers/middle grade):
+// délka a stavba vět, slovní zásoba, únosnost napětí (temný okamžik),
+// hloubka emocí, zapojení posluchače a struktura děje se liší podle věku.
+// Pásmo přepisuje obecnou strukturu příběhu ze systémového promptu tam,
+// kde je pro daný věk nevhodná (batole nemá temný okamžik).
+function buildAgeProfile(age: number, en: boolean): string {
+  const band = age <= 3 ? 0 : age <= 5 ? 1 : age <= 7 ? 2 : 3;
+  const profiles = en
+    ? [
+        [
+          `═══ AGE PROFILE: TODDLER (${age} years) — overrides the general story structure ═══`,
+          "- Narration per scene: 1–3 SHORT sentences (max 8 words each), present tense, ~120–200 characters total.",
+          "- Vocabulary: only concrete everyday words the child knows (home, animals, food, family). No metaphors, no abstractions.",
+          "- Structure OVERRIDE: NO dark moment, NO real stakes, no twist. Use a CUMULATIVE, predictable structure: a gentle mini-task (find the teddy, say goodnight to everyone) that grows by one small step each scene and resolves warmly.",
+          "- REPETITION is the engine: one refrain sentence that returns in almost every scene, so the child can predict and 'read along'.",
+          "- Lots of animal sounds and onomatopoeia; one PARTICIPATION question to the listener every 2–3 scenes ('Do you see the doggy? What does it say?').",
+          "- Emotions: safety, warmth, cosiness. The final scenes slow down into a sleep ritual (yawning, tucking in, goodnight).",
+        ],
+        [
+          `═══ AGE PROFILE: PRESCHOOL (${age} years) ═══`,
+          "- Narration per scene: 2–4 sentences (max ~12 words each), ~250–400 characters total.",
+          "- Vocabulary: simple and concrete; 1–2 playful new words per story, meaning always obvious from context.",
+          "- Structure: ONE clear problem → journey → solution. One GENTLE twist. Magical thinking welcome (talking animals, living toys).",
+          "- Tension: mild and short — the dark moment is only a soft cloud (hope dips for ONE scene, a friend or an earlier clue helps immediately).",
+          "- A recurring refrain or sound the child can predict is welcome. One participation question mid-story is welcome.",
+          "- Emotions: name feelings simply ('Valentina was a little scared') and show coping (a deep breath, holding hands). Themes: friendship, sharing, courage in small things.",
+        ],
+        [
+          `═══ AGE PROFILE: EARLY SCHOOL (${age} years) ═══`,
+          "- Narration per scene: 3–5 sentences, varied rhythm, ~400–550 characters total.",
+          "- Vocabulary: richer; 2–3 less common words per story explained by context. Humour welcome, including light wordplay.",
+          "- Structure: the FULL arc from the general rules applies (real stakes, earned twist, dark moment that breathes, callbacks).",
+          "- Weave in ONE small true fact of the world naturally (how a lighthouse works, why leaves fall) — curiosity is the hook.",
+          "- Emotions: inner world matters — what the hero fears, hopes and decides; the hero visibly LEARNS something and uses it.",
+          "- Dialogue-heavy scenes; friends cooperate and each contributes something different.",
+        ],
+        [
+          `═══ AGE PROFILE: OLDER CHILD (${age}+ years) ═══`,
+          "- Narration per scene: 4–7 sentences, layered and vivid, ~550–750 characters total.",
+          "- Vocabulary: rich, with idioms and occasional irony; the narrator may wink at the reader.",
+          "- Structure: full arc PLUS one extra layer — a planted setup with a later payoff, or a red herring; scene endings may be mini-cliffhangers.",
+          "- Real dilemmas with trade-offs: the hero must CHOOSE between two goods (helping a friend vs. winning), and the choice has consequences.",
+          "- Weave in 1–2 accurate facts (science, history, geography) that the plot actually uses.",
+          "- Emotions: deeper inner monologue, mixed feelings are allowed and named; the dark moment is fully felt before the earned resolution.",
+        ],
+      ]
+    : [
+        [
+          `═══ VĚKOVÝ PROFIL: BATOLE (${age} roky) — přepisuje obecnou strukturu příběhu ═══`,
+          "- Vyprávění na scénu: 1–3 KRÁTKÉ věty (max 8 slov), přítomný čas, celkem ~120–200 znaků.",
+          "- Slovník: jen konkrétní známá slova (domov, zvířátka, jídlo, rodina). Žádné metafory ani abstrakce.",
+          "- PŘEPIS struktury: ŽÁDNÝ temný okamžik, ŽÁDNÉ skutečné sázky, žádný zvrat. KUMULATIVNÍ, předvídatelná struktura: jemný mini-úkol (najít medvídka, popřát všem dobrou noc), který každou scénu povyroste o krůček a hřejivě se vyřeší.",
+          "- Motorem je OPAKOVÁNÍ: jedna návratná věta-refrén skoro v každé scéně, ať ji dítě předvídá a „čte s sebou“.",
+          "- Hodně zvuků zvířat a citoslovcí; každé 2–3 scény jedna otázka POSLUCHAČOVI („Vidíš pejska? Jak dělá?“).",
+          "- Emoce: bezpečí, teplo, útulnost. Závěrečné scény zpomalí do usínacího rituálu (zívání, přikrývání, dobrou noc).",
+        ],
+        [
+          `═══ VĚKOVÝ PROFIL: ŠKOLKA (${age} let) ═══`,
+          "- Vyprávění na scénu: 2–4 věty (max ~12 slov), celkem ~250–400 znaků.",
+          "- Slovník: jednoduchý a konkrétní; 1–2 hravá nová slova na pohádku, význam vždy jasný z kontextu.",
+          "- Struktura: JEDEN jasný problém → cesta → řešení. Jeden JEMNÝ zvrat. Kouzelné myšlení vítáno (mluvící zvířata, oživlé hračky).",
+          "- Napětí: mírné a krátké — temný okamžik je jen mráček (naděje klesne na JEDNU scénu, hned pomůže kamarád nebo dřívější nápověda).",
+          "- Návratný refrén nebo zvuk, který dítě předvídá, je vítaný. Jedna otázka posluchači uprostřed příběhu je vítaná.",
+          "- Emoce: pocity pojmenovat jednoduše („Valentýnka se trochu bála“) a ukázat zvládnutí (nádech, držení za ruce). Témata: kamarádství, dělení se, odvaha v malém.",
+        ],
+        [
+          `═══ VĚKOVÝ PROFIL: MALÝ ŠKOLÁK (${age} let) ═══`,
+          "- Vyprávění na scénu: 3–5 vět, střídavý rytmus, celkem ~400–550 znaků.",
+          "- Slovník: bohatší; 2–3 méně běžná slova na pohádku vysvětlená kontextem. Humor vítán, i drobné slovní hříčky.",
+          "- Struktura: platí PLNÝ oblouk z obecných pravidel (skutečné sázky, zasloužený zvrat, temný okamžik s dozněním, ohlasy).",
+          "- Přirozeně vpleť JEDNU malou pravdivou zajímavost o světě (jak funguje maják, proč padá listí) — zvědavost je háček.",
+          "- Emoce: vnitřní svět je důležitý — čeho se hrdina bojí, v co doufá, jak se rozhoduje; hrdina se viditelně něco NAUČÍ a použije to.",
+          "- Hodně dialogů; kamarádi spolupracují a každý přispěje něčím jiným.",
+        ],
+        [
+          `═══ VĚKOVÝ PROFIL: VĚTŠÍ ŠKOLÁK (${age}+ let) ═══`,
+          "- Vyprávění na scénu: 4–7 vět, vrstevnaté a živé, celkem ~550–750 znaků.",
+          "- Slovník: bohatý, s idiomy a občasnou ironií; vypravěč smí na čtenáře mrknout.",
+          "- Struktura: plný oblouk PLUS jedna vrstva navíc — zaseté vodítko s pozdějším vyplacením, nebo falešná stopa; konce scén smí být mini-cliffhangery.",
+          "- Skutečná dilemata s cenou: hrdina musí VOLIT mezi dvěma dobry (pomoct kamarádovi vs. vyhrát) a volba má následky.",
+          "- Vpleť 1–2 přesné zajímavosti (věda, historie, zeměpis), které děj opravdu použije.",
+          "- Emoce: hlubší vnitřní monolog, smíšené pocity jsou dovolené a pojmenované; temný okamžik se plně prožije, než přijde zasloužené rozuzlení.",
+        ],
+      ];
+  return profiles[band].join("\n");
+}
+
 function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
   const langName = storyLangName(req.language); // null → čeština
   const en = langName !== null; // testovací jazyky jedou na anglické kostře
@@ -239,17 +327,7 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
         .filter(Boolean)
         .join(" ");
 
-  const ageNote = en
-    ? req.age <= 3
-      ? "Very simple sentences (max 8 words), lots of repetition, soothing rhythm."
-      : req.age <= 5
-      ? "Short sentences, concrete images, magical and playful."
-      : "Sentences may be longer; the story may have mild tension and humour."
-    : req.age <= 3
-    ? "Velmi jednoduché věty (max 8 slov), hodně opakování, uklidňující rytmus."
-    : req.age <= 5
-    ? "Krátké věty, konkrétní obrazy, kouzelné a hravé."
-    : "Věty mohou být delší, příběh může mít mírné napětí a humor.";
+  const ageProfile = buildAgeProfile(req.age, en);
 
   const lines = en
     ? [
@@ -259,7 +337,7 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
         `Characters:`,
         cast,
         familyContext,
-        `Target audience age: ${req.age} years. ${ageNote}`,
+        ageProfile,
         `Number of scenes: ${req.sceneCount}`,
         `Narration language: ${langName}`,
         "",
@@ -273,7 +351,7 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
         `Postavy:`,
         cast,
         familyContext,
-        `Věk hlavního publika: ${req.age} let. ${ageNote}`,
+        ageProfile,
         `Počet scén: ${req.sceneCount}`,
         `Jazyk vyprávění: čeština`,
         "",
