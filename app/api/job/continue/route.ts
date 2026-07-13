@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "blob-not-configured" }, { status: 501 });
   }
   try {
-    const { id } = await req.json();
+    const { id, force } = await req.json();
     if (typeof id !== "string" || !/^[a-z0-9-]{10,}$/i.test(id)) {
       return NextResponse.json({ error: "invalid id" }, { status: 400 });
     }
@@ -26,8 +26,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, alreadyDone: true });
     }
     // Pojistka proti zbytečnému dvojímu běhu: když status před chvílí ožil,
-    // původní funkce nejspíš stále běží
-    if (status?.updatedAt && Date.now() - status.updatedAt < 60_000) {
+    // původní funkce nejspíš stále běží. ♻️ force = samo-řetězení jobu
+    // (funkce se před 5min limitem vědomě předává dál) — pojistku přeskočí.
+    if (!force && status?.updatedAt && Date.now() - status.updatedAt < 60_000) {
       return NextResponse.json({ ok: true, stillRunning: true });
     }
     const body = await readJson<Record<string, unknown>>(`jobs/${id}/request.json`);

@@ -43,6 +43,12 @@ export interface JobStatus {
   /** ⏱ Tracker přípravy: kdy byl dopsaný příběh a kdy byla pohádka hotová */
   wroteAt?: number;
   finishedAt?: number;
+  /** Kolikrát se job sám na serveru předal další funkci (řetězení před 5min limitem) */
+  chains?: number;
+  /** Délka rozepsaného textu při minulém běhu — restart s delším partial = zdravé navázání */
+  partialLen?: number;
+  /** Restarty psaní BEZ pokroku v partial.json — jen ty znamenají zaseknutí */
+  stuckRestarts?: number;
 }
 
 export async function putJson(path: string, data: unknown): Promise<string> {
@@ -113,12 +119,50 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     return putJson(statusPath, st).catch(e => console.error(`[job ${id}] status write failed:`, e));
   };
 
-  if (!st.scenesScript?.length && (st.restarts ?? 0) >= 3) {
+  // Tvrdý strop počtu běhů psaní (zdravé řetězení dlouhého psaní projde,
+  // skutečné zaseknutí chytá kontrola pokroku partial.json níže)
+  if (!st.scenesScript?.length && (st.restarts ?? 0) >= 8) {
     st.phase = "error";
     st.error = `Psaní příběhu opakovaně selhává${st.lastError ? ` (${st.lastError.slice(0, 200)})` : ""} — zrušte pohádku ✕ a zadejte ji znovu, případně s méně stránkami.`;
     await write();
     return;
   }
+
+  // ── ♻️ SAMO-ŘETĚZENÍ: Vercel funkci utne po 5 minutách. Dřív pokračování
+  // spouštěla jen OTEVŘENÁ appka (poll watchdog) — zamčený telefon = mrtvý
+  // job a „příprava" přes hodinu. Teď se job před limitem sám předá další
+  // funkci přes /api/job/continue (force přeskočí pojistku čerstvého stavu).
+  const runStartedAt = Date.now();
+  const SELF_KICK_AT = 240_000;   // kontroly mezi scénami/archy
+  const WRITING_KICK_AT = 265_000; // psaní = jeden dlouhý stream → časovač
+  const timeUp = () => Date.now() - runStartedAt > SELF_KICK_AT;
+  let selfKicked = false;
+  const selfContinue = async (): Promise<void> => {
+    if (selfKicked) return;
+    selfKicked = true;
+    const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+    if (!host) return; // lokální vývoj — pokračování zajistí klient jako dřív
+    st.chains = (st.chains ?? 0) + 1;
+    if (st.chains > 10) { // pojistka proti nekonečnému řetězu (nikdy nenastává)
+      st.phase = "error";
+      st.error = "Příprava se opakovaně nedokončila ani po mnoha pokusech — zrušte pohádku ✕ a zadejte ji znovu.";
+      await write();
+      return;
+    }
+    await write();
+    console.log(`[job ${id}] ♻️ self-continue #${st.chains} (${Math.round((Date.now() - runStartedAt) / 1000)}s)`);
+    try {
+      await fetch(`https://${host}/api/job/continue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, force: true }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (e) {
+      console.warn(`[job ${id}] self-continue failed:`, e instanceof Error ? e.message : e);
+      selfKicked = false; // klientský watchdog zůstává jako záloha
+    }
+  };
 
   try {
     if (!st.scenesScript?.length) {
@@ -203,13 +247,29 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           resumeText = partial.text;
           console.log(`[job ${id}] resuming story from ${resumeText.length} chars`);
         }
+        // Restart s POKROKEM (partial narostl) = zdravé navázání po limitu
+        // funkce; bez pokroku = skutečné zaseknutí → po 3 se job zastaví
+        if (resumeText.length > (prev?.partialLen ?? 0)) st.stuckRestarts = 0;
+        else st.stuckRestarts = (prev?.stuckRestarts ?? 0) + 1;
+        st.partialLen = resumeText.length;
+        if ((st.stuckRestarts ?? 0) >= 3) {
+          st.phase = "error";
+          st.error = `Psaní příběhu se zaseklo a neposouvá se${st.lastError ? ` (${st.lastError.slice(0, 200)})` : ""} — zrušte pohádku ✕ a zadejte ji znovu, případně s méně stránkami.`;
+          await write();
+          return;
+        }
       }
 
       // Heartbeat během psaní: stream průběžně obnovuje updatedAt (klient
-      // nehlásí falešné zaseknutí) a UKLÁDÁ rozepsaný text pro navázání
+      // nehlásí falešné zaseknutí) a UKLÁDÁ rozepsaný text pro navázání.
+      // ♻️ Časovač: když psaní přesáhne limit funkce, job se sám předá dál
+      // (nová funkce naváže na partial.json prefillovaným pokračováním)
+      const writingKick = setTimeout(() => { void selfContinue(); }, WRITING_KICK_AT);
       let lastBeat = Date.now();
       let latestText = resumeText;
-      const script = await generateStory(storyReq, extras, (_chars, fullText) => {
+      let script;
+      try {
+        script = await generateStory(storyReq, extras, (_chars, fullText) => {
         latestText = fullText;
         const now = Date.now();
         if (now - lastBeat > 20_000) {
@@ -218,7 +278,10 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           putJson(`jobs/${id}/partial.json`, { text: latestText })
             .catch(e => console.warn(`[job ${id}] partial write failed:`, e));
         }
-      }, resumeText || undefined);
+        }, resumeText || undefined);
+      } finally {
+        clearTimeout(writingKick);
+      }
       st.title = script.title;
       st.heroDescription = script.heroDescription;
       // 🔀 Dva konce: konec B se generuje hned za koncem A (jeden seznam scén)
@@ -236,6 +299,13 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       st.done = 0;
       st.sceneUrls = {};
       st.wroteAt = Date.now(); // ⏱ konec psaní
+      // ♻️ Psaní přeteklo limit a řetěz už běží: scénář se uloží a tento běh
+      // končí — obrázky kreslí (jediná) navazující funkce
+      if (selfKicked) {
+        await write();
+        console.log(`[job ${id}] script saved, handing image work to the chained run`);
+        return;
+      }
     }
 
     const scenesScript = st.scenesScript!;
@@ -320,7 +390,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     }
 
     // Scene 1 first (anchor), then the rest in parallel
-    await doScene(0);
+    if (!timeUp()) await doScene(0);
 
     // 🗂️ Režim archů: zbylé scény po skupinách v JEDNOM obrázku (3×3 ve 4K =
     // až 9 scén za cenu jednoho obrázku), rozřezané a zkontrolované jedenácterem
@@ -330,7 +400,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     if (sheetMode !== "off" && !quotaExhausted && st.sceneUrls![0]) {
       const maxCells = sheetMode === "2x2" ? 4 : 9;
       let pending = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
-      while (pending.length >= 2 && !quotaExhausted) {
+      while (pending.length >= 2 && !quotaExhausted && !timeUp()) {
         const group = pending.slice(0, Math.min(maxCells, pending.length));
         await write(); // heartbeat před dlouhým generováním archu
         try {
@@ -362,15 +432,22 @@ export async function runJob(id: string, body: Record<string, unknown>) {
 
     let idx = 1;
     async function worker() {
-      while (idx < total) { const i = idx++; await doScene(i); }
+      while (idx < total && !timeUp()) { const i = idx++; await doScene(i); }
     }
     await Promise.all(Array.from({ length: Math.min(3, Math.max(0, total - 1)) }, worker));
 
     // Verification rounds — the job is done only when every image exists
-    for (let round = 0; round < 2 && !quotaExhausted; round++) {
+    for (let round = 0; round < 2 && !quotaExhausted && !timeUp(); round++) {
       const missing = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
       if (missing.length === 0) break;
-      for (const i of missing) await doScene(i);
+      for (const i of missing) { if (timeUp()) break; await doScene(i); }
+    }
+
+    // ♻️ Došel čas funkce a scény ještě chybí → předat štafetu další funkci
+    // (hotové scény se přeskočí; klientský watchdog zůstává jako záloha)
+    if (!quotaExhausted && Object.keys(st.sceneUrls!).length < total && timeUp()) {
+      await selfContinue();
+      return;
     }
 
     // Denní kvóta vyčerpaná uprostřed práce → jasná chyba, žádné další pokusy
