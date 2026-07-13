@@ -343,7 +343,17 @@ export default function Home() {
   const [recState, setRecState] = useState<"idle" | "ready" | "rec" | "done" | "uploading">("idle");
   const [recSecs, setRecSecs] = useState(0);
   const [recUrl, setRecUrl] = useState<string | null>(null);
-  const [cloneTesting, setCloneTesting] = useState(false);
+  // 🔊 Centrální přehrávač ukázek hlasů: naráz hraje jen JEDNA ukázka,
+  // ⏳ ukazuje načítání, opětovné ťuknutí hrající ukázku zastaví (⏹)
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const previewTokenRef = useRef(0);
+  const [preview, setPreview] = useState<{ key: string; phase: "loading" | "playing" } | null>(null);
+  const stopPreview = useCallback(() => {
+    previewTokenRef.current++;
+    previewAudioRef.current?.pause();
+    previewAudioRef.current = null;
+    setPreview(null);
+  }, []);
   const mediaRecRef = useRef<MediaRecorder | null>(null);
   const recChunksRef = useRef<Blob[]>([]);
   const recBlobRef = useRef<Blob | null>(null);
@@ -398,48 +408,79 @@ export default function Home() {
       setRecState("idle");
       setRecUrl(null);
       setCloneName("");
-      const vs = await fetch("/api/voices").then(r => r.json()).catch(() => null);
-      if (vs?.voices) setVoices(vs.voices);
+      await refreshVoices();
       pickVoice(d.id);
+      await appAlert(`✓ ${t.voiceAdded}`); // potvrzení, že hlas je uložený
       testVoice(d.id); // ověření: hned přehrát ukázku klonem
     } catch (e) {
       setRecState("done");
       await appAlert(`${t.cloneErr}${e instanceof Error && e.message ? ` (${e.message.slice(0, 160)})` : ""}`);
     }
   }
-  async function testVoice(id: string) {
-    if (cloneTesting) return;
-    setCloneTesting(true);
+  /** Přehraje ukázku (klíč = řádek v UI): ťuknutí na hrající ukázku ji
+   *  zastaví, spuštění jiné ukázky tu předchozí utne — nic se nepřekrývá. */
+  async function playPreview(key: string, getUrl: () => Promise<string | null>) {
+    if (preview?.key === key) { stopPreview(); return; } // ⏹ na téže položce
+    stopPreview();
+    const token = ++previewTokenRef.current;
+    setPreview({ key, phase: "loading" });
     try {
-      const text = uiLang === "en"
-        ? "Good night, Nicolas and Valentina. Sweet dreams!"
-        : "Dobrou noc, Nicolásku a Valentýnko. Sladké sny!";
-      const res = await fetch("/api/scene", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(45_000),
-        body: JSON.stringify({ scene: { index: 0, narration: text, imagePrompt: "x" }, audioOnly: true, voiceId: id }),
-      });
-      const d = await safeJson<{ audioUrl?: string }>(res);
-      if (res.ok && d.audioUrl) { audioRef.current?.pause(); new Audio(d.audioUrl).play().catch(() => {}); }
-    } catch {} finally {
-      setCloneTesting(false);
+      const url = await getUrl();
+      if (previewTokenRef.current !== token) return; // mezitím spuštěna jiná
+      if (!url) throw new Error("no audio");
+      audioRef.current?.pause(); // ztišit čtečku pohádky
+      const a = new Audio(url);
+      previewAudioRef.current = a;
+      a.onended = () => { if (previewTokenRef.current === token) { previewAudioRef.current = null; setPreview(null); } };
+      setPreview({ key, phase: "playing" });
+      await a.play();
+    } catch {
+      if (previewTokenRef.current === token) setPreview(null);
+    }
+  }
+  /** Krátká namluvená ukázka hlasu (text podle jazyka prostředí) */
+  async function voiceSampleUrl(id: string): Promise<string | null> {
+    const text = uiLang === "en"
+      ? "Good night, Nicolas and Valentina. Sweet dreams!"
+      : "Dobrou noc, Nicolásku a Valentýnko. Sladké sny!";
+    const res = await fetch("/api/scene", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(45_000),
+      body: JSON.stringify({ scene: { index: 0, narration: text, imagePrompt: "x" }, audioOnly: true, voiceId: id }),
+    });
+    const d = await safeJson<{ audioUrl?: string }>(res);
+    return res.ok && d.audioUrl ? d.audioUrl : null;
+  }
+  function testVoice(id: string) {
+    void playPreview(`voice:${id}`, () => voiceSampleUrl(id));
+  }
+  /** Znovu načte seznam hlasů ze serveru (zdroj pravdy) vč. seznamu klonů */
+  async function refreshVoices() {
+    const vs = await fetch("/api/voices").then(r => r.json()).catch(() => null);
+    if (Array.isArray(vs?.voices)) {
+      setVoices(vs.voices);
+      setClones(vs.voices.filter((v: VoiceOption) => v.kind === "clone").map((v: VoiceOption) => ({ id: v.id, name: v.name })));
     }
   }
   async function deleteClone(id: string) {
     if (!(await appConfirm(t.cloneDeleteAsk))) return;
+    stopPreview();
     try {
-      await fetch("/api/voice-clone", {
+      const res = await fetch("/api/voice-clone", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
         signal: AbortSignal.timeout(30_000),
       });
+      const d = await safeJson<{ ok?: boolean; error?: string }>(res);
+      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
       setClones(p => p.filter(c => c.id !== id));
       if (voicePref === id) pickVoice("auto");
-      const vs = await fetch("/api/voices").then(r => r.json()).catch(() => null);
-      if (vs?.voices) setVoices(vs.voices);
-    } catch {}
+    } catch (e) {
+      await appAlert(`${t.voiceDelErr}${e instanceof Error && e.message ? ` (${e.message.slice(0, 160)})` : ""}`);
+    }
+    await refreshVoices();
   }
 
   // 🪄 Hlas podle popisu (ElevenLabs Voice Design): popis → 3 ukázky → uložit
@@ -456,7 +497,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: AbortSignal.timeout(60_000),
-        body: JSON.stringify({ op: "previews", description: designDesc.trim() }),
+        body: JSON.stringify({ op: "previews", description: designDesc.trim(), language: uiLang }),
       });
       const d = await safeJson<{ previews?: Array<{ id: string; audioUrl: string }>; error?: string }>(res);
       if (!res.ok || !d.previews?.length) throw new Error(d.error || "no previews");
@@ -471,7 +512,8 @@ export default function Home() {
     if (designSaving) return;
     setDesignSaving(true);
     try {
-      const name = (designDesc.split(/[,.;…]/)[0] || "").trim().slice(0, 40) || "Vlastní vypravěč";
+      const name = (designDesc.split(/[,.;…]/)[0] || "").trim().slice(0, 40)
+        || (uiLang === "en" ? "Custom narrator" : "Vlastní vypravěč");
       const res = await fetch("/api/voice-design", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -482,9 +524,9 @@ export default function Home() {
       if (!res.ok || !d.id) throw new Error(d.error || "save failed");
       setDesignPreviews(null);
       setDesignDesc("");
-      const vs = await fetch("/api/voices").then(r => r.json()).catch(() => null);
-      if (vs?.voices) setVoices(vs.voices);
+      await refreshVoices();
       pickVoice(d.id);
+      await appAlert(`✓ ${t.voiceAdded}`); // potvrzení, že hlas je uložený
     } catch (e) {
       await appAlert(`${t.designErr}${e instanceof Error && e.message ? ` (${e.message.slice(0, 160)})` : ""}`);
     } finally {
@@ -493,17 +535,21 @@ export default function Home() {
   }
   async function deleteDesigned(id: string) {
     if (!(await appConfirm(t.voiceDelAsk))) return;
+    stopPreview();
     try {
-      await fetch("/api/voice-design", {
+      const res = await fetch("/api/voice-design", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: AbortSignal.timeout(30_000),
         body: JSON.stringify({ op: "delete", id }),
       });
-    } catch {}
-    if (voicePref === id) pickVoice("auto");
-    const vs = await fetch("/api/voices").then(r => r.json()).catch(() => null);
-    if (vs?.voices) setVoices(vs.voices);
+      const d = await safeJson<{ ok?: boolean; error?: string }>(res);
+      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+      if (voicePref === id) pickVoice("auto");
+    } catch (e) {
+      await appAlert(`${t.voiceDelErr}${e instanceof Error && e.message ? ` (${e.message.slice(0, 160)})` : ""}`);
+    }
+    await refreshVoices();
   }
 
   // Background generation state (LOCAL in-browser pipeline)
@@ -2168,14 +2214,10 @@ export default function Home() {
   interface CustomTheme { id: string; name: string; prompt: string; photos?: Array<{ data: string; mimeType: string }>; photoBase64?: string; photoMimeType?: string; previewUrl?: string }
   const MAX_WORLD_PHOTOS = 8;
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
-  // 📜 Klasické (licenčně volné) pohádky — rolovací seznam, vybraná se chová
-  // jako vlastní svět (posílá se jako customTheme s připraveným dějem)
-  const [folkOpen, setFolkOpen] = useState(false);
-  // 🎡 Roller vestavěných světů — sbalený za tlačítkem, zavírá se ✕ i výběrem
+  // 🎡 Roller světů — světy i klasické pohádky v JEDNOM válci za tlačítkem
   const [worldOpen, setWorldOpen] = useState(false);
   // 🧒 Výběr postav jako roller se zaškrtávátky (vícero postav najednou)
   const [charOpen, setCharOpen] = useState(false);
-  const selectedFolk = folkTaleById(selectedTheme);
   // 💡 Ponaučení pohádky — rolovací výběr; text se předá vypravěči,
   // který ho vplete do děje (bez kázání)
   // 🔀 Dva konce — defaultně vypnuto, před generováním se potvrzuje
@@ -3131,13 +3173,16 @@ export default function Home() {
             <label>{t.worldLabel}</label>
             {/* 🎡 Vestavěné světy jako roller v panelu s ✕ (uložené vlastní
                 světy a + Vlastní svět zůstávají jako tlačítka pod ním) */}
-            <button type="button" className={`chip chip-btn chip-full ${worldOpen || themes.some(th => th.id === selectedTheme) ? "chip-on" : ""}`}
+            <button type="button" className={`chip chip-btn chip-full ${worldOpen || !!selectedTheme ? "chip-on" : ""}`}
               onClick={() => setWorldOpen(p => !p)}>
               {(() => {
                 const sel = themes.find(th => th.id === selectedTheme);
-                return sel
-                  ? `${sel.emoji} ${uiLang === "en" && sel.nameEn ? sel.nameEn : sel.name}`
-                  : `🌍 ${t.worldPick}`;
+                if (sel) return `${sel.emoji} ${uiLang === "en" && sel.nameEn ? sel.nameEn : sel.name}`;
+                const folk = folkTaleById(selectedTheme);
+                if (folk) return `${folk.emoji} ${uiLang === "en" ? folk.nameEn : folk.name}`;
+                const ct = customThemes.find(c => c.id === selectedTheme);
+                if (ct) return `🌍 ${ct.name}`;
+                return `🌍 ${t.worldPick}`;
               })()}
             </button>
             {worldOpen && (
@@ -3147,12 +3192,15 @@ export default function Home() {
                   <button type="button" className="panel-close" aria-label={t.cancel}
                     onClick={() => setWorldOpen(false)}>✕</button>
                 </div>
+                {/* Jeden válec se VŠÍM: světy → české a klasické → Andersen
+                    (pohádky abecedně v rámci skupiny) */}
                 <div className="folk-list world-roller">
                   <button type="button" className={`folk-item ${!selectedTheme ? "folk-on" : ""}`}
                     onClick={() => { setSelectedTheme(""); setWorldOpen(false); }}>
                     <span className="folk-emoji">✨</span>
                     <span>{t.worldNone}</span>
                   </button>
+                  <p className="folk-group">🌍 {uiLang === "en" ? "Worlds" : "Světy"}</p>
                   {themes.map(th => (
                     <button type="button" key={th.id} className={`folk-item ${selectedTheme === th.id ? "folk-on" : ""}`}
                       onClick={() => { setSelectedTheme(p => p === th.id ? "" : th.id); setWorldOpen(false); }}>
@@ -3160,7 +3208,30 @@ export default function Home() {
                       <span>{uiLang === "en" && th.nameEn ? th.nameEn : th.name}</span>
                     </button>
                   ))}
+                  <p className="folk-group">📜 {uiLang === "en" ? "Czech & classic tales" : "České a klasické pohádky"}</p>
+                  {FOLK_TALES.filter(ft => ft.group !== "dk")
+                    .slice().sort((a, b) => (uiLang === "en" ? a.nameEn.localeCompare(b.nameEn, "en") : a.name.localeCompare(b.name, "cs")))
+                    .map(ft => (
+                    <button type="button" key={ft.id}
+                      className={`folk-item ${selectedTheme === ft.id ? "folk-on" : ""}`}
+                      onClick={() => { setSelectedTheme(p => p === ft.id ? "" : ft.id); setWorldOpen(false); }}>
+                      <span className="folk-emoji">{ft.emoji}</span>
+                      <span>{uiLang === "en" ? ft.nameEn : ft.name}</span>
+                    </button>
+                  ))}
+                  <p className="folk-group">🇩🇰 {uiLang === "en" ? "Andersen — Danish tales" : "Andersen — dánské pohádky"}</p>
+                  {FOLK_TALES.filter(ft => ft.group === "dk")
+                    .slice().sort((a, b) => (uiLang === "en" ? a.nameEn.localeCompare(b.nameEn, "en") : a.name.localeCompare(b.name, "cs")))
+                    .map(ft => (
+                    <button type="button" key={ft.id}
+                      className={`folk-item ${selectedTheme === ft.id ? "folk-on" : ""}`}
+                      onClick={() => { setSelectedTheme(p => p === ft.id ? "" : ft.id); setWorldOpen(false); }}>
+                      <span className="folk-emoji">{ft.emoji}</span>
+                      <span>{uiLang === "en" ? ft.nameEn : ft.name}</span>
+                    </button>
+                  ))}
                 </div>
+                <p className="gen-step-hint">{t.folkHint}</p>
               </div>
             )}
             <div className="chips">
@@ -3171,44 +3242,15 @@ export default function Home() {
                   <button type="button" className="chip-remove" onClick={() => removeCustomTheme(ct.id)}>×</button>
                 </div>
               ))}
-              <button type="button" className={`chip chip-btn ${folkOpen || selectedFolk ? "chip-on" : ""}`}
-                onClick={() => setFolkOpen(p => !p)}>
-                📜 {selectedFolk ? (uiLang === "en" ? selectedFolk.nameEn : selectedFolk.name) : t.folkChip}
-              </button>
               <button type="button" className={`chip chip-btn ${addingTheme ? "chip-on" : ""}`} onClick={() => setAddingTheme(p => !p)}>
                 {t.addWorldChip}
               </button>
             </div>
-            {folkOpen && (
-              <div className="add-char-panel">
-                <div className="panel-title-row">
-                  <p className="panel-title">{t.folkTitle}</p>
-                  <button type="button" className="panel-close" aria-label={t.cancel}
-                    onClick={() => setFolkOpen(false)}>✕</button>
-                </div>
-                <div className="folk-list">
-                  <p className="folk-group">🇨🇿 {uiLang === "en" ? "Czech & classic" : "České a klasické"}</p>
-                  {FOLK_TALES.filter(ft => ft.group !== "dk").map(ft => (
-                    <button type="button" key={ft.id}
-                      className={`folk-item ${selectedTheme === ft.id ? "folk-on" : ""}`}
-                      onClick={() => { setSelectedTheme(p => p === ft.id ? "" : ft.id); setFolkOpen(false); }}>
-                      <span className="folk-emoji">{ft.emoji}</span>
-                      <span>{uiLang === "en" ? ft.nameEn : ft.name}</span>
-                    </button>
-                  ))}
-                  <p className="folk-group">🇩🇰 {uiLang === "en" ? "Andersen — Danish tales" : "Andersen — dánské pohádky"}</p>
-                  {FOLK_TALES.filter(ft => ft.group === "dk").map(ft => (
-                    <button type="button" key={ft.id}
-                      className={`folk-item ${selectedTheme === ft.id ? "folk-on" : ""}`}
-                      onClick={() => { setSelectedTheme(p => p === ft.id ? "" : ft.id); setFolkOpen(false); }}>
-                      <span className="folk-emoji">{ft.emoji}</span>
-                      <span>{uiLang === "en" ? ft.nameEn : ft.name}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="gen-step-hint">{t.folkHint}</p>
-              </div>
-            )}
+            {/* 📍 Pohádka podle mé lokality — návrh námětu z okolí */}
+            <button type="button" className={`chip chip-btn chip-full ${gpsLoading ? "chip-on" : ""}`}
+              onClick={suggestFromLocation} disabled={gpsLoading || ideaLoading} title={t.gpsHint}>
+              {gpsLoading ? "⏳ " : "📍 "}{t.gpsBtn}
+            </button>
             {addingTheme && (
               <div className="add-char-panel">
                 <p className="panel-title">{t.newWorldTitle}</p>
@@ -3219,14 +3261,17 @@ export default function Home() {
                 <div className="field">
                   <label>{t.worldDescLabel}</label>
                   {/* Ťuknutí otevře velký editor přes celý displej — stejně jako u zadání pohádky */}
+                  {/* ✕ pro smazání textu je NAD polem vpravo — nepřekrývá text */}
+                  {newThemeDesc.trim() !== "" && (
+                    <div className="ta-toolbar">
+                      <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
+                        onClick={e => { e.stopPropagation(); setNewThemeDesc(""); }}>✕</button>
+                    </div>
+                  )}
                   <div className="ta-wrap">
                     <textarea className="ta-accent" value={newThemeDesc} readOnly placeholder={t.worldDescPlaceholder}
                       onClick={openWorldEditor}
                       onFocus={e => { e.target.blur(); openWorldEditor(); }} />
-                    {newThemeDesc.trim() !== "" && (
-                      <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
-                        onClick={e => { e.stopPropagation(); setNewThemeDesc(""); }}>✕</button>
-                    )}
                   </div>
                   <div className="insp-row">
                     <button type="button" className="insp-btn" onClick={studyNewWorld}
@@ -3271,16 +3316,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* 📍 Námět podle místa — appka zjistí polohu a navrhne pohádku z okolí */}
-        <div className="field">
-          <label>{t.gpsLabel}</label>
-          <button type="button" className={`chip chip-btn chip-full ${gpsLoading ? "chip-on" : ""}`}
-            onClick={suggestFromLocation} disabled={gpsLoading || ideaLoading}>
-            {gpsLoading ? "⏳ " : "📍 "}{t.gpsBtn}
-          </button>
-          <p className="gen-step-hint">{t.gpsHint}</p>
-        </div>
-
         {/* 🎙️ Hlas vypravěče — automatika / knihovna hlasů / klon rodiče */}
         <div className="field">
           <label>{t.voiceLabel}</label>
@@ -3295,7 +3330,7 @@ export default function Home() {
               <div className="panel-title-row">
                 <p className="panel-title">🎙️ {t.voiceLabel}</p>
                 <button type="button" className="panel-close" aria-label={t.cancel}
-                  onClick={() => setVoiceOpen(false)}>✕</button>
+                  onClick={() => { stopPreview(); setVoiceOpen(false); }}>✕</button>
               </div>
               <div className="folk-list">
                 <button type="button" className={`folk-item ${voicePref === "auto" ? "folk-on" : ""}`}
@@ -3303,30 +3338,38 @@ export default function Home() {
                   <span className="folk-emoji">✨</span>
                   <span>{t.voiceAuto}</span>
                 </button>
-                {voices.map(v => v.kind ? (
+                {/* Ťuknutí hlas vybere a pustí/zastaví ukázku (⏳ nahrávám,
+                    ⏹ hraje) — panel zůstává otevřený kvůli porovnávání */}
+                {voices.map(v => {
+                  const pk = `voice:${v.id}`;
+                  const playIcon = preview?.key === pk ? (preview.phase === "loading" ? "⏳" : "⏹") : "▶";
+                  return v.kind ? (
                   <div key={v.id} role="button" tabIndex={0}
                     className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
-                    onClick={() => { pickVoice(v.id); setVoiceOpen(false); testVoice(v.id); }}
-                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { pickVoice(v.id); setVoiceOpen(false); } }}>
+                    onClick={() => { pickVoice(v.id); testVoice(v.id); }}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { pickVoice(v.id); testVoice(v.id); } }}>
                     <span className="folk-emoji">{v.emoji}</span>
                     <span>{v.name}</span>
-                    <button type="button" className="chip-remove folk-remove" aria-label="Smazat"
+                    <span className="voice-play" aria-hidden>{playIcon}</span>
+                    <button type="button" className="chip-remove folk-remove" aria-label={t.cloneDelete}
                       onClick={e => { e.stopPropagation(); if (v.kind === "clone") deleteClone(v.id); else deleteDesigned(v.id); }}>×</button>
                   </div>
                 ) : (
                   <button type="button" key={v.id} className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
-                    onClick={() => { pickVoice(v.id); setVoiceOpen(false); testVoice(v.id); }}>
+                    onClick={() => { pickVoice(v.id); testVoice(v.id); }}>
                     <span className="folk-emoji">{v.emoji}</span>
                     <span>{v.name}</span>
+                    <span className="voice-play" aria-hidden>{playIcon}</span>
                   </button>
-                ))}
+                );})}
               </div>
               {recState === "idle" ? (
-                clones.length < 4 && (
-                  <button type="button" className="chip chip-btn chip-full" onClick={() => setRecState("ready")}>
-                    🎙️ {t.cloneStart}
-                  </button>
-                )
+                /* Vždy viditelné — vylepšení hlasu = smazat × a nahrát znovu;
+                   při plných 4 klonech to tlačítko vysvětlí místo zmizení */
+                <button type="button" className="chip chip-btn chip-full"
+                  onClick={() => { if (clones.length >= 4) { void appAlert(t.voiceMaxClones); return; } setRecState("ready"); }}>
+                  🎙️ {t.cloneStart}
+                </button>
               ) : (
                 <div className="field">
                   <input type="text" value={cloneName} onChange={e => setCloneName(e.target.value)}
@@ -3364,9 +3407,10 @@ export default function Home() {
                 </button>
                 {designPreviews && designPreviews.map((p, i) => (
                   <div key={p.id} className="file-row">
+                    {/* přehrávání přes centrální přehrávač: ▶ pustí, ⏹ zastaví */}
                     <button type="button" className="outline-btn"
-                      onClick={() => { audioRef.current?.pause(); new Audio(p.audioUrl).play().catch(() => {}); }}>
-                      ▶︎ {t.designSample} {i + 1}
+                      onClick={() => playPreview(`design:${p.id}`, async () => p.audioUrl)}>
+                      {preview?.key === `design:${p.id}` ? "⏹" : "▶︎"} {t.designSample} {i + 1}
                     </button>
                     <button type="button" onClick={() => designSave(p.id)} disabled={designSaving}>
                       {designSaving ? "⏳" : "✓"} {t.designUse}
@@ -3394,15 +3438,17 @@ export default function Home() {
             </>
           )}
           {/* Ťuknutí otevře velký editor — celý text viditelný, pohodlné psaní.
-              Oranžový ✕ v rohu pole maže text */}
+              Oranžový ✕ NAD polem vpravo maže text (nepřekrývá ho) */}
+          {topic.trim() !== "" && (
+            <div className="ta-toolbar">
+              <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
+                onClick={e => { e.stopPropagation(); setTopic(""); }}>✕</button>
+            </div>
+          )}
           <div className="ta-wrap">
             <textarea className="ta-accent" value={topic} readOnly placeholder={t.wishPlaceholder}
               onClick={openTopicEditor}
               onFocus={e => { e.target.blur(); openTopicEditor(); }} />
-            {topic.trim() !== "" && (
-              <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
-                onClick={e => { e.stopPropagation(); setTopic(""); }}>✕</button>
-            )}
           </div>
           <div className="insp-row">
             <button type="button" className="insp-btn" onClick={() => suggestIdea()} disabled={ideaLoading}>
@@ -3970,13 +4016,15 @@ export default function Home() {
         <div className="app-confirm-overlay" onClick={() => setTopicEditorOpen(false)}>
           <div className="app-confirm topic-editor" onClick={e => e.stopPropagation()}>
             <p className="app-confirm-msg">📝 {t.wishLabel}</p>
+            {topic.trim() !== "" && (
+              <div className="ta-toolbar">
+                <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
+                  onClick={() => setTopic("")}>✕</button>
+              </div>
+            )}
             <div className="ta-wrap">
               <textarea className="topic-editor-ta" value={topic} autoFocus
                 onChange={e => setTopic(e.target.value)} placeholder={t.wishPlaceholder} />
-              {topic.trim() !== "" && (
-                <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
-                  onClick={() => setTopic("")}>✕</button>
-              )}
             </div>
             <div className="app-confirm-btns topic-editor-btns">
               <button type="button" className="outline-btn" disabled={!topic.trim() || expandLoading || ideaLoading}
@@ -3996,13 +4044,15 @@ export default function Home() {
         <div className="app-confirm-overlay" onClick={() => setWorldEditorOpen(false)}>
           <div className="app-confirm topic-editor" onClick={e => e.stopPropagation()}>
             <p className="app-confirm-msg">🌍 {t.worldDescLabel}</p>
+            {newThemeDesc.trim() !== "" && (
+              <div className="ta-toolbar">
+                <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
+                  onClick={() => setNewThemeDesc("")}>✕</button>
+              </div>
+            )}
             <div className="ta-wrap">
               <textarea className="topic-editor-ta" value={newThemeDesc} autoFocus
                 onChange={e => setNewThemeDesc(e.target.value)} placeholder={t.worldDescPlaceholder} />
-              {newThemeDesc.trim() !== "" && (
-                <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
-                  onClick={() => setNewThemeDesc("")}>✕</button>
-              )}
             </div>
             <div className="app-confirm-btns topic-editor-btns">
               <button type="button" className="cancel-btn"

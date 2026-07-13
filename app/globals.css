@@ -1849,7 +1849,14 @@ button:disabled {
   box-shadow: 0 2px 8px rgba(244, 81, 30, 0.4);
 }
 
-.folk-remove { margin-left: auto; }
+.folk-remove { margin-left: 0.35rem; }
+
+/* ▶/⏳/⏹ indikátor přehrávání ukázky hlasu na konci řádku výběru */
+.voice-play {
+  margin-left: auto;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
 
 /* ── Fotky vlastního světa (až 8, mřížka náhledů s ×) ── */
 .world-photo-grid {
@@ -2307,9 +2314,15 @@ button:disabled {
   transform: translateX(28px);
 }
 
-/* ✕ v rohu textového pole — smazání textu (oranžové, jako ostatní rušení) */
+/* ✕ smazání textu — v liště NAD polem vpravo, aby nezakrýval text */
 .ta-wrap {
   position: relative;
+}
+
+.ta-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.35rem;
 }
 
 /* Hlavní pole na vyplnění (zadání pohádky, popis světa) — tenká oranžová linka;
@@ -2330,10 +2343,6 @@ textarea.ta-accent:focus {
 }
 
 .ta-clear {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;

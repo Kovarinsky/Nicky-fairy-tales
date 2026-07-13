@@ -18,9 +18,12 @@ function apiKey(): string {
   return (process.env.ELEVENLABS_API_KEY || "").replace(/[^\x20-\x7E]/g, "").trim();
 }
 
-// Ukázkový text ve stylu pohádky (Voice Design chce 100–1000 znaků)
+// Ukázkový text ve stylu pohádky (Voice Design chce 100–1000 znaků) —
+// jazyk ukázky se řídí jazykem prostředí appky (parametr language)
 const SAMPLE_CS =
   "Byl jednou jeden večer, kdy měsíc svítil jako lampička. „Kdo to ťuká na okno?“ zašeptala Valentýnka. Nicolásek se usmál: „To je jen vítr, neboj se.“ A víš, co se stalo pak? Z lesa se ozvalo tichounké… haf haf! Všichni se k sobě přitulili a nechali se unášet do říše snů.";
+const SAMPLE_EN =
+  "Once upon an evening, the moon glowed like a night light. “Who is knocking on the window?” whispered Valentina. Nicolas smiled: “It is only the wind, don't be afraid.” And do you know what happened next? From the forest came a tiny… woof woof! They all snuggled up close and drifted away to the land of dreams.";
 
 export async function POST(req: NextRequest) {
   if (!apiKey()) return NextResponse.json({ error: "ELEVENLABS_API_KEY chybí" }, { status: 501 });
@@ -36,7 +39,7 @@ export async function POST(req: NextRequest) {
       const res = await fetch("https://api.elevenlabs.io/v1/text-to-voice/create-previews", {
         method: "POST",
         headers: { "xi-api-key": apiKey(), "Content-Type": "application/json" },
-        body: JSON.stringify({ voice_description: description, text: SAMPLE_CS }),
+        body: JSON.stringify({ voice_description: description, text: body.language === "en" ? SAMPLE_EN : SAMPLE_CS }),
         signal: AbortSignal.timeout(55_000),
       });
       const data = (await res.json().catch(() => ({}))) as {
