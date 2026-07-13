@@ -848,7 +848,30 @@ export async function generateStory(
 // (Otesánek, drak…), vlastních postav, 'Key objects:', 'Story outfits:'
 // i 'Heights:'. (Dřívější verze cizí záznamy vyhazovala → vymyšlené postavy
 // neměly zámek vzhledu a na každé scéně vypadaly jinak.)
-function enforceCanonicalAppearance(hero: string, req: StoryRequest, extras: StoryExtras = {}): string {
+/** ⚡ Náhled rozepsaného scénáře pro kreslení BĚHEM psaní: jakmile stream
+ *  obsahuje heroDescription a KOMPLETNÍ 1. scénu (soundscape za imagePromptem
+ *  = řetězce jsou uzavřené), může se scéna 1 začít malovat souběžně s psaním.
+ *  Pole jdou v pořadí title → heroDescription → scenes, takže první výskyty
+ *  narration/imagePrompt patří vždy scéně 1. */
+export function peekEarlyScene(partial: string): { heroDescription: string; scene: Scene } | null {
+  try {
+    const hd = /"heroDescription"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(partial);
+    const na = /"narration"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(partial);
+    const ip = /"imagePrompt"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(partial);
+    const sc = /"soundscape"\s*:/.exec(partial);
+    if (!hd || !na || !ip || !sc) return null;
+    const un = (s: string) => JSON.parse(`"${s}"`) as string;
+    const heroDescription = un(hd[1]);
+    const narration = un(na[1]);
+    const imagePrompt = un(ip[1]);
+    if (!heroDescription || !narration || !imagePrompt) return null;
+    return { heroDescription, scene: { index: 1, narration, imagePrompt } };
+  } catch {
+    return null;
+  }
+}
+
+export function enforceCanonicalAppearance(hero: string, req: StoryRequest, extras: StoryExtras = {}): string {
   const parts = hero.split("|").map(s => s.trim()).filter(Boolean);
   // Jména kanonických postav (cs + en varianta + jméno z popisu)
   const canonNames = new Set<string>();

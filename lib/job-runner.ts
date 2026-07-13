@@ -5,7 +5,7 @@
 // napsaný příběh i hotové scény a dodělá jen chybějící.
 
 import { put, head } from "@vercel/blob";
-import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, type StoryExtras } from "@/lib/claude";
+import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, peekEarlyScene, enforceCanonicalAppearance, type StoryExtras } from "@/lib/claude";
 import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefEntries, refsForText } from "@/lib/portraits";
@@ -178,6 +178,11 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     }
   };
 
+  // ⚡ Kreslení BĚHEM psaní: jakmile stream dopíše 1. scénu, začne se malovat
+  // souběžně s psaním zbytku — psaní (~2 min) a kotva (~1 min) se překryjí
+  let earlyDraw: Promise<{ buffer: Buffer; mimeType: string } | null> | null = null;
+  let earlyImg: { buffer: Buffer; mimeType: string } | null = null;
+
   try {
     logEv(`▶ běh funkce start${(st.chains ?? 0) > 0 ? ` (řetěz ${st.chains})` : ""}${st.scenesScript?.length ? ` — scénář hotový, ${Object.keys(st.sceneUrls || {}).length}/${st.total ?? "?"} scén nakresleno` : (st.restarts ?? 0) > 0 ? ` — psaní pokus ${(st.restarts ?? 0) + 1}` : ""}`);
     if (!st.scenesScript?.length) {
@@ -287,10 +292,33 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       logEv(`✍️ píšu příběh (${storyReq.sceneCount} scén, ${storyReq.language})${resumeText ? ` — navazuji od ${resumeText.length} znaků` : ""}`);
       let lastBeat = Date.now();
       let latestText = resumeText;
+      // ⚡ Nastartuje kreslení scény 1, jakmile je v rozepsaném textu celá
+      const tryEarlyDraw = (text: string) => {
+        if (earlyDraw) return;
+        const peek = peekEarlyScene(text);
+        if (!peek) return;
+        const hero = enforceCanonicalAppearance(peek.heroDescription, storyReq, extras);
+        logEv("⚡ scéna 1 se kreslí souběžně s psaním zbytku příběhu");
+        earlyDraw = (async () => {
+          const entries = await loadPortraitRefEntries(charactersByIds(ids));
+          const early: ReferenceImage[] = [...refsForText(entries, `${peek.scene.imagePrompt} ${peek.scene.narration}`)];
+          for (const ci of (Array.isArray(body.customCharacterImages) ? (body.customCharacterImages as Array<{ data?: string; mimeType?: string }>) : [])) {
+            if (ci?.data && ci?.mimeType) early.push({ data: ci.data, mimeType: ci.mimeType, name: "a custom story character" });
+          }
+          const img = await generateSceneImage(peek.scene, hero, early);
+          earlyImg = img;
+          logEv("⚡ scéna 1 dokreslena během psaní");
+          return img;
+        })().catch(e => {
+          logEv(`⚡ ranné kreslení scény 1 selhalo: ${e instanceof Error ? e.message.slice(0, 120) : e}`);
+          return null;
+        });
+      };
       let script;
       try {
         script = await generateStory(storyReq, extras, (_chars, fullText) => {
         latestText = fullText;
+        tryEarlyDraw(fullText);
         const now = Date.now();
         if (now - lastBeat > 20_000) {
           lastBeat = now;
@@ -321,8 +349,18 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       st.wroteAt = Date.now(); // ⏱ konec psaní
       logEv(`✍️ příběh dopsán za ${secsSince(tWrite)}s (${st.scenesScript.length} scén, ${latestText.length} znaků)`);
       // ♻️ Psaní přeteklo limit a řetěz už běží: scénář se uloží a tento běh
-      // končí — obrázky kreslí (jediná) navazující funkce
+      // končí — obrázky kreslí (jediná) navazující funkce. Už dokreslená
+      // ranná scéna 1 se stihne uložit (navazující běh ji přeskočí).
       if (selfKicked) {
+        // (čtení přes lokální proměnnou — earlyImg plní asynchronní closure)
+        const ei = earlyImg as { buffer: Buffer; mimeType: string } | null;
+        if (ei) {
+          const url = await putJson(`jobs/${id}/scene-0.json`, {
+            index: st.scenesScript[0].index,
+            imageUrl: `data:${ei.mimeType};base64,${ei.buffer.toString("base64")}`,
+          }).catch(() => null);
+          if (url) { st.sceneUrls = { 0: url }; st.done = 1; }
+        }
         await write();
         console.log(`[job ${id}] script saved, handing image work to the chained run`);
         return;
@@ -409,6 +447,23 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       await write();
       if (i === 0 && !anchor) {
         anchor = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: ANCHOR_LABEL };
+      }
+    }
+
+    // ⚡ Scéna 1 z ranného kreslení (běžela souběžně s psaním) — když vyšla,
+    // rovnou se uloží a poslouží jako kotva stylu; jinak se kreslí normálně
+    const earlyDrawP = earlyDraw as Promise<{ buffer: Buffer; mimeType: string } | null> | null;
+    if (earlyDrawP && !st.sceneUrls![0]) {
+      const img = await earlyDrawP;
+      if (img) {
+        const url = await putJson(`jobs/${id}/scene-0.json`, {
+          index: scenesScript[0].index,
+          imageUrl: `data:${img.mimeType};base64,${img.buffer.toString("base64")}`,
+        });
+        st.sceneUrls![0] = url;
+        st.done = Object.keys(st.sceneUrls!).length;
+        anchor = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: ANCHOR_LABEL };
+        await write();
       }
     }
 

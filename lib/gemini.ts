@@ -338,8 +338,11 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
     STYLE_SUFFIX,
   ].filter(Boolean).join(" ");
 
-  // Gemini sanitizes its own prompt — eliminates content filter guesswork
-  const safePrompt = await sanitizeWithGemini(apiKey, rawPrompt);
+  // ⚡ Líná sanitizace: rychlá regexová očista hned; plná LLM sanitizace se
+  // dělá až KDYŽ filtr obsahu opravdu zablokuje (dřív stála 2–5 s u KAŽDÉ
+  // scény, blokace je přitom výjimečná)
+  let safePrompt = regexSanitize(rawPrompt);
+  let llmSanitized = false;
   console.log(`[Gemini] scene ${scene.index} model=${model} (${safePrompt.length} chars): ${safePrompt.slice(0, 200)}`);
 
   const MAX_ATTEMPTS = 3;
@@ -405,6 +408,13 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
         }
         const isRateLimit = lastErr.message.startsWith("Gemini 429");
         const isBlocked = lastErr.message.startsWith("Gemini BLOCKED");
+        // Filtr obsahu zablokoval → teprv teď se prompt přepíše LLM sanitizací
+        if (isBlocked && !llmSanitized) {
+          llmSanitized = true;
+          safePrompt = await sanitizeWithGemini(apiKey, rawPrompt);
+          console.log(`[Gemini] scene ${scene.index}: BLOCKED → LLM sanitized (${safePrompt.length} chars)`);
+          continue;
+        }
         if ((lastErr.message.match(/^Gemini 4/) && !isRateLimit) || isBlocked) break;
         if (attempt < MAX_ATTEMPTS) {
           const delay = isRateLimit ? 15000 * attempt : 5000 * attempt;
@@ -543,7 +553,9 @@ export async function generateSceneSheet(
     lockClose,
     STYLE_SUFFIX,
   ].filter(Boolean).join(" ");
-  const safePrompt = await sanitizeWithGemini(apiKey, rawPrompt);
+  // ⚡ Líná sanitizace jako u sólo scén (LLM přepis až po skutečné blokaci)
+  let safePrompt = regexSanitize(rawPrompt);
+  let llmSanitized = false;
   console.log(`[Gemini sheet] ${n} scén v mřížce ${grid}×${grid}, model=${model} (${safePrompt.length} chars)`);
 
   // ČASOVÝ ROZPOČET: arch se generuje JEDNOU (+1 pokus jen při rozbité
@@ -551,29 +563,37 @@ export async function generateSceneSheet(
   // překreslení se nevešla do 5min limitu funkce a job se točil dokola.
   let slices: ImageResult[] | null = null;
   for (let attempt = 1; attempt <= 2 && !slices; attempt++) {
-    const sheet = await callGeminiImage(
-      apiKey, model,
-      attempt === 1
-        ? safePrompt
-        : `${safePrompt} ⚠ CORRECTION: the previous attempt did not have straight clean white gutters at the exact grid positions — redraw with a PRECISE ${grid}×${grid} grid.`,
-      "16:9", refImages, "4K"
-    );
+    let sheet: ImageResult;
+    try {
+      sheet = await callGeminiImage(
+        apiKey, model,
+        attempt === 1
+          ? safePrompt
+          : `${safePrompt} ⚠ CORRECTION: the previous attempt did not have straight clean white gutters at the exact grid positions — redraw with a PRECISE ${grid}×${grid} grid.`,
+        "16:9", refImages, "4K"
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.startsWith("Gemini BLOCKED") && !llmSanitized) {
+        llmSanitized = true;
+        safePrompt = await sanitizeWithGemini(apiKey, rawPrompt);
+        attempt--; // blokace nespotřebuje pokus — zkusí se s přepsaným promptem
+        continue;
+      }
+      throw e;
+    }
     slices = await sliceSheet(sheet, grid);
     if (!slices) console.warn(`[Gemini sheet] attempt ${attempt}: mřížka nesedí`);
   }
   if (!slices) throw new Error("sheet: mřížka se nepodařila nakreslit");
 
-  // Jedenáctero na každý výřez zvlášť (po 3 najednou); vadný panel → null
-  // → dokreslí ho sólo cesta s vlastní QA a překreslením
-  const verdicts: Array<{ ok: boolean; problems: string; badRules: number } | null> = new Array(n).fill(null);
-  for (let i = 0; i < n; i += 3) {
-    const chunk = await Promise.all(
-      Array.from({ length: Math.min(3, n - i) }, (_, j) =>
-        verifySceneImage(apiKey, slices![i + j], heroDescription, scenes[i + j].imagePrompt)
-      )
-    );
-    chunk.forEach((v, j) => { verdicts[i + j] = v; });
-  }
+  // Jedenáctero na každý výřez zvlášť — VŠECHNY panely paralelně (kontrolní
+  // model má volné limity; po 3 to dřív stálo ~3× déle)
+  const verdicts = await Promise.all(
+    Array.from({ length: n }, (_, i) =>
+      verifySceneImage(apiKey, slices![i], heroDescription, scenes[i].imagePrompt)
+    )
+  );
   const out: Array<ImageResult | null> = [];
   for (let i = 0; i < n; i++) {
     const v = verdicts[i];
