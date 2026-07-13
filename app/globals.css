@@ -1849,14 +1849,17 @@ button:disabled {
   box-shadow: 0 2px 8px rgba(244, 81, 30, 0.4);
 }
 
-.folk-remove { margin-left: 0.35rem; }
+.folk-remove { margin-left: auto; }
 
-/* ▶/⏳/⏹ indikátor přehrávání ukázky hlasu na konci řádku výběru */
+/* ▶/⏳/⏹ indikátor přehrávání ukázky hlasu na konci řádku výběru;
+   × za ním už doprava tlačit nemusí */
 .voice-play {
   margin-left: auto;
   font-size: 0.85rem;
   opacity: 0.85;
 }
+
+.voice-play + .folk-remove { margin-left: 0.35rem; }
 
 /* ── Fotky vlastního světa (až 8, mřížka náhledů s ×) ── */
 .world-photo-grid {

@@ -44,6 +44,8 @@ const CUSTOM_CHARS_KEY = "nicky-custom-chars";
 const CUSTOM_THEMES_KEY = "nicky-custom-themes";
 const JOB_KEY = "nicky-pending-job";
 const VOICE_PREF_KEY = "nicky-voice-pref";
+const STORY_LANG_KEY = "nicky-story-lang";   // pevně vybraný jazyk pohádky ("auto" = podle prostředí/hlasu)
+const TEST_LANGS_KEY = "nicky-test-langs";   // které testovací jazyky jsou v rolleru (jdou odebrat ×)
 const SERVER_JOB_KEY = "nicky-server-job";
 const HISTORY_MAX = 20; // offline zásoba: posledních 20 pohádek v telefonu
 const SETTINGS_KEY = "nicky-settings";
@@ -83,6 +85,7 @@ interface SavedSettings {
   sceneCount?: number;
   selectedTheme?: string;
   selectedIds?: string[];
+  selectedCustomIds?: string[];
 }
 
 function loadSettings(): SavedSettings {
@@ -161,6 +164,16 @@ function fmtDate(iso: string): string {
   } catch { return ""; }
 }
 
+// 🌐 Jazyky vyprávění: čeština a angličtina pevně, testovací jazyky
+// (Chorvatština, Dánština, Slovenština) jdou z rolleru odebrat ×
+const STORY_LANGS: Array<{ code: string; flag: string; cs: string; en: string; test?: boolean }> = [
+  { code: "cs", flag: "🇨🇿", cs: "Čeština", en: "Czech" },
+  { code: "en", flag: "🇬🇧", cs: "Angličtina", en: "English" },
+  { code: "hr", flag: "🇭🇷", cs: "Chorvatština", en: "Croatian", test: true },
+  { code: "da", flag: "🇩🇰", cs: "Dánština", en: "Danish", test: true },
+  { code: "sk", flag: "🇸🇰", cs: "Slovenština", en: "Slovak", test: true },
+];
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function Home() {
   // Form state
@@ -188,6 +201,15 @@ export default function Home() {
   const inspImageRef = useRef<HTMLInputElement>(null);
   const inspPdfRef = useRef<HTMLInputElement>(null);
   const [sceneCount, setSceneCount] = useState(6);
+  // Výběr postav a nastavení se ukládá PRŮBĚŽNĚ (dřív jen při generování —
+  // odškrtnuté postavy se po zavření appky vracely). Ref hlídá, ať se
+  // neuloží prázdný stav dřív, než se obnoví ten uložený.
+  const settingsReadyRef = useRef(false);
+  useEffect(() => {
+    if (!settingsReadyRef.current) return;
+    saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds, selectedCustomIds });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVoiceId, sceneCount, selectedTheme, selectedIds, selectedCustomIds]);
 
   // Generation state
   const [loading, setLoading] = useState(false);
@@ -325,6 +347,37 @@ export default function Home() {
   function pickVoice(id: string) {
     setVoicePref(id);
     try { localStorage.setItem(VOICE_PREF_KEY, id); } catch {}
+  }
+
+  // 🌐 Jazyk pohádky: "auto" (podle prostředí a hlasu) nebo pevně z rolleru;
+  // testovací jazyky (hr/da/sk) jdou odebrat × a kdykoli zase obnovit
+  const [storyLang, setStoryLang] = useState("auto");
+  const [langOpen, setLangOpen] = useState(false);
+  const [testLangs, setTestLangs] = useState<string[]>(STORY_LANGS.filter(l => l.test).map(l => l.code));
+  useEffect(() => {
+    try {
+      const l = localStorage.getItem(STORY_LANG_KEY);
+      if (l) setStoryLang(l);
+      const tl = localStorage.getItem(TEST_LANGS_KEY);
+      if (tl) setTestLangs(JSON.parse(tl));
+    } catch {}
+  }, []);
+  function pickStoryLang(code: string) {
+    setStoryLang(code);
+    try { localStorage.setItem(STORY_LANG_KEY, code); } catch {}
+  }
+  function removeTestLang(code: string) {
+    setTestLangs(p => {
+      const next = p.filter(c => c !== code);
+      try { localStorage.setItem(TEST_LANGS_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+    if (storyLang === code) pickStoryLang("auto");
+  }
+  function restoreTestLangs() {
+    const all = STORY_LANGS.filter(l => l.test).map(l => l.code);
+    setTestLangs(all);
+    try { localStorage.setItem(TEST_LANGS_KEY, JSON.stringify(all)); } catch {}
   }
   useEffect(() => {
     if (voicePref !== "auto") {
@@ -628,14 +681,18 @@ export default function Home() {
     fetch("/api/characters").then(r => r.json()).then(d => {
       const list: CharOption[] = d.characters || [];
       setChars(list);
-      if (saved.selectedIds && saved.selectedIds.length > 0) {
+      // Uložený PRÁZDNÝ výběr se respektuje (uživatel odškrtal všechny);
+      // teprve chybějící/neplatný záznam znamená „vybrat všechny"
+      if (Array.isArray(saved.selectedIds)) {
         const validIds = new Set(list.map(c => c.id));
         const filtered = saved.selectedIds.filter(id => validIds.has(id));
-        setSelectedIds(filtered.length > 0 ? filtered : list.map(c => c.id));
+        setSelectedIds(saved.selectedIds.length === 0 || filtered.length > 0 ? filtered : list.map(c => c.id));
       } else {
         setSelectedIds(list.map(c => c.id));
       }
-    }).catch(() => {});
+      if (Array.isArray(saved.selectedCustomIds)) setSelectedCustomIds(saved.selectedCustomIds);
+      settingsReadyRef.current = true; // od teď se změny výběru průběžně ukládají
+    }).catch(() => { settingsReadyRef.current = true; });
     fetch("/api/themes").then(r => r.json()).then(d => {
       setThemes(d.themes || []);
       if (saved.selectedTheme) setSelectedTheme(saved.selectedTheme);
@@ -2060,9 +2117,10 @@ export default function Home() {
       characterIds: selectedIds,
       age: getTargetAge([...selectedIds, ...selectedCustomIds]),
       sceneCount,
-      // Jazyk pohádky: hlas s pevným jazykem (🇨🇿/🇬🇧) rozhoduje; klon a
-      // vymyšlené hlasy („any") mluví oběma → rozhoduje jazyk prostředí
+      // Jazyk pohádky: ručně vybraný jazyk z rolleru má přednost; v automatice
+      // rozhoduje hlas s pevným jazykem (🇨🇿/🇬🇧), jinak jazyk prostředí
       language: (() => {
+        if (storyLang !== "auto") return storyLang;
         const vl = voices.find(v => v.id === selectedVoiceId)?.language;
         return vl === "cs" || vl === "en" ? vl : uiLang;
       })(),
@@ -2111,7 +2169,7 @@ export default function Home() {
         if (jobRes.ok) {
           const { jobId } = await jobRes.json();
           if (jobId) {
-            saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds });
+            saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds, selectedCustomIds });
             addServerJob(jobId);
             setSequelOf(null); // pokračování je zadané — chip zmizí
             return; // phone is free — the server does the work
@@ -2188,7 +2246,7 @@ export default function Home() {
           ? c.photos
           : c.photoBase64 && c.photoMimeType ? [{ data: c.photoBase64, mimeType: c.photoMimeType }] : []);
 
-      saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds });
+      saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds, selectedCustomIds });
       const finalScenes = await generateMedia(script.title, script.heroDescription, fullScenes, customImageRefs, selectedVoiceId, background, entry.id);
       renderedMapRef.current.set(entry.id, finalScenes);
       // Cache even if some audio failed — imageUrl always has SVG fallback
@@ -3419,6 +3477,58 @@ export default function Home() {
                 ))}
               </div>
               <p className="gen-step-hint">{t.clonePrivacy}</p>
+            </div>
+          )}
+        </div>
+
+        {/* 🌐 Jazyk pohádky — roller: auto / čeština / angličtina / testovací
+            jazyky (odebratelné ×, obnovitelné ↺) */}
+        <div className="field">
+          <label>{t.langLabel}</label>
+          <button type="button" className={`chip chip-btn chip-full ${langOpen || storyLang !== "auto" ? "chip-on" : ""}`}
+            onClick={() => setLangOpen(p => !p)}>
+            {(() => {
+              const l = STORY_LANGS.find(x => x.code === storyLang);
+              return l ? `${l.flag} ${uiLang === "en" ? l.en : l.cs}` : `🌐 ${t.langAuto}`;
+            })()}
+          </button>
+          {langOpen && (
+            <div className="add-char-panel">
+              <div className="panel-title-row">
+                <p className="panel-title">🌐 {t.langLabel}</p>
+                <button type="button" className="panel-close" aria-label={t.cancel}
+                  onClick={() => setLangOpen(false)}>✕</button>
+              </div>
+              <div className="folk-list">
+                <button type="button" className={`folk-item ${storyLang === "auto" ? "folk-on" : ""}`}
+                  onClick={() => { pickStoryLang("auto"); setLangOpen(false); }}>
+                  <span className="folk-emoji">✨</span>
+                  <span>{t.langAuto}</span>
+                </button>
+                {STORY_LANGS.filter(l => !l.test || testLangs.includes(l.code)).map(l => l.test ? (
+                  <div key={l.code} role="button" tabIndex={0}
+                    className={`folk-item ${storyLang === l.code ? "folk-on" : ""}`}
+                    onClick={() => { pickStoryLang(l.code); setLangOpen(false); }}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { pickStoryLang(l.code); setLangOpen(false); } }}>
+                    <span className="folk-emoji">{l.flag}</span>
+                    <span>{uiLang === "en" ? l.en : l.cs} 🧪</span>
+                    <button type="button" className="chip-remove folk-remove" aria-label={t.cancel}
+                      onClick={e => { e.stopPropagation(); removeTestLang(l.code); }}>×</button>
+                  </div>
+                ) : (
+                  <button type="button" key={l.code} className={`folk-item ${storyLang === l.code ? "folk-on" : ""}`}
+                    onClick={() => { pickStoryLang(l.code); setLangOpen(false); }}>
+                    <span className="folk-emoji">{l.flag}</span>
+                    <span>{uiLang === "en" ? l.en : l.cs}</span>
+                  </button>
+                ))}
+              </div>
+              {testLangs.length < STORY_LANGS.filter(l => l.test).length && (
+                <button type="button" className="chip chip-btn chip-full" onClick={restoreTestLangs}>
+                  ↺ {t.langRestore}
+                </button>
+              )}
+              <p className="gen-step-hint">{t.langHint}</p>
             </div>
           )}
         </div>

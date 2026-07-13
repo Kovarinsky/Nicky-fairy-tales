@@ -23,10 +23,28 @@ export interface StoryExtras {
   pdfBriefText?: string;
 }
 
-function buildSystemPrompt(language: "cs" | "en"): string {
-  if (language === "en") {
+// 🌐 Testovací jazyky vyprávění: prompt jede na anglické kostře, jen samotná
+// narrace se píše cílovým jazykem (heroDescription a imagePrompty zůstávají
+// anglicky). Neznámý kód jazyka padá na češtinu (zpětná kompatibilita).
+export const EXTRA_STORY_LANGS: Record<string, string> = {
+  hr: "Croatian",
+  da: "Danish",
+  sk: "Slovak",
+};
+
+function storyLangName(language: string): string | null {
+  if (language === "en") return "English";
+  return EXTRA_STORY_LANGS[language] || null;
+}
+
+function buildSystemPrompt(language: string): string {
+  const langName = storyLangName(language);
+  if (langName) {
     return [
-      "You are a kind, talented storyteller for children. You write in English.",
+      `You are a kind, talented storyteller for children. You write the story narration in ${langName}.`,
+      langName !== "English"
+        ? `The 'narration' of every scene MUST be written in natural, fluent ${langName} (a native bedtime-story voice). Keep the characters' names unchanged. Everything else — title in ${langName}; heroDescription and imagePrompts ALWAYS in English.`
+        : "",
       "Your task: write an original fairy tale divided into scenes (book pages).",
       "",
       "═══ STORY RULES ═══",
@@ -172,8 +190,8 @@ function buildSystemPrompt(language: "cs" | "en"): string {
 }
 
 function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
-  const lang = (req.language === "en" ? "en" : "cs") as "cs" | "en";
-  const en = lang === "en";
+  const langName = storyLangName(req.language); // null → čeština
+  const en = langName !== null; // testovací jazyky jedou na anglické kostře
 
   const allChars: Character[] = [
     ...req.characters,
@@ -184,9 +202,9 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
     })),
   ];
 
-  // V anglickém vyprávění vystupují postavy pod anglickou podobou jména
+  // V cizojazyčném vyprávění vystupují postavy pod mezinárodní podobou jména
   const displayName = (c: { name: string; nameEn?: string }) =>
-    req.language === "en" && c.nameEn ? c.nameEn : c.name;
+    en && c.nameEn ? c.nameEn : c.name;
   const cast = allChars.map((c) => `- ${displayName(c)}: ${c.description}`).join("\n");
 
   const hasNicky = allChars.some((c) => c.id === "nicolas");
@@ -243,7 +261,7 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
         familyContext,
         `Target audience age: ${req.age} years. ${ageNote}`,
         `Number of scenes: ${req.sceneCount}`,
-        `Narration language: English`,
+        `Narration language: ${langName}`,
         "",
         "IMPORTANT for imagePrompts: keep them short — name the characters present, their action",
         "and the scene's environment. Facial expression must match the scene's emotion.",
@@ -711,7 +729,7 @@ export async function generateStory(
   const content: string | AnthropicPart[] =
     parts.length === 1 && parts[0].type === "text" ? parts[0].text : parts;
 
-  const language = (req.language === "en" ? "en" : "cs") as "cs" | "en";
+  const language = req.language || "cs";
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     // Prefill: jen v 1. pokusu — když navázaný text nejde zparsovat,

@@ -5,7 +5,7 @@
 // napsaný příběh i hotové scény a dodělá jen chybějící.
 
 import { put, head } from "@vercel/blob";
-import { generateStory, extractPdfBrief, type StoryExtras } from "@/lib/claude";
+import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, type StoryExtras } from "@/lib/claude";
 import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefEntries, refsForText } from "@/lib/portraits";
@@ -162,7 +162,8 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         characters,
         age: Number(body.age) || 4,
         sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), MAX_SCENES),
-        language: String(body.language || "cs") === "en" ? "en" : "cs",
+        // Povolené jazyky vyprávění (cs/en + testovací); jiné padají na cs
+        language: (l => (["cs", "en", ...Object.keys(EXTRA_STORY_LANGS)].includes(l) ? l : "cs"))(String(body.language || "cs")),
         twoEndings: !!body.twoEndings,
         moral: body.moral ? String(body.moral).slice(0, 300) : undefined,
         previousStory: (body.previousStory as { title?: unknown; text?: unknown } | undefined)?.title

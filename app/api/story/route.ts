@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateStory, extractPdfBrief, type StoryExtras } from "@/lib/claude";
+import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, type StoryExtras } from "@/lib/claude";
 import { charactersByIds, loadCharacters } from "@/lib/characters";
 import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character } from "@/lib/types";
@@ -96,7 +96,8 @@ export async function POST(req: NextRequest) {
       } catch {}
     }
 
-    const language = String(body.language || "cs") === "en" ? "en" : "cs";
+    // Povolené jazyky vyprávění (cs/en + testovací); jiné padají na cs
+    const language = (l => (["cs", "en", ...Object.keys(EXTRA_STORY_LANGS)].includes(l) ? l : "cs"))(String(body.language || "cs"));
 
     // Vlastní svět (téma podle fotky/popisu) má přednost před předdefinovaným
     const customTheme = body.customTheme && typeof body.customTheme.prompt === "string"
@@ -125,7 +126,7 @@ export async function POST(req: NextRequest) {
     let pdfBrief: string | undefined;
     if (pdfBase64) {
       try {
-        pdfBrief = await extractPdfBrief(language, pdfBase64);
+        pdfBrief = await extractPdfBrief(language === "en" ? "en" : "cs", pdfBase64);
       } catch {}
     }
 
