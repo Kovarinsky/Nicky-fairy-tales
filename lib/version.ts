@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.75";
+export const APP_VERSION = "3.76";
 
 // Changelog (newest first)
+// 3.76 - 🗑️ Smazaná pohádka zmizí i z plochy: mazání z historie dřív nechalo knihu načtenou dole na stránce (vypadalo to, že se smazání nepovedlo); 📋 deník přípravy se nově UKLÁDÁ k hotové pohádce — v historii má pohádka odznak „⏱ čas 📋" a ťuknutím se deník otevře i po dokončení (kroky, trvání, chyby)
 // 3.75 - 🔧 Drobnosti UI: +/− v počtu stránek přesně vycentrované (flex + optická korekce baseline); tlačítko „🎙️ Nahrát rodinný hlas (klon)" dočasně schované (celý flow zůstává v kódu — vrací se jedním řádkem); existující klony dál fungují a jdou mazat ×
 // 3.74 - ✂️ Konec uřezaných zadání: ✨ Rozvinout dřív četlo jen prvních 600 znaků kostry a výstup tvrdě utínalo na ~900 tokenech (osnova končila uprostřed věty — „…vede král") → vstup nově až 3000 znaků, výstup do ~280 slov s instrukcí VŽDY dokončit poslední větu a stropem 2000 tokenů jen jako pojistkou; 🎲 Vymysli námět čte z poznámek 800 znaků místo 300; samotné zadání pohádky se do psaní posílá CELÉ (nikdy se neřezalo)
 // 3.73 - 🚩 Přepínač jazyka prostředí: vlajky nově jako vestavěné SVG — emoji vlajky 🇨🇿/🇬🇧 Windows neumí vykreslit a rozpadly se na písmena („cz CZ / GB EN"); teď vypadá přepínač stejně na mobilu i desktopu

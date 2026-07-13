@@ -37,6 +37,8 @@ interface HistoryEntry {
   /** ⏱ Délka přípravy (s) — celkem a z toho psaní */
   prepSec?: number;
   writeSec?: number;
+  /** 📋 Deník přípravy (kroky s časy a chybami) — přetrvá i po dokončení */
+  log?: Array<{ t: number; m: string }>;
 }
 
 const HISTORY_KEY = "nicky-story-history";
@@ -618,7 +620,8 @@ export default function Home() {
   type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string; restarts?: number; lastError?: string; log?: JobLogEntry[] };
   const MAX_ACTIVE_JOBS = 3;
   // 📋 Otevřený deník běhu jobu (overlay) — entries se berou živě z pollů
-  const [logView, setLogView] = useState<{ jobId: string; title: string } | null>(null);
+  // (jobId → entries živě z pollů; entries → snapshot z hotové pohádky v historii)
+  const [logView, setLogView] = useState<{ title: string; jobId?: string; entries?: JobLogEntry[] } | null>(null);
   const [serverJobs, setServerJobs] = useState<ServerJob[]>([]);
   // The ref is the synchronous source of truth (poll callbacks and the mount
   // resume mutate it back-to-back — state alone would race); state mirrors it
@@ -1827,7 +1830,7 @@ export default function Home() {
     return null;
   }
 
-  async function finalizeServerJob(st: { title?: string; heroDescription?: string; scenesScript?: Scene[]; sceneUrls?: Record<number, string>; total?: number; voiceId?: string; choice?: StoryChoiceMeta; createdAt?: number; wroteAt?: number; finishedAt?: number }, jobId: string) {
+  async function finalizeServerJob(st: { title?: string; heroDescription?: string; scenesScript?: Scene[]; sceneUrls?: Record<number, string>; total?: number; voiceId?: string; choice?: StoryChoiceMeta; createdAt?: number; wroteAt?: number; finishedAt?: number; log?: JobLogEntry[] }, jobId: string) {
     const script = st.scenesScript || [];
     const urls = st.sceneUrls || {};
     const pre = jobMediaRef.current.get(jobId)?.scenes ?? new Map<number, { imageUrl?: string; audioUrl?: string }>();
@@ -1858,6 +1861,7 @@ export default function Home() {
       // ⏱ Tracker přípravy: celkem / z toho psaní (sekundy)
       prepSec: st.createdAt && st.finishedAt ? Math.max(0, Math.round((st.finishedAt - st.createdAt) / 1000)) : undefined,
       writeSec: st.createdAt && st.wroteAt ? Math.max(0, Math.round((st.wroteAt - st.createdAt) / 1000)) : undefined,
+      log: st.log, // 📋 deník přípravy zůstává dostupný i po dokončení
     };
     saveHistory(entry);
     setStoryHistory(loadHistory());
@@ -2700,6 +2704,19 @@ export default function Home() {
       setStoryHistory(next);
       renderedMapRef.current.delete(entry.id);
       evictOldStories(next.map(x => x.id)).catch(() => {});
+      // Smazaná pohádka nesmí zůstat načtená ve čtečce/na ploše — dřív kniha
+      // zmizela z historie, ale dole na stránce visela dál
+      if (readerEntryIdRef.current === entry.id) {
+        audioRef.current?.pause();
+        setIsPlaying(false);
+        readerEntryIdRef.current = null;
+        setScenes([]);
+        setTitle("");
+        setStoryChoice(null);
+        setBranch(null);
+        setPage(0);
+        setViewMode("form");
+      }
     } catch {}
     armDelete(null);
   }
@@ -4034,8 +4051,12 @@ export default function Home() {
                         <span className="history-badge badge-size">{estimateStorySize(entry.scenes.length)}</span>
                         <span className="history-badge badge-scenes">{t.scenesBadge(entry.scenes.length)}</span>
                         {entry.prepSec !== undefined && (
-                          <span className="history-badge badge-size" title={entry.writeSec !== undefined ? `✍️ psaní ${Math.floor(entry.writeSec / 60)}:${String(entry.writeSec % 60).padStart(2, "0")}` : undefined}>
-                            ⏱ {Math.floor(entry.prepSec / 60)}:{String(entry.prepSec % 60).padStart(2, "0")}
+                          /* ťuknutí otevře 📋 deník přípravy (když ho pohádka má) */
+                          <span className={`history-badge badge-size${entry.log?.length ? " badge-log" : ""}`}
+                            role={entry.log?.length ? "button" : undefined}
+                            title={entry.writeSec !== undefined ? `✍️ psaní ${fmtDur(entry.writeSec)}` : undefined}
+                            onClick={entry.log?.length ? (e => { e.stopPropagation(); setLogView({ title: entry.title, entries: entry.log }); }) : undefined}>
+                            ⏱ {fmtDur(entry.prepSec)}{entry.log?.length ? " 📋" : ""}
                           </span>
                         )}
                         <span className="history-badge badge-sequel" role="button"
@@ -4249,7 +4270,7 @@ export default function Home() {
             <p className="app-confirm-msg">📋 {t.logTitle}{logView.title ? ` — ${logView.title}` : ""}</p>
             <div className="job-log-list">
               {(() => {
-                const entries = serverJobs.find(j => j.jobId === logView.jobId)?.log || [];
+                const entries = logView.entries ?? (serverJobs.find(j => j.jobId === logView.jobId)?.log || []);
                 if (entries.length === 0) return <p>{t.logEmpty}</p>;
                 const t0 = entries[0].t;
                 return entries.map((en, i) => (
