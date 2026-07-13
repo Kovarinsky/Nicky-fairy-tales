@@ -22,15 +22,16 @@ const SHEET_PRICE_4K = 0.151;
 // usage/u<ts>-i<1K obrázky>-c<znaky>[-s<4K archy>][-t1][-d<zařízení>].json
 // (data jsou v názvu souboru — stačí výpis, nic se nestahuje; -t1 značí
 // záznam celé pohádky). Záznamy starší 90 dní se rovnou promažou.
-async function ownUsage(days: number): Promise<{ images: number; sheets: number; chars: number; usd: number; days: number; stories: number; devices: number; prepAvgSec: number; prepMinSec: number; prepMaxSec: number; prepCount: number } | { error: string }> {
+async function ownUsage(days: number): Promise<{ images: number; sheets: number; chars: number; usd: number; days: number; stories: number; devices: number; prepAvgSec: number; prepMinSec: number; prepMaxSec: number; prepLastSec: number; prepCount: number } | { error: string }> {
   if (!blobToken()) return { error: "blob-not-configured" };
   const cutoff = Date.now() - days * 86_400_000;
   const pruneBefore = Date.now() - 90 * 86_400_000;
   const model = (process.env.GEMINI_IMAGE_MODEL_PRIMARY || process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image").trim();
   const price = IMAGE_PRICES[model] ?? 0.05;
   let images = 0, sheets = 0, chars = 0, stories = 0;
-  // ⏱ trvání přípravy pohádek (-p<s> jen u záznamů celých pohádek)
-  let prepSum = 0, prepCount = 0, prepMin = Infinity, prepMax = 0;
+  // ⏱ trvání přípravy pohádek (-p<s> jen u záznamů celých pohádek);
+  // "last" = nejnovější záznam podle časového razítka v názvu
+  let prepSum = 0, prepCount = 0, prepMin = Infinity, prepMax = 0, prepLastTs = 0, prepLast = 0;
   const devices = new Set<string>();
   const stale: string[] = [];
   try {
@@ -53,6 +54,7 @@ async function ownUsage(days: number): Promise<{ images: number; sheets: number;
             const sec = Number(m[6]);
             prepSum += sec; prepCount += 1;
             prepMin = Math.min(prepMin, sec); prepMax = Math.max(prepMax, sec);
+            if (ts > prepLastTs) { prepLastTs = ts; prepLast = sec; }
           }
           if (m[7]) devices.add(m[7].toLowerCase());
         }
@@ -67,6 +69,7 @@ async function ownUsage(days: number): Promise<{ images: number; sheets: number;
       prepAvgSec: prepCount > 0 ? Math.round(prepSum / prepCount) : 0,
       prepMinSec: prepCount > 0 ? prepMin : 0,
       prepMaxSec: prepMax,
+      prepLastSec: prepLast,
       prepCount,
     };
   } catch (e) {

@@ -44,9 +44,7 @@ const CUSTOM_CHARS_KEY = "nicky-custom-chars";
 const CUSTOM_THEMES_KEY = "nicky-custom-themes";
 const JOB_KEY = "nicky-pending-job";
 const VOICE_PREF_KEY = "nicky-voice-pref";
-const STORY_LANG_KEY = "nicky-story-lang";   // pevně vybraný jazyk pohádky ("auto" = podle prostředí/hlasu)
 const AGE_PREF_KEY = "nicky-age-pref";       // ruční věkové pásmo ("auto" = podle vybraných postav)
-const TEST_LANGS_KEY = "nicky-test-langs";   // které testovací jazyky jsou v rolleru (jdou odebrat ×)
 const SERVER_JOB_KEY = "nicky-server-job";
 const HISTORY_MAX = 20; // offline zásoba: posledních 20 pohádek v telefonu
 const SETTINGS_KEY = "nicky-settings";
@@ -282,7 +280,7 @@ export default function Home() {
   type UsageData = {
     claude?: { usd?: number; days?: number; error?: string };
     elevenlabs?: { used?: number; limit?: number; tier?: string; error?: string };
-    own?: { images?: number; sheets?: number; chars?: number; usd?: number; days?: number; stories?: number; devices?: number; prepAvgSec?: number; prepMinSec?: number; prepMaxSec?: number; prepCount?: number; error?: string };
+    own?: { images?: number; sheets?: number; chars?: number; usd?: number; days?: number; stories?: number; devices?: number; prepAvgSec?: number; prepMinSec?: number; prepMaxSec?: number; prepLastSec?: number; prepCount?: number; error?: string };
     czkRate?: number;
   };
   // Which queued story the gen-cards preview (tap a segment to switch)
@@ -366,24 +364,6 @@ export default function Home() {
     try { localStorage.setItem(VOICE_PREF_KEY, id); } catch {}
   }
 
-  // 🌐 Jazyk pohádky: "auto" (podle prostředí a hlasu) nebo pevně z rolleru;
-  // testovací jazyky (hr/da/sk) jdou odebrat × a kdykoli zase obnovit
-  const [storyLang, setStoryLang] = useState("auto");
-  const [langOpen, setLangOpen] = useState(false);
-  const [testLangs, setTestLangs] = useState<string[]>(STORY_LANGS.filter(l => l.test).map(l => l.code));
-  useEffect(() => {
-    try {
-      const l = localStorage.getItem(STORY_LANG_KEY);
-      if (l) setStoryLang(l);
-      const tl = localStorage.getItem(TEST_LANGS_KEY);
-      if (tl) setTestLangs(JSON.parse(tl));
-    } catch {}
-  }, []);
-  function pickStoryLang(code: string) {
-    setStoryLang(code);
-    try { localStorage.setItem(STORY_LANG_KEY, code); } catch {}
-  }
-
   // 👶🧒👦 Věkové pásmo vyprávění: auto (podle postav) nebo ručně — řídí
   // věkový profil promptu (délka vět, slovník, napětí, hloubka)
   const AGE_BANDS: Array<{ id: string; age: number; label: string }> = [
@@ -399,19 +379,6 @@ export default function Home() {
   function pickAge(id: string) {
     setAgePref(id);
     try { localStorage.setItem(AGE_PREF_KEY, id); } catch {}
-  }
-  function removeTestLang(code: string) {
-    setTestLangs(p => {
-      const next = p.filter(c => c !== code);
-      try { localStorage.setItem(TEST_LANGS_KEY, JSON.stringify(next)); } catch {}
-      return next;
-    });
-    if (storyLang === code) pickStoryLang("auto");
-  }
-  function restoreTestLangs() {
-    const all = STORY_LANGS.filter(l => l.test).map(l => l.code);
-    setTestLangs(all);
-    try { localStorage.setItem(TEST_LANGS_KEY, JSON.stringify(all)); } catch {}
   }
   useEffect(() => {
     if (voicePref !== "auto") {
@@ -2239,10 +2206,10 @@ export default function Home() {
       characterIds: selectedIds,
       age: AGE_BANDS.find(b => b.id === agePref)?.age ?? getTargetAge([...selectedIds, ...selectedCustomIds]),
       sceneCount,
-      // Jazyk pohádky: ručně vybraný jazyk z rolleru má přednost; v automatice
-      // rozhoduje hlas s pevným jazykem (🇨🇿/🇬🇧/🇭🇷…), jinak jazyk prostředí
+      // Jazyk pohádky určuje VYPRAVĚČ (hlas a jazyk jsou jeden výběr):
+      // hlas s pevným jazykem (🇨🇿/🇬🇧/🇭🇷/🇩🇰/🇸🇰) píše svým jazykem,
+      // vícejazyčné hlasy (klon, vymyšlené, Gemini test) → jazyk prostředí
       language: (() => {
-        if (storyLang !== "auto") return storyLang;
         const vl = voices.find(v => v.id === selectedVoiceId)?.language;
         return isStoryLang(vl) ? vl! : uiLang;
       })(),
@@ -2389,10 +2356,9 @@ export default function Home() {
     }
   }
 
-  // Custom worlds (story themes by photo/description) — až 8 fotek na svět
-  // (photoBase64/photoMimeType = zpětná kompatibilita se světy s 1 fotkou)
+  // Custom worlds (story themes by description; photos/photoBase64 =
+  // zpětná kompatibilita se staršími světy uloženými s fotkami)
   interface CustomTheme { id: string; name: string; prompt: string; photos?: Array<{ data: string; mimeType: string }>; photoBase64?: string; photoMimeType?: string; previewUrl?: string }
-  const MAX_WORLD_PHOTOS = 8;
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
   // 🎡 Roller světů — světy i klasické pohádky v JEDNOM válci za tlačítkem
   const [worldOpen, setWorldOpen] = useState(false);
@@ -2408,7 +2374,6 @@ export default function Home() {
   const [newThemeName, setNewThemeName] = useState("");
   const [newThemeDesc, setNewThemeDesc] = useState("");
   const [newThemePhotos, setNewThemePhotos] = useState<Array<{ data: string; mimeType: string; previewUrl: string }>>([]);
-  const themePhotoRef = useRef<HTMLInputElement>(null);
   // 🧠 Nastudování světa: Claude z popisu (i odkazu) sestaví průvodce světem,
   // případně vrátí jednu doplňující otázku — uživatel doplní a nechá znovu
   const [worldStudyLoading, setWorldStudyLoading] = useState(false);
@@ -3127,10 +3092,6 @@ export default function Home() {
       } catch {}
     }
   }
-  async function handleThemePhoto(file: File) {
-    const r = await resizeAndEncode(file, 640).catch(() => null);
-    if (r) setNewThemePhotos(p => (p.length >= MAX_WORLD_PHOTOS ? p : [...p, r]));
-  }
   function addCustomTheme() {
     if (!newThemeName.trim() && !newThemeDesc.trim()) return;
     const id = `ctheme_${Date.now()}`;
@@ -3462,31 +3423,6 @@ export default function Home() {
                   {worldQuestion && <p className="gen-step-hint world-question">❓ {worldQuestion} — {t.worldQuestionHint}</p>}
                   {worldStudyError && <p className="gen-step-hint">{t.worldStudyError}</p>}
                 </div>
-                <div className="field">
-                  <label>{t.worldPhotoLabel}</label>
-                  <div className="file-row">
-                    <button type="button" className="outline-btn" onClick={() => themePhotoRef.current?.click()}
-                      disabled={newThemePhotos.length >= MAX_WORLD_PHOTOS}>
-                      📷 {t.uploadPhoto} ({newThemePhotos.length}/{MAX_WORLD_PHOTOS})
-                    </button>
-                  </div>
-                  {newThemePhotos.length > 0 && (
-                    <div className="world-photo-grid">
-                      {newThemePhotos.map((ph, i) => (
-                        <div key={i} className="world-photo-thumb">
-                          <img src={ph.previewUrl} alt={`fotka ${i + 1}`} />
-                          <button type="button" className="chip-remove world-photo-x" aria-label="Odebrat"
-                            onClick={() => setNewThemePhotos(p => p.filter((_, j) => j !== i))}>×</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <input ref={themePhotoRef} type="file" accept="image/*" multiple style={{ display: "none" }}
-                    onChange={async e => {
-                      for (const f of Array.from(e.target.files || []).slice(0, MAX_WORLD_PHOTOS - newThemePhotos.length)) await handleThemePhoto(f);
-                      e.target.value = "";
-                    }} />
-                </div>
                 <div className="panel-actions">
                   <button type="button" onClick={addCustomTheme} disabled={!newThemeName.trim() && !newThemeDesc.trim()}>{t.saveWorld}</button>
                   <button type="button" className="cancel-btn" onClick={() => { setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]); setWorldQuestion(null); setWorldStudyError(false); }}>✕ {t.cancel}</button>
@@ -3553,6 +3489,8 @@ export default function Home() {
                 );})];
                 })}
               </div>
+              {/* hlas = i jazyk pohádky (sloučený výběr) */}
+              <p className="gen-step-hint">{t.langHint}</p>
               {recState === "idle" ? (
                 /* Vždy viditelné — vylepšení hlasu = smazat × a nahrát znovu;
                    při plných 4 klonech to tlačítko vysvětlí místo zmizení */
@@ -3609,58 +3547,6 @@ export default function Home() {
                 ))}
               </div>
               <p className="gen-step-hint">{t.clonePrivacy}</p>
-            </div>
-          )}
-        </div>
-
-        {/* 🌐 Jazyk pohádky — roller: auto / čeština / angličtina / testovací
-            jazyky (odebratelné ×, obnovitelné ↺) */}
-        <div className="field">
-          <label>{t.langLabel}</label>
-          <button type="button" className={`chip chip-btn chip-full ${langOpen || storyLang !== "auto" ? "chip-on" : ""}`}
-            onClick={() => setLangOpen(p => !p)}>
-            {(() => {
-              const l = STORY_LANGS.find(x => x.code === storyLang);
-              return l ? `${l.flag} ${uiLang === "en" ? l.en : l.cs}` : `🌐 ${t.langAuto}`;
-            })()}
-          </button>
-          {langOpen && (
-            <div className="add-char-panel">
-              <div className="panel-title-row">
-                <p className="panel-title">🌐 {t.langLabel}</p>
-                <button type="button" className="panel-close" aria-label={t.cancel}
-                  onClick={() => setLangOpen(false)}>✕</button>
-              </div>
-              <div className="folk-list">
-                <button type="button" className={`folk-item ${storyLang === "auto" ? "folk-on" : ""}`}
-                  onClick={() => { pickStoryLang("auto"); setLangOpen(false); }}>
-                  <span className="folk-emoji">✨</span>
-                  <span>{t.langAuto}</span>
-                </button>
-                {STORY_LANGS.filter(l => !l.test || testLangs.includes(l.code)).map(l => l.test ? (
-                  <div key={l.code} role="button" tabIndex={0}
-                    className={`folk-item ${storyLang === l.code ? "folk-on" : ""}`}
-                    onClick={() => { pickStoryLang(l.code); setLangOpen(false); }}
-                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { pickStoryLang(l.code); setLangOpen(false); } }}>
-                    <span className="folk-emoji">{l.flag}</span>
-                    <span>{uiLang === "en" ? l.en : l.cs} 🧪</span>
-                    <button type="button" className="chip-remove folk-remove" aria-label={t.cancel}
-                      onClick={e => { e.stopPropagation(); removeTestLang(l.code); }}>×</button>
-                  </div>
-                ) : (
-                  <button type="button" key={l.code} className={`folk-item ${storyLang === l.code ? "folk-on" : ""}`}
-                    onClick={() => { pickStoryLang(l.code); setLangOpen(false); }}>
-                    <span className="folk-emoji">{l.flag}</span>
-                    <span>{uiLang === "en" ? l.en : l.cs}</span>
-                  </button>
-                ))}
-              </div>
-              {testLangs.length < STORY_LANGS.filter(l => l.test).length && (
-                <button type="button" className="chip chip-btn chip-full" onClick={restoreTestLangs}>
-                  ↺ {t.langRestore}
-                </button>
-              )}
-              <p className="gen-step-hint">{t.langHint}</p>
             </div>
           )}
         </div>
@@ -4204,11 +4090,11 @@ export default function Home() {
                         <span className="usage-num">🎙️ {(usage.own.chars ?? 0).toLocaleString("cs-CZ")}</span>
                         <span className="usage-lbl">{t.statVoice}</span>
                       </div>
-                      {/* ⏱ průměrné trvání přípravy pohádky (z -p záznamů) */}
+                      {/* ⏱ příprava POSLEDNÍ pohádky + průměr (z -p záznamů) */}
                       {(usage.own.prepCount ?? 0) > 0 && (
                         <div className="usage-stat">
-                          <span className="usage-num">⏱ {fmtDur(usage.own.prepAvgSec ?? 0)}</span>
-                          <span className="usage-lbl">{t.statPrep(fmtDur(usage.own.prepMinSec ?? 0), fmtDur(usage.own.prepMaxSec ?? 0))}</span>
+                          <span className="usage-num">⏱ {fmtDur(usage.own.prepLastSec || usage.own.prepAvgSec || 0)}</span>
+                          <span className="usage-lbl">{t.statPrep(fmtDur(usage.own.prepAvgSec ?? 0), fmtDur(usage.own.prepMinSec ?? 0), fmtDur(usage.own.prepMaxSec ?? 0))}</span>
                         </div>
                       )}
                     </div>
