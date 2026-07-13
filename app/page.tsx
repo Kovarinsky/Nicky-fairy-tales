@@ -779,19 +779,48 @@ export default function Home() {
     } catch {}
 
     // Restore story interrupted by window switch — only when every scene has
-    // an image. The app opens on the MAIN MENU (form); the restored book sits
-    // below it and play switches to the reader — no jump straight into a story.
+    // an image AND the story still exists in history (orphaned draft of a
+    // DELETED story used to resurrect forever). The app opens on the MAIN
+    // MENU (form); the restored book sits below it.
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
+      const hist = loadHistory();
+      let restored = false;
       if (raw) {
         const draft = JSON.parse(raw);
-        if (draft?.scenes?.length > 0 && draft.title
+        const histMatch = draft?.id
+          ? hist.find(e => e.id === draft.id)
+          : hist.find(e => e.title === draft?.title); // starší draft bez id
+        if (draft?.scenes?.length > 0 && draft.title && histMatch
             && draft.scenes.every((s: RenderedScene) => s.imageUrl)) {
           setTitle(draft.title);
           setScenes(draft.scenes);
           setPage(draft.page ?? 0);
+          readerEntryIdRef.current = histMatch.id;
+          readerHeroRef.current = histMatch.heroDescription || "";
+          readerCharIdsRef.current = histMatch.selectedIds || [];
+          setStoryChoice(histMatch.choice ?? null);
+          restored = true;
         }
         localStorage.removeItem(DRAFT_KEY);
+      }
+      // Osiřelý (smazaný) nebo žádný draft → na plochu POSLEDNÍ pohádka
+      // z historie (média z offline cache)
+      if (!restored && hist.length > 0) {
+        const newest = hist[0];
+        getCachedStory(newest.id).then(cached => {
+          if (!cached || cached.length === 0 || !cached[0]?.imageUrl) return;
+          const rendered = newest.scenes.map((s, i) => ({ ...s, imageUrl: cached[i]?.imageUrl, audioUrl: cached[i]?.audioUrl }));
+          renderedMapRef.current.set(newest.id, rendered);
+          readerEntryIdRef.current = newest.id;
+          readerHeroRef.current = newest.heroDescription || "";
+          readerCharIdsRef.current = newest.selectedIds || [];
+          setStoryChoice(newest.choice ?? null);
+          setBranch(null);
+          setTitle(newest.title);
+          setScenes(rendered);
+          setPage(0);
+        }).catch(() => {});
       }
     } catch {}
   }, []);
@@ -801,7 +830,8 @@ export default function Home() {
     function onVisibilityChange() {
       if (document.hidden && scenes.length > 0 && scenes.every(s => s.imageUrl)) {
         try {
-          localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, scenes, page }));
+          // id → po obnovení jde draft spárovat s historií (smazaná pohádka se neobnoví)
+          localStorage.setItem(DRAFT_KEY, JSON.stringify({ id: readerEntryIdRef.current, title, scenes, page }));
         } catch {}
       }
     }
