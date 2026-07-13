@@ -610,8 +610,8 @@ export async function suggestTopicIdea(language: "cs" | "en", characterNames: st
     : "";
   const hintPart = ctx.userHint
     ? language === "en"
-      ? ` Build on the user's notes and include them in the idea: "${ctx.userHint.slice(0, 300)}".`
-      : ` Vyjdi z poznámek uživatele a zapracuj je do námětu: „${ctx.userHint.slice(0, 300)}".`
+      ? ` Build on the user's notes and include them in the idea: "${ctx.userHint.slice(0, 800)}".`
+      : ` Vyjdi z poznámek uživatele a zapracuj je do námětu: „${ctx.userHint.slice(0, 800)}".`
     : "";
   // 📍 Námět z místa, kde rodina právě je — skutečná krajina, moře/hory,
   // místní zvířata a poznávací prvky okolí (souřadnice Claude umí zařadit)
@@ -647,11 +647,13 @@ export async function expandTopicIdea(
       ? ` The story takes place in this world: ${ctx.themeName}.${ctx.themePrompt ? ` World guide: ${ctx.themePrompt.slice(0, 800)}` : ""}`
       : ` Příběh se odehrává v tomto světě: ${ctx.themeName}.${ctx.themePrompt ? ` Průvodce světem: ${ctx.themePrompt.slice(0, 800)}` : ""}`
     : "";
-  const skeleton = (ctx.userHint || "").slice(0, 600);
+  // Vstupní kostra až 3000 znaků (dřív 600 — delší zadání se tiše uřízlo
+  // a rozvinutí pak polovinu uživatelova textu vůbec nevidělo)
+  const skeleton = (ctx.userHint || "").slice(0, 3000);
   const prompt = language === "en"
     ? [
         `The user wrote a brief skeleton of a bedtime-story idea for small children: "${skeleton}". Featured heroes: ${who}.${worldPart}`,
-        "Expand it into a DETAILED story brief (6–10 sentences, max 180 words):",
+        "Expand it into a DETAILED story brief (6–12 sentences; up to ~280 words when the skeleton is rich). ALWAYS finish your last sentence:",
         "- Keep EVERYTHING the user specified — make it concrete and richer, never contradict it.",
         "- Add named characters, exact places, era/dates, costumes, props, and a plot with a twist seed.",
         "- If the skeleton refers to real history or legends, use faithful facts (names, dates) retold warmly for children.",
@@ -662,7 +664,7 @@ export async function expandTopicIdea(
       ].join("\n")
     : [
         `Uživatel napsal stručnou kostru námětu pohádky pro malé děti: „${skeleton}“. Vystupují: ${who}.${worldPart}`,
-        "Rozviň ji do DETAILNÍ osnovy (6–10 vět, max 180 slov):",
+        "Rozviň ji do DETAILNÍ osnovy (6–12 vět; u bohaté kostry až ~280 slov). Poslední větu VŽDY dokonči:",
         "- Zachovej VŠECHNO, co uživatel zadal — jen to zkonkretizuj a obohať, nikdy nepopírej.",
         "- Doplň pojmenované postavy, přesná místa, dobu/letopočty, kostýmy, rekvizity a zápletku se zárodkem zvratu.",
         "- Pokud kostra odkazuje na skutečnou historii či legendy, použij věrná fakta (jména, data) laskavě převyprávěná pro děti.",
@@ -679,7 +681,9 @@ export async function expandTopicIdea(
     : prompt;
   const raw = await callAnthropicApi({
     model,
-    max_tokens: 900,
+    // Strop je jen pojistka — délku řídí instrukce; 900 utínalo delší
+    // osnovy uprostřed věty („…vede král")
+    max_tokens: 2000,
     messages: [{ role: "user", content }],
   });
   return raw.trim();
