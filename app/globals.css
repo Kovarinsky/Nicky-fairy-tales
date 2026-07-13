@@ -560,8 +560,13 @@ textarea {
 }
 
 .stepper-btn {
+  /* flex centrování — +/− sedělo mimo střed (baseline písma + výchozí padding) */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 56px;
   height: 48px;
+  padding: 0 0 3px; /* optická korekce: znaky +/− sedí v písmu nad středem */
   border: 1.5px solid rgba(255, 255, 255, 0.22);
   border-radius: 14px;
   background: rgba(124, 77, 255, 0.28);

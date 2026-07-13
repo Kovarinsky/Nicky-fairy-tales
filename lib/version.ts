@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.74";
+export const APP_VERSION = "3.75";
 
 // Changelog (newest first)
+// 3.75 - 🔧 Drobnosti UI: +/− v počtu stránek přesně vycentrované (flex + optická korekce baseline); tlačítko „🎙️ Nahrát rodinný hlas (klon)" dočasně schované (celý flow zůstává v kódu — vrací se jedním řádkem); existující klony dál fungují a jdou mazat ×
 // 3.74 - ✂️ Konec uřezaných zadání: ✨ Rozvinout dřív četlo jen prvních 600 znaků kostry a výstup tvrdě utínalo na ~900 tokenech (osnova končila uprostřed věty — „…vede král") → vstup nově až 3000 znaků, výstup do ~280 slov s instrukcí VŽDY dokončit poslední větu a stropem 2000 tokenů jen jako pojistkou; 🎲 Vymysli námět čte z poznámek 800 znaků místo 300; samotné zadání pohádky se do psaní posílá CELÉ (nikdy se neřezalo)
 // 3.73 - 🚩 Přepínač jazyka prostředí: vlajky nově jako vestavěné SVG — emoji vlajky 🇨🇿/🇬🇧 Windows neumí vykreslit a rozpadly se na písmena („cz CZ / GB EN"); teď vypadá přepínač stejně na mobilu i desktopu
 // 3.72 - ⚡ ZRYCHLENÍ PŘÍPRAVY (cíl 2–3 min): (1) scéna 1 se kreslí UŽ BĚHEM psaní — jakmile ji stream dopíše, maluje se souběžně se zbytkem příběhu (psaní ~2 min a kotva ~1 min se překryjí, dřív šly za sebou); (2) kontroly panelů archu běží VŠECHNY paralelně (po 3 stály ~3× déle); (3) líná sanitizace promptů — rychlá regexová očista hned, LLM přepis (2–5 s na scénu) až když filtr obsahu skutečně zablokuje; deník 📋 nové kroky ukazuje („⚡ scéna 1 se kreslí souběžně s psaním")

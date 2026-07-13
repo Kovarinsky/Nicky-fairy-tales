@@ -3511,12 +3511,9 @@ export default function Home() {
               {/* hlas = i jazyk pohádky (sloučený výběr) */}
               <p className="gen-step-hint">{t.langHint}</p>
               {recState === "idle" ? (
-                /* Vždy viditelné — vylepšení hlasu = smazat × a nahrát znovu;
-                   při plných 4 klonech to tlačítko vysvětlí místo zmizení */
-                <button type="button" className="chip chip-btn chip-full"
-                  onClick={() => { if (clones.length >= 4) { void appAlert(t.voiceMaxClones); return; } setRecState("ready"); }}>
-                  🎙️ {t.cloneStart}
-                </button>
+                /* 🎙️ Nahrávání klonu je DOČASNĚ schované (na přání) — celý
+                   flow zůstává v kódu, stačí tlačítko zase vrátit */
+                null
               ) : (
                 <div className="field">
                   <input type="text" value={cloneName} onChange={e => setCloneName(e.target.value)}
