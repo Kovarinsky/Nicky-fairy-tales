@@ -732,6 +732,30 @@ export default function Home() {
     }).catch(() => {});
     setStoryHistory(loadHistory());
 
+    // 📋 Zpětné doplnění deníku k čerstvě hotovým pohádkám (dokončila je
+    // starší verze appky / jiné zařízení) — status.json na serveru žije ~1 h
+    (async () => {
+      const missing = loadHistory()
+        .filter(e => !e.log?.length && Date.now() - new Date(e.createdAt).getTime() < 3600_000)
+        .slice(0, 3);
+      for (const e of missing) {
+        try {
+          const r = await fetch(`/api/job/status?id=${e.id}`, { cache: "no-store" });
+          if (!r.ok) continue;
+          const stj = await r.json();
+          if (Array.isArray(stj?.log) && stj.log.length) {
+            const all = loadHistory();
+            const idx = all.findIndex(x => x.id === e.id);
+            if (idx >= 0) {
+              all[idx] = { ...all[idx], log: stj.log };
+              localStorage.setItem(HISTORY_KEY, JSON.stringify(all));
+              setStoryHistory(all);
+            }
+          }
+        } catch {}
+      }
+    })();
+
     // Restore UI language
     try {
       const l = localStorage.getItem(UI_LANG_KEY);

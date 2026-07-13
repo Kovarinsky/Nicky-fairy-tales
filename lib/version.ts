@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.78";
+export const APP_VERSION = "3.79";
 
 // Changelog (newest first)
+// 3.79 - 📋 Deník se k hotové pohádce doplní i ZPĚTNĚ: když pohádku dokončila starší verze appky nebo jiné zařízení (odznak ⏱ bez 📋), appka si při startu deník stáhne ze serveru, dokud tam ještě žije (~1 hodina po dokončení)
 // 3.78 - 🖌 Překreslit jde KAŽDÝ obrázek: v rohu stránky ve čtečce je štěteček — nový obrázek projde kontrolou a NAHRADÍ starý (uloží se k pohádce, dřív se oprava po reloadu ztratila; oprava starší pohádky navíc používala kontext posledního generování místo té otevřené); kontrola má nové PRAVIDLO STYLU: fotografie/fotorealistický/3D obrázek = okamžité zamítnutí (tudy prošel „týpek s kávou" — vůbec nic nekontrolovalo, jestli je to malovaná ilustrace)
 // 3.77 - 🔒 ZPŘÍSNĚNÍ jedenáctera: NEOVĚŘENÝ panel archu (kontrola 3× selhala, typicky rate-limit) se už NEPŘIJÍMÁ — jde na sólo dokreslení s vlastní QA; kontroly panelů běží po 4 (všech 9 naráz umělo vyčerpat limit kontrolního modelu — právě tudy proklouzly duplicitní postavy a předměty); sólo scéna s nedostupnou kontrolou dostane po pauze ještě jeden pokus o ověření; 🎬 titulky bez technologií (know-how) — jen hrdinové pohádky a poděkování; 🌙 dobrou noc na konci jmenovitě VŠEM postavám aktuální pohádky, v jazyce vyprávění (Godnat, Nicolas, Valentina og Jakob…)
 // 3.76 - 🗑️ Smazaná pohádka zmizí i z plochy: mazání z historie dřív nechalo knihu načtenou dole na stránce (vypadalo to, že se smazání nepovedlo); 📋 deník přípravy se nově UKLÁDÁ k hotové pohádce — v historii má pohádka odznak „⏱ čas 📋" a ťuknutím se deník otevře i po dokončení (kroky, trvání, chyby)
