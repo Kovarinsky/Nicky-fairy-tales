@@ -3161,8 +3161,24 @@ export default function Home() {
         <button type="button" className={`lang-toggle ${uiLang === "en" ? "lang-en" : ""}`}
           onClick={() => switchLang(uiLang === "cs" ? "en" : "cs")} aria-label="Jazyk / Language">
           <span className="lang-thumb" aria-hidden="true" />
-          <span className={`lang-opt ${uiLang === "cs" ? "on" : ""}`}>🇨🇿 CZ</span>
-          <span className={`lang-opt ${uiLang === "en" ? "on" : ""}`}>🇬🇧 EN</span>
+          {/* vlajky jako SVG — emoji vlajky Windows neumí (rozpadly se na „cz CZ") */}
+          <span className={`lang-opt ${uiLang === "cs" ? "on" : ""}`}>
+            <svg className="lang-flag" viewBox="0 0 18 12" aria-hidden="true">
+              <rect width="18" height="6" fill="#fff" /><rect y="6" width="18" height="6" fill="#d7141a" />
+              <path d="M0 0 L9 6 L0 12 Z" fill="#11457e" />
+            </svg>
+            CZ
+          </span>
+          <span className={`lang-opt ${uiLang === "en" ? "on" : ""}`}>
+            <svg className="lang-flag" viewBox="0 0 18 12" aria-hidden="true">
+              <rect width="18" height="12" fill="#012169" />
+              <path d="M0 0 L18 12 M18 0 L0 12" stroke="#fff" strokeWidth="2.4" />
+              <path d="M0 0 L18 12 M18 0 L0 12" stroke="#c8102e" strokeWidth="1.2" />
+              <path d="M9 0 V12 M0 6 H18" stroke="#fff" strokeWidth="4" />
+              <path d="M9 0 V12 M0 6 H18" stroke="#c8102e" strokeWidth="2.2" />
+            </svg>
+            EN
+          </span>
         </button>
       </div>
       {bgPickerOpen && (

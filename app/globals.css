@@ -319,6 +319,15 @@ body {
   color: #fff;
 }
 
+/* SVG vlajka v přepínači jazyka (emoji vlajky na Windows nefungují) */
+.lang-flag {
+  width: 17px;
+  height: 11.5px;
+  border-radius: 2px;
+  flex: none;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
 .lang-thumb {
   position: absolute;
   top: 3px;
