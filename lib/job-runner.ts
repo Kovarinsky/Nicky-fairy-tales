@@ -6,7 +6,7 @@
 
 import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, peekEarlyScene, enforceCanonicalAppearance, type StoryExtras } from "@/lib/claude";
-import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, isCreditsDepletedError } from "@/lib/gemini";
+import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, isCreditsDepletedError, isSpendCapError } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefEntries, refsForText } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
@@ -439,6 +439,9 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // Vyčerpaný PŘEDPLACENÝ kredit ≠ denní kvóta: nevyprší o půlnoci, je
     // třeba dobít v Google AI Studio — hláška musí říct pravdu
     let creditsDepleted = false;
+    // Měsíční ROZPOČTOVÝ STROP ≠ kredit: platba do Google Cloud Billing ho
+    // NEZVEDNE — musí se zvednout ručně v AI Studio (Usage & billing)
+    let spendCapped = false;
 
     // 💰 ROZPOČTOVÁ POJISTKA: pohádka smí přes všechny běhy vygenerovat
     // nejvýš ~4 obrázky na stránku (QA překreslení, archy, řetězy) — pak
@@ -470,6 +473,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         st.imgError = e.message.slice(0, 220);
         if (isDailyQuotaError(e.message)) quotaExhausted = true;
         if (isCreditsDepletedError(e.message)) creditsDepleted = true;
+        if (isSpendCapError(e.message)) spendCapped = true;
         return null;
       });
       if (!img) { await write(); return; } // retry rounds below; chybu vidí klient
@@ -559,6 +563,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
             logEv(`🗂️ arch CHYBA po ${secsSince(tSheet)}s: ${msg.slice(0, 140)} → sólo dokreslení`);
             if (isDailyQuotaError(msg)) quotaExhausted = true;
             if (isCreditsDepletedError(msg)) creditsDepleted = true;
+            if (isSpendCapError(msg)) spendCapped = true;
           }
         }));
         if (Object.keys(st.sceneUrls!).length === before) {
@@ -606,10 +611,12 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // Denní kvóta vyčerpaná uprostřed práce → jasná chyba, žádné další pokusy
     if (quotaExhausted && Object.keys(st.sceneUrls!).length < total) {
       st.phase = "error";
-      st.error = creditsDepleted
+      st.error = spendCapped
+        ? `Měsíční ROZPOČTOVÝ STROP Gemini API (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo) — POZOR, tohle NENÍ totéž co kredit: platba do Google Cloud Billing tento strop nezvedne. Musíte ho zvednout ručně v AI Studio → Usage and billing → Spend limit (https://aistudio.google.com/) a pohádku zadat znovu. Sám se neobnoví.`
+        : creditsDepleted
         ? `Vyčerpaný KREDIT Gemini (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo) — dobijte kredit v Google AI Studio (Billing) a pohádku zadejte znovu. Sám se neobnoví.`
         : `Vyčerpán denní limit kreslení Gemini (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo). Resetuje se kolem 9:00 ráno — pak pohádku zadejte znovu.`;
-      logEv(`⛔ STOP: denní kvóta Gemini vyčerpaná (${Object.keys(st.sceneUrls!).length}/${total})`);
+      logEv(`⛔ STOP: ${spendCapped ? "měsíční rozpočtový strop" : "denní kvóta"} Gemini vyčerpaná (${Object.keys(st.sceneUrls!).length}/${total})`);
       await write();
       await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true);
       return;

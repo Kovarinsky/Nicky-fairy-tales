@@ -15,15 +15,24 @@ const SANITIZE_MODEL = "gemini-2.0-flash"; // fast text model — sanitizes its 
 // Vizuální kontrola desatera — silnější vision model (přepsatelný env proměnnou)
 const VERIFY_MODEL = (process.env.GEMINI_VERIFY_MODEL || "gemini-2.5-flash").trim();
 
-// Denní kvóta / vyčerpaný kredit — okamžité opakování je zbytečné (reset až
-// o půlnoci PT / po dobití). Joby na tuto chybu musí přestat pálit pokusy.
+// Denní kvóta / vyčerpaný kredit / měsíční rozpočtový strop — okamžité
+// opakování je zbytečné (reset až o půlnoci PT / po dobití / po ručním
+// zvednutí stropu). Joby na tuto chybu musí přestat pálit pokusy.
 export function isDailyQuotaError(msg: string): boolean {
-  return /per_day|per day|requests_per_model|credits are depleted|QUOTA_DAILY/i.test(msg);
+  return /per_day|per day|requests_per_model|credits are depleted|QUOTA_DAILY|spending cap|spend cap/i.test(msg);
 }
 
 /** Vyčerpaný PŘEDPLACENÝ kredit (nevyprší o půlnoci — je třeba dobít v AI Studio) */
 export function isCreditsDepletedError(msg: string): boolean {
   return /credits are depleted|prepayment/i.test(msg);
+}
+
+/** Měsíční ROZPOČTOVÝ STROP (spend cap) na projektu Gemini API — JINÁ věc
+ *  než kredit: platba do Google Cloud Billing ho NEZVEDNE (to je jiný účet/
+ *  jiná položka), strop se musí zvednout ručně v AI Studio (Usage & billing
+ *  → Spend limit na https://aistudio.google.com/). */
+export function isSpendCapError(msg: string): boolean {
+  return /spending cap|spend cap/i.test(msg);
 }
 
 export interface ImageResult {
