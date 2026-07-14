@@ -11,11 +11,14 @@
 
 import { put, head } from "@vercel/blob";
 import { blobToken } from "./blob-token";
-import { generateBackgroundImage } from "./gemini";
+import { generateBackgroundImage, verifySceneImage } from "./gemini";
 import { loadReferenceImages, type ReferenceImage } from "./characters";
 import type { Character } from "./types";
 
-const PORTRAIT_VERSION = 2; // v2: opravené výšky (Valentýnka po ramena, James = Nicolas) a Janovy vlasy
+// v3: portréty procházejí KONTROLOU (dřív jediná cesta bez QA — vadný portrét
+// Belly se stal referencí a chyba se replikovala do všech pohádek) + popisy
+// nově zamykají barvu pleti; bump = celá knihovna se překreslí
+const PORTRAIT_VERSION = 3;
 const memCache = new Map<string, ReferenceImage>();
 
 const PORTRAIT_STYLE =
@@ -79,11 +82,28 @@ export async function getCharacterPortrait(c: Character, force = false): Promise
     }
   } catch {}
 
-  // 2) Namalovat JEDNOU z fotek + kanonického popisu a uložit
+  // 2) Namalovat JEDNOU z fotek + kanonického popisu a uložit — S KONTROLOU:
+  // portrét je REFERENCE pro všechny scény, vadný portrét = vadná celá knihovna
   try {
     const photoRefs = loadReferenceImages([c]);
     console.log(`[portraits] drawing canonical portrait of ${c.id}…`);
-    const img = await generateBackgroundImage(portraitPrompt(c), photoRefs);
+    const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
+    const sceneDesc = `A full-body standing storybook portrait of ${c.name}. Only ${c.name} present — exactly one person/animal.`;
+    let img = await generateBackgroundImage(portraitPrompt(c), photoRefs);
+    let v = await verifySceneImage(apiKey, img, c.description, sceneDesc);
+    if (v && !v.ok) {
+      console.warn(`[portraits] ${c.id} REJECTED (${v.problems.slice(0, 140)}) → redraw with correction`);
+      img = await generateBackgroundImage(
+        `${portraitPrompt(c)} ⚠ CORRECTION: the previous attempt violated: ${v.problems.slice(0, 300)}. Follow the description EXACTLY (hair color and length, skin tone, eye color, clothing).`,
+        photoRefs
+      );
+      v = await verifySceneImage(apiKey, img, c.description, sceneDesc);
+      if (v && !v.ok) {
+        // ani oprava neprošla → RADĚJI ŽÁDNÝ portrét (scény dostanou fotky)
+        console.warn(`[portraits] ${c.id} still rejected (${v.problems.slice(0, 140)}) → falling back to photos`);
+        return null;
+      }
+    }
     await put(pathName, img.buffer, {
       access: "public",
       contentType: img.mimeType,

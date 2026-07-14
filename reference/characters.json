@@ -2,21 +2,21 @@
   {
     "id": "nicolas",
     "name": "Nicolásek",
-    "description": "Nicolas: straight light-blond hair, bright blue eyes, white T-shirt with two red horizontal stripes, mid-blue denim shorts, white sneakers with grey soles, tall boy",
+    "description": "Nicolas: straight light-blond hair, bright blue eyes, fair light skin, white T-shirt with two red horizontal stripes, mid-blue denim shorts, white sneakers with grey soles, tall boy",
     "referenceFile": "nicolas.jpg",
     "nameEn": "Nicolas"
   },
   {
     "id": "valentyna",
     "name": "Valentýnka",
-    "description": "Valentýna: wavy light-blonde hair with large pink fabric bow, sky-blue eyes, yellow dress with small white flower print and white collar, white sandals, small girl — the top of her head reaches Nicolas's shoulders",
+    "description": "Valentýna: wavy light-blonde hair with large pink fabric bow, sky-blue eyes, fair light skin, yellow dress with small white flower print and white collar, white sandals, small girl — the top of her head reaches Nicolas's shoulders",
     "referenceFile": "valentyna.jpg",
     "nameEn": "Valentina"
   },
   {
     "id": "jan",
     "name": "Táta Jan",
-    "description": "Jan: adult man with short dark-brown hair (fuller on top, slightly receding only at the temples with a widow's peak), short brown stubble beard, warm dark-brown eyes, strong jaw, big warm open smile, navy-blue polo shirt with white horizontal stripes, navy shorts, white sneakers, tall athletic build",
+    "description": "Jan: adult man with short dark-brown hair (fuller on top, slightly receding only at the temples with a widow's peak), short brown stubble beard, warm dark-brown eyes, fair light skin, strong jaw, big warm open smile, navy-blue polo shirt with white horizontal stripes, navy shorts, white sneakers, tall athletic build",
     "referenceFile": "jan.jpg",
     "referenceFiles": [
       "jan-face.jpg",
@@ -27,7 +27,7 @@
   {
     "id": "jana",
     "name": "Máma Jana",
-    "description": "Jana: adult woman with very long straight blonde hair, blue-grey eyes, gentle smile, lilac-purple hoodie with drawstrings, black leggings, slim medium height",
+    "description": "Jana: adult woman with very long straight blonde hair, blue-grey eyes, fair light skin, gentle smile, lilac-purple hoodie with drawstrings, black leggings, slim medium height",
     "referenceFile": "jana.jpg",
     "nameEn": "Mom Jana"
   },
@@ -41,28 +41,28 @@
   {
     "id": "james",
     "name": "James",
-    "description": "James: 6-year-old boy with straight mid-brown hair with a fringe, dark brown eyes, cheeky warm smile, green T-shirt with cartoon dog print, white shorts, black sneakers with orange laces; Nicolas's best friend from Riverside school, exactly the SAME height as Nicolas",
+    "description": "James: 6-year-old boy with straight mid-brown hair with a fringe, dark brown eyes, fair light skin, cheeky warm smile, green T-shirt with cartoon dog print, white shorts, black sneakers with orange laces; Nicolas's best friend from Riverside school, exactly the SAME height as Nicolas",
     "referenceFile": "james.jpg",
     "nameEn": "James"
   },
   {
     "id": "bella",
     "name": "Bella",
-    "description": "Bella: 8-year-old girl with very long straight light-brown hair, blue-grey eyes, bright friendly smile, small shell earrings, cream sweatshirt, blue-grey shorts, pink sneakers; James's big sister, slightly taller than the boys",
+    "description": "Bella: 8-year-old girl with very long straight light-brown hair, blue-grey eyes, fair light skin, bright friendly smile, small shell earrings, cream sweatshirt, blue-grey shorts, pink sneakers; James's big sister, slightly taller than the boys",
     "referenceFile": "bella.jpg",
     "nameEn": "Bella"
   },
   {
     "id": "eva",
     "name": "Eva",
-    "description": "Eva: adult woman with light-brown hair slicked back into a neat low bun, shaped dark eyebrows, blue-grey eyes, soft gentle smile with mauve lips, white ribbed tank top with a thin blue-striped trim, blue-and-white pinstriped skirt, small gold wristwatch, slim medium height",
+    "description": "Eva: adult woman with light-brown hair slicked back into a neat low bun, shaped dark eyebrows, blue-grey eyes, fair light skin, soft gentle smile with mauve lips, white ribbed tank top with a thin blue-striped trim, blue-and-white pinstriped skirt, small gold wristwatch, slim medium height",
     "referenceFile": "eva.jpg",
     "nameEn": "Eva"
   },
   {
     "id": "jakob",
     "name": "Jakob",
-    "description": "Jakob: adult man with short slightly wavy mid-brown hair, bright blue eyes, light brown stubble, big warm friendly smile, plain white T-shirt, slim tall build",
+    "description": "Jakob: adult man with short slightly wavy mid-brown hair, bright blue eyes, fair light skin, light brown stubble, big warm friendly smile, plain white T-shirt, slim tall build",
     "referenceFile": "jakob.jpg",
     "nameEn": "Jakob"
   }

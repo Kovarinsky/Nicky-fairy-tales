@@ -223,7 +223,7 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
 // JSON režim + dostatečný limit tokenů (utržená odpověď dřív prošla jako „ok").
 // Vrací null, jen když se kontrola ani na 3. pokus nepovedla — volající pak
 // NEPŘEPISUJE poslední ověřený stav neověřeným obrázkem.
-async function verifySceneImage(
+export async function verifySceneImage(
   apiKey: string, img: ImageResult, heroDescription: string, scenePrompt = ""
 ): Promise<{ ok: boolean; problems: string; badRules: number } | null> {
   for (let attempt = 1; attempt <= 3; attempt++) {
