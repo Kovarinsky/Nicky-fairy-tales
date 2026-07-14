@@ -404,6 +404,24 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
         ? "Write a NEW, self-contained adventure that follows on: the heroes remember the previous events and reference them at least once (a callback), but the plot, problem and twist are NEW. Give the story a NEW title — never reuse the previous one."
         : "Napiš NOVÉ, samostatné dobrodružství, které navazuje: hrdinové si minulé události pamatují a alespoň jednou na ně odkážou (callback), ale zápletka, problém i zvrat jsou NOVÉ. Dej pohádce NOVÝ název — nikdy nepoužij ten minulý."
     );
+    // 📖 Sequel to a story this app didn't originally write (received/shared
+    // tale) — its cast's appearance was reconstructed from the pictures
+    // (see describeStoryCast). Those looks are now CANONICAL, exactly like a
+    // library character's description: copy them verbatim, invent nothing.
+    if (req.previousStory.heroDescription) {
+      lines.push(
+        en
+          ? `CANONICAL CAST FROM THE PREVIOUS TALE (reconstructed from its illustrations) — copy these appearances into heroDescription WORD FOR WORD for every character that reappears; only characters new to THIS installment get a fresh entry: ${req.previousStory.heroDescription.slice(0, 3000)}`
+          : `KANONICKÉ OBSAZENÍ Z MINULÉ POHÁDKY (rekonstruováno z jejích obrázků) — tyto podoby zkopíruj do heroDescription DOSLOVA pro každou postavu, která se vrací; jen postavy NOVÉ pro tento díl dostanou čerstvý záznam: ${req.previousStory.heroDescription.slice(0, 3000)}`
+      );
+    }
+    if (req.previousStory.worldNotes) {
+      lines.push(
+        en
+          ? `WORLD CARRIED OVER from the previous tale — keep it consistent unless the new plot deliberately moves elsewhere: ${req.previousStory.worldNotes.slice(0, 1200)}`
+          : `SVĚT PŘEVZATÝ z minulé pohádky — drž ho konzistentní, pokud nový děj záměrně nezavede jinam: ${req.previousStory.worldNotes.slice(0, 1200)}`
+      );
+    }
   }
 
   if (req.twoEndings) {

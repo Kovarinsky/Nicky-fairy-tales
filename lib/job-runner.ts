@@ -241,10 +241,18 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         language: (l => (["cs", "en", ...Object.keys(EXTRA_STORY_LANGS)].includes(l) ? l : "cs"))(String(body.language || "cs")),
         twoEndings: !!body.twoEndings,
         moral: body.moral ? String(body.moral).slice(0, 300) : undefined,
-        previousStory: (body.previousStory as { title?: unknown; text?: unknown } | undefined)?.title
+        previousStory: (body.previousStory as { title?: unknown; text?: unknown; heroDescription?: unknown; worldNotes?: unknown } | undefined)?.title
           ? {
               title: String((body.previousStory as { title: unknown }).title).slice(0, 200),
               text: String((body.previousStory as { text?: unknown }).text || "").slice(0, 4000),
+              // 📖 Zkopírovaná pohádka nastudovaná zpětně z obrázků (/api/story-adopt) —
+              // vypravěč tyto podoby postav zopakuje beze změny, ať pokračování sedí
+              heroDescription: (body.previousStory as { heroDescription?: unknown }).heroDescription
+                ? String((body.previousStory as { heroDescription: unknown }).heroDescription).slice(0, 3000)
+                : undefined,
+              worldNotes: (body.previousStory as { worldNotes?: unknown }).worldNotes
+                ? String((body.previousStory as { worldNotes: unknown }).worldNotes).slice(0, 1200)
+                : undefined,
             }
           : undefined,
       };

@@ -306,6 +306,52 @@ export async function verifySceneImage(
   return null;
 }
 
+// ── 📖 „Nastudovat svět" ZKOPÍROVANÉ pohádky ───────────────────────────────
+// Poslaná/přijatá pohádka (odkaz /s/) nenese heroDescription ani worldNotes —
+// appka jinou postavu nezná z knihovny. Aby šlo příběh upravovat „jako
+// běžnou pohádku" (✨ Pokračování, 🖌 překreslení se zámkem vzhledu), appka
+// si napřed z HOTOVÝCH OBRÁZKŮ a textu vypravování zpětně sestaví záznam
+// heroDescription + worldNotes ve STEJNÉM formátu, jaký píše vypravěč —
+// od teď to appka bere jako kanonický popis této pohádky.
+export async function describeStoryCast(
+  apiKey: string,
+  title: string,
+  narration: string,
+  images: ReferenceImage[]
+): Promise<{ heroDescription: string; worldNotes: string }> {
+  const parts: Array<{ text?: string; inlineData?: { data: string; mimeType: string } }> = [
+    { text: [
+      "You are reverse-engineering a children's storybook's character sheet from its FINISHED illustrations, so future illustrations of the SAME story stay consistent.",
+      `TITLE: ${title.slice(0, 200)}`,
+      `NARRATION (all pages, for character names and roles): ${narration.slice(0, 3500)}`,
+      "",
+      "Look CAREFULLY at every attached illustration and write TWO fields:",
+      "1) \"heroDescription\": one entry per NAMED character that actually appears in the illustrations — 'Name: [hair style+color], [eye color], [exact clothing with colors], [distinctive features].' Be as specific as the pictures allow (exact hair color and length, skin tone, exact outfit colors and items). Separate characters with ' | '. If a recurring object appears (a boat, a vehicle, a toy), add a 'Key objects:' entry with its exact appearance. End with a 'Heights:' entry stating RELATIVE heights/ages you can see (without numeric ages) so body sizes stay consistent. NO age numbers anywhere.",
+      "2) \"worldNotes\" (max 110 words): the recurring setting(s)/venue(s) seen across the illustrations, so later scenes keep the same place consistent.",
+      "Reply with ONLY JSON: {\"heroDescription\":\"...\",\"worldNotes\":\"...\"}",
+    ].join("\n") },
+    ...images.slice(0, 4).flatMap(img => [
+      { inlineData: { data: img.data, mimeType: img.mimeType } },
+    ]),
+  ];
+  const raw = await geminiPost(apiKey, VERIFY_MODEL, {
+    contents: [{ role: "user", parts }],
+    generationConfig: {
+      maxOutputTokens: 1200,
+      responseMimeType: "application/json",
+      ...(VERIFY_MODEL.includes("2.5") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+    },
+  });
+  const data = JSON.parse(raw) as { candidates?: GeminiCandidate[] };
+  const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error("Nastudování světa se nepovedlo (chybí JSON odpověď).");
+  const v = JSON.parse(m[0]) as { heroDescription?: string; worldNotes?: string };
+  const heroDescription = String(v.heroDescription || "").trim();
+  if (!heroDescription) throw new Error("Nastudování světa se nepovedlo (prázdný popis postav).");
+  return { heroDescription, worldNotes: String(v.worldNotes || "").trim() };
+}
+
 // Pozadí aplikace — ilustrovaná scenérie ve stejném stylu jako pohádky,
 // na výšku (telefon). Volitelně s referenčními fotkami postav (Nicolásek
 // a Valentýnka bývají součástí každého světa). Prompt je bezpečný a pevně

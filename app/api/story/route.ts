@@ -118,6 +118,14 @@ export async function POST(req: NextRequest) {
         ? {
             title: String(body.previousStory.title).slice(0, 200),
             text: String(body.previousStory.text || "").slice(0, 4000),
+            // 📖 Zkopírovaná pohádka nastudovaná zpětně z obrázků (viz /api/story-adopt) —
+            // vypravěč tyto podoby postav zopakuje beze změny, ať pokračování sedí
+            heroDescription: body.previousStory.heroDescription
+              ? String(body.previousStory.heroDescription).slice(0, 3000)
+              : undefined,
+            worldNotes: body.previousStory.worldNotes
+              ? String(body.previousStory.worldNotes).slice(0, 1200)
+              : undefined,
           }
         : undefined,
     };

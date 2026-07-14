@@ -81,6 +81,18 @@ function saveHistory(entry: HistoryEntry) {
   } catch { /* localStorage full – silently ignore */ }
 }
 
+// Tichá oprava JEDNÉ položky historie NA MÍSTĚ (nepředsouvá ji na první
+// místo jako saveHistory) — používá se pro drobné dopočty na pozadí
+// (nastudovaný svět zkopírované pohádky, oprava textu stránky…)
+function patchHistoryEntry(id: string, patch: Partial<HistoryEntry>): HistoryEntry[] {
+  const all = loadHistory();
+  const idx = all.findIndex(e => e.id === id);
+  if (idx < 0) return all;
+  all[idx] = { ...all[idx], ...patch };
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(all)); } catch {}
+  return all;
+}
+
 interface SavedSettings {
   selectedVoiceId?: string;
   sceneCount?: number;
@@ -1697,6 +1709,53 @@ export default function Home() {
     cacheStory(entry.id, entry.scenes.map((s, i) => ({ ...s, ...(media[i] || {}) })) as RenderedScene[]).catch(() => {});
   }
 
+  // ── 📖 „Adopce" zkopírované (poslané/přijaté) pohádky ──────────────────────
+  // Appka ji nezná z knihovny postav → heroDescription je prázdné, takže
+  // ✨ Pokračování i 🖌 překreslení dřív neměly ŽÁDNÝ zámek vzhledu (a
+  // překreslení tak nešlo ani zkontrolovat). Z hotových obrázků + textu si
+  // appka jednou zpětně nastuduje kanonický popis postav a světa (Gemini
+  // vision) a od té chvíle se s pohádkou pracuje jako s běžnou.
+  const adoptingRef = useRef<Set<string>>(new Set());
+  async function adoptCopiedStory(entry: HistoryEntry): Promise<{ heroDescription: string; worldNotes: string } | null> {
+    if (adoptingRef.current.has(entry.id)) return null; // už běží jinde
+    adoptingRef.current.add(entry.id);
+    try {
+      let media = renderedMapRef.current.get(entry.id);
+      if (!media) media = (await getCachedStory(entry.id)) as RenderedScene[] | undefined;
+      const realImgs = (media || []).map(m => m.imageUrl).filter((u): u is string => !!u && !isPlaceholderImg(u));
+      if (realImgs.length === 0) return null;
+      // Reprezentativní výběr — první/prostřední/poslední, ať Gemini vidí rozsah pohádky
+      const pickIdx = realImgs.length <= 3
+        ? realImgs.map((_, i) => i)
+        : [0, Math.floor(realImgs.length / 2), realImgs.length - 1];
+      const images = pickIdx
+        .map(i => dataUrlParts(realImgs[i]))
+        .filter((x): x is { mime: string; data: string } => !!x)
+        .map(x => ({ data: x.data, mimeType: x.mime }));
+      if (images.length === 0) return null;
+      const narration = entry.scenes.map(s => s.narration).join(" ").slice(0, 4000);
+      const res = await fetch("/api/story-adopt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(45_000),
+        body: JSON.stringify({ title: entry.title, narration, images }),
+      });
+      const d = await safeJson<{ heroDescription?: string; worldNotes?: string; error?: string }>(res);
+      if (!res.ok || !d.heroDescription) return null;
+      // Stejná konvence jako u vypravěče: zámek prostředí se připojí k heroDescription
+      const merged = d.worldNotes
+        ? `${d.heroDescription} | World & setting lock: ${d.worldNotes.slice(0, 700)}`
+        : d.heroDescription;
+      patchHistoryEntry(entry.id, { heroDescription: merged });
+      setStoryHistory(loadHistory());
+      return { heroDescription: d.heroDescription, worldNotes: d.worldNotes || "" };
+    } catch {
+      return null;
+    } finally {
+      adoptingRef.current.delete(entry.id);
+    }
+  }
+
   // ── Voice switch in reader — audio-only regeneration ──────────────────────
   async function switchVoice(newVoiceId: string) {
     if (newVoiceId === selectedVoiceId || regenAudio) return;
@@ -1988,6 +2047,42 @@ export default function Home() {
     } catch {} finally {
       setFixingScene(null);
     }
+  }
+
+  // ── ✏️ Ruční úprava textu stránky (jako u běžné pohádky — funguje na
+  //    vlastní i zkopírované/přijaté pohádce) ─────────────────────────────
+  const [editingPage, setEditingPage] = useState<{ page: number; text: string } | null>(null);
+  function openPageEditor(i: number) {
+    if (!scenes[i]) return;
+    setEditingPage({ page: i, text: scenes[i].narration || "" });
+  }
+  function savePageText() {
+    if (!editingPage) return;
+    const { page: i, text } = editingPage;
+    const trimmed = text.trim();
+    if (!trimmed) { setEditingPage(null); return; }
+    setScenes(prev => {
+      if (!prev[i]) return prev;
+      const n = [...prev];
+      // Text se změnil → staré namluvení k němu už nepatří, namluví se znovu
+      n[i] = { ...n[i], narration: trimmed, audioUrl: undefined };
+      const eid = readerEntryIdRef.current;
+      if (eid) {
+        renderedMapRef.current.set(eid, n);
+        cacheStory(eid, n).catch(() => {});
+        // Skript v historii (a tedy i budoucí ✨ Pokračování/export) musí nést NOVÝ text
+        const histEntry = loadHistory().find(e => e.id === eid);
+        if (histEntry?.scenes[i]) {
+          const scenesCopy = [...histEntry.scenes];
+          scenesCopy[i] = { ...scenesCopy[i], narration: trimmed };
+          patchHistoryEntry(eid, { scenes: scenesCopy });
+          setStoryHistory(loadHistory());
+        }
+        audioFetchRef.current.delete(`${eid}:${i}`); // dřívější úspěšné namluvení už neplatí
+      }
+      return n;
+    });
+    setEditingPage(null);
   }
 
   // ── Server-side job: the whole story generates ON Vercel; the phone only
@@ -2427,7 +2522,9 @@ export default function Home() {
         const vl = voices.find(v => v.id === selectedVoiceId)?.language;
         return isStoryLang(vl) ? vl! : uiLang;
       })(),
-      previousStory: sequelOf ? { title: sequelOf.title, text: sequelOf.text } : undefined,
+      previousStory: sequelOf
+        ? { title: sequelOf.title, text: sequelOf.text, heroDescription: sequelOf.heroDescription, worldNotes: sequelOf.worldNotes }
+        : undefined,
       twoEndings,
       customCharacters: selectedCustomObjsForJob.map(c => ({
         id: c.id, name: c.name,
@@ -2583,7 +2680,8 @@ export default function Home() {
   // 🔀 Dva konce — defaultně vypnuto, před generováním se potvrzuje
   const [twoEndings, setTwoEndings] = useState(false);
   // 📖 Pokračování uložené pohádky: nový díl naváže na minulý děj
-  const [sequelOf, setSequelOf] = useState<{ id: string; title: string; text: string } | null>(null);
+  const [sequelOf, setSequelOf] = useState<{ id: string; title: string; text: string; heroDescription?: string; worldNotes?: string } | null>(null);
+  const [sequelAdopting, setSequelAdopting] = useState(false); // 📖 nastuduji svět zkopírované pohádky, než začne pokračování
   const [addingTheme, setAddingTheme] = useState(false);
   const [newThemeName, setNewThemeName] = useState("");
   const [newThemeDesc, setNewThemeDesc] = useState("");
@@ -2931,15 +3029,26 @@ export default function Home() {
   // ── 📖 Pokračování uložené pohádky ────────────────────────────────────────
   // Předá minulý děj (text scén) vypravěči a obnoví obsazení + svět z původní
   // pohádky; uživatel může před generováním cokoli změnit
-  function startSequel(e: React.MouseEvent, entry: HistoryEntry) {
+  async function startSequel(e: React.MouseEvent, entry: HistoryEntry) {
     e.stopPropagation();
     if (swipeHandledRef.current || confirmDeleteIdRef.current) return;
     const text = entry.scenes.map(s => s.narration).join(" ").slice(0, 3500);
-    setSequelOf({ id: entry.id, title: entry.title, text });
     if (entry.selectedIds?.length) setSelectedIds(entry.selectedIds);
     if (entry.themeId) setSelectedTheme(entry.themeId);
     setHistoryOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    if (entry.heroDescription) {
+      // Běžná pohádka — appka už kanonické obsazení zná z generování
+      setSequelOf({ id: entry.id, title: entry.title, text, heroDescription: entry.heroDescription });
+      return;
+    }
+    // 📖 Zkopírovaná (poslaná/přijatá) pohádka — appka nemá heroDescription;
+    // nastuduje si svět z hotových obrázků, ať pokračování drží STEJNÉ postavy
+    setSequelOf({ id: entry.id, title: entry.title, text });
+    setSequelAdopting(true);
+    const w = await adoptCopiedStory(entry);
+    setSequelAdopting(false);
+    if (w) setSequelOf(prev => (prev?.id === entry.id ? { ...prev, heroDescription: w.heroDescription, worldNotes: w.worldNotes } : prev));
   }
 
   // ── 📤 Poslat pohádku ─────────────────────────────────────────────────────
@@ -3133,6 +3242,14 @@ export default function Home() {
       setViewMode("reader");
       setHistoryOpen(false);
       isAutoAdvanceRef.current = true; // start narration right away
+      // 📖 Zkopírovaná (poslaná/přijatá) pohádka nemá heroDescription —
+      // na pozadí si appka „nastuduje svět", ať 🖌 překreslení dostane
+      // zámek vzhledu a kontrolu konzistence (dřív nemělo ani jedno)
+      if (!entry.heroDescription) {
+        adoptCopiedStory(entry).then(w => {
+          if (w && readerEntryIdRef.current === entry.id) readerHeroRef.current = `${w.heroDescription}${w.worldNotes ? ` | World & setting lock: ${w.worldNotes.slice(0, 700)}` : ""}`;
+        }).catch(() => {});
+      }
     }
 
     // 1. Instant restore from in-memory ref (bg generation continues uninterrupted)
@@ -4084,6 +4201,10 @@ export default function Home() {
               <div className="page-clip" ref={pageClipRef}>
                 <p className="page-text">{current.narration}</p>
               </div>
+              {/* ✏️ Ruční úprava textu — jako u běžné pohádky, i u zkopírované */}
+              <button type="button" className="page-edit" aria-label={t.editTextBtn} title={t.editTextBtn}
+                disabled={loading}
+                onClick={e => { e.stopPropagation(); audioRef.current?.pause(); openPageEditor(page); }}>✏️</button>
             </div>
 
             {/* 🔇 Hlas selhal (kredit/výpadek) — viditelná hláška místo věčného ⏳ */}
@@ -4396,6 +4517,33 @@ export default function Home() {
                 ✕ {t.cancel}
               </button>
               <button type="button" className="btn-span2" onClick={() => setTopicEditorOpen(false)}>✓ OK</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✏️ Editor textu stránky — stejné okno jako u přání */}
+      {editingPage && (
+        <div className="app-confirm-overlay" onClick={() => setEditingPage(null)}>
+          <div className="app-confirm topic-editor" onClick={e => e.stopPropagation()}>
+            <p className="app-confirm-msg">✏️ {t.editTextTitle(editingPage.page + 1)}</p>
+            {editingPage.text.trim() !== "" && (
+              <div className="ta-toolbar">
+                <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
+                  onClick={() => setEditingPage(p => (p ? { ...p, text: "" } : p))}>✕</button>
+              </div>
+            )}
+            <div className="ta-wrap">
+              <textarea className="topic-editor-ta" value={editingPage.text} autoFocus
+                onChange={e => setEditingPage(p => (p ? { ...p, text: e.target.value } : p))} />
+            </div>
+            <div className="app-confirm-btns topic-editor-btns">
+              <button type="button" className="cancel-btn" onClick={() => setEditingPage(null)}>
+                ✕ {t.cancel}
+              </button>
+              <button type="button" className="btn-span2" disabled={!editingPage.text.trim()} onClick={savePageText}>
+                ✓ {t.okBtn}
+              </button>
             </div>
           </div>
         </div>

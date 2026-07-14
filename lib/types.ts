@@ -34,8 +34,12 @@ export interface StoryRequest {
   language: string;
   /** Ponaučení, které má pohádka přirozeně předat (volitelné) */
   moral?: string;
-  /** Pokračování dřívější pohádky: název + shrnutí minulého děje */
-  previousStory?: { title: string; text: string };
+  /** Pokračování dřívější pohádky: název + shrnutí minulého děje.
+   *  heroDescription/worldNotes (volitelné) — když pokračování navazuje na
+   *  poslanou/přijatou pohádku (appka nezná její postavy z knihovny), appka
+   *  si napřed „nastuduje svět" z obrázků a textu (viz describeStoryCast) a
+   *  vypravěč tyto podoby postav MUSÍ zopakovat beze změny. */
+  previousStory?: { title: string; text: string; heroDescription?: string; worldNotes?: string };
   /** 🔀 Interaktivní pohádka se dvěma konci (čtenář si vybere) */
   twoEndings?: boolean;
 }
