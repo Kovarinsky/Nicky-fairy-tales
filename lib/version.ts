@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.90";
+export const APP_VERSION = "3.91";
 
 // Changelog (newest first)
+// 3.91 - 🟠 JEDNOTNÁ BARVA POTVRZENÍ: všechna potvrzovací tlačítka napříč appkou jsou ORANŽOVÁ („✓ Hotovo" v panelech, OK v dialozích, ✓ OK ve velkých editorech, Uložit svět/postavu…) a rušení je nově neutrální tmavé sklo — dřív byl oranžový naopak Zrušit a pletlo se, co je souhlas
 // 3.90 - 🙈 Odebírání hlasů: KAŽDÝ vestavěný hlas (vč. testovacích a filmových prototypů) jde × odebrat z výběru — skryje se na tomto zařízení a tlačítko „↺ Obnovit odebrané hlasy (N)" ho kdykoli vrátí; skrytý hlas se nepoužije ani v automatice; klony a vymyšlené hlasy dál × mažou doopravdy (i u ElevenLabs)
 // 3.89 - ✓ POTVRZENÍ ve výběrových panelech: Svět, Postavy, Vypravěč i Pozadí mají dole velké tlačítko „✓ Hotovo" — křížek nahoře jen zavírá a mátl (ruším/potvrzuji?); 🪄 sekce „Vymyslet hlas podle popisu" dočasně schovaná (na přání — kód zůstává, vymyšlené hlasy dál fungují a jdou mazat ×); 🌊 dva NOVÉ hlasové prototypy „dobrodružný animák" (Vaiana vibe): Dobrodružný vypravěč (Fenrir — energický) a Dobrodružná vypravěčka (Leda — mladá, dynamická) s hravou dobrodružnou režií přednesu
 // 3.88 - 🎙️ Hlasy dotažené: názvy hlasů se řídí jazykem prostředí (nameEn — v EN už žádný „Gemini vypravěč"); KOMPLETNÍ Gemini matice — pár žena/muž pro VŠECHNY jazyky včetně 🇨🇿 češtiny a 🇬🇧 angličtiny (Sulafat + Iapetus s režií v daném jazyce, nahrazují staré „any" Charon/Aoede); 🎬 dva NOVÉ prototypy „hollywood movie teller": Filmový vypravěč (Algenib — hluboký, gravelly) a Filmová vypravěčka (Gacrux — zralá, dramatická) s trailerovou režií přednesu (cs/en podle textu)
