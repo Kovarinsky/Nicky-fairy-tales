@@ -6,7 +6,7 @@
 
 import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, peekEarlyScene, enforceCanonicalAppearance, type StoryExtras } from "@/lib/claude";
-import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, isCreditsDepletedError, lastSheetReport } from "@/lib/gemini";
+import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, isCreditsDepletedError } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefEntries, refsForText } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
@@ -507,49 +507,53 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     const sheetMode = (process.env.IMAGE_SHEET_MODE || "3x3").toLowerCase();
     if (sheetMode !== "off" && !quotaExhausted && st.sceneUrls![0]) {
       const maxCells = sheetMode === "2x2" ? 4 : 9;
-      let pending = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
-      // Pojistky proti SMYČCE ARCHŮ: max 3 archy na běh, a arch BEZ jediného
-      // nového panelu ukončuje archovou fázi (dřív se stejný arch — prošlo
-      // 0/8 — kreslil pořád dokola přes řetězy funkcí a pálil kredit)
-      let sheetRounds = 0;
-      while (pending.length >= 2 && !quotaExhausted && !timeUp() && sheetRounds < 3 && !budgetBlown()) {
-        sheetRounds++;
+      // ⚡ Archy jedné vlny běží PARALELNĚ (15 stránek = archy 9+5 najednou —
+      // 4K arch generuje ~stejně dlouho jako jedna 1K scéna, sériově to byla
+      // zbytečná minuta navíc). Max 2 vlny; vlna bez jediného nového panelu
+      // ukončuje archovou fázi (pojistka proti smyčce archů).
+      for (let round = 1; round <= 2 && !quotaExhausted && !timeUp() && !budgetBlown(); round++) {
+        const pend = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
+        if (pend.length < 2) break;
+        const groups: number[][] = [];
+        for (let g = 0; g < pend.length; g += maxCells) groups.push(pend.slice(g, g + maxCells));
+        // poslední skupina o 1 scéně nemá jako arch smysl — dokreslí ji sólo fáze
+        if (groups.length > 1 && groups[groups.length - 1].length < 2) groups.pop();
+        const before = Object.keys(st.sceneUrls!).length;
         st.imgSpent = spentNow();
-        const group = pending.slice(0, Math.min(maxCells, pending.length));
-        const tSheet = Date.now();
-        logEv(`🗂️ kreslím arch ${group.length} scén (${group.map(i => i + 1).join(",")})`);
-        await write(); // heartbeat před dlouhým generováním archu
-        try {
-          const groupText = group.map(i => `${scenesScript[i].imagePrompt} ${scenesScript[i].narration}`).join(" ");
-          const groupRefs = refsFor(groupText);
-          const refs = anchor ? [...groupRefs, anchor] : groupRefs;
-          const results = await generateSceneSheet(group.map(i => scenesScript[i]), heroDescription, refs);
-          const passed = results.filter(Boolean).length;
-          logEv(`🗂️ arch hotový za ${secsSince(tSheet)}s (prošlo ${passed}/${group.length} panelů)${lastSheetReport ? ` — ${lastSheetReport.slice(0, 220)}` : ""}`);
-          // panely se ukládají PARALELNĚ (sériově to stálo ~2–4 s na arch)
-          await Promise.all(group.map(async (i, k) => {
-            const img = results[k];
-            if (!img) return;
-            const url = await putJson(`jobs/${id}/scene-${i}.json`, {
-              index: scenesScript[i].index,
-              imageUrl: `data:${img.mimeType};base64,${img.buffer.toString("base64")}`,
-            });
-            st.sceneUrls![i] = url;
-          }));
-          st.done = Object.keys(st.sceneUrls!).length;
-          await write();
-          if (passed === 0) {
-            logEv("🗂️ arch nepřinesl žádný panel → zbytek jde sólo cestou");
-            break;
+        logEv(`🗂️ kreslím ${groups.length > 1 ? `${groups.length} archy paralelně` : "arch"} (${groups.map(g => g.length).join("+")} scén)`);
+        await write(); // heartbeat před dlouhým generováním
+        await Promise.all(groups.map(async group => {
+          const tSheet = Date.now();
+          try {
+            const groupText = group.map(i => `${scenesScript[i].imagePrompt} ${scenesScript[i].narration}`).join(" ");
+            const groupRefs = refsFor(groupText);
+            const refs = anchor ? [...groupRefs, anchor] : groupRefs;
+            const { results, report } = await generateSceneSheet(group.map(i => scenesScript[i]), heroDescription, refs);
+            const passed = results.filter(Boolean).length;
+            logEv(`🗂️ arch (${group.length} scén) hotový za ${secsSince(tSheet)}s (prošlo ${passed}/${group.length})${report ? ` — ${report.slice(0, 200)}` : ""}`);
+            // panely se ukládají paralelně (sériově to stálo ~2–4 s na arch)
+            await Promise.all(group.map(async (i, k) => {
+              const img = results[k];
+              if (!img) return;
+              const url = await putJson(`jobs/${id}/scene-${i}.json`, {
+                index: scenesScript[i].index,
+                imageUrl: `data:${img.mimeType};base64,${img.buffer.toString("base64")}`,
+              });
+              st.sceneUrls![i] = url;
+            }));
+            st.done = Object.keys(st.sceneUrls!).length;
+            await write();
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            logEv(`🗂️ arch CHYBA po ${secsSince(tSheet)}s: ${msg.slice(0, 140)} → sólo dokreslení`);
+            if (isDailyQuotaError(msg)) quotaExhausted = true;
+            if (isCreditsDepletedError(msg)) creditsDepleted = true;
           }
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          logEv(`🗂️ arch CHYBA po ${secsSince(tSheet)}s: ${msg.slice(0, 140)} → sólo dokreslení`);
-          if (isDailyQuotaError(msg)) quotaExhausted = true;
-          if (isCreditsDepletedError(msg)) creditsDepleted = true;
-          break; // zbytek dokreslí sólo kola
+        }));
+        if (Object.keys(st.sceneUrls!).length === before) {
+          logEv("🗂️ archy nepřinesly žádný nový panel → zbytek jde sólo cestou");
+          break;
         }
-        pending = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
       }
     }
 

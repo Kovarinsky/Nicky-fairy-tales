@@ -524,20 +524,18 @@ async function sliceSheet(img: ImageResult, grid: number): Promise<ImageResult[]
   }
 }
 
-/** Důvody zamítnutí panelů posledního archu — volající je zapíše do 📋 deníku */
-export let lastSheetReport = "";
-
 /**
  * Vygeneruje 2–9 scén jedním archem (2×2 pro ≤4, jinak 3×3; volné buňky se
- * vyplní prázdnou scenérií). Vrací pole délky scenes.length — prošlé výřezy
- * jako ImageResult, neprošlé/nedokreslené jako null (dokreslí se sólo).
+ * vyplní prázdnou scenérií). Vrací výřezy délky scenes.length — prošlé jako
+ * ImageResult, neprošlé/nedokreslené jako null (dokreslí se sólo) — a report
+ * s důvody zamítnutí (archy běží i paralelně, report nesmí být globální).
  * Při nefunkční mřížce / nepodpoře 4K vyhodí chybu → volající jde sólo cestou.
  */
 export async function generateSceneSheet(
   scenes: Scene[],
   heroDescription: string,
   refImages: ReferenceImage[] = []
-): Promise<Array<ImageResult | null>> {
+): Promise<{ results: Array<ImageResult | null>; report: string }> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
   const model = IMAGE_MODEL.trim();
@@ -629,7 +627,6 @@ export async function generateSceneSheet(
       out.push(await compressImage(slices[i]));
     }
   }
-  lastSheetReport = reasons.slice(0, 4).join(" | ");
   console.log(`[Gemini sheet] hotovo: ${out.filter(Boolean).length}/${n} panelů prošlo (zbytek sólo)`);
-  return out;
+  return { results: out, report: reasons.slice(0, 4).join(" | ") };
 }
