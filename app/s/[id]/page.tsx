@@ -26,6 +26,35 @@ export default function SharedStoryPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isAutoRef = useRef(false); // po prvním ručním ▶ přehrává další stránky sám
 
+  // ⛶ Celá obrazovka: ▶ přehrání i otočení na šířku ji zapnou samy.
+  // Maximalizované rozvržení řídí třída .share-max — platí i na šířku bez
+  // fullscreen API (iOS Safari ho nemá), takže karta nikdy nepřeteče displej
+  const mainRef = useRef<HTMLElement | null>(null);
+  const [isFs, setIsFs] = useState(false);
+  const [isLs, setIsLs] = useState(false);
+  const [fsAvail, setFsAvail] = useState(false);
+  useEffect(() => {
+    setFsAvail(!!document.documentElement.requestFullscreen);
+    const onFs = () => setIsFs(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFs);
+    const mq = window.matchMedia("(orientation: landscape)");
+    const onMq = () => setIsLs(mq.matches);
+    onMq();
+    mq.addEventListener("change", onMq);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      mq.removeEventListener("change", onMq);
+    };
+  }, []);
+  const shareMax = isFs || isLs;
+  function enterFs() {
+    if (!document.fullscreenElement) mainRef.current?.requestFullscreen?.().catch(() => {});
+  }
+  function toggleFs() {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else enterFs();
+  }
+
   useEffect(() => {
     if (!id) return;
     fetch(`/api/share?id=${encodeURIComponent(id)}`)
@@ -76,6 +105,7 @@ export default function SharedStoryPage() {
       isAutoRef.current = false;
     } else {
       isAutoRef.current = true;
+      enterFs(); // ▶ rovnou do celé obrazovky — ťuknutí je platné gesto
       a.play().then(() => setIsPlaying(true)).catch(() => {});
     }
   }
@@ -100,7 +130,7 @@ export default function SharedStoryPage() {
   }
 
   return (
-    <main className="share-main">
+    <main className={`share-main${shareMax ? " share-max" : ""}`} ref={mainRef}>
       <audio ref={audioRef} onEnded={onEnded} />
       {error && (
         <div className="share-card">
@@ -147,6 +177,12 @@ export default function SharedStoryPage() {
               </button>
               <span className="share-pagenum">{pos + 1} / {visible.length}{story.choice && branch === null ? "+" : ""}</span>
               <button type="button" className="share-btn" onClick={() => go(nextIdx)} disabled={nextIdx === null} aria-label="Další">→</button>
+              {fsAvail && (
+                <button type="button" className="share-btn" onClick={toggleFs}
+                  aria-label={isFs ? "Ukončit celou obrazovku" : "Celá obrazovka"}>
+                  {isFs ? "🗗" : "⛶"}
+                </button>
+              )}
             </div>
           )}
           <p className="share-footer">✨ Vytvořeno v appce Nickyho pohádky</p>

@@ -2334,14 +2334,16 @@ button:disabled {
   color: #c4b5fd;
 }
 
-/* Akční tlačítka u uložené pohádky (Pokračování/Poslat/Soubor) — větší,
-   ať se dají na tabletu pohodlně nahmatat (informační odznaky zůstávají malé) */
+/* Akční tlačítka u uložené pohádky (Pokračování/Poslat) — velká a hranatá,
+   ať vypadají jako tlačítka a dají se pohodlně nahmatat
+   (informační odznaky zůstávají malé pilulky) */
 .badge-sequel,
-.badge-share,
-.badge-export {
-  font-size: 0.92rem;
-  padding: 0.5rem 0.85rem;
-  min-height: 42px;
+.badge-share {
+  font-size: 1rem;
+  font-weight: 800;
+  padding: 0.65rem 1.1rem;
+  min-height: 50px;
+  border-radius: 10px;
 }
 
 /* 📤 Poslat pohádku — nahraje pohádku a pošle odkaz (WhatsApp, e-mail…) */
@@ -2353,18 +2355,6 @@ button:disabled {
 }
 
 .badge-share:active {
-  transform: scale(0.94);
-}
-
-/* 💾 Pohádka jako soubor — offline poslání (Quick Share/Bluetooth) */
-.badge-export {
-  background: rgba(52, 211, 153, 0.14);
-  border: 1px solid rgba(52, 211, 153, 0.45);
-  color: #6ee7b7;
-  cursor: pointer;
-}
-
-.badge-export:active {
   transform: scale(0.94);
 }
 
@@ -2980,6 +2970,9 @@ textarea.ta-accent:focus {
 .share-card {
   width: min(720px, 100%);
   background: rgba(13, 19, 64, 0.88);
+  /* stránka /s/ NENÍ v .container → dědila tmavou barvu textu z body
+     (tmavá na tmavé kartě = neviditelný text); barva se musí říct výslovně */
+  color: #f3efff;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 22px;
   padding: 1.1rem 1.1rem 0.9rem;
@@ -3028,7 +3021,7 @@ textarea.ta-accent:focus {
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.25);
   background: rgba(255, 255, 255, 0.1);
-  color: var(--text);
+  color: #fff; /* var(--text) je tmavá — na tmavém tlačítku neviditelná */
   font-size: 1.2rem;
   font-weight: 800;
   cursor: pointer;
@@ -3060,6 +3053,69 @@ textarea.ta-accent:focus {
 .share-loading {
   padding: 1.2rem 0.4rem;
   font-weight: 700;
+}
+
+/* ⛶ Maximalizovaná /s/ (celá obrazovka NEBO otočení na šířku): karta vyplní
+   displej a nikdy nepřeteče, obrázek dostane maximum místa, text pod ním.
+   Řídí ji třída .share-max — na šířku platí i bez fullscreen API (iOS) */
+.share-main.share-max {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: #0d1340;
+  padding: 0.6rem;
+}
+
+.share-main.share-max .share-card {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.share-main.share-max .share-img {
+  flex: 1 1 0;
+  min-height: 0;
+  width: auto;
+  max-width: 100%;
+  align-self: center;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+/* Na výšku drží obrázek rám 16:9 na plnou šířku (jako čtečka v appce) —
+   flex roztahování by ho deformovalo do svislého pruhu */
+@media (orientation: portrait) {
+  .share-main.share-max .share-img {
+    flex: 0 0 auto;
+    width: 100%;
+    height: auto;
+  }
+}
+
+.share-main.share-max .share-text {
+  flex: 0 0 auto;
+  max-height: 26dvh;
+  overflow-y: auto;
+  margin: 0.5rem 0.2rem;
+}
+
+.share-main.share-max .share-footer {
+  display: none;
+}
+
+/* Na šířku šetří výšku i titulek a text v jedné řádce prostoru */
+@media (orientation: landscape) {
+  .share-main.share-max .share-title {
+    display: none;
+  }
+  .share-main.share-max .share-text {
+    max-height: 22dvh;
+    font-size: 0.95rem;
+  }
 }
 
 /* 📖 Pokračování pohádky — jediný klikací odznak v řádce (nový díl příběhu) */
