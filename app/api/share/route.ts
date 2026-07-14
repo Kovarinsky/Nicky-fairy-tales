@@ -93,7 +93,20 @@ export async function POST(req: NextRequest) {
         choice = { common, altFrom, options: [String(rawChoice.options[0]).slice(0, 60), String(rawChoice.options[1]).slice(0, 60)] };
       }
     }
-    const doc = { title, createdAt: new Date().toISOString(), scenes, ...(choice ? { choice } : {}) };
+    // ⏱ Metadata přípravy — příjemce je uvidí u pohádky v historii
+    const meta = body as { prepSec?: unknown; writeSec?: unknown; createdAt?: unknown };
+    const prepSec = Number(meta.prepSec);
+    const writeSec = Number(meta.writeSec);
+    const origCreated = typeof meta.createdAt === "string" && !Number.isNaN(Date.parse(meta.createdAt))
+      ? new Date(meta.createdAt).toISOString() : null;
+    const doc = {
+      title,
+      createdAt: origCreated || new Date().toISOString(),
+      scenes,
+      ...(choice ? { choice } : {}),
+      ...(Number.isFinite(prepSec) && prepSec >= 0 ? { prepSec: Math.round(prepSec) } : {}),
+      ...(Number.isFinite(writeSec) && writeSec >= 0 ? { writeSec: Math.round(writeSec) } : {}),
+    };
     await put(`share/${id}.json`, JSON.stringify(doc), {
       access: "public",
       contentType: "application/json",

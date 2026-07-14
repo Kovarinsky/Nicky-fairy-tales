@@ -3009,7 +3009,11 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: AbortSignal.timeout(30_000),
-        body: JSON.stringify({ op: "publish", id: shareId, title: entry.title, scenes, choice: entry.choice }),
+        body: JSON.stringify({
+          op: "publish", id: shareId, title: entry.title, scenes, choice: entry.choice,
+          // ⏱ ať příjemce vidí u pohádky i čas přípravy a původní datum
+          prepSec: entry.prepSec, writeSec: entry.writeSec, createdAt: entry.createdAt,
+        }),
       });
       const d = await safeJson<{ ok?: boolean; error?: string }>(res);
       if (!res.ok || !d.ok) throw new Error(d.error || "publish failed");

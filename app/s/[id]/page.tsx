@@ -15,6 +15,9 @@ interface SharedStory {
   createdAt: string;
   scenes: SharedScene[];
   choice?: { common: number; altFrom: number; options: [string, string] };
+  /** ⏱ Délka přípravy (s) — ukáže se u pohádky v historii příjemce */
+  prepSec?: number;
+  writeSec?: number;
 }
 
 export default function SharedStoryPage() {
@@ -99,6 +102,8 @@ export default function SharedStoryPage() {
         themeId: "",
         topic: "",
         ...(story.choice ? { choice: story.choice } : {}),
+        ...(typeof story.prepSec === "number" ? { prepSec: story.prepSec } : {}),
+        ...(typeof story.writeSec === "number" ? { writeSec: story.writeSec } : {}),
       } as never);
       localStorage.setItem(KEY, JSON.stringify(all.slice(0, 20)));
       cacheStory(hid, story.scenes.map((s, i) => ({
