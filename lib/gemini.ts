@@ -241,7 +241,7 @@ async function verifySceneImage(
               "",
               "Run this TWELVE-RULE checklist and FAIL the image on ANY violation:",
               "0) STYLE: the image MUST be a hand-painted 2D storybook ILLUSTRATION. A photograph, photorealistic render, 3D/CGI look, or stock-photo style image = FAIL immediately (this alone fails the image, regardless of content).",
-              "1) IDENTIFY every visible person one by one and match each to a named character by hair, face and outfit. COUNT them: the number of visible people MUST EQUAL the number of characters named in the scene description — more OR fewer = FAIL. ANY person you cannot confidently match (extra child, stranger, background figure) = FAIL. A character named in the scene description who is MISSING = FAIL. A person who mixes features of TWO characters (one character's face with another's outfit or hairstyle — swapped/merged identities) = FAIL.",
+              "1) IDENTIFY every visible person one by one and match each to a named character by hair, face and outfit. COUNT them: the number of visible people MUST EQUAL the number of characters named in the scene description — more OR fewer = FAIL. ANY person you cannot confidently match (extra child, stranger, background figure) = FAIL. A character named in the scene description who is MISSING = FAIL. A person who mixes features of TWO characters (one character's face with another's outfit or hairstyle — swapped/merged identities) = FAIL. EXCEPTION: when the scene description itself mentions a GROUP (a team, other players, opponents, the crowd, the audience, villagers…), unnamed background figures belonging to that group are ALLOWED — list them as 'group:<what>' in people, they don't fail the count; but none of them may look like a copy of a named hero.",
               "2) Each named character appears EXACTLY ONCE — two similar children or two similar adults = FAIL.",
               "3) HAIR COLOR of EVERY person matches their sheet entry (blond stays blond, brown stays brown, dark stays dark) — check person by person.",
               "4) Hair LENGTH and STYLE match the sheet (short stays short, long stays long; beard per sheet).",
@@ -331,7 +331,7 @@ function buildAppearanceLock(heroDescription: string): { open: string; close: st
       heroDescription,
       `Every named character MUST look IDENTICAL to this description in EVERY image: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes — AND the same AGE, same BODY SIZE and PROPORTIONS. Relative heights between characters NEVER change: a toddler stays toddler-sized, a child stays child-sized, adults stay adult-sized. Any recurring OBJECT listed above (vehicle, magic item, toy) keeps IDENTICAL type, shape and colors in every scene — the same car stays the same car, and each key object exists ONCE in the world: NEVER draw two copies of it in one image. These are LOCKED — do NOT change anything between scenes.`,
       `If 'Story outfits:' defines outdoor/indoor variants, draw the variant stated at the end of the scene description — and ALL characters in the scene share the SAME dressing level (never one in a winter coat while another wears a T-shirt).`,
-      `ONLY the characters named in the scene are visible — zero additional people, strangers, or background human figures. Each named character appears EXACTLY ONCE in the image — NEVER draw two copies of the same person.`,
+      `ONLY the characters named in the scene are visible — zero additional people, strangers, or background human figures (EXCEPTION: a group the scene itself mentions — a team, opponents, the crowd — may appear as smaller background figures who never resemble the named heroes). Each named character appears EXACTLY ONCE in the image — NEVER draw two copies of the same person.`,
       `IDENTITIES ARE SEPARATE: characters who look similar (two adult men, two adult women, two boys) are DIFFERENT people — NEVER merge them, swap them, or mix their features. Each keeps their OWN hair, face, build and signature clothing exactly as listed. A reference portrait may ONLY be used for the character it belongs to.`,
     ].join(" "),
     close: `⚠ CONSISTENCY REMINDER: match hair, eyes, clothing, age, body size and relative heights EXACTLY as stated above — do NOT alter any detail.`,
@@ -543,7 +543,8 @@ async function sliceSheet(img: ImageResult, grid: number): Promise<ImageResult[]
 export async function generateSceneSheet(
   scenes: Scene[],
   heroDescription: string,
-  refImages: ReferenceImage[] = []
+  refImages: ReferenceImage[] = [],
+  correction = "" // výtky z minulé vlny — arch se kreslí S KOREKCÍ, ne naslepo znovu
 ): Promise<{ results: Array<ImageResult | null>; report: string }> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
@@ -572,7 +573,8 @@ export async function generateSceneSheet(
     `Compose each panel like a FINISHED book illustration: every character and every key object (boat, vehicle, building, the moon…) FULLY inside its panel with a comfortable breathing margin — nothing important may touch or cross the white gutters or panel edges. No cropped heads, no half-cut characters or objects.`,
     lockOpen,
     ...panelLines,
-    `⚠ PANEL CAST RULE: each panel shows ONLY the characters explicitly named in ITS OWN description — nobody else. No extra children, adults, or background figures in ANY panel. A character not named in a panel's description must NOT appear in that panel, even though their description or portrait is provided for other panels.`,
+    `⚠ PANEL CAST RULE: each panel shows ONLY the characters explicitly named in ITS OWN description — nobody else. No extra children, adults, or background figures in ANY panel. A character not named in a panel's description must NOT appear in that panel, even though their description or portrait is provided for other panels. EXCEPTION: when a panel's description itself mentions a group (a team, other players, opponents, the crowd…), paint that group as smaller BACKGROUND figures who never resemble the named heroes.`,
+    correction ? `⚠ CORRECTION — a previous attempt violated these rules, fix EXACTLY these issues: ${correction.slice(0, 600)}` : "",
     lockClose,
     STYLE_SUFFIX,
   ].filter(Boolean).join(" ");

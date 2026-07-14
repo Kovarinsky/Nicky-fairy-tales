@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.91";
+export const APP_VERSION = "3.92";
 
 // Changelog (newest first)
+// 3.92 - ⚽ SKUPINY V POZADÍ povolené (z 📋 deníku: fotbalová pohádka padala na „two identical Kicker characters" a arch prošel 1/9 — týmové scény přirozeně potřebují spoluhráče): psaní smí výslovně přidat skupinu v pozadí („other players of both teams in the background"), kreslení ji maluje jako malé vzdálené postavy nepodobné hrdinům a kontrola ji NEpočítá do přesného počtu (hlásí ji jako group:…); 2. vlna archů se kreslí S KOREKCÍ z výtek 1. vlny (dřív stejný prompt naslepo znovu); UI: menší OK v dialozích, VĚTŠÍ tlačítko 📋 deníku u jobu
 // 3.91 - 🟠 JEDNOTNÁ BARVA POTVRZENÍ: všechna potvrzovací tlačítka napříč appkou jsou ORANŽOVÁ („✓ Hotovo" v panelech, OK v dialozích, ✓ OK ve velkých editorech, Uložit svět/postavu…) a rušení je nově neutrální tmavé sklo — dřív byl oranžový naopak Zrušit a pletlo se, co je souhlas
 // 3.90 - 🙈 Odebírání hlasů: KAŽDÝ vestavěný hlas (vč. testovacích a filmových prototypů) jde × odebrat z výběru — skryje se na tomto zařízení a tlačítko „↺ Obnovit odebrané hlasy (N)" ho kdykoli vrátí; skrytý hlas se nepoužije ani v automatice; klony a vymyšlené hlasy dál × mažou doopravdy (i u ElevenLabs)
 // 3.89 - ✓ POTVRZENÍ ve výběrových panelech: Svět, Postavy, Vypravěč i Pozadí mají dole velké tlačítko „✓ Hotovo" — křížek nahoře jen zavírá a mátl (ruším/potvrzuji?); 🪄 sekce „Vymyslet hlas podle popisu" dočasně schovaná (na přání — kód zůstává, vymyšlené hlasy dál fungují a jdou mazat ×); 🌊 dva NOVÉ hlasové prototypy „dobrodružný animák" (Vaiana vibe): Dobrodružný vypravěč (Fenrir — energický) a Dobrodružná vypravěčka (Leda — mladá, dynamická) s hravou dobrodružnou režií přednesu

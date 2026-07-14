@@ -1993,6 +1993,12 @@ button:disabled {
   gap: 0.6rem;
 }
 
+/* kompaktnější potvrzení v dialozích (velké OK zabíralo zbytečně místo) */
+.app-confirm-btns button {
+  padding: 0.55rem 1rem;
+  font-size: 0.95rem;
+}
+
 /* Doplňující otázka Clauda při nastudování vlastního světa */
 .world-question {
   color: #fbbf24;
@@ -3264,10 +3270,15 @@ textarea.ta-accent:focus {
 
 .job-seg-x:active { background: rgba(220, 38, 38, 0.8); }
 
-/* 📋 deník běhu — druhé kolečko pod ✕ v pravém rohu jobu */
+/* 📋 deník běhu — VĚTŠÍ tlačítko pod ✕ (deník je hlavní diagnostika) */
 .job-seg-log {
-  top: 26px;
-  font-size: 0.6rem;
+  top: 25px;
+  width: 30px;
+  height: 30px;
+  font-size: 0.95rem;
+  line-height: 30px;
+  background: rgba(124, 77, 255, 0.75);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
 }
 
 .job-seg-log:active { background: rgba(124, 77, 255, 0.8); }

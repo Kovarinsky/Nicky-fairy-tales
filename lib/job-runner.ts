@@ -511,6 +511,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       // 4K arch generuje ~stejně dlouho jako jedna 1K scéna, sériově to byla
       // zbytečná minuta navíc). Max 2 vlny; vlna bez jediného nového panelu
       // ukončuje archovou fázi (pojistka proti smyčce archů).
+      let prevRoundReports = ""; // výtky z 1. vlny → 2. vlna kreslí s korekcí
       for (let round = 1; round <= 2 && !quotaExhausted && !timeUp() && !budgetBlown(); round++) {
         const pend = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
         if (pend.length < 2) break;
@@ -522,13 +523,15 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         st.imgSpent = spentNow();
         logEv(`🗂️ kreslím ${groups.length > 1 ? `${groups.length} archy paralelně` : "arch"} (${groups.map(g => g.length).join("+")} scén)`);
         await write(); // heartbeat před dlouhým generováním
+        const roundReports: string[] = [];
         await Promise.all(groups.map(async group => {
           const tSheet = Date.now();
           try {
             const groupText = group.map(i => `${scenesScript[i].imagePrompt} ${scenesScript[i].narration}`).join(" ");
             const groupRefs = refsFor(groupText);
             const refs = anchor ? [...groupRefs, anchor] : groupRefs;
-            const { results, report } = await generateSceneSheet(group.map(i => scenesScript[i]), heroDescription, refs);
+            const { results, report } = await generateSceneSheet(group.map(i => scenesScript[i]), heroDescription, refs, prevRoundReports);
+            if (report) roundReports.push(report);
             const passed = results.filter(Boolean).length;
             logEv(`🗂️ arch (${group.length} scén) hotový za ${secsSince(tSheet)}s (prošlo ${passed}/${group.length})${report ? ` — ${report.slice(0, 200)}` : ""}`);
             // panely se ukládají paralelně (sériově to stálo ~2–4 s na arch)
@@ -554,6 +557,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           logEv("🗂️ archy nepřinesly žádný nový panel → zbytek jde sólo cestou");
           break;
         }
+        prevRoundReports = roundReports.join(" | ");
       }
     }
 
