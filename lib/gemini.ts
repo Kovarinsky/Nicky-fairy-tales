@@ -249,7 +249,7 @@ async function verifySceneImage(
               "6) Dressing level is UNIFORM for the scene: no winter coat next to a T-shirt; indoors without jackets/hats; never summer clothes in snow.",
               "7) BODY PROPORTIONS: children child-sized, adults adult-sized, relative heights per the 'Heights:' entry.",
               "8) ANATOMY: exactly two arms, two legs, five fingers per hand, natural faces; bicycles have two wheels.",
-              "9) KEY OBJECTS identical to their sheet entry — the same vehicle/boat/toy type and colors as stated.",
+              "9) KEY OBJECTS identical to their sheet entry — the same vehicle/boat/toy type and colors as stated. Each key object appears EXACTLY ONCE — two copies of the same boat/lighthouse/vehicle in one image = FAIL (unless the scene explicitly says otherwise).",
               "10) NO text, letters, numbers, watermarks or signatures anywhere in the image.",
               "11) FRAMING: nothing important is CUT OFF by the image edges — no cropped heads or faces, no half-cut characters, and no key objects (boat, vehicle, building, the moon…) sliced by the border. Background scenery may naturally continue past the edge.",
               "Minor painterly variation is fine — but violations of the rules above are NEVER minor.",
@@ -257,7 +257,15 @@ async function verifySceneImage(
             ].join("\n") },
           ],
         }],
-        generationConfig: { maxOutputTokens: 500, responseMimeType: "application/json" },
+        // thinkingBudget 0 je KRITICKÝ: gemini-2.5-flash jinak „přemýšlí"
+        // ~475 tokenů z limitu a verdikt se UTRHNE (finish=MAX_TOKENS) —
+        // kontrola pak tiše neběžela a vadné obrázky procházely neověřené.
+        // (jen pro 2.5 — jiné verify modely parametr neznají a vrátily by 400)
+        generationConfig: {
+          maxOutputTokens: 700,
+          responseMimeType: "application/json",
+          ...(VERIFY_MODEL.includes("2.5") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+        },
       });
       const data = JSON.parse(raw) as { candidates?: GeminiCandidate[] };
       const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
@@ -268,7 +276,8 @@ async function verifySceneImage(
       let problems = String(v.problems || "").slice(0, 400);
       // Pojistka: inspektor vyjmenoval osobu, kterou nepřiřadil k žádné
       // postavě (UNKNOWN) — cizí člověk v obraze, i kdyby dal ok:true
-      if (ok && Array.isArray(v.people) && v.people.some(p => /unknown|stranger/i.test(String(p)))) {
+      // (osoby smí být řetězce i objekty {name: …} — kontrola přes JSON)
+      if (ok && Array.isArray(v.people) && /unknown|stranger/i.test(JSON.stringify(v.people))) {
         ok = false;
         problems = "rule 1: an unmatched person (stranger/extra figure) is present";
       }
@@ -320,7 +329,7 @@ function buildAppearanceLock(heroDescription: string): { open: string; close: st
     open: [
       `⚠ APPEARANCE LOCK — IMMUTABLE across every image in this story:`,
       heroDescription,
-      `Every named character MUST look IDENTICAL to this description in EVERY image: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes — AND the same AGE, same BODY SIZE and PROPORTIONS. Relative heights between characters NEVER change: a toddler stays toddler-sized, a child stays child-sized, adults stay adult-sized. Any recurring OBJECT listed above (vehicle, magic item, toy) keeps IDENTICAL type, shape and colors in every scene — the same car stays the same car. These are LOCKED — do NOT change anything between scenes.`,
+      `Every named character MUST look IDENTICAL to this description in EVERY image: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes — AND the same AGE, same BODY SIZE and PROPORTIONS. Relative heights between characters NEVER change: a toddler stays toddler-sized, a child stays child-sized, adults stay adult-sized. Any recurring OBJECT listed above (vehicle, magic item, toy) keeps IDENTICAL type, shape and colors in every scene — the same car stays the same car, and each key object exists ONCE in the world: NEVER draw two copies of it in one image. These are LOCKED — do NOT change anything between scenes.`,
       `If 'Story outfits:' defines outdoor/indoor variants, draw the variant stated at the end of the scene description — and ALL characters in the scene share the SAME dressing level (never one in a winter coat while another wears a T-shirt).`,
       `ONLY the characters named in the scene are visible — zero additional people, strangers, or background human figures. Each named character appears EXACTLY ONCE in the image — NEVER draw two copies of the same person.`,
       `IDENTITIES ARE SEPARATE: characters who look similar (two adult men, two adult women, two boys) are DIFFERENT people — NEVER merge them, swap them, or mix their features. Each keeps their OWN hair, face, build and signature clothing exactly as listed. A reference portrait may ONLY be used for the character it belongs to.`,
