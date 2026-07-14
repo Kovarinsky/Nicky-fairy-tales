@@ -991,16 +991,24 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [ctrlsOpen, viewMode]);
 
-  // Re-run layout-dependent effects when the device rotates (portrait ⇄ landscape)
+  // Re-run layout-dependent effects when the device rotates (portrait ⇄
+  // landscape) — ALE i vstup/výstup z fullscreen a obyčejný resize mění
+  // zobrazenou šířku obrázku (tablet skryje/zobrazí lišty prohlížeče beze
+  // změny orientace), takže titulkový pruh zůstával spočítaný na starou
+  // (užší) šířku, dokud se nezměnila orientace
   const [orientTick, setOrientTick] = useState(0);
   useEffect(() => {
     const onChange = () => setOrientTick(o => o + 1);
     const mq = window.matchMedia("(orientation: landscape)");
     mq.addEventListener("change", onChange);
     window.addEventListener("orientationchange", onChange);
+    window.addEventListener("resize", onChange);
+    document.addEventListener("fullscreenchange", onChange);
     return () => {
       mq.removeEventListener("change", onChange);
       window.removeEventListener("orientationchange", onChange);
+      window.removeEventListener("resize", onChange);
+      document.removeEventListener("fullscreenchange", onChange);
     };
   }, []);
 
@@ -1625,11 +1633,13 @@ export default function Home() {
   // Před sdílením/exportem se chybějící namluvení doplní — odeslaná pohádka
   // („hotový odsouhlasený příběh") je vždy kompletní i s hlasem
   async function fillMissingAudio(
-    entry: HistoryEntry,
+    id: string,
+    entryScenes: Scene[],
     media: Array<{ imageUrl?: string; audioUrl?: string }>,
-    onProgress?: (done: number, total: number) => void
+    onProgress?: (done: number, total: number) => void,
+    voiceIdOverride?: string
   ): Promise<void> {
-    const missing = entry.scenes.map((s, i) => (!media[i]?.audioUrl && s.narration ? i : -1)).filter(i => i >= 0);
+    const missing = entryScenes.map((s, i) => (!media[i]?.audioUrl && s.narration ? i : -1)).filter(i => i >= 0);
     if (missing.length === 0) return;
     let done = 0;
     let idx = 0;
@@ -1637,7 +1647,7 @@ export default function Home() {
       while (idx < missing.length) {
         const i = missing[idx++];
         try {
-          const s = entry.scenes[i];
+          const s = entryScenes[i];
           const res = await fetch("/api/scene", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1645,7 +1655,7 @@ export default function Home() {
             body: JSON.stringify({
               scene: { index: s.index, narration: s.narration, imagePrompt: s.imagePrompt || "x" },
               audioOnly: true,
-              voiceId: selectedVoiceId || undefined,
+              voiceId: voiceIdOverride ?? (selectedVoiceId || undefined),
               deviceId: deviceId(),
             }),
           });
@@ -1657,7 +1667,7 @@ export default function Home() {
       }
     };
     await Promise.all(Array.from({ length: Math.min(2, missing.length) }, worker));
-    cacheStory(entry.id, entry.scenes.map((s, i) => ({ ...s, ...(media[i] || {}) })) as RenderedScene[]).catch(() => {});
+    cacheStory(id, entryScenes.map((s, i) => ({ ...s, ...(media[i] || {}) })) as RenderedScene[]).catch(() => {});
   }
 
   // Před sdílením/exportem dokreslit i chybějící obrázky (líná větev B) —
@@ -1926,6 +1936,9 @@ export default function Home() {
     if (entryId && complete) {
       try { localStorage.removeItem(JOB_KEY); } catch {}
       try { sessionStorage.removeItem("nicky-stall-reload"); } catch {}
+      // 🔌 Namluvit VŠECHNY stránky HNED, dokud je internet — jinak by
+      // pohádka otevřená offline neměla žádný zvuk (hlas je jinak líný)
+      fillMissingAudio(entryId, scriptScenes, localScenes, undefined, voiceId).catch(() => {});
     }
     setStalled(false);
 
@@ -2059,6 +2072,10 @@ export default function Home() {
     renderedMapRef.current.set(jobId, rendered);
     cacheStory(jobId, rendered).catch(() => {});
     evictOldStories(loadHistory().map(e => e.id)).catch(() => {});
+    // 🔌 Namluvit VŠECHNY stránky HNED, dokud je internet — hlas se jinak
+    // vyrábí líně až při čtení, takže pohádka otevřená offline (bez signálu)
+    // by neměla žádný zvuk. Běží na pozadí, nic neblokuje.
+    fillMissingAudio(jobId, script, rendered, undefined, st.voiceId).catch(() => {});
     // Job row → „hotová ▶ Otevřít"; the finished story is no longer persisted
     // as a pending job (it lives in history + IndexedDB now)
     updateServerJob(jobId, {
@@ -3022,7 +3039,7 @@ export default function Home() {
       // Doplnit chybějící obrázky (líná větev B) a namluvení (líný hlas) —
       // sdílená pohádka je kompletní včetně obou konců
       await fillMissingImages(entry, mediaArr, (d, tot) => setShareProg({ done: d, total: tot }));
-      await fillMissingAudio(entry, mediaArr, (d, tot) => setShareProg({ done: d, total: tot }));
+      await fillMissingAudio(entry.id, entry.scenes, mediaArr, (d, tot) => setShareProg({ done: d, total: tot }));
       setShareProg({ done: 0, total });
       // Nahrát s pamětí: co už jednou prošlo, se znovu nenahrává
       async function uploadCached(kind: "img" | "aud", i: number, dataUrl: string): Promise<string> {

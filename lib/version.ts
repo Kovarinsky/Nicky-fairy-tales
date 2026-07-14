@@ -1,6 +1,7 @@
-export const APP_VERSION = "4.01";
+export const APP_VERSION = "4.02";
 
 // Changelog (newest first)
+// 4.02 - 🔌 HLAS FUNGUJE OFFLINE: namluvení se dřív vyrábělo LÍNĚ až při čtení — pohádka otevřená bez signálu (tablet v autě, letadlo) tak neměla žádný zvuk, i když si ji uživatel stáhl dopředu; appka teď namluví VŠECHNY stránky hned po dokončení generování, dokud je internet (běží na pozadí, nic neblokuje) — jednou stažená pohádka pak přehraje hlas i úplně offline; 📐 OPRAVA titulkového pruhu na tabletu ve fullscreenu: pruh se přeměřoval jen při změně orientace, ale vstup do fullscreen/změna velikosti okna umí zobrazenou šířku obrázku změnit i beze změny orientace — pruh teď reaguje i na resize a fullscreenchange (čtečka i přehrávač poslané pohádky)
 // 4.01 - ⌨️ OVLÁDÁNÍ KLÁVESNICÍ: čtečka i přehrávač poslané pohádky reagují na systémové klávesy — ←/→ (i PageUp/PageDown z prezentérů) listují, MEZERNÍK přehraje/pozastaví vyprávění, Esc mimo fullscreen vede Domů; 🎧 MEDIA SESSION: hardwarové mediální klávesy (▶⏸⏮⏭ na klávesnici, sluchátkách i zamčené obrazovce telefonu) ovládají vyprávění a listování a systém ukazuje název pohádky se stránkou jako u přehrávače hudby
 // 4.00 - ⏱ Čas přípravy u POSLANÉ pohádky: pohádka uložená do historie z odkazu neměla odznak ⏱ (délka přípravy se do sdílených dat neposílala) — publikace nově nese prepSec/writeSec i PŮVODNÍ datum vytvoření a příjemce je vidí v historii jako u vlastních pohádek
 // 3.99 - 📤 Přehrávač poslané pohádky dotažen: titulkový pruh drží ŠÍŘKU OBRÁZKU (ne celé karty), nové tlačítko 🏠 DOMŮ vede do hlavního menu a zaslaná pohádka se ukládá do HISTORIE appky (text + offline cache obrázků a hlasu) — příjemce ji pak najde v menu jako každou jinou pohádku

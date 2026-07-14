@@ -63,6 +63,16 @@ export default function SharedStoryPage() {
     if (isPlaying) setRollTick(t => t + 1);
   }, [isPlaying]);
 
+  // Přeměřit i na obyčejný resize (ne jen orientaci/fullscreen) — tablet umí
+  // změnit zobrazenou šířku obrázku (skrytí/zobrazení lišt prohlížeče) beze
+  // změny orientace, jinak zůstal pruh spočítaný na starou (užší) šířku
+  const [resizeTick, setResizeTick] = useState(0);
+  useEffect(() => {
+    const onResize = () => setResizeTick(t => t + 1);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   // Titulkový pruh drží ŠÍŘKU OBRÁZKU (v max režimu je obrázek letterboxovaný
   // užší než karta — pruh přes celou kartu vypadal rozbitě)
   useEffect(() => {
@@ -79,7 +89,7 @@ export default function SharedStoryPage() {
       body.style.marginLeft = "";
       body.style.marginRight = "";
     }
-  }, [shareMax, page, story, rollTick, isLs, isFs]);
+  }, [shareMax, page, story, rollTick, isLs, isFs, resizeTick]);
 
   // 💾 Zaslaná pohádka se uloží do HISTORIE appky (localStorage + offline
   // cache médií) — příjemce ji pak najde v hlavním menu jako každou jinou
