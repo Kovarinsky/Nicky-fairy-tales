@@ -252,6 +252,7 @@ async function verifySceneImage(
               "9) KEY OBJECTS identical to their sheet entry — the same vehicle/boat/toy type and colors as stated. Each key object appears EXACTLY ONCE — two copies of the same boat/lighthouse/vehicle in one image = FAIL (unless the scene explicitly says otherwise).",
               "10) NO text, letters, numbers, watermarks or signatures anywhere in the image.",
               "11) FRAMING: nothing important is CUT OFF by the image edges — no cropped heads or faces, no half-cut characters, and no key objects (boat, vehicle, building, the moon…) sliced by the border. Background scenery may naturally continue past the edge.",
+              "12) SETTING: if the sheet contains a 'World & setting lock', the scene's venue must MATCH it — e.g. a football match happens ON a proper pitch with lines and goals (never on a river bank), a named real person looks like the described HUMAN.",
               "Minor painterly variation is fine — but violations of the rules above are NEVER minor.",
               'Reply with ONLY JSON. ALWAYS include a "people" audit — list every visible person as "<who you matched them to or UNKNOWN>". Passing image: {"people":["Nicolas","Valentýna"],"ok":true}. Failing image: {"people":[...],"ok":false,"rules":[<numbers of violated rules>],"problems":"<max 60 words: per violated rule a short English reason>"}. Any UNKNOWN in people means rule 1 failed.',
             ].join("\n") },

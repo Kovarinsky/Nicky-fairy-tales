@@ -60,6 +60,9 @@ export interface StoryScript {
   title: string;
   /** Krátký popis vzhledu hrdiny pro konzistenci napříč obrázky */
   heroDescription: string;
+  /** 📖 Story Bible: fakta světa příběhu (prostředí, reálné reálie, kulisy) —
+      anglicky; připojuje se k heroDescription, aby platila v každém obrázku */
+  worldNotes?: string;
   scenes: Scene[];
   /** 🔀 Dva konce: scenes = společný děj + konec A; altScenes = konec B.
       Poslední společná scéna (afterScene) končí otázkou na posluchače. */

@@ -100,6 +100,13 @@ function buildSystemPrompt(language: string): string {
       "- Do not add style directions (Disney/storybook style is appended automatically).",
       "- No age numbers or age-specific terms.",
       "",
+      "═══ STORY BIBLE (worldNotes) — study the world BEFORE writing ═══",
+      "Add a top-level field \"worldNotes\" (ENGLISH, max 110 words): a factual guide to THIS story's world that every scene and every illustration must respect.",
+      "- (1) SETTING LOCK: describe the recurring venue(s) EXACTLY and keep them consistent (e.g. 'matches take place ON a green grass football pitch with white painted lines and two goals with white nets, small stands beside it; the river is visible BEYOND the pitch — never as the playing surface'). Every scene that logically happens at that venue must name it in its imagePrompt.",
+      "- (2) REAL-WORLD CORRECTNESS: apply how the activity really looks and works (a football match has TWO teams in clearly DIFFERENT kits, a referee, opponents ON the pitch, one round ball; a hospital has doctors in scrubs…). Match/competition scenes MUST include the opponents as a background group.",
+      "- (3) REAL PEOPLE mentioned by name (athletes, celebrities — e.g. Lionel Messi) are real HUMAN BEINGS: give each a full HUMAN entry in heroDescription (hair, face, kit, build) like any other character. NEVER draw a literal pun on a name — Messi is a man, not a lion.",
+      "- (4) CINEMATOGRAPHY: vary the camera across scenes like a good documentary — wide establishing shot, action close-up, over-the-shoulder, celebration crowd shot — while the venue and characters stay identical.",
+      "",
       "═══ SOUNDSCAPE ═══",
       "Every scene has a `soundscape` – choose based on scene mood (REQUIRED):",
       '  "magic"     — spells, magic, fairies, wonders, enchanted objects',
@@ -112,7 +119,7 @@ function buildSystemPrompt(language: string): string {
       "Reply with ONLY valid RFC 8259 JSON — no markdown, no code fences, no // comments, no trailing commas.",
       "Required fields per scene: index (number), narration (string), imagePrompt (string), soundscape (one of the 5 values).",
       "Compact example structure (fill in real content):",
-      '{"title":"...","heroDescription":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"forest"}]}',
+      '{"title":"...","heroDescription":"...","worldNotes":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"forest"}]}',
     ].join("\n");
   }
 
@@ -173,6 +180,13 @@ function buildSystemPrompt(language: string): string {
     "- Nepřidávej stylové pokyny (Disney/storybook styl se připojuje automaticky).",
     "- Žádné věkové číslice ani věkově specifické výrazy.",
     "",
+    "═══ STORY BIBLE (worldNotes) — nastuduj svět PŘED psaním ═══",
+    "Přidej pole \"worldNotes\" (ANGLICKY, max 110 slov): faktický průvodce světem TÉTO pohádky, který musí respektovat každá scéna i každý obrázek.",
+    "- (1) ZÁMEK PROSTŘEDÍ: přesně popiš opakující se dějiště a drž ho konzistentní (např. 'matches take place ON a green grass football pitch with white painted lines and two goals with white nets, small stands beside it; the river is visible BEYOND the pitch — never as the playing surface'). Každá scéna, která se tam logicky odehrává, MUSÍ dějiště jmenovat ve svém imagePromptu.",
+    "- (2) REÁLNÁ SPRÁVNOST: uplatni, jak činnost doopravdy vypadá a funguje (fotbalový zápas má DVA týmy ve zřetelně JINÝCH dresech, rozhodčího, protihráče NA hřišti, jeden kulatý míč; nemocnice má lékaře v pláštích…). Zápasové/soutěžní scény MUSÍ obsahovat soupeře jako skupinu v pozadí.",
+    "- (3) SKUTEČNÍ LIDÉ zmínění jménem (sportovci, celebrity — např. Lionel Messi) jsou skuteční LIDÉ: dej každému plný LIDSKÝ záznam v heroDescription (vlasy, tvář, dres, postava) jako každé jiné postavě. NIKDY nekresli doslovnou hříčku ze jména — Messi je člověk, ne lev.",
+    "- (4) KAMERA: střídej záběry napříč scénami jako dobrý dokument — široký ustavující záběr, akční detail, přes rameno, oslavný záběr s davem — dějiště a postavy přitom zůstávají identické.",
+    "",
     "═══ SOUNDSCAPE ═══",
     "Každá scéna má `soundscape` – vyberte podle nálady scény (POVINNÉ):",
     '  "magic"     — kouzla, magie, víly, zázraky, kouzelné předměty',
@@ -185,7 +199,7 @@ function buildSystemPrompt(language: string): string {
     "Odpověz POUZE validním RFC 8259 JSON — bez markdown, bez ``` obalení, bez // komentářů, bez trailing čárek.",
     "Povinné pole na každou scénu: index (číslo), narration (string), imagePrompt (string), soundscape (jedna z 5 hodnot).",
     "Příklad struktury (vyplň reálným obsahem):",
-    '{"title":"...","heroDescription":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"forest"}]}',
+    '{"title":"...","heroDescription":"...","worldNotes":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"forest"}]}',
   ].join("\n");
 }
 
@@ -838,6 +852,11 @@ export async function generateStory(
       // doslova z reference/characters.json, ať Claude napsal cokoliv.
       // (Řeší „jednou blond, podruhé hnědé vlasy" mezi pohádkami.)
       script.heroDescription = enforceCanonicalAppearance(script.heroDescription || "", req, extras);
+      // 📖 Story Bible: zámek prostředí a reálií se PŘIPOJÍ k heroDescription —
+      // poteče tak automaticky do zámku vzhledu, archů i kontroly každého obrázku
+      if (script.worldNotes && typeof script.worldNotes === "string") {
+        script.heroDescription = `${script.heroDescription} | World & setting lock: ${script.worldNotes.slice(0, 700)}`;
+      }
       return script;
     } catch (e) {
       if (attempt === 2) throw e;
@@ -860,12 +879,15 @@ export async function generateStory(
 export function peekEarlyScene(partial: string): { heroDescription: string; scene: Scene } | null {
   try {
     const hd = /"heroDescription"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(partial);
+    const wn = /"worldNotes"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(partial);
     const na = /"narration"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(partial);
     const ip = /"imagePrompt"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(partial);
     const sc = /"soundscape"\s*:/.exec(partial);
     if (!hd || !na || !ip || !sc) return null;
     const un = (s: string) => JSON.parse(`"${s}"`) as string;
-    const heroDescription = un(hd[1]);
+    let heroDescription = un(hd[1]);
+    // 📖 Story Bible poteče i do ranného kreslení scény 1
+    if (wn) heroDescription = `${heroDescription} | World & setting lock: ${un(wn[1]).slice(0, 700)}`;
     const narration = un(na[1]);
     const imagePrompt = un(ip[1]);
     if (!heroDescription || !narration || !imagePrompt) return null;

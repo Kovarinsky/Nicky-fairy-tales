@@ -1,6 +1,7 @@
-export const APP_VERSION = "3.92";
+export const APP_VERSION = "3.93";
 
 // Changelog (newest first)
+// 3.93 - 📖 STORY BIBLE — vypravěč povinně „nastuduje svět" PŘED psaním (pole worldNotes): (1) ZÁMEK PROSTŘEDÍ (zápas se hraje NA hřišti s lajnami a brankami, řeka smí být jen ZA ním), (2) reálná správnost (dva týmy v RŮZNÝCH dresech, rozhodčí, soupeři na hřišti), (3) skuteční lidé jsou LIDÉ s plným lidským záznamem (Messi je člověk, ne lev), (4) dokumentární střídání záběrů; bible se připojuje k zámku vzhledu → platí v KAŽDÉM obrázku, archu, ranném kreslení i v kontrole (nové pravidlo 12: dějiště musí odpovídat zámku prostředí)
 // 3.92 - ⚽ SKUPINY V POZADÍ povolené (z 📋 deníku: fotbalová pohádka padala na „two identical Kicker characters" a arch prošel 1/9 — týmové scény přirozeně potřebují spoluhráče): psaní smí výslovně přidat skupinu v pozadí („other players of both teams in the background"), kreslení ji maluje jako malé vzdálené postavy nepodobné hrdinům a kontrola ji NEpočítá do přesného počtu (hlásí ji jako group:…); 2. vlna archů se kreslí S KOREKCÍ z výtek 1. vlny (dřív stejný prompt naslepo znovu); UI: menší OK v dialozích, VĚTŠÍ tlačítko 📋 deníku u jobu
 // 3.91 - 🟠 JEDNOTNÁ BARVA POTVRZENÍ: všechna potvrzovací tlačítka napříč appkou jsou ORANŽOVÁ („✓ Hotovo" v panelech, OK v dialozích, ✓ OK ve velkých editorech, Uložit svět/postavu…) a rušení je nově neutrální tmavé sklo — dřív byl oranžový naopak Zrušit a pletlo se, co je souhlas
 // 3.90 - 🙈 Odebírání hlasů: KAŽDÝ vestavěný hlas (vč. testovacích a filmových prototypů) jde × odebrat z výběru — skryje se na tomto zařízení a tlačítko „↺ Obnovit odebrané hlasy (N)" ho kdykoli vrátí; skrytý hlas se nepoužije ani v automatice; klony a vymyšlené hlasy dál × mažou doopravdy (i u ElevenLabs)
