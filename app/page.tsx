@@ -1371,6 +1371,58 @@ export default function Home() {
     setSlideKey(k => k + 1);
   }, [scenes.length]);
 
+  // ⌨️ Systémové klávesy ve čtečce: ←/→ (i PageUp/PageDown z prezentérů)
+  // listují, MEZERNÍK přehraje/pozastaví, Esc mimo fullscreen vede Domů
+  useEffect(() => {
+    if (viewMode !== "reader") return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (e.key === "ArrowRight" || e.key === "PageDown") {
+        e.preventDefault();
+        if (nextVisible !== null) goToPage(nextVisible);
+      } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+        e.preventDefault();
+        if (prevVisible !== null) goToPage(prevVisible);
+      } else if (e.key === " " || e.code === "Space") {
+        e.preventDefault(); // jinak mezerník scrolluje stránku
+        togglePlay();
+      } else if (e.key === "Escape" && !document.fullscreenElement) {
+        // fullscreen si Esc odbaví prohlížeč sám; mimo něj = Domů
+        resetToForm();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  // 🎧 Media Session: hardwarové mediální klávesy (▶⏸⏮⏭ na klávesnici,
+  // sluchátkách i zámčené obrazovce) ovládají vyprávění a listování
+  useEffect(() => {
+    if (viewMode !== "reader" || !("mediaSession" in navigator)) return;
+    const ms = navigator.mediaSession;
+    try {
+      ms.metadata = new MediaMetadata({
+        title: `${title} — ${pagePos + 1}/${visiblePages.length}`,
+        artist: uiLang === "en" ? "Nicky's Fairy Tales" : "Nickyho pohádky",
+      });
+    } catch {}
+    try {
+      ms.setActionHandler("play", () => audioRef.current?.play().catch(() => {}));
+      ms.setActionHandler("pause", () => audioRef.current?.pause());
+      ms.setActionHandler("nexttrack", () => { if (nextVisible !== null) goToPage(nextVisible); });
+      ms.setActionHandler("previoustrack", () => { if (prevVisible !== null) goToPage(prevVisible); });
+    } catch {}
+    return () => {
+      try {
+        ms.setActionHandler("play", null);
+        ms.setActionHandler("pause", null);
+        ms.setActionHandler("nexttrack", null);
+        ms.setActionHandler("previoustrack", null);
+      } catch {}
+    };
+  });
+
   function handleAudioEnded() {
     setIsPlaying(false);
     // 🔀 Konec společného děje — místo otáčení stránky se ukáže výběr konce

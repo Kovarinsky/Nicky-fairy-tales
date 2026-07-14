@@ -138,6 +138,50 @@ export default function SharedStoryPage() {
     return () => cancelAnimationFrame(raf);
   }, [page, branch, shareMax, rollTick, story]);
 
+  // ⌨️ Systémové klávesy: ←/→ (i PageUp/PageDown) listují, MEZERNÍK
+  // přehraje/pozastaví — stejně jako čtečka v appce
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (e.key === "ArrowRight" || e.key === "PageDown") {
+        e.preventDefault();
+        go(nextIdx);
+      } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+        e.preventDefault();
+        go(prevIdx);
+      } else if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        togglePlay();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  // 🎧 Media Session: hardwarové mediální klávesy ovládají i poslanou pohádku
+  useEffect(() => {
+    if (!story || !("mediaSession" in navigator)) return;
+    const ms = navigator.mediaSession;
+    try {
+      ms.metadata = new MediaMetadata({ title: `${story.title} — ${pos + 1}/${visible.length}`, artist: "Nickyho pohádky" });
+    } catch {}
+    try {
+      ms.setActionHandler("play", () => { isAutoRef.current = true; audioRef.current?.play().then(() => setIsPlaying(true)).catch(() => {}); });
+      ms.setActionHandler("pause", () => { audioRef.current?.pause(); setIsPlaying(false); });
+      ms.setActionHandler("nexttrack", () => go(nextIdx));
+      ms.setActionHandler("previoustrack", () => go(prevIdx));
+    } catch {}
+    return () => {
+      try {
+        ms.setActionHandler("play", null);
+        ms.setActionHandler("pause", null);
+        ms.setActionHandler("nexttrack", null);
+        ms.setActionHandler("previoustrack", null);
+      } catch {}
+    };
+  });
+
   function enterFs() {
     if (!document.fullscreenElement) mainRef.current?.requestFullscreen?.().catch(() => {});
   }
