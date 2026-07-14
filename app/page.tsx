@@ -47,6 +47,7 @@ const CUSTOM_THEMES_KEY = "nicky-custom-themes";
 const JOB_KEY = "nicky-pending-job";
 const VOICE_PREF_KEY = "nicky-voice-pref";
 const AGE_PREF_KEY = "nicky-age-pref";       // ruční věkové pásmo ("auto" = podle vybraných postav)
+const HIDDEN_VOICES_KEY = "nicky-hidden-voices"; // vestavěné hlasy odebrané × (na tomto zařízení)
 const SERVER_JOB_KEY = "nicky-server-job";
 const HISTORY_MAX = 20; // offline zásoba: posledních 20 pohádek v telefonu
 const SETTINGS_KEY = "nicky-settings";
@@ -383,6 +384,25 @@ export default function Home() {
     try { localStorage.setItem(VOICE_PREF_KEY, id); } catch {}
   }
 
+  // 🙈 Odebrané vestavěné hlasy: × je skryje NA TOMTO ZAŘÍZENÍ (testovací
+  // hlasy jdou uklidit), ↺ je kdykoli vrátí; klony/vymyšlené mažou doopravdy
+  const [hiddenVoices, setHiddenVoices] = useState<string[]>([]);
+  useEffect(() => {
+    try { const h = localStorage.getItem(HIDDEN_VOICES_KEY); if (h) setHiddenVoices(JSON.parse(h)); } catch {}
+  }, []);
+  function hideVoice(id: string) {
+    setHiddenVoices(p => {
+      const next = [...new Set([...p, id])];
+      try { localStorage.setItem(HIDDEN_VOICES_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+    if (voicePref === id) pickVoice("auto");
+  }
+  function restoreHiddenVoices() {
+    setHiddenVoices([]);
+    try { localStorage.removeItem(HIDDEN_VOICES_KEY); } catch {}
+  }
+
   // 👶🧒👦 Věkové pásmo vyprávění: auto (podle postav) nebo ručně — řídí
   // věkový profil promptu (délka vět, slovník, napětí, hloubka)
   const AGE_BANDS: Array<{ id: string; age: number; label: string }> = [
@@ -400,14 +420,15 @@ export default function Home() {
     try { localStorage.setItem(AGE_PREF_KEY, id); } catch {}
   }
   useEffect(() => {
+    const visible = voices.filter(v => !hiddenVoices.includes(v.id));
     if (voicePref !== "auto") {
-      if (voices.some(v => v.id === voicePref)) { setSelectedVoiceId(voicePref); return; }
-      if (voices.length > 0) pickVoice("auto"); // vybraný hlas zmizel (smazaný klon)
+      if (visible.some(v => v.id === voicePref)) { setSelectedVoiceId(voicePref); return; }
+      if (voices.length > 0) pickVoice("auto"); // vybraný hlas zmizel (smazaný/skrytý)
     }
-    const match = voices.find(v => v.language === uiLang);
+    const match = visible.find(v => v.language === uiLang);
     if (match) setSelectedVoiceId(match.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voices, uiLang, voicePref]);
+  }, [voices, uiLang, voicePref, hiddenVoices]);
 
   // 🎙️ Klon rodičovského hlasu — nahrání, vytvoření, ukázka, smazání
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -3589,7 +3610,8 @@ export default function Home() {
                     Hlasy jsou seskupené podle jazyka (jazyk hlasu = jazyk
                     pohádky v automatice); klony a vymyšlené jsou na konci */}
                 {(["cs", "en", "hr", "da", "sk", "any"] as const).flatMap(gl => {
-                  const group = voices.filter(v => (v.kind ? gl === "any" : (v.language === gl || (gl === "any" && !isStoryLang(v.language)))));
+                  const group = voices.filter(v => !hiddenVoices.includes(v.id)
+                    && (v.kind ? gl === "any" : (v.language === gl || (gl === "any" && !isStoryLang(v.language)))));
                   if (group.length === 0) return [];
                   const meta = STORY_LANGS.find(x => x.code === gl);
                   const head = meta
@@ -3612,15 +3634,25 @@ export default function Home() {
                       onClick={e => { e.stopPropagation(); if (v.kind === "clone") deleteClone(v.id); else deleteDesigned(v.id); }}>×</button>
                   </div>
                 ) : (
-                  <button type="button" key={v.id} className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
-                    onClick={() => { pickVoice(v.id); testVoice(v.id); }}>
+                  /* vestavěný hlas: × ho skryje na tomto zařízení (↺ vrátí) */
+                  <div key={v.id} role="button" tabIndex={0}
+                    className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
+                    onClick={() => { pickVoice(v.id); testVoice(v.id); }}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { pickVoice(v.id); testVoice(v.id); } }}>
                     <span className="folk-emoji">{v.emoji}</span>
                     <span>{vName}</span>
                     <span className="voice-play" aria-hidden>{playIcon}</span>
-                  </button>
+                    <button type="button" className="chip-remove folk-remove" aria-label={t.voiceHide}
+                      onClick={e => { e.stopPropagation(); hideVoice(v.id); }}>×</button>
+                  </div>
                 );})];
                 })}
               </div>
+              {hiddenVoices.length > 0 && (
+                <button type="button" className="chip chip-btn chip-full" onClick={restoreHiddenVoices}>
+                  ↺ {t.voiceRestore} ({hiddenVoices.length})
+                </button>
+              )}
               {/* hlas = i jazyk pohádky (sloučený výběr) */}
               <p className="gen-step-hint">{t.langHint}</p>
               {recState === "idle" ? (
