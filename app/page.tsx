@@ -1495,6 +1495,9 @@ export default function Home() {
   // zpožděním a smazání hned po fetchi vedlo k duplicitnímu — placenému —
   // namluvení stejné stránky)
   const audioFetchRef = useRef<Set<string>>(new Set());
+  // 🔇 Namluvení selhalo (vyčerpaný kredit, výpadek TTS…) — dřív se chyba
+  // tiše spolkla a Přehrát ukazovalo ⏳ donekonečna; teď se čtenáři ukáže
+  const [audioErr, setAudioErr] = useState<string | null>(null);
   async function ensureAudio(i: number) {
     const s = scenes[i];
     if (!s || s.audioUrl || !s.narration || isPlaceholderImg(s.imageUrl)) return;
@@ -1514,9 +1517,13 @@ export default function Home() {
           deviceId: deviceId(),
         }),
       });
-      const d = await safeJson<{ audioUrl?: string }>(res);
-      if (!res.ok || !d.audioUrl) return;
+      const d = await safeJson<{ audioUrl?: string; error?: string }>(res);
+      if (!res.ok || !d.audioUrl) {
+        setAudioErr(`${t.audioFailed}${d.error ? ` (${String(d.error).slice(0, 180)})` : ""}`);
+        return;
+      }
       ok = true;
+      setAudioErr(null);
       setScenes(prev => {
         const next = [...prev];
         if (!next[i] || next[i].audioUrl) return prev;
@@ -1528,7 +1535,9 @@ export default function Home() {
         }
         return next;
       });
-    } catch {} finally {
+    } catch {
+      setAudioErr(t.audioFailed);
+    } finally {
       // Neúspěch → klíč uvolnit (další pokus povolen); úspěch klíč drží
       if (!ok) audioFetchRef.current.delete(fetchKey);
     }
@@ -4050,6 +4059,18 @@ export default function Home() {
                 <p className="page-text">{current.narration}</p>
               </div>
             </div>
+
+            {/* 🔇 Hlas selhal (kredit/výpadek) — viditelná hláška místo věčného ⏳ */}
+            {readerMode && audioErr && !current.audioUrl && !isPlaceholderImg(current.imageUrl) && (
+              <div className="audio-err" onClick={e => e.stopPropagation()}>
+                <span>{audioErr}</span>
+                <button type="button" className="btn-retry" onClick={() => {
+                  setAudioErr(null);
+                  audioFetchRef.current.delete(`${readerEntryIdRef.current || "x"}:${page}`);
+                  ensureAudio(page);
+                }}>{t.retryAudio}</button>
+              </div>
+            )}
 
             {/* 4 tlačítka: řada na šířku obrázku (portrét) / sloupec na výšku
                 obrázku (fullscreen). Hlas a hudba se nastavují v hlavním menu,

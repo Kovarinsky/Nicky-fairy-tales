@@ -969,6 +969,21 @@ button:disabled {
   background: #14092e;
 }
 
+/* v3.78 zabalil obrázek do .page-image-wrap (kvůli 🖌 tlačítku) — ve flex
+   sloupci karty musí roli obrázku hrát OBAL, jinak rám přeteče přes displej
+   a text s ovládáním skončí pod obrazovkou */
+.reader-mode .page-image-wrap {
+  width: 100%;
+  flex: 0 1 auto;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+}
+.reader-mode .page-image-wrap .page-image {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+}
+
 /* Text box directly UNDER the image on a white background */
 .reader-mode .page-body {
   flex: 0 0 auto;
@@ -1076,13 +1091,23 @@ button:disabled {
 @media (orientation: landscape) {
   /* Uniform 16:9 frame: every scene renders at the same (max) size;
      non-16:9 images are gently cropped to fit instead of shrinking */
-  .reader-mode .page-image {
+  .reader-mode .page-image,
+  .reader-mode .page-image-wrap {
     flex: 1 1 0;
+    min-height: 0;
     aspect-ratio: 16 / 9;
     width: auto;
     max-width: 100%;
     align-self: center;
     object-fit: cover;
+  }
+  /* obrázek uvnitř obalu jen vyplní jeho 16:9 rám */
+  .reader-mode .page-image-wrap .page-image {
+    flex: none;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    align-self: auto;
   }
   /* Landscape (fullscreen): sloupec 4 tlačítek na výšku obrázku; panel
      VYJÍŽDÍ zpoza pravé hrany a zase ZAJEDE */
@@ -1194,6 +1219,28 @@ button:disabled {
 }
 
 .page-image-wrap .page-image { width: 100%; }
+
+/* 🔇 Hlas se nepodařilo namluvit — plovoucí hláška nahoře na kartě čtečky */
+.audio-err {
+  position: absolute;
+  top: 0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: max-content;
+  max-width: min(92%, 540px);
+  padding: 0.45rem 0.7rem;
+  border-radius: 12px;
+  background: rgba(20, 9, 46, 0.92);
+  border: 1px solid rgba(255, 120, 120, 0.5);
+  color: #ffd7d7;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.audio-err .btn-retry { flex-shrink: 0; }
 
 .img-redraw {
   position: absolute;
