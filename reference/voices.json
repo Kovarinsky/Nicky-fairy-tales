@@ -110,5 +110,21 @@
     "emoji": "🎬",
     "description": "Prototyp: epický ženský hlas jako z filmového traileru — zralý, dramatický; mluví česky i anglicky",
     "language": "any"
+  },
+  {
+    "id": "gemini:Fenrir:adventure",
+    "name": "Dobrodružný vypravěč (test)",
+    "nameEn": "Adventure narrator (test)",
+    "emoji": "🌊",
+    "description": "Prototyp: mladistvý, energický a hravý hlas jako z dobrodružného animáku (Vaiana vibe); mluví česky i anglicky",
+    "language": "any"
+  },
+  {
+    "id": "gemini:Leda:adventure",
+    "name": "Dobrodružná vypravěčka (test)",
+    "nameEn": "Adventure narrator — female (test)",
+    "emoji": "🌊",
+    "description": "Prototyp: mladý, dynamický ženský hlas jako z dobrodružného animáku (Vaiana vibe); mluví česky i anglicky",
+    "language": "any"
   }
 ]

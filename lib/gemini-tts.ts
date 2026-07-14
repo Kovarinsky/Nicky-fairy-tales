@@ -23,10 +23,18 @@ const STYLE_BY_LANG: Record<string, string> = {
   sk: "Prečítaj nasledujúci text vrelo a pokojne, ako rozprávač detskej rozprávky pred spaním — s prirodzenými pauzami, otázky opytovacie, zvolania živo. Hovor spisovnou slovenčinou:",
 };
 
-// 🎬 Filmový přednes („hollywood trailer") — prototyp na porovnání stylů
-const MOVIE_STYLE_BY_LANG: Record<string, string> = {
-  cs: "Namluv následující text jako epický filmový vypravěč z hollywoodského traileru — hluboce, dramaticky, s velkolepými pauzami a narůstajícím napětím, přesto vřele a srozumitelně pro děti:",
-  en: "Narrate the following text like an epic Hollywood movie-trailer narrator — deep, dramatic, suspenseful pacing with grand pauses, yet warm and child-friendly:",
+// 🎬🌊 Stylové režie přednesu (přípona v id hlasu, např. „Algenib:movie")
+const EXTRA_STYLES: Record<string, Record<string, string>> = {
+  // hollywoodský trailer — hluboce, dramaticky, velkolepé pauzy
+  movie: {
+    cs: "Namluv následující text jako epický filmový vypravěč z hollywoodského traileru — hluboce, dramaticky, s velkolepými pauzami a narůstajícím napětím, přesto vřele a srozumitelně pro děti:",
+    en: "Narrate the following text like an epic Hollywood movie-trailer narrator — deep, dramatic, suspenseful pacing with grand pauses, yet warm and child-friendly:",
+  },
+  // dobrodružný animák (Vaiana/Moana vibe) — mladistvě, energicky, s vtipem
+  adventure: {
+    cs: "Namluv následující text mladistvě, energicky a hravě, jako charismatický vypravěč dobrodružného animovaného filmu — se švihem, humorem a nakažlivým nadšením, jako kamarád, který právě zažil velké dobrodružství na moři; zvolání živě, napětí se špetkou legrace:",
+    en: "Narrate the following text youthfully, energetically and playfully, like a charismatic narrator of an animated adventure movie — with swagger, humor and infectious enthusiasm, like a friend who just lived through a great ocean adventure; lively exclamations, suspense with a wink:",
+  },
 };
 
 /** Namluví text hlasem Gemini; vrací WAV buffer. Jméno hlasu smí nést
@@ -37,12 +45,12 @@ export async function narrateWithGemini(text: string, voiceName: string): Promis
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
   const segs = voiceName.split(":");
   const name = segs[0];
-  const movie = segs.includes("movie");
+  const styleKey = segs.find(s => EXTRA_STYLES[s]);
   const langHint = segs.find(s => STYLE_BY_LANG[s]);
   const czech = /[ěščřžýáíéůúťďňĚŠČŘŽÝÁÍÉŮÚŤĎŇ]/.test(text);
   const lang = langHint || (czech ? "cs" : "en");
-  const style = movie
-    ? (MOVIE_STYLE_BY_LANG[lang] || MOVIE_STYLE_BY_LANG.en)
+  const style = styleKey
+    ? (EXTRA_STYLES[styleKey][lang] || EXTRA_STYLES[styleKey].en)
     : (STYLE_BY_LANG[lang] || STYLE_BY_LANG.en);
   voiceName = name;
   const res = await fetch(

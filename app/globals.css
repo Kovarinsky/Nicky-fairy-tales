@@ -2369,6 +2369,25 @@ button:disabled {
   transform: translateX(28px);
 }
 
+/* ✓ potvrzovací tlačítko výběrových panelů — křížek jen zavírá,
+   tohle je jasné „hotovo, vybráno" */
+.panel-ok {
+  display: block;
+  width: 100%;
+  margin-top: 0.7rem;
+  padding: 0.7rem;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #7c4dff, #536dfe);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(83, 109, 254, 0.4);
+}
+
+.panel-ok:active { transform: scale(0.98); }
+
 /* ✕ smazání textu — v liště NAD polem vpravo, aby nezakrýval text */
 .ta-wrap {
   position: relative;

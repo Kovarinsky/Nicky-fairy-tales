@@ -3315,6 +3315,7 @@ export default function Home() {
             ))}
           </div>
           <p className="gen-step-hint">{t.bgHoldHint}</p>
+          <button type="button" className="panel-ok" onClick={() => setBgPickerOpen(false)}>✓ {t.okBtn}</button>
         </div>
       )}
 
@@ -3382,6 +3383,7 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
+                <button type="button" className="panel-ok" onClick={() => setCharOpen(false)}>✓ {t.okBtn}</button>
               </div>
             )}
             <div className="chips">
@@ -3499,6 +3501,8 @@ export default function Home() {
                   ))}
                 </div>
                 <p className="gen-step-hint">{t.folkHint}</p>
+                {/* ✓ potvrzení — křížek nahoře jen zavírá, tohle je jasné „hotovo" */}
+                <button type="button" className="panel-ok" onClick={() => setWorldOpen(false)}>✓ {t.okBtn}</button>
               </div>
             )}
             <div className="chips">
@@ -3648,30 +3652,9 @@ export default function Home() {
                   {recState === "uploading" && <p className="gen-step-hint">⏳ {t.cloneCreating}</p>}
                 </div>
               )}
-              {/* 🪄 Hlas podle popisu — Voice Design */}
-              <div className="field">
-                <label>{t.designTitle}</label>
-                <div className="ta-wrap">
-                  <textarea value={designDesc} onChange={e => setDesignDesc(e.target.value)}
-                    placeholder={t.designPlaceholder} style={{ minHeight: 70 }} />
-                </div>
-                <button type="button" onClick={designGenerate} disabled={designBusy || designDesc.trim().length < 10}>
-                  {designBusy ? "⏳ " : "🪄 "}{t.designGen}
-                </button>
-                {designPreviews && designPreviews.map((p, i) => (
-                  <div key={p.id} className="file-row">
-                    {/* přehrávání přes centrální přehrávač: ▶ pustí, ⏹ zastaví */}
-                    <button type="button" className="outline-btn"
-                      onClick={() => playPreview(`design:${p.id}`, async () => p.audioUrl)}>
-                      {preview?.key === `design:${p.id}` ? "⏹" : "▶︎"} {t.designSample} {i + 1}
-                    </button>
-                    <button type="button" onClick={() => designSave(p.id)} disabled={designSaving}>
-                      {designSaving ? "⏳" : "✓"} {t.designUse}
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <p className="gen-step-hint">{t.clonePrivacy}</p>
+              {/* 🪄 Voice Design je DOČASNĚ schovaný (na přání) — flow zůstává
+                  v kódu (designGenerate/designSave), vrací se vložením JSX */}
+              <button type="button" className="panel-ok" onClick={() => { stopPreview(); setVoiceOpen(false); }}>✓ {t.okBtn}</button>
             </div>
           )}
         </div>
