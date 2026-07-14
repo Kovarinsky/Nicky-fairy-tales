@@ -14,7 +14,7 @@ import { buildStoryHtml } from "@/lib/story-export";
 // ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; nameEn?: string; photo?: string; }
 interface ThemeOption { id: string; name: string; nameEn?: string; emoji: string; }
-interface VoiceOption { id: string; name: string; emoji: string; description: string; language: string; kind?: "clone" | "designed"; }
+interface VoiceOption { id: string; name: string; nameEn?: string; emoji: string; description: string; language: string; kind?: "clone" | "designed"; }
 interface CustomChar {
   id: string; name: string; description: string;
   photoBase64?: string; photoMimeType?: string; previewUrl?: string;
@@ -3565,7 +3565,7 @@ export default function Home() {
             onClick={() => setVoiceOpen(p => !p)}>
             🎙️ {voicePref === "auto"
               ? t.voiceAuto
-              : voices.find(v => v.id === voicePref)?.name || t.voiceAuto}
+              : (v => (uiLang === "en" && v?.nameEn ? v.nameEn : v?.name))(voices.find(v => v.id === voicePref)) || t.voiceAuto}
           </button>
           {voiceOpen && (
             <div className="add-char-panel">
@@ -3594,13 +3594,15 @@ export default function Home() {
                   return [<p key={`vg-${gl}`} className="folk-group">{head}</p>, ...group.map(v => {
                   const pk = `voice:${v.id}`;
                   const playIcon = preview?.key === pk ? (preview.phase === "loading" ? "⏳" : "⏹") : "▶";
+                  // název hlasu podle jazyka prostředí (klony/vymyšlené mají jen name)
+                  const vName = uiLang === "en" && v.nameEn ? v.nameEn : v.name;
                   return v.kind ? (
                   <div key={v.id} role="button" tabIndex={0}
                     className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
                     onClick={() => { pickVoice(v.id); testVoice(v.id); }}
                     onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { pickVoice(v.id); testVoice(v.id); } }}>
                     <span className="folk-emoji">{v.emoji}</span>
-                    <span>{v.name}</span>
+                    <span>{vName}</span>
                     <span className="voice-play" aria-hidden>{playIcon}</span>
                     <button type="button" className="chip-remove folk-remove" aria-label={t.cloneDelete}
                       onClick={e => { e.stopPropagation(); if (v.kind === "clone") deleteClone(v.id); else deleteDesigned(v.id); }}>×</button>
@@ -3609,7 +3611,7 @@ export default function Home() {
                   <button type="button" key={v.id} className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
                     onClick={() => { pickVoice(v.id); testVoice(v.id); }}>
                     <span className="folk-emoji">{v.emoji}</span>
-                    <span>{v.name}</span>
+                    <span>{vName}</span>
                     <span className="voice-play" aria-hidden>{playIcon}</span>
                   </button>
                 );})];

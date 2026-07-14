@@ -9,7 +9,7 @@ import { blobToken } from "@/lib/blob-token";
 
 export const runtime = "nodejs";
 
-interface VoiceEntry { id: string; name: string; emoji: string; description: string; language: string; }
+interface VoiceEntry { id: string; name: string; nameEn?: string; emoji: string; description: string; language: string; }
 
 export async function GET() {
   let voices: VoiceEntry[] = [];

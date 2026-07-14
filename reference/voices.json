@@ -2,71 +2,113 @@
   {
     "id": "8l5r0apxY5VWrLx8u6t6",
     "name": "Vypravěč",
+    "nameEn": "Czech Narrator",
     "emoji": "🇨🇿",
-    "description": "Profesionální vypravěč",
+    "description": "Profesionální vypravěč (ElevenLabs)",
+    "language": "cs"
+  },
+  {
+    "id": "gemini:Iapetus:cs",
+    "name": "Gemini vypravěč (test)",
+    "nameEn": "Gemini narrator CZ (test)",
+    "emoji": "🧪",
+    "description": "Testovací mužský hlas Google Gemini — vypráví česky",
+    "language": "cs"
+  },
+  {
+    "id": "gemini:Sulafat:cs",
+    "name": "Gemini vypravěčka (test)",
+    "nameEn": "Gemini narrator CZ — female (test)",
+    "emoji": "🧪",
+    "description": "Testovací ženský hlas Google Gemini — vypráví česky",
     "language": "cs"
   },
   {
     "id": "thfYL0Elyru2qqTtNQsE",
-    "name": "English Narrator",
+    "name": "Anglický vypravěč",
+    "nameEn": "English Narrator",
     "emoji": "🇬🇧",
-    "description": "English fairy tale narrator",
+    "description": "English fairy tale narrator (ElevenLabs)",
     "language": "en"
   },
   {
-    "id": "gemini:Charon",
-    "name": "Gemini vypravěč (test)",
+    "id": "gemini:Iapetus:en",
+    "name": "Gemini vypravěč EN (test)",
+    "nameEn": "Gemini narrator EN (test)",
     "emoji": "🧪",
-    "description": "Testovací mužský hlas Google Gemini — porovnání kvality, mluví česky i anglicky",
-    "language": "any"
+    "description": "Testovací mužský hlas Google Gemini — vypráví anglicky",
+    "language": "en"
   },
   {
-    "id": "gemini:Aoede",
-    "name": "Gemini vypravěčka (test)",
+    "id": "gemini:Sulafat:en",
+    "name": "Gemini vypravěčka EN (test)",
+    "nameEn": "Gemini narrator EN — female (test)",
     "emoji": "🧪",
-    "description": "Testovací ženský hlas Google Gemini — porovnání kvality, mluví česky i anglicky",
-    "language": "any"
+    "description": "Testovací ženský hlas Google Gemini — vypráví anglicky",
+    "language": "en"
   },
   {
     "id": "gemini:Sulafat:hr",
     "name": "Hrvatska pripovjedačica (test)",
+    "nameEn": "Croatian narrator — female (test)",
     "emoji": "🇭🇷",
-    "description": "Testovací ženský chorvatský hlas Google Gemini — vřelá pohádková intonace, vypráví chorvatsky",
+    "description": "Testovací ženský chorvatský hlas Google Gemini — vypráví chorvatsky",
     "language": "hr"
   },
   {
     "id": "gemini:Iapetus:hr",
     "name": "Hrvatski pripovjedač (test)",
+    "nameEn": "Croatian narrator (test)",
     "emoji": "🇭🇷",
-    "description": "Testovací mužský chorvatský hlas Google Gemini — klidný pohádkový přednes, vypráví chorvatsky",
+    "description": "Testovací mužský chorvatský hlas Google Gemini — vypráví chorvatsky",
     "language": "hr"
   },
   {
     "id": "gemini:Sulafat:da",
-    "name": "Dansk fortæller — kvinde (test)",
+    "name": "Dánská vypravěčka (test)",
+    "nameEn": "Danish narrator — female (test)",
     "emoji": "🇩🇰",
-    "description": "Testovací ženský dánský hlas Google Gemini — vřelá pohádková intonace, vypráví dánsky",
+    "description": "Testovací ženský dánský hlas Google Gemini — vypráví dánsky",
     "language": "da"
   },
   {
     "id": "gemini:Iapetus:da",
-    "name": "Dansk fortæller — mand (test)",
+    "name": "Dánský vypravěč (test)",
+    "nameEn": "Danish narrator (test)",
     "emoji": "🇩🇰",
-    "description": "Testovací mužský dánský hlas Google Gemini — klidný pohádkový přednes, vypráví dánsky",
+    "description": "Testovací mužský dánský hlas Google Gemini — vypráví dánsky",
     "language": "da"
   },
   {
     "id": "gemini:Sulafat:sk",
     "name": "Slovenská rozprávačka (test)",
+    "nameEn": "Slovak narrator — female (test)",
     "emoji": "🇸🇰",
-    "description": "Testovací ženský slovenský hlas Google Gemini — vrelá rozprávková intonácia, rozpráva po slovensky",
+    "description": "Testovací ženský slovenský hlas Google Gemini — rozpráva po slovensky",
     "language": "sk"
   },
   {
     "id": "gemini:Iapetus:sk",
     "name": "Slovenský rozprávač (test)",
+    "nameEn": "Slovak narrator (test)",
     "emoji": "🇸🇰",
-    "description": "Testovací mužský slovenský hlas Google Gemini — pokojný rozprávkový prednes, rozpráva po slovensky",
+    "description": "Testovací mužský slovenský hlas Google Gemini — rozpráva po slovensky",
     "language": "sk"
+  },
+  {
+    "id": "gemini:Algenib:movie",
+    "name": "Filmový vypravěč (test)",
+    "nameEn": "Hollywood movie narrator (test)",
+    "emoji": "🎬",
+    "description": "Prototyp: epický hlas jako z filmového traileru — hluboký, dramatický; mluví česky i anglicky",
+    "language": "any"
+  },
+  {
+    "id": "gemini:Gacrux:movie",
+    "name": "Filmová vypravěčka (test)",
+    "nameEn": "Hollywood movie narrator — female (test)",
+    "emoji": "🎬",
+    "description": "Prototyp: epický ženský hlas jako z filmového traileru — zralý, dramatický; mluví česky i anglicky",
+    "language": "any"
   }
 ]

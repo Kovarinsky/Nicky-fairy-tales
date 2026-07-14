@@ -23,14 +23,27 @@ const STYLE_BY_LANG: Record<string, string> = {
   sk: "Prečítaj nasledujúci text vrelo a pokojne, ako rozprávač detskej rozprávky pred spaním — s prirodzenými pauzami, otázky opytovacie, zvolania živo. Hovor spisovnou slovenčinou:",
 };
 
-/** Namluví text hlasem Gemini; vrací WAV buffer. Jméno hlasu smí nést jazyk
- *  („Sulafat:hr" → chorvatská režie); bez něj se jazyk pozná z textu. */
+// 🎬 Filmový přednes („hollywood trailer") — prototyp na porovnání stylů
+const MOVIE_STYLE_BY_LANG: Record<string, string> = {
+  cs: "Namluv následující text jako epický filmový vypravěč z hollywoodského traileru — hluboce, dramaticky, s velkolepými pauzami a narůstajícím napětím, přesto vřele a srozumitelně pro děti:",
+  en: "Narrate the following text like an epic Hollywood movie-trailer narrator — deep, dramatic, suspenseful pacing with grand pauses, yet warm and child-friendly:",
+};
+
+/** Namluví text hlasem Gemini; vrací WAV buffer. Jméno hlasu smí nést
+ *  přípony („Sulafat:hr" → chorvatská režie, „Algenib:movie" → filmový
+ *  přednes); bez jazykové přípony se jazyk pozná z textu. */
 export async function narrateWithGemini(text: string, voiceName: string): Promise<{ buffer: Buffer; mimeType: string }> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
-  const [name, langHint] = voiceName.split(":");
+  const segs = voiceName.split(":");
+  const name = segs[0];
+  const movie = segs.includes("movie");
+  const langHint = segs.find(s => STYLE_BY_LANG[s]);
   const czech = /[ěščřžýáíéůúťďňĚŠČŘŽÝÁÍÉŮÚŤĎŇ]/.test(text);
-  const style = STYLE_BY_LANG[langHint] || (czech ? STYLE_BY_LANG.cs : STYLE_BY_LANG.en);
+  const lang = langHint || (czech ? "cs" : "en");
+  const style = movie
+    ? (MOVIE_STYLE_BY_LANG[lang] || MOVIE_STYLE_BY_LANG.en)
+    : (STYLE_BY_LANG[lang] || STYLE_BY_LANG.en);
   voiceName = name;
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(TTS_MODEL)}:generateContent?key=${encodeURIComponent(apiKey)}`,
