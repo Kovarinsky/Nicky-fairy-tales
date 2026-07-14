@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import { cacheStory } from "@/lib/scene-cache";
 
 interface SharedScene { narration: string; imageUrl: string; audioUrl: string }
 interface SharedStory {
@@ -52,10 +53,60 @@ export default function SharedStoryPage() {
   // text jednořádkový a roluje bílým oknem — synchronně s hlasem, bez hlasu
   // stálou rychlostí
   const clipRef = useRef<HTMLDivElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
   const [rollTick, setRollTick] = useState(0);
   useEffect(() => {
     if (isPlaying) setRollTick(t => t + 1);
   }, [isPlaying]);
+
+  // Titulkový pruh drží ŠÍŘKU OBRÁZKU (v max režimu je obrázek letterboxovaný
+  // užší než karta — pruh přes celou kartu vypadal rozbitě)
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const img = imgRef.current;
+    const iw = img?.getBoundingClientRect().width || 0;
+    if (shareMax && iw > 0) {
+      body.style.width = `${Math.round(iw)}px`;
+      body.style.marginLeft = "auto";
+      body.style.marginRight = "auto";
+    } else {
+      body.style.width = "";
+      body.style.marginLeft = "";
+      body.style.marginRight = "";
+    }
+  }, [shareMax, page, story, rollTick, isLs, isFs]);
+
+  // 💾 Zaslaná pohádka se uloží do HISTORIE appky (localStorage + offline
+  // cache médií) — příjemce ji pak najde v hlavním menu jako každou jinou
+  useEffect(() => {
+    if (!story || !id) return;
+    try {
+      const KEY = "nicky-story-history";
+      const all = JSON.parse(localStorage.getItem(KEY) || "[]") as Array<{ id?: string; title?: string }>;
+      if (!Array.isArray(all)) return;
+      const hid = `shared-${id}`;
+      // už uložená (nebo je to odesílatelova vlastní pohádka se stejným názvem) → nic
+      if (all.some(e => e?.id === hid || e?.title === story.title)) return;
+      all.unshift({
+        id: hid,
+        title: story.title,
+        heroDescription: "",
+        createdAt: story.createdAt || new Date().toISOString(),
+        scenes: story.scenes.map((s, i) => ({ index: i + 1, narration: s.narration, imagePrompt: "" })),
+        selectedIds: [],
+        themeId: "",
+        topic: "",
+        ...(story.choice ? { choice: story.choice } : {}),
+      } as never);
+      localStorage.setItem(KEY, JSON.stringify(all.slice(0, 20)));
+      cacheStory(hid, story.scenes.map((s, i) => ({
+        index: i + 1, narration: s.narration, imagePrompt: "",
+        imageUrl: s.imageUrl, audioUrl: s.audioUrl,
+      }))).catch(() => {});
+    } catch {}
+  }, [story, id]);
   useEffect(() => {
     const clip = clipRef.current;
     if (!clip) return;
@@ -180,10 +231,11 @@ export default function SharedStoryPage() {
         <div className="share-card">
           <h1 className="share-title">{story.title}</h1>
           {scene.imageUrl
-            ? <img className="share-img" src={scene.imageUrl} alt={`Stránka ${pos + 1}`} />
+            ? <img className="share-img" src={scene.imageUrl} alt={`Stránka ${pos + 1}`}
+                ref={imgRef} onLoad={() => setRollTick(t => t + 1)} />
             : <div className="share-img share-img-empty">🖼️</div>}
           {/* bílý titulkový pruh jako ve čtečce; v max režimu jednořádkový rolující */}
-          <div className="share-body">
+          <div className="share-body" ref={bodyRef}>
             <div className="share-clip" ref={clipRef}>
               <p className="share-text">{scene.narration}</p>
             </div>
@@ -223,6 +275,12 @@ export default function SharedStoryPage() {
                   {isFs ? "🗗" : "⛶"}
                 </button>
               )}
+              <button type="button" className="share-btn share-home" aria-label="Domů — hlavní menu"
+                onClick={() => {
+                  try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch {}
+                  audioRef.current?.pause();
+                  window.location.href = "/";
+                }}>🏠</button>
             </div>
           )}
           <p className="share-footer">✨ Vytvořeno v appce Nickyho pohádky</p>

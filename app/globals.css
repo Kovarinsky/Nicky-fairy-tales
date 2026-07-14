@@ -3058,6 +3058,12 @@ textarea.ta-accent:focus {
   border: none;
 }
 
+/* 🏠 Domů — oranžové jako v ovládání čtečky */
+.share-home {
+  background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+  border: none;
+}
+
 .share-pagenum {
   font-weight: 800;
   opacity: 0.85;
