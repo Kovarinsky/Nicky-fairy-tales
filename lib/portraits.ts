@@ -90,14 +90,14 @@ export async function getCharacterPortrait(c: Character, force = false): Promise
     const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
     const sceneDesc = `A full-body standing storybook portrait of ${c.name}. Only ${c.name} present — exactly one person/animal.`;
     let img = await generateBackgroundImage(portraitPrompt(c), photoRefs);
-    let v = await verifySceneImage(apiKey, img, c.description, sceneDesc);
+    let v = await verifySceneImage(apiKey, img, c.description, sceneDesc, photoRefs);
     if (v && !v.ok) {
       console.warn(`[portraits] ${c.id} REJECTED (${v.problems.slice(0, 140)}) → redraw with correction`);
       img = await generateBackgroundImage(
         `${portraitPrompt(c)} ⚠ CORRECTION: the previous attempt violated: ${v.problems.slice(0, 300)}. Follow the description EXACTLY (hair color and length, skin tone, eye color, clothing).`,
         photoRefs
       );
-      v = await verifySceneImage(apiKey, img, c.description, sceneDesc);
+      v = await verifySceneImage(apiKey, img, c.description, sceneDesc, photoRefs);
       if (v && !v.ok) {
         // ani oprava neprošla → RADĚJI ŽÁDNÝ portrét (scény dostanou fotky)
         console.warn(`[portraits] ${c.id} still rejected (${v.problems.slice(0, 140)}) → falling back to photos`);

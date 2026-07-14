@@ -224,14 +224,23 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
 // Vrací null, jen když se kontrola ani na 3. pokus nepovedla — volající pak
 // NEPŘEPISUJE poslední ověřený stav neověřeným obrázkem.
 export async function verifySceneImage(
-  apiKey: string, img: ImageResult, heroDescription: string, scenePrompt = ""
+  apiKey: string, img: ImageResult, heroDescription: string, scenePrompt = "",
+  refs: ReferenceImage[] = [] // 🕵️ kanonické portréty — inspektor porovnává TVÁŘE, ne jen text
 ): Promise<{ ok: boolean; problems: string; badRules: number } | null> {
+  // Referenční portréty jdou inspektorovi PŘED kontrolovaný obrázek — dřív
+  // soudil jen podle textu a „Bella jako černoška" mu nemohla padnout do oka
+  const refParts = refs.slice(0, 8).flatMap((r, i) => [
+    { text: `REFERENCE ${i + 1} — ${(r.label || (r.name ? `canonical portrait of ${r.name}` : "reference image")).slice(0, 300)}:` },
+    { inlineData: { data: r.data, mimeType: r.mimeType } },
+  ]);
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const raw = await geminiPost(apiKey, VERIFY_MODEL, {
         contents: [{
           role: "user",
           parts: [
+            ...refParts,
+            { text: refParts.length ? "IMAGE TO INSPECT (judge ONLY this one against the references and rules):" : "IMAGE TO INSPECT:" },
             { inlineData: { data: img.buffer.toString("base64"), mimeType: img.mimeType } },
             { text: [
               "You are a STRICT quality inspector for a children's storybook illustration.",
@@ -243,7 +252,7 @@ export async function verifySceneImage(
               "0) STYLE: the image MUST be a hand-painted 2D storybook ILLUSTRATION. A photograph, photorealistic render, 3D/CGI look, or stock-photo style image = FAIL immediately (this alone fails the image, regardless of content).",
               "1) IDENTIFY every visible person one by one and match each to a named character by hair, face and outfit. COUNT them: the number of visible people MUST EQUAL the number of characters named in the scene description — more OR fewer = FAIL. ANY person you cannot confidently match (extra child, stranger, background figure) = FAIL. A character named in the scene description who is MISSING = FAIL. A person who mixes features of TWO characters (one character's face with another's outfit or hairstyle — swapped/merged identities) = FAIL. EXCEPTION: when the scene description itself mentions a GROUP (a team, other players, opponents, the crowd, the audience, villagers…), unnamed background figures belonging to that group are ALLOWED — list them as 'group:<what>' in people, they don't fail the count; but none of them may look like a copy of a named hero.",
               "2) Each named character appears EXACTLY ONCE — two similar children or two similar adults = FAIL.",
-              "3) HAIR COLOR of EVERY person matches their sheet entry (blond stays blond, brown stays brown, dark stays dark) — check person by person.",
+              "3) HAIR COLOR and SKIN TONE of EVERY person match their sheet entry (blond stays blond, brown stays brown, dark stays dark; fair/light skin stays fair — a character described with fair light skin drawn with dark skin = FAIL, and vice versa) — check person by person.",
               "4) Hair LENGTH and STYLE match the sheet (short stays short, long stays long; beard per sheet).",
               "5) CLOTHING: each character wears THEIR OWN outfit (or their 'Story outfits:' variant for this scene). A signature outfit on the WRONG person (e.g. a different child wearing Nicolas's white T-shirt with red stripes) = FAIL. The SAME signature garment on TWO different people (two lilac hoodies, two striped polos) = FAIL. An adult's signature outfit worn by a child (or vice versa) = FAIL.",
               "6) Dressing level is UNIFORM for the scene: no winter coat next to a T-shirt; indoors without jackets/hats; never summer clothes in snow.",
@@ -253,6 +262,9 @@ export async function verifySceneImage(
               "10) NO text, letters, numbers, watermarks or signatures anywhere in the image.",
               "11) FRAMING: nothing important is CUT OFF by the image edges — no cropped heads or faces, no half-cut characters, and no key objects (boat, vehicle, building, the moon…) sliced by the border. Background scenery may naturally continue past the edge.",
               "12) SETTING: if the sheet contains a 'World & setting lock', the scene's venue must MATCH it — e.g. a football match happens ON a proper pitch with lines and goals (never on a river bank), a named real person looks like the described HUMAN.",
+              ...(refParts.length ? [
+                "13) IDENTITY MATCH TO REFERENCES: compare EVERY visible named character against their REFERENCE image above — it must clearly be the SAME person: same face, same SKIN TONE, same hair color and style, same apparent AGE and BODY SIZE (a small child in the reference must stay a small child — drawn as a teenager or adult = FAIL; an adult must stay an adult), same signature outfit. A character who looks like a DIFFERENT person than their reference (different ethnicity, different age, different face) = FAIL.",
+              ] : []),
               "Minor painterly variation is fine — but violations of the rules above are NEVER minor.",
               'Reply with ONLY JSON. ALWAYS include a "people" audit — list every visible person as "<who you matched them to or UNKNOWN>". Passing image: {"people":["Nicolas","Valentýna"],"ok":true}. Failing image: {"people":[...],"ok":false,"rules":[<numbers of violated rules>],"problems":"<max 60 words: per violated rule a short English reason>"}. Any UNKNOWN in people means rule 1 failed.',
             ].join("\n") },
@@ -381,12 +393,12 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
         // Drží se NEJLEPŠÍ OVĚŘENÝ pokus (nejméně porušených pravidel) —
         // neověřený obrázek nikdy nenahradí ověřený.
         if (heroDescription) {
-          let v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt);
+          let v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt, refImages);
           if (!v0) {
             // Kontrola 3× selhala (typicky rate-limit) → po pauze ještě jednou;
             // teprve pak se obrázek přijme s varováním (jinak by se nic nedokreslilo)
             await new Promise(r => setTimeout(r, 6000));
-            v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt);
+            v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt, refImages);
             if (!v0) console.warn(`[Gemini QA] scene ${scene.index}: kontrola opakovaně selhala — obrázek přijat NEOVĚŘENÝ`);
           }
           if (v0 && !v0.ok) {
@@ -399,7 +411,7 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
                   ? safePrompt
                   : `${safePrompt} ⚠ CORRECTION ${fix}: the previous attempt violated these rules: ${best.problems}. Fix EXACTLY these issues — follow the APPEARANCE LOCK precisely, draw ONLY the named characters, each EXACTLY ONCE, with their own hair colors and outfits.`;
                 const img2 = await callGeminiImage(apiKey, m, prompt2, withAspect ? "16:9" : null, refImages);
-                const v2 = await verifySceneImage(apiKey, img2, heroDescription, scene.imagePrompt);
+                const v2 = await verifySceneImage(apiKey, img2, heroDescription, scene.imagePrompt, refImages);
                 if (v2 && (v2.ok || v2.badRules < best.badRules)) {
                   best = { img: img2, badRules: v2.ok ? 0 : v2.badRules, problems: v2.problems };
                 }
@@ -620,7 +632,7 @@ export async function generateSceneSheet(
   for (let i = 0; i < n; i += 4) {
     const chunk = await Promise.all(
       Array.from({ length: Math.min(4, n - i) }, (_, j) =>
-        verifySceneImage(apiKey, slices![i + j], heroDescription, scenes[i + j].imagePrompt)
+        verifySceneImage(apiKey, slices![i + j], heroDescription, scenes[i + j].imagePrompt, refImages)
       )
     );
     chunk.forEach((v, j) => { verdicts[i + j] = v; });

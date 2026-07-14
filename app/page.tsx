@@ -1399,10 +1399,29 @@ export default function Home() {
   const readerHeroRef = useRef<string>("");
   const readerCharIdsRef = useRef<string[]>([]);
 
-  // 🌙 Jména postav AKTUÁLNÍ pohádky (pro titulky a jmenovitou dobrou noc)
+  // 🌙 Jména postav AKTUÁLNÍ pohádky (pro titulky a jmenovitou dobrou noc):
+  // všechny ZAŠKRTNUTÉ postavy (vestavěné i vlastní), které v ději OPRAVDU
+  // vystupují — jméno se hledá v textu scén přes KMEN (české skloňování:
+  // „Valentýna" musí chytit i „Valentýnu/Valentýně")
   function storyCharNames(): string[] {
     const ids = readerCharIdsRef.current?.length ? readerCharIdsRef.current : selectedIds;
-    return [
+    const text = scenes.map(s => s.narration || "").join(" ").toLowerCase();
+    const appears = (...names: Array<string | undefined>) => {
+      if (!text) return true; // bez textu (prázdná kniha) se nikdo nevynechává
+      return names.some(n => {
+        if (!n) return false;
+        const stem = n.trim().toLowerCase().slice(0, Math.max(3, n.trim().length - 2));
+        return stem.length >= 3 && text.includes(stem);
+      });
+    };
+    const named = [
+      ...chars.filter(c => ids.includes(c.id) && appears(c.name, c.nameEn))
+        .map(c => (uiLang === "en" && c.nameEn ? c.nameEn : c.name)),
+      ...customChars.filter(c => selectedCustomIds.includes(c.id) && appears(c.name)).map(c => c.name),
+    ];
+    // Pojistka: kdyby filtr nikoho nenašel (přejmenované postavy v ději),
+    // dobrou noc dostanou všechny zaškrtnuté — nikdy prázdný pozdrav
+    return named.length > 0 ? named : [
       ...chars.filter(c => ids.includes(c.id)).map(c => (uiLang === "en" && c.nameEn ? c.nameEn : c.name)),
       ...customChars.filter(c => selectedCustomIds.includes(c.id)).map(c => c.name),
     ];

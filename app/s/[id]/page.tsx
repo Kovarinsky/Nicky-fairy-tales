@@ -47,6 +47,41 @@ export default function SharedStoryPage() {
     };
   }, []);
   const shareMax = isFs || isLs;
+
+  // 🎞️ Rolující titulky jako ve čtečce appky: v maximalizovaném režimu je
+  // text jednořádkový a roluje bílým oknem — synchronně s hlasem, bez hlasu
+  // stálou rychlostí
+  const clipRef = useRef<HTMLDivElement | null>(null);
+  const [rollTick, setRollTick] = useState(0);
+  useEffect(() => {
+    if (isPlaying) setRollTick(t => t + 1);
+  }, [isPlaying]);
+  useEffect(() => {
+    const clip = clipRef.current;
+    if (!clip) return;
+    clip.scrollLeft = 0;
+    if (!shareMax) return;
+    const overflow = clip.scrollWidth - clip.clientWidth;
+    if (overflow <= 0) return;
+    const a = audioRef.current;
+    const DELAY_MS = 2200;
+    const SPEED = 40; // px/s fallback bez hlasu
+    const fallbackDur = (overflow / SPEED) * 1000;
+    let raf = 0;
+    const start = performance.now();
+    const tick = (t: number) => {
+      const dur = a && Number.isFinite(a.duration) ? a.duration : 0;
+      const active = a && dur > 3 && (a.currentTime > 0.05 || !a.paused);
+      const p = active
+        ? Math.min(1, Math.max(0, (a!.currentTime - 1.2) / Math.max(1, dur - 3.2)))
+        : Math.min(1, Math.max(0, (t - start - DELAY_MS) / fallbackDur));
+      clip.scrollLeft = p * overflow;
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [page, branch, shareMax, rollTick, story]);
+
   function enterFs() {
     if (!document.fullscreenElement) mainRef.current?.requestFullscreen?.().catch(() => {});
   }
@@ -147,7 +182,12 @@ export default function SharedStoryPage() {
           {scene.imageUrl
             ? <img className="share-img" src={scene.imageUrl} alt={`Stránka ${pos + 1}`} />
             : <div className="share-img share-img-empty">🖼️</div>}
-          <p className="share-text">{scene.narration}</p>
+          {/* bílý titulkový pruh jako ve čtečce; v max režimu jednořádkový rolující */}
+          <div className="share-body">
+            <div className="share-clip" ref={clipRef}>
+              <p className="share-text">{scene.narration}</p>
+            </div>
+          </div>
           {choicePending && !isPlaying ? (
             <div className="choice-cards" style={{ margin: "0.4rem 0 0.6rem" }}>
               {(["A", "B"] as const).map((b, bi) => {

@@ -3001,9 +3001,22 @@ textarea.ta-accent:focus {
   font-size: 2.5rem;
 }
 
+/* Bílý titulkový pruh pod obrázkem — stejný jazyk jako čtečka v appce */
+.share-body {
+  margin: 0.8rem 0 0.6rem;
+  padding: 0.55rem 1.15rem;
+  background: rgba(248, 247, 255, 0.96);
+  border-radius: 12px;
+}
+
+.share-clip {
+  overflow: hidden;
+}
+
 .share-text {
-  margin: 0.8rem 0.2rem;
-  font-size: 1.02rem;
+  margin: 0;
+  color: #1e1b4b;
+  font-size: 1rem;
   line-height: 1.55;
 }
 
@@ -3015,15 +3028,22 @@ textarea.ta-accent:focus {
   margin: 0.4rem 0 0.6rem;
 }
 
+/* Tlačítka jako standardní ovládání čtečky (.ctrl-cell) — stejné sklo,
+   stejný fialový primár; flex centrování = šipky přesně uprostřed */
 .share-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 52px;
   height: 48px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.1);
   color: #fff; /* var(--text) je tmavá — na tmavém tlačítku neviditelná */
   font-size: 1.2rem;
   font-weight: 800;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -3034,7 +3054,7 @@ textarea.ta-accent:focus {
 
 .share-play {
   min-width: 72px;
-  background: linear-gradient(135deg, #7c4dff, #536dfe);
+  background: linear-gradient(135deg, #7c4dff 0%, #5c35cc 100%);
   border: none;
 }
 
@@ -3096,24 +3116,38 @@ textarea.ta-accent:focus {
   }
 }
 
-.share-main.share-max .share-text {
+/* Max režim: bílé okno je JEDNOŘÁDKOVÝ rolující ticker jako ve čtečce
+   (text jede synchronně s hlasem, okraje měkce vyjíždějí z mlhy) */
+.share-main.share-max .share-body {
   flex: 0 0 auto;
-  max-height: 26dvh;
-  overflow-y: auto;
-  margin: 0.5rem 0.2rem;
+  margin: 0.6rem 0 0.4rem;
+  padding: 0.5rem 1.35rem 0.6rem;
+}
+
+.share-main.share-max .share-clip {
+  mask-image: linear-gradient(90deg, transparent 0, #000 1.1rem, #000 calc(100% - 1.1rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 1.1rem, #000 calc(100% - 1.1rem), transparent 100%);
+}
+
+.share-main.share-max .share-text {
+  white-space: nowrap;
+  display: inline-block;
+  /* větší vnitřní odsazení než šířka vyblednutí — začátek i konec věty
+     jsou při rolování plně čitelné, ne v mlze okraje */
+  padding: 0 1.35rem;
+  font-size: 0.98rem;
 }
 
 .share-main.share-max .share-footer {
   display: none;
 }
 
-/* Na šířku šetří výšku i titulek a text v jedné řádce prostoru */
+/* Na šířku šetří výšku i titulek */
 @media (orientation: landscape) {
   .share-main.share-max .share-title {
     display: none;
   }
   .share-main.share-max .share-text {
-    max-height: 22dvh;
     font-size: 0.95rem;
   }
 }
