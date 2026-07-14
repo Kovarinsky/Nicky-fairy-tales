@@ -828,12 +828,20 @@ export async function generateStory(
   const language = req.language || "cs";
 
   for (let attempt = 1; attempt <= 2; attempt++) {
-    // Prefill: jen v 1. pokusu — když navázaný text nejde zparsovat,
-    // 2. pokus píše celý příběh od začátku (partial mohl být poškozený)
+    // Navázání rozepsaného textu: jen v 1. pokusu — když navázaný text nejde
+    // zparsovat, 2. pokus píše celý příběh od začátku. POZOR: modely Claude 5
+    // NEPODPORUJÍ assistant prefill (Anthropic 400) — pokračuje se proto
+    // instrukcí v user zprávě a překryv se ořízne při slepování.
     const prefix = attempt === 1 && resumeText ? resumeText.replace(/\s+$/, "") : "";
+    const baseParts: AnthropicPart[] = Array.isArray(content) ? [...content] : [{ type: "text", text: content }];
+    if (prefix) {
+      baseParts.push({
+        type: "text",
+        text: `\n\n⚠ CONTINUATION MODE: You already wrote the BEGINNING of your JSON response (it was interrupted). It is quoted below between the markers. Continue EXACTLY where it stops — output ONLY the remaining characters of the SAME JSON document. Do NOT repeat anything already written, do NOT restart, no code fences, no commentary.\n<already_written>\n${prefix}\n</already_written>`,
+      });
+    }
     const messages: Array<{ role: string; content: string | AnthropicPart[] }> =
-      [{ role: "user", content }];
-    if (prefix) messages.push({ role: "assistant", content: prefix });
+      [{ role: "user", content: prefix ? baseParts : content }];
     const continuation = await callAnthropicApi({
       model,
       max_tokens: 16384, // 20 scén s vyprávěním a popisy obrázků se do 8k nevešlo
@@ -845,7 +853,7 @@ export async function generateStory(
     }, prefix
       ? (chars, fullText) => onDelta?.(prefix.length + chars, prefix + fullText)
       : onDelta);
-    const raw = prefix + continuation;
+    const raw = prefix ? mergeContinuation(prefix, continuation) : continuation;
     try {
       const script = parseScript(raw);
       // PRAVIDLO KONZISTENCE #1: vzhled známých postav je KANONICKÝ — vždy
@@ -864,6 +872,25 @@ export async function generateStory(
     }
   }
   throw new Error("Nepodařilo se vygenerovat příběh.");
+}
+
+/** Slepení navázaného psaní: model občas zopakuje pár znaků/celý ocas
+ *  rozepsaného textu nebo začne code fencem — překryv se najde a ořízne. */
+function mergeContinuation(prefix: string, continuation: string): string {
+  let cont = continuation.replace(/^```(?:json)?\s*/i, "").replace(/^\s+/, "");
+  // největší překryv: konec prefixu == začátek pokračování (až 400 znaků)
+  const max = Math.min(400, prefix.length, cont.length);
+  for (let len = max; len >= 8; len--) {
+    if (prefix.endsWith(cont.slice(0, len))) {
+      cont = cont.slice(len);
+      break;
+    }
+  }
+  // model přes zákaz zopakoval CELÝ dokument od začátku → vzít jeho verzi
+  if (cont.trimStart().startsWith("{\"title\"") || cont.trimStart().startsWith("{ \"title\"")) {
+    return cont;
+  }
+  return prefix + cont;
 }
 
 // Přestaví heroDescription: popisy postav z kartotéky se přebírají DOSLOVA.
