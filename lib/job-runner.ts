@@ -373,6 +373,11 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         const now = Date.now();
         if (now - lastBeat > 20_000) {
           lastBeat = now;
+          // 📋 Dřív se během psaní do deníku nezapsalo nic 20–30s+ v kuse
+          // (jen heartbeat updatedAt) — vypadalo to zaseknuté, i když Claude
+          // reálně streamoval text. Teď je vidět živý postup: kolik znaků
+          // je zatím napsáno a jak dlouho psaní běží.
+          logEv(`✍️ píšu… (${latestText.length} znaků zatím, ${secsSince(tWrite)}s)`);
           write();
           putJson(`jobs/${id}/partial.json`, { text: latestText })
             .catch(e => console.warn(`[job ${id}] partial write failed:`, e));

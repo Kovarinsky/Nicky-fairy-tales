@@ -1,6 +1,7 @@
-export const APP_VERSION = "4.10";
+export const APP_VERSION = "4.11";
 
 // Changelog (newest first)
+// 4.11 - 📋 VÍCE DETAILU V LOGU BĚHEM PSANÍ: appka dřív během celého psaní (klidně 2+ minuty) nezapsala do deníku ani řádek — jen tichý heartbeat na pozadí, takže to při delším psaní vypadalo zaseknuté, i když Claude reálně streamoval text. Teď se každých ~20 s zapíše živý postup („✍️ píšu… (1234 znaků zatím, 80s)"), ať je vidět, že se opravdu pracuje.
 // 4.10 - 🎙️ 10 NOVÝCH testovacích hlasů z hlasového průzkumu (Gemini TTS, vybráno podle oficiálních popisků stylu — přátelský/živý/veselý/jemný/pohodový/uvolněný/zářivý/vzdušný/svěží/tichý), mluví libovolným jazykem appky; k vyzkoušení v „🎙️ Vypravěč a jazyk pohádky" ve skupině 🌍 Vícejazyčné a vlastní — všech 10 ověřeno živě proti Gemini TTS API
 // 4.09 - ▶ ODEBRÁNO brzké čtení: appka dřív nabízela „Číst" ještě za běhu generování (odhadem, že čtenář kreslení nedožene) — na přání appka teď pohádku k přečtení nabídne, až je SKUTEČNĚ celá hotová, nikdy dřív.
 // 4.08 - 🩺 TRVALÝ DIAGNOSTICKÝ DENÍK: zrušení (✕) i běžný úklid úložiště dřív smazaly úplně VŠECHNO k jobu — po zastavení zaseknuté přípravy tak nezbyl žádný 📋 deník k diagnostice. Appka teď při každém kroku ukládá kopii deníku do trvalého úložiště (debug-logs/), které úklid nemaže (jen po 30 dnech); appka si navíc pamatuje posledních 15 zrušených/chybových běhů (nová sekce „🩺 Zrušené/chybové běhy" u historie) a jejich celý deník jde znovu otevřít i s odstupem, i po zavření appky
