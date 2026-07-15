@@ -1,6 +1,7 @@
-export const APP_VERSION = "4.09";
+export const APP_VERSION = "4.10";
 
 // Changelog (newest first)
+// 4.10 - 🎙️ 10 NOVÝCH testovacích hlasů z hlasového průzkumu (Gemini TTS, vybráno podle oficiálních popisků stylu — přátelský/živý/veselý/jemný/pohodový/uvolněný/zářivý/vzdušný/svěží/tichý), mluví libovolným jazykem appky; k vyzkoušení v „🎙️ Vypravěč a jazyk pohádky" ve skupině 🌍 Vícejazyčné a vlastní — všech 10 ověřeno živě proti Gemini TTS API
 // 4.09 - ▶ ODEBRÁNO brzké čtení: appka dřív nabízela „Číst" ještě za běhu generování (odhadem, že čtenář kreslení nedožene) — na přání appka teď pohádku k přečtení nabídne, až je SKUTEČNĚ celá hotová, nikdy dřív.
 // 4.08 - 🩺 TRVALÝ DIAGNOSTICKÝ DENÍK: zrušení (✕) i běžný úklid úložiště dřív smazaly úplně VŠECHNO k jobu — po zastavení zaseknuté přípravy tak nezbyl žádný 📋 deník k diagnostice. Appka teď při každém kroku ukládá kopii deníku do trvalého úložiště (debug-logs/), které úklid nemaže (jen po 30 dnech); appka si navíc pamatuje posledních 15 zrušených/chybových běhů (nová sekce „🩺 Zrušené/chybové běhy" u historie) a jejich celý deník jde znovu otevřít i s odstupem, i po zavření appky
 // 4.07 - 🚀 TVRDÝ STROP 5 MINUT na celou přípravu (přes všechny řetězy, ne jen jeden běh funkce): appka teď hlídá globální čas od zadání (4:40, s rezervou na dopsání) a jakmile ho scéna/arch překročí uprostřed opravování, PŘESTANE obrázek dokola překreslovat a přijme první průchod i s drobnou vadou (jde 🖌 opravit ručně) — a jakmile je strop u konce, appka NEZAHÁJÍ další řetěz kvůli obrázkům, radši uzavře pohádku hned s tím, co je hotové, než aby se řetězila donekonečna (viz „Kvarner" — 7 řetězů, 36 minut). Zdravé rychlé pohádky to nijak nezpomalí — strop zasáhne jen tam, kde by se appka jinak zasekla na opravování.

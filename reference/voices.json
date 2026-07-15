@@ -126,5 +126,85 @@
     "emoji": "🌊",
     "description": "Prototyp: mladý, dynamický ženský hlas jako z dobrodružného animáku (Vaiana vibe); mluví česky i anglicky",
     "language": "any"
+  },
+  {
+    "id": "gemini:Achird",
+    "name": "Přátelský hlas (test)",
+    "nameEn": "Friendly voice (test)",
+    "emoji": "🤝",
+    "description": "Kandidát z hlasového průzkumu (Google popisek: Friendly) — vřelý, přátelský tón na pohádku; mluví libovolným jazykem appky",
+    "language": "any"
+  },
+  {
+    "id": "gemini:Sadachbia",
+    "name": "Živý hlas (test)",
+    "nameEn": "Lively voice (test)",
+    "emoji": "✨",
+    "description": "Kandidát z hlasového průzkumu (Google popisek: Lively) — čilý, barevný přednes; mluví libovolným jazykem appky",
+    "language": "any"
+  },
+  {
+    "id": "gemini:Puck",
+    "name": "Veselý hlas (test)",
+    "nameEn": "Upbeat voice (test)",
+    "emoji": "😄",
+    "description": "Kandidát z hlasového průzkumu (Google popisek: Upbeat) — hravý, dobrá nálada; mluví libovolným jazykem appky",
+    "language": "any"
+  },
+  {
+    "id": "gemini:Vindemiatrix",
+    "name": "Jemný hlas (test)",
+    "nameEn": "Gentle voice (test)",
+    "emoji": "🌙",
+    "description": "Kandidát z hlasového průzkumu (Google popisek: Gentle) — jemný, konejšivý na dobrou noc; mluví libovolným jazykem appky",
+    "language": "any"
+  },
+  {
+    "id": "gemini:Callirrhoe",
+    "name": "Pohodový hlas (test)",
+    "nameEn": "Easy-going voice (test)",
+    "emoji": "😌",
+    "description": "Kandidát z hlasového průzkumu (Google popisek: Easy-going) — uvolněný, nenucený přednes; mluví libovolným jazykem appky",
+    "language": "any"
+  },
+  {
+    "id": "gemini:Umbriel",
+    "name": "Uvolněný hlas (test)",
+    "nameEn": "Relaxed voice (test)",
+    "emoji": "🍃",
+    "description": "Kandidát z hlasového průzkumu (Google popisek: Easy-going) — klidný, bez spěchu; mluví libovolným jazykem appky",
+    "language": "any"
+  },
+  {
+    "id": "gemini:Autonoe",
+    "name": "Zářivý hlas (test)",
+    "nameEn": "Bright voice (test)",
+    "emoji": "🌟",
+    "description": "Kandidát z hlasového průzkumu (Google popisek: Bright) — jasný, zářivý tón; mluví libovolným jazykem appky",
+    "language": "any"
+  },
+  {
+    "id": "gemini:Aoede",
+    "name": "Vzdušný hlas (test)",
+    "nameEn": "Breezy voice (test)",
+    "emoji": "🌬️",
+    "description": "Kandidát z hlasového průzkumu (Google popisek: Breezy) — lehký, plynulý přednes; mluví libovolným jazykem appky",
+    "language": "any"
+  },
+  {
+    "id": "gemini:Zephyr",
+    "name": "Svěží hlas (test)",
+    "nameEn": "Fresh & bright voice (test)",
+    "emoji": "🌤️",
+    "description": "Kandidát z hlasového průzkumu (Google popisek: Bright) — svěží, čistý tón; mluví libovolným jazykem appky",
+    "language": "any"
+  },
+  {
+    "id": "gemini:Achernar",
+    "name": "Tichý hlas (test)",
+    "nameEn": "Soft voice (test)",
+    "emoji": "🤫",
+    "description": "Kandidát z hlasového průzkumu (Google popisek: Soft) — tichý, měkký na uspávací pasáže; mluví libovolným jazykem appky",
+    "language": "any"
   }
 ]
