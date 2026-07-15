@@ -406,7 +406,11 @@ function buildAppearanceLock(heroDescription: string): { open: string; close: st
   };
 }
 
-export async function generateSceneImage(scene: Scene, heroDescription: string, refImages: ReferenceImage[] = []): Promise<ImageResult> {
+export async function generateSceneImage(
+  scene: Scene, heroDescription: string, refImages: ReferenceImage[] = [],
+  deadline?: number // epoch ms — po překročení appka PŘIJME první průchod i s vadami
+  // (rychlost > dokonalost, jde 🖌 opravit ručně); bez deadline chová se jako dřív
+): Promise<ImageResult> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
   const model = IMAGE_MODEL.trim();
@@ -456,9 +460,11 @@ export async function generateSceneImage(scene: Scene, heroDescription: string, 
             v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt, refImages);
             if (!v0) console.warn(`[Gemini QA] scene ${scene.index}: kontrola opakovaně selhala — obrázek přijat NEOVĚŘENÝ`);
           }
-          if (v0 && !v0.ok) {
+          if (v0 && !v0.ok && deadline !== undefined && Date.now() > deadline) {
+            console.warn(`[Gemini QA] scene ${scene.index}: REJECTED [${v0.badRules} rules] (${v0.problems}) but GLOBAL DEADLINE passed → accepted as-is, no redraw`);
+          } else if (v0 && !v0.ok) {
             let best = { img, badRules: v0.badRules, problems: v0.problems };
-            for (let fix = 1; fix <= 3 && best.badRules > 0; fix++) {
+            for (let fix = 1; fix <= 3 && best.badRules > 0 && !(deadline !== undefined && Date.now() > deadline); fix++) {
               const fresh = fix === 3; // poslední kolo = čerstvý pokus bez korekce
               console.warn(`[Gemini QA] scene ${scene.index}: REJECTED [${best.badRules} rules] (${best.problems}) → ${fresh ? "fresh redraw" : `correction ${fix}/2`}`);
               try {

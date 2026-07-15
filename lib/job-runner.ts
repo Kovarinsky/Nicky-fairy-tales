@@ -161,6 +161,16 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   const SELF_KICK_AT = 240_000;   // kontroly mezi scénami/archy
   const WRITING_KICK_AT = 280_000; // psaní = jeden dlouhý stream → časovač (zbytečné řetězy stojí čas)
   const timeUp = () => Date.now() - runStartedAt > SELF_KICK_AT;
+
+  // 🚀 GLOBÁLNÍ STROP na CELOU pohádku, přes VŠECHNY řetězy (cíl < 5 min od
+  // zadání) — počítá se od st.createdAt, ne od runStartedAt (ten se resetuje
+  // s každým novým řetězem). Po překročení appka přestává opravovat vadné
+  // obrázky (přijme první průchod i s vadami — jde je později 🖌 opravit
+  // ručně) a nezahajuje další řetěz kvůli obrázkům — raději hotová pohádka
+  // s pár nedokonalými scénami hned, než perfektní za 30 minut.
+  const HARD_DEADLINE_MS = 280_000; // 4:40 — necháváme ~20 s na dopsání a zápis
+  const hardDeadlineAt = st.createdAt + HARD_DEADLINE_MS;
+  const overallTimeUp = () => Date.now() > hardDeadlineAt;
   let selfKicked = false;
   const selfContinue = async (): Promise<void> => {
     if (selfKicked) return;
@@ -329,7 +339,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           for (const ci of (Array.isArray(body.customCharacterImages) ? (body.customCharacterImages as Array<{ data?: string; mimeType?: string }>) : [])) {
             if (ci?.data && ci?.mimeType) early.push({ data: ci.data, mimeType: ci.mimeType, name: "a custom story character" });
           }
-          const img = await generateSceneImage(peek.scene, hero, early);
+          const img = await generateSceneImage(peek.scene, hero, early, hardDeadlineAt);
           earlyImg = img;
           logEv("⚡ scéna 1 dokreslena během psaní");
           return img;
@@ -473,7 +483,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       // 🎙️ Hlas se NEVYRÁBÍ při generování — namluvení vzniká líně až při
       // čtení hotové pohádky (klient si ho vyžádá přes /api/scene audioOnly).
       // Nepřehrané pohádky tak hlas vůbec neplatí.
-      const img = await generateSceneImage(scene, heroDescription, refs).catch((e: Error) => {
+      const img = await generateSceneImage(scene, heroDescription, refs, hardDeadlineAt).catch((e: Error) => {
         logEv(`🎨 scéna ${i + 1} CHYBA po ${secsSince(tScene)}s: ${e.message.slice(0, 140)}`);
         st.imgError = e.message.slice(0, 220);
         if (isDailyQuotaError(e.message)) quotaExhausted = true;
@@ -530,7 +540,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       // zbytečná minuta navíc). Max 2 vlny; vlna bez jediného nového panelu
       // ukončuje archovou fázi (pojistka proti smyčce archů).
       let prevRoundReports = ""; // výtky z 1. vlny → 2. vlna kreslí s korekcí
-      for (let round = 1; round <= 2 && !quotaExhausted && !timeUp() && !budgetBlown(); round++) {
+      for (let round = 1; round <= 2 && !quotaExhausted && !timeUp() && !budgetBlown() && !overallTimeUp(); round++) {
         const pend = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
         if (pend.length < 2) break;
         const groups: number[][] = [];
@@ -609,10 +619,16 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     }
 
     // ♻️ Došel čas funkce a scény ještě chybí → předat štafetu další funkci
-    // (hotové scény se přeskočí; klientský watchdog zůstává jako záloha)
+    // (hotové scény se přeskočí; klientský watchdog zůstává jako záloha) —
+    // ALE jen pokud jsme ještě pod globálním 5min stropem; jinak by se
+    // pohádka mohla řetězit donekonečna (viz „Kvarner" — 7 řetězů, 36 min)
     if (!quotaExhausted && Object.keys(st.sceneUrls!).length < total && timeUp()) {
-      await selfContinue();
-      return;
+      if (overallTimeUp()) {
+        logEv(`⏱️ globální strop ${Math.round(HARD_DEADLINE_MS / 1000)}s dosažen (${Object.keys(st.sceneUrls!).length}/${total} scén hotovo) → uzavírám pohádku i s chybějícími scénami (jdou 🖌 opravit ručně)`);
+      } else {
+        await selfContinue();
+        return;
+      }
     }
 
     // Denní kvóta vyčerpaná uprostřed práce → jasná chyba, žádné další pokusy
