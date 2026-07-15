@@ -54,6 +54,11 @@ export interface JobStatus {
   /** 📋 Deník běhu: posledních ~60 událostí s časem — diagnostika „proč to trvá"
    *  (jede ve statusu, klient ho vidí při každém pollu; 📋 u jobu ho zobrazí) */
   log?: Array<{ t: number; m: string }>;
+  /** 🗂️ Archová fáze už jednou skončila „ani jeden nový panel" (obtížná
+   *  konzistence — typicky náročný svět/reference) — další řetězy ji
+   *  přeskočí a jdou rovnou sólo, ať se stejný neúspěch neopakuje znovu
+   *  a znovu na KAŽDÉM restartu funkce. */
+  sheetGaveUp?: boolean;
 }
 
 export async function putJson(path: string, data: unknown): Promise<string> {
@@ -517,7 +522,8 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // per panel. Neprošlé/nevygenerované panely dokreslí sólo kola níže.
     // IMAGE_SHEET_MODE: "3x3" (výchozí) | "2x2" | "off"
     const sheetMode = (process.env.IMAGE_SHEET_MODE || "3x3").toLowerCase();
-    if (sheetMode !== "off" && !quotaExhausted && st.sceneUrls![0]) {
+    if (st.sheetGaveUp) logEv("🗂️ archová fáze už dřív vzdala (žádný nový panel) → rovnou sólo");
+    if (sheetMode !== "off" && !quotaExhausted && !st.sheetGaveUp && st.sceneUrls![0]) {
       const maxCells = sheetMode === "2x2" ? 4 : 9;
       // ⚡ Archy jedné vlny běží PARALELNĚ (15 stránek = archy 9+5 najednou —
       // 4K arch generuje ~stejně dlouho jako jedna 1K scéna, sériově to byla
@@ -568,6 +574,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         }));
         if (Object.keys(st.sceneUrls!).length === before) {
           logEv("🗂️ archy nepřinesly žádný nový panel → zbytek jde sólo cestou");
+          st.sheetGaveUp = true; // příští řetěz už archy nezkouší znovu
           break;
         }
         prevRoundReports = roundReports.join(" | ");

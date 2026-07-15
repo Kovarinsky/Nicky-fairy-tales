@@ -3770,6 +3770,7 @@ export default function Home() {
                   onClick={() => { pickVoice("auto"); setVoiceOpen(false); }}>
                   <span className="folk-emoji">✨</span>
                   <span>{t.voiceAuto}</span>
+                  {voicePref === "auto" && <span className="voice-check" aria-hidden>✓</span>}
                 </button>
                 {/* Ťuknutí hlas vybere a pustí/zastaví ukázku (⏳ nahrávám,
                     ⏹ hraje) — panel zůstává otevřený kvůli porovnávání.
@@ -3795,6 +3796,7 @@ export default function Home() {
                     onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { pickVoice(v.id); testVoice(v.id); } }}>
                     <span className="folk-emoji">{v.emoji}</span>
                     <span>{vName}</span>
+                    {voicePref === v.id && <span className="voice-check" aria-hidden>✓</span>}
                     <span className="voice-play" aria-hidden>{playIcon}</span>
                     <button type="button" className="chip-remove folk-remove" aria-label={t.cloneDelete}
                       onClick={e => { e.stopPropagation(); if (v.kind === "clone") deleteClone(v.id); else deleteDesigned(v.id); }}>×</button>
@@ -3807,6 +3809,7 @@ export default function Home() {
                     onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { pickVoice(v.id); testVoice(v.id); } }}>
                     <span className="folk-emoji">{v.emoji}</span>
                     <span>{vName}</span>
+                    {voicePref === v.id && <span className="voice-check" aria-hidden>✓</span>}
                     <span className="voice-play" aria-hidden>{playIcon}</span>
                     <button type="button" className="chip-remove folk-remove" aria-label={t.voiceHide}
                       onClick={e => { e.stopPropagation(); hideVoice(v.id); }}>×</button>

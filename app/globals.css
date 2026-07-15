@@ -1979,6 +1979,23 @@ button:disabled {
   box-shadow: 0 2px 8px rgba(244, 81, 30, 0.4);
 }
 
+/* ✓ malé oranžové potvrzení PŘÍMO u vybraného hlasu — fialové podbarvení
+   řádku (.folk-on) samo nestačilo, nebylo jasné, který přesně je vybraný */
+.voice-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  min-width: 19px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff9800, #f4511e);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 900;
+  box-shadow: 0 1px 5px rgba(244, 81, 30, 0.5);
+}
+
 .folk-remove { margin-left: auto; }
 
 /* ▶/⏳/⏹ indikátor přehrávání ukázky hlasu na konci řádku výběru;
