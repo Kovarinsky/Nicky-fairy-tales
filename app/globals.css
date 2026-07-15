@@ -344,24 +344,6 @@ body {
   transform: translateX(100%);
 }
 
-/* ▶ Brzké čtení — tlačítko v segmentu běžící pohádky */
-.job-seg-read {
-  position: absolute;
-  left: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 2;
-  border: none;
-  border-radius: 999px;
-  padding: 0.22rem 0.6rem;
-  font-size: 0.74rem;
-  font-weight: 800;
-  color: #fff;
-  background: linear-gradient(135deg, #43a047, #2e7d32);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-}
-
 /* 🎙️ Text na přečtení při klonování hlasu */
 .clone-script {
   margin: 0.4rem 0;
