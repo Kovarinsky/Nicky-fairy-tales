@@ -51,7 +51,23 @@ export async function POST(req: NextRequest) {
       await del(toDelete.slice(i, i + 100), { token: blobToken() });
     }
 
-    return NextResponse.json({ jobsTotal: jobsSeen.size, blobsDeleted: toDelete.length });
+    // 🩺 debug-logs/ přežívají zrušení i běžný úklid výše (diagnostika i po
+    // ✕) — promazat jen VELMI staré záznamy (30 dní), ať úložiště neroste věčně
+    const DEBUG_LOG_MAX_AGE_MS = 30 * 24 * 3600_000;
+    const staleDebug: string[] = [];
+    let dCursor: string | undefined;
+    do {
+      const page = await list({ prefix: "debug-logs/", cursor: dCursor, limit: 1000, token: blobToken() });
+      for (const blob of page.blobs) {
+        if (Date.now() - new Date(blob.uploadedAt).getTime() > DEBUG_LOG_MAX_AGE_MS) staleDebug.push(blob.url);
+      }
+      dCursor = page.cursor;
+    } while (dCursor);
+    for (let i = 0; i < staleDebug.length; i += 100) {
+      await del(staleDebug.slice(i, i + 100), { token: blobToken() });
+    }
+
+    return NextResponse.json({ jobsTotal: jobsSeen.size, blobsDeleted: toDelete.length, debugLogsPruned: staleDebug.length });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Neznámá chyba";
     return NextResponse.json({ error: message }, { status: 500 });

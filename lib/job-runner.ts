@@ -132,8 +132,25 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           stuckRestarts: prev?.stuckRestarts,
           log: prev?.log, // deník přežívá restarty psaní
         };
+  // 🩺 Trvalý diagnostický záznam běhu — NEZÁVISLÝ na jobs/<id>/* (ten smaže
+  // ✕ zrušení i běžný úklid úložiště). Píše se do JINÉ složky (debug-logs/),
+  // kterou úklid nemaže — i po zrušené/chybové pohádce tak zůstává k
+  // dispozici plný 📋 deník (appka ho umí zobrazit přes /api/job/debug-log,
+  // i když je job dávno pryč). Jen text (žádné obrázky) — pár KB na běh.
+  const writeDebugArchive = () => {
+    const record = {
+      id, title: st.title, topic: typeof body.topic === "string" ? body.topic.slice(0, 300) : undefined,
+      phase: st.phase, error: st.error, imgError: st.imgError, lastError: st.lastError,
+      total: st.total, done: st.done,
+      createdAt: st.createdAt, updatedAt: st.updatedAt, finishedAt: st.finishedAt, wroteAt: st.wroteAt,
+      chains: st.chains, restarts: st.restarts, stuckRestarts: st.stuckRestarts,
+      log: st.log,
+    };
+    return putJson(`debug-logs/${id}.json`, record).catch(e => console.error(`[job ${id}] debug archive write failed:`, e));
+  };
   const write = () => {
     st.updatedAt = Date.now();
+    void writeDebugArchive();
     return putJson(statusPath, st).catch(e => console.error(`[job ${id}] status write failed:`, e));
   };
   // 📋 Deník: co se kdy stalo (trvání kroků, chyby) — bez await, zapíše se

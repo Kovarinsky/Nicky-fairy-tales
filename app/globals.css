@@ -1998,6 +1998,21 @@ button:disabled {
 
 .folk-remove { margin-left: auto; }
 
+/* 🩺 Zrušené/chybové běhy — jednoduchý řádek s 📋 tlačítkem (žádné swipe-mazání) */
+.debug-job-item { cursor: pointer; }
+.debug-job-log-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  background: rgba(124, 77, 255, 0.75);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
+}
+
 /* ▶/⏳/⏹ indikátor přehrávání ukázky hlasu na konci řádku výběru;
    × za ním už doprava tlačit nemusí */
 .voice-play {

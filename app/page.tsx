@@ -74,6 +74,22 @@ function loadHistory(): HistoryEntry[] {
   } catch { return []; }
 }
 
+// 🩺 Zrušené/chybové běhy — appka si po ✕ nebo chybě pamatuje ID + název,
+// ať jde 📋 deník dohledat i POZDĚJI (server drží trvalý záznam v debug-logs/,
+// nezávislý na jobs/<id>/*, který ✕/úklid maže). Bez tohohle po zastavení
+// generování nezbylo vůbec nic k diagnostice.
+const DEBUG_JOBS_KEY = "nicky-debug-jobs";
+interface DebugJobRef { id: string; title?: string; phase?: string; error?: string; endedAt: string }
+function loadDebugJobs(): DebugJobRef[] {
+  try { return JSON.parse(localStorage.getItem(DEBUG_JOBS_KEY) || "[]"); } catch { return []; }
+}
+function archiveDebugJob(ref: Omit<DebugJobRef, "endedAt">) {
+  try {
+    const next = [{ ...ref, endedAt: new Date().toISOString() }, ...loadDebugJobs().filter(x => x.id !== ref.id)].slice(0, 15);
+    localStorage.setItem(DEBUG_JOBS_KEY, JSON.stringify(next));
+  } catch {}
+}
+
 function saveHistory(entry: HistoryEntry) {
   try {
     const prev = loadHistory().filter(e => e.id !== entry.id);
@@ -318,6 +334,19 @@ export default function Home() {
   const [focusJobId, setFocusJobId] = useState<string | null>(null);
 
   const [usageOpen, setUsageOpen] = useState(false);
+  // 🩺 Zrušené/chybové běhy — deník je pořád dohledatelný přes /api/job/debug-log
+  const [debugJobs, setDebugJobs] = useState<DebugJobRef[]>([]);
+  const [debugJobsOpen, setDebugJobsOpen] = useState(false);
+  async function openDebugJobLog(ref: DebugJobRef) {
+    try {
+      const res = await fetch(`/api/job/debug-log?id=${ref.id}`, { cache: "no-store" });
+      const d = await safeJson<{ title?: string; log?: JobLogEntry[]; error?: string }>(res);
+      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+      setLogView({ title: d.title || ref.title || "", entries: d.log || [] });
+    } catch (e) {
+      await appAlert(`${t.debugLogErr}${e instanceof Error && e.message ? ` (${e.message.slice(0, 160)})` : ""}`);
+    }
+  }
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [usageErr, setUsageErr] = useState(false);
   function toggleUsage() {
@@ -689,7 +718,14 @@ export default function Home() {
     syncServerJobs(serverJobsRef.current.map(j => (j.jobId === jobId ? { ...j, ...patch } : j)));
   }, [syncServerJobs]);
   const removeServerJob = useCallback((jobId: string) => {
-    syncServerJobs(serverJobsRef.current.filter(j => j.jobId !== jobId));
+    // 🩺 Archivovat, POKUD pohádka nedoběhla do konce (zrušená/chybová) —
+    // hotové pohádky mají svůj deník už uložený v historii (netřeba duplikovat)
+    const j = serverJobsRef.current.find(x => x.jobId === jobId);
+    if (j && j.phase !== "done") {
+      archiveDebugJob({ id: j.jobId, title: j.title, phase: j.phase, error: j.error });
+      setDebugJobs(loadDebugJobs());
+    }
+    syncServerJobs(serverJobsRef.current.filter(x => x.jobId !== jobId));
   }, [syncServerJobs]);
 
   // ⏱ Časomíra u běžícího jobu — tikne jednou za vteřinu, ať se ukazované
@@ -772,6 +808,7 @@ export default function Home() {
       }
     }).catch(() => {});
     setStoryHistory(loadHistory());
+    setDebugJobs(loadDebugJobs());
 
     // 📋 Zpětné doplnění deníku k čerstvě hotovým pohádkám (dokončila je
     // starší verze appky / jiné zařízení) — status.json na serveru žije ~1 h
@@ -4407,6 +4444,37 @@ export default function Home() {
         </div>
       )}
 
+
+      {/* ── 🩺 Zrušené/chybové běhy — deník dostupný i po zavření/zrušení ── */}
+      {!readerMode && debugJobs.length > 0 && (
+        <div className="history-box">
+          <button type="button" className="history-toggle" onClick={() => setDebugJobsOpen(p => !p)}>
+            {t.debugJobsTitle(debugJobs.length)} {debugJobsOpen ? "▲" : "▼"}
+          </button>
+          {debugJobsOpen && (
+            <>
+              <p className="gen-step-hint" style={{ margin: "0.15rem 0 0.4rem" }}>{t.debugJobsHint}</p>
+              <div className="history-list">
+                {debugJobs.map(ref => (
+                  <button type="button" key={ref.id} className="history-item debug-job-item"
+                    onClick={() => openDebugJobLog(ref)}>
+                    <div className="history-item-body">
+                      <span className="history-title-clip">
+                        <span className="history-title">{ref.title || ref.id.slice(0, 8)}</span>
+                      </span>
+                      <div className="history-badges">
+                        <span className="history-badge badge-size">{ref.phase === "error" ? t.segError : t.segWriting}</span>
+                      </div>
+                      <span className="history-date">{fmtDate(ref.endedAt)}</span>
+                    </div>
+                    <span className="debug-job-log-btn" aria-label={t.logTitle}>📋</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── USAGE — real spend overview ── */}
       {!readerMode && (
