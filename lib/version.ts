@@ -1,6 +1,7 @@
-export const APP_VERSION = "4.11";
+export const APP_VERSION = "4.12";
 
 // Changelog (newest first)
+// 4.12 - 🚨 NALEZENA A OPRAVENA PŘÍČINA 25+ MINUTOVÝCH ZÁSEKŮ („27m?"): appka volala Gemini pro obrázky i vizuální kontrolu přes syrové Node `https.request` BEZ JAKÉHOKOLI TIMEOUTU — když spojení tiše zůstalo viset (žádná odpověď, žádná chyba), promise se nikdy nesplnila ani neselhala, takže se do 📋 deníku nezapsalo vůbec nic a job stál donekonečna (v jednom případě 26 minut mezi dvěma řádky deníku). Obě volání teď mají 90s nečinnostní limit — zaseknuté spojení se přeruší a existující logika opakování/záložního modelu/timeoutu se převezme normálně; ověřeno izolovaným testem (zaseknuté spojení → spolehlivě selže po timeoutu místo věčného čekání).
 // 4.11 - 📋 VÍCE DETAILU V LOGU BĚHEM PSANÍ: appka dřív během celého psaní (klidně 2+ minuty) nezapsala do deníku ani řádek — jen tichý heartbeat na pozadí, takže to při delším psaní vypadalo zaseknuté, i když Claude reálně streamoval text. Teď se každých ~20 s zapíše živý postup („✍️ píšu… (1234 znaků zatím, 80s)"), ať je vidět, že se opravdu pracuje.
 // 4.10 - 🎙️ 10 NOVÝCH testovacích hlasů z hlasového průzkumu (Gemini TTS, vybráno podle oficiálních popisků stylu — přátelský/živý/veselý/jemný/pohodový/uvolněný/zářivý/vzdušný/svěží/tichý), mluví libovolným jazykem appky; k vyzkoušení v „🎙️ Vypravěč a jazyk pohádky" ve skupině 🌍 Vícejazyčné a vlastní — všech 10 ověřeno živě proti Gemini TTS API
 // 4.09 - ▶ ODEBRÁNO brzké čtení: appka dřív nabízela „Číst" ještě za běhu generování (odhadem, že čtenář kreslení nedožene) — na přání appka teď pohádku k přečtení nabídne, až je SKUTEČNĚ celá hotová, nikdy dřív.

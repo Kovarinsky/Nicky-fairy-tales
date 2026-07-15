@@ -71,6 +71,13 @@ type GeminiCandidate = {
   safetyRatings?: Array<{ category: string; probability: string; blocked?: boolean }>;
 };
 
+// ⏱ Bez timeoutu se hen (žádná odpověď, ani chyba) hangla klidně 25+ minut —
+// celý job pak stál a do 📋 deníku se nezapsalo vůbec nic (nebylo co logovat,
+// promise nikdy nedospěla k resolve ani reject). req.setTimeout je NEČINNOSTNÍ
+// limit (žádná data po tuto dobu) — destroy(err) vyvolá "error" a promise
+// se rejectne, takže existující retry/backoff/fallback logika převezme řízení.
+const GEMINI_REQUEST_TIMEOUT_MS = 90_000;
+
 function geminiPost(apiKey: string, model: string, body: object): Promise<string> {
   const bodyBuf = Buffer.from(JSON.stringify(body), "utf-8");
   const path = `/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -85,6 +92,9 @@ function geminiPost(apiKey: string, model: string, body: object): Promise<string
         res.on("error", reject);
       }
     );
+    req.setTimeout(GEMINI_REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error(`Gemini request timed out after ${GEMINI_REQUEST_TIMEOUT_MS / 1000}s (no response)`));
+    });
     req.on("error", reject);
     req.write(bodyBuf);
     req.end();
@@ -220,6 +230,13 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
         res.on("error", reject);
       }
     );
+    // ⏱ Bez timeoutu se hen (žádná odpověď) hangla klidně 25+ minut — job
+    // stál a do 📋 deníku se nezapsalo nic, protože ta promise nikdy nedospěla
+    // k resolve ani reject. destroy(err) vyvolá "error" → existující retry/
+    // backoff/model-fallback logika v generateSceneImage převezme řízení.
+    req.setTimeout(GEMINI_REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error(`Gemini request timed out after ${GEMINI_REQUEST_TIMEOUT_MS / 1000}s (no response)`));
+    });
     req.on("error", reject);
     req.write(bodyBuf);
     req.end();
