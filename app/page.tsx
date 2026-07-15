@@ -666,7 +666,7 @@ export default function Home() {
   // Server jobs — a QUEUE: several fairy tales can generate on Vercel at once,
   // each gets its own toast row and the newest one drives the gen-cards
   type JobLogEntry = { t: number; m: string };
-  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string; restarts?: number; stuckRestarts?: number; lastError?: string; log?: JobLogEntry[] };
+  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string; restarts?: number; stuckRestarts?: number; lastError?: string; log?: JobLogEntry[]; createdAt?: number };
   const MAX_ACTIVE_JOBS = 3;
   // 📋 Otevřený deník běhu jobu (overlay) — entries se berou živě z pollů
   // (jobId → entries živě z pollů; entries → snapshot z hotové pohádky v historii)
@@ -691,6 +691,15 @@ export default function Home() {
   const removeServerJob = useCallback((jobId: string) => {
     syncServerJobs(serverJobsRef.current.filter(j => j.jobId !== jobId));
   }, [syncServerJobs]);
+
+  // ⏱ Časomíra u běžícího jobu — tikne jednou za vteřinu, ať se ukazované
+  // uplynulé číslo hýbe, ne jen při každém pollu (ten chodí à 4 s)
+  const [jobClockTick, setJobClockTick] = useState(0);
+  useEffect(() => {
+    if (!serverJobs.some(j => j.phase === "writing" || j.phase === "generating")) return;
+    const iv = setInterval(() => setJobClockTick(t => t + 1), 1000);
+    return () => clearInterval(iv);
+  }, [serverJobs]);
 
   // ✕ na dílu tlačítka: zrušit pohádku jedním ťuknutím (z fronty + data na serveru)
   const cancelServerJob = useCallback((jobId: string) => {
@@ -2440,14 +2449,17 @@ export default function Home() {
         if (st.phase === "writing" || st.phase === "generating") {
           maybeKickContinue(jobId, st, serverJobsRef.current.find(j => j.jobId === jobId)?.stalled);
         }
+        // ⏱ Skutečný serverový čas zadání — zpřesní optimistický Date.now() z
+        // addServerJob (a obnoví ho po reloadu stránky, kdy se joby jen rehydrují z id)
+        const createdAtPatch = typeof st.createdAt === "number" ? { createdAt: st.createdAt } : {};
         if (st.phase === "writing") {
           // restarts/lastError: diagnostika, proč se psaní opakuje (viditelná v řádku)
-          updateServerJob(jobId, { phase: "writing", restarts: st.restarts || 0, stuckRestarts: st.stuckRestarts || 0, lastError: st.lastError || undefined, log: st.log });
+          updateServerJob(jobId, { phase: "writing", restarts: st.restarts || 0, stuckRestarts: st.stuckRestarts || 0, lastError: st.lastError || undefined, log: st.log, ...createdAtPatch });
         } else if (st.phase === "generating") {
           jobMetaRef.current.set(jobId, { title: st.title, heroDescription: st.heroDescription, choice: st.choice });
           prefetchJobScenes(jobId, st);
           updateEarlyReady(jobId, st); // ▶ Číst se ukáže, až čtenář nebude muset čekat
-          updateServerJob(jobId, { phase: "generating", done: st.done || 0, total: st.total || 0, title: st.title, imgError: st.imgError || undefined, log: st.log });
+          updateServerJob(jobId, { phase: "generating", done: st.done || 0, total: st.total || 0, title: st.title, imgError: st.imgError || undefined, log: st.log, ...createdAtPatch });
         } else if (st.phase === "done") {
           stopJobPolling(jobId);
           await finalizeServerJob(st, jobId);
@@ -2463,7 +2475,9 @@ export default function Home() {
 
   function addServerJob(jobId: string) {
     if (!serverJobsRef.current.some(j => j.jobId === jobId)) {
-      syncServerJobs([...serverJobsRef.current, { jobId, phase: "writing", done: 0, total: 0 }]);
+      // ⏱ Optimistický start časomíry hned teď — první poll ho zpřesní na
+      // skutečný serverový čas (st.createdAt), ať sedí i po obnovení stránky
+      syncServerJobs([...serverJobsRef.current, { jobId, phase: "writing", done: 0, total: 0, createdAt: Date.now() }]);
     }
     startJobPolling(jobId);
   }
@@ -4068,11 +4082,23 @@ export default function Home() {
                             : j.phase === "generating" ? `🎨 ${j.done}/${j.total}`
                             : j.phase === "done" ? t.segOpen
                             : t.segError}
+                          {/* ⏱ Časomíra přípravy — tikne s jobClockTick, hodnota se
+                              vždy počítá znovu z reálného Date.now() */}
+                          {(j.phase === "writing" || j.phase === "generating") && j.createdAt && (
+                            <span className="job-seg-timer" data-tick={jobClockTick}>
+                              ⏱ {fmtDur(Math.max(0, (Date.now() - j.createdAt) / 1000))}
+                            </span>
+                          )}
                         </span>
-                        {/* živý stav: poslední krok z 📋 deníku — ať je vidět,
-                            že job pracuje, i když se čísla zrovna nehýbou */}
+                        {/* živý stav: poslední krok z 📋 deníku — ROLUJE, ať jde
+                            přečíst i delší hlášku, ne jen useknutý začátek;
+                            key na textu = animace se restartuje s KAŽDÝM novým krokem */}
                         {j.phase === "generating" && j.log?.length ? (
-                          <span className="job-live-note">{j.log[j.log.length - 1].m.slice(0, 90)}</span>
+                          <span className="job-live-note-clip">
+                            <span className="job-live-note" key={j.log[j.log.length - 1].t}>
+                              {j.log[j.log.length - 1].m}
+                            </span>
+                          </span>
                         ) : null}
                         {j.phase === "writing" && j.lastError && (
                           <span className="job-last-error">⚠️ {j.lastError.slice(0, 160)}</span>
