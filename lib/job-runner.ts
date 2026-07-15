@@ -547,7 +547,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     }
 
     // Scene 1 first (anchor), then the rest in parallel
-    if (!timeUp()) await doScene(0);
+    if (!timeUp() && !overallTimeUp()) await doScene(0);
 
     // 🗂️ Režim archů: zbylé scény po skupinách v JEDNOM obrázku (3×3 ve 4K =
     // až 9 scén za cenu jednoho obrázku), rozřezané a zkontrolované jedenácterem
@@ -615,17 +615,17 @@ export async function runJob(id: string, body: Record<string, unknown>) {
 
     let idx = 1;
     async function worker() {
-      while (idx < total && !timeUp()) { const i = idx++; await doScene(i); }
+      while (idx < total && !timeUp() && !overallTimeUp()) { const i = idx++; await doScene(i); }
     }
     // 4 souběžní kreslíři (dřív 3) — sólo dokreslení po neprošlém archu je
     // nejpomalejší fáze; Gemini limity 4 souběhy zvládají
     await Promise.all(Array.from({ length: Math.min(4, Math.max(0, total - 1)) }, worker));
 
     // Verification rounds — the job is done only when every image exists
-    for (let round = 0; round < 2 && !quotaExhausted && !timeUp(); round++) {
+    for (let round = 0; round < 2 && !quotaExhausted && !timeUp() && !overallTimeUp(); round++) {
       const missing = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
       if (missing.length === 0) break;
-      for (const i of missing) { if (timeUp()) break; await doScene(i); }
+      for (const i of missing) { if (timeUp() || overallTimeUp()) break; await doScene(i); }
     }
 
     st.imgSpent = spentNow(); // 💰 útrata běhu do stavu (řetězy ji sčítají)
@@ -644,7 +644,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // (hotové scény se přeskočí; klientský watchdog zůstává jako záloha) —
     // ALE jen pokud jsme ještě pod globálním 5min stropem; jinak by se
     // pohádka mohla řetězit donekonečna (viz „Kvarner" — 7 řetězů, 36 min)
-    if (!quotaExhausted && Object.keys(st.sceneUrls!).length < total && timeUp()) {
+    if (!quotaExhausted && Object.keys(st.sceneUrls!).length < total && (timeUp() || overallTimeUp())) {
       if (overallTimeUp()) {
         logEv(`⏱️ globální strop ${Math.round(HARD_DEADLINE_MS / 1000)}s dosažen (${Object.keys(st.sceneUrls!).length}/${total} scén hotovo) → uzavírám pohádku i s chybějícími scénami (jdou 🖌 opravit ručně)`);
       } else {
