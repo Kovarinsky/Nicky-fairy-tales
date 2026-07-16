@@ -568,7 +568,14 @@ function sanitizeApiKey(key: string | undefined): string {
   return (key || "").replace(/[^\x20-\x7E]/g, "").trim();
 }
 
-async function callAnthropicApi(body: object, onDelta?: (chars: number, fullText: string) => void): Promise<string> {
+async function callAnthropicApi(
+  body: object,
+  onDelta?: (chars: number, fullText: string) => void,
+  // 📋 Volitelný zápis do TRVALÉHO deníku joby (job-runner posílá logEv) —
+  // dřív šly retry pokusy jen do server konzole, kterou appka/uživatel
+  // nevidí, takže dlouhé „psaní… (N. pokus)" bylo bez jakéhokoli vysvětlení.
+  onRetry?: (msg: string) => void
+): Promise<string> {
   const apiKey = sanitizeApiKey(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) throw new Error("Chybí ANTHROPIC_API_KEY.");
 
@@ -604,7 +611,9 @@ async function callAnthropicApi(body: object, onDelta?: (chars: number, fullText
       });
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e));
-      console.warn(`[Claude] síťová chyba, zkouším znovu (pokus ${attempt + 1}): ${lastErr.message}`);
+      const msg = `🌐 Claude: síťová chyba, zkouším znovu (pokus ${attempt + 1}/${MAX_ATTEMPTS}): ${lastErr.message.slice(0, 140)}`;
+      console.warn(msg);
+      onRetry?.(msg);
       await new Promise(r => setTimeout(r, 5_000));
       continue;
     }
@@ -612,7 +621,9 @@ async function callAnthropicApi(body: object, onDelta?: (chars: number, fullText
       await res.text().catch(() => "");
       const retryAfter = Number(res.headers.get("retry-after"));
       const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter, 30) * 1000 : 12_000;
-      console.warn(`[Claude] ${res.status}, retry in ${waitMs / 1000}s (attempt ${attempt + 1})`);
+      const msg = `🌐 Claude: ${res.status} (přetíženo), zkusím znovu za ${Math.round(waitMs / 1000)}s (pokus ${attempt + 1}/${MAX_ATTEMPTS})`;
+      console.warn(msg);
+      onRetry?.(msg);
       lastErr = new Error(`Anthropic ${res.status}`);
       await new Promise(r => setTimeout(r, waitMs));
       continue;
@@ -652,13 +663,17 @@ async function callAnthropicApi(body: object, onDelta?: (chars: number, fullText
       }
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e));
-      console.warn(`[Claude] chyba streamu, zkouším znovu (pokus ${attempt + 1}): ${lastErr.message}`);
+      const msg = `🌐 Claude: chyba streamu, zkouším znovu (pokus ${attempt + 1}/${MAX_ATTEMPTS}): ${lastErr.message.slice(0, 140)}${out ? ` (mělo už ${out.length} znaků, zahazuji a jedu znovu)` : ""}`;
+      console.warn(msg);
+      onRetry?.(msg);
       await new Promise(r => setTimeout(r, 5_000));
       continue;
     }
     if (!out) {
       lastErr = new Error("Claude nevrátil text (prázdný stream).");
-      console.warn(`[Claude] prázdný stream, zkouším znovu (pokus ${attempt + 1})`);
+      const msg = `🌐 Claude: prázdný stream (spojení OK, ale žádný text), zkouším znovu (pokus ${attempt + 1}/${MAX_ATTEMPTS})`;
+      console.warn(msg);
+      onRetry?.(msg);
       await new Promise(r => setTimeout(r, 5_000));
       continue;
     }
@@ -855,7 +870,11 @@ export async function generateStory(
   onDelta?: (chars: number, fullText: string) => void,
   // Navázání po restartu funkce: rozepsaný text z minulého běhu se pošle
   // jako prefill asistentovy odpovědi — Claude POKRAČUJE, nepíše od nuly.
-  resumeText?: string
+  resumeText?: string,
+  // 📋 Zápis do trvalého deníku joby — ať jsou retry pokusy Clauda (síťová
+  // chyba, přetížení, prázdný stream) vidět appce/uživateli, ne jen v
+  // server konzoli
+  onLog?: (msg: string) => void
 ): Promise<StoryScript> {
   const model = MODEL.trim();
   const parts: AnthropicPart[] = [];
@@ -922,7 +941,7 @@ export async function generateStory(
       messages,
     }, prefix
       ? (chars, fullText) => onDelta?.(prefix.length + chars, prefix + fullText)
-      : onDelta);
+      : onDelta, onLog);
     const raw = prefix ? mergeContinuation(prefix, continuation) : continuation;
     try {
       const script = parseScript(raw);
@@ -938,7 +957,9 @@ export async function generateStory(
       return script;
     } catch (e) {
       if (attempt === 2) throw e;
-      console.warn(`[Claude] JSON parse failed attempt ${attempt}, retrying: ${e instanceof Error ? e.message : e}`);
+      const msg = `📄 Claude: scénář se nedal přečíst (JSON), zkouším ještě jednou celý od začátku: ${e instanceof Error ? e.message.slice(0, 140) : e}`;
+      console.warn(msg);
+      onLog?.(msg);
     }
   }
   throw new Error("Nepodařilo se vygenerovat příběh.");

@@ -323,12 +323,18 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         }
         // Restart s POKROKEM (partial narostl) = zdravé navázání po limitu
         // funkce; bez pokroku = skutečné zaseknutí → po 3 se job zastaví
-        if (resumeText.length > (prev?.partialLen ?? 0)) st.stuckRestarts = 0;
+        const prevLen = prev?.partialLen ?? 0;
+        if (resumeText.length > prevLen) st.stuckRestarts = 0;
         else st.stuckRestarts = (prev?.stuckRestarts ?? 0) + 1;
         st.partialLen = resumeText.length;
+        // 📋 Bez tohohle bylo v deníku vidět jen „psaní pokus N", ale ne PROČ
+        // se restartuje ani jestli se vůbec někam hýbe — teď je vidět délka
+        // rozepsaného textu a počet restartů BEZ pokroku (0–3 → pak stop)
+        logEv(`🔁 restart psaní (pokus ${(st.restarts ?? 0) + 1}): rozepsáno ${resumeText.length} znaků (dřív ${prevLen}), bez pokroku ${st.stuckRestarts}×${st.lastError ? ` — minulá chyba: ${st.lastError.slice(0, 140)}` : ""}`);
         if ((st.stuckRestarts ?? 0) >= 3) {
           st.phase = "error";
           st.error = `Psaní příběhu se zaseklo a neposouvá se${st.lastError ? ` (${st.lastError.slice(0, 200)})` : ""} — zrušte pohádku ✕ a zadejte ji znovu, případně s méně stránkami.`;
+          logEv(`⛔ STOP: psaní se ${st.stuckRestarts}× po sobě nikam neposunulo`);
           await write();
           return;
         }
@@ -382,7 +388,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           putJson(`jobs/${id}/partial.json`, { text: latestText })
             .catch(e => console.warn(`[job ${id}] partial write failed:`, e));
         }
-        }, resumeText || undefined);
+        }, resumeText || undefined, logEv);
       } finally {
         clearTimeout(writingKick);
       }
