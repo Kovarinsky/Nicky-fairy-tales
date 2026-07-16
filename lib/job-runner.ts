@@ -571,9 +571,18 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // až 9 scén za cenu jednoho obrázku), rozřezané a zkontrolované jedenácterem
     // per panel. Neprošlé/nevygenerované panely dokreslí sólo kola níže.
     // IMAGE_SHEET_MODE: "3x3" (výchozí) | "2x2" | "off"
+    // ⚠ U 3+ pojmenovaných postav se archy v testech ukázaly nespolehlivé
+    // (model při víc referenčních tvářích v jednom obrázku míchá identity —
+    // napříč běhy prošlo 0/8, 0/8, 5/8, 4/8 panelů) a ekonomika vychází kolem
+    // nuly nebo ztrátová (3,5 Kč za arch skoro vždy, úspora nejistá) — u
+    // bohatšího obsazení jde appka rovnou sólo cestou, u 1-2 postav archy
+    // prokazatelně fungují a zůstávají zapnuté.
+    const castSize = (Array.isArray(body.characterIds) ? (body.characterIds as unknown[]).length : 0)
+      + (Array.isArray(body.customCharacters) ? (body.customCharacters as unknown[]).length : 0);
     const sheetMode = (process.env.IMAGE_SHEET_MODE || "3x3").toLowerCase();
     if (st.sheetGaveUp) logEv("🗂️ archová fáze už dřív vzdala (žádný nový panel) → rovnou sólo");
-    if (sheetMode !== "off" && !quotaExhausted && !st.sheetGaveUp && st.sceneUrls![0]) {
+    else if (castSize >= 3) logEv(`🗂️ archová fáze přeskočena (${castSize} postav — u 3+ nespolehlivé) → rovnou sólo`);
+    if (sheetMode !== "off" && castSize < 3 && !quotaExhausted && !st.sheetGaveUp && st.sceneUrls![0]) {
       const maxCells = sheetMode === "2x2" ? 4 : 9;
       // ⚡ Archy jedné vlny běží PARALELNĚ (15 stránek = archy 9+5 najednou —
       // 4K arch generuje ~stejně dlouho jako jedna 1K scéna, sériově to byla

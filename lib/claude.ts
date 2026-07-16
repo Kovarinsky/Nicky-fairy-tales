@@ -723,6 +723,9 @@ export async function suggestTopicIdea(language: "cs" | "en", characterNames: st
   const raw = await callAnthropicApi({
     model,
     max_tokens: 300,
+    // Sonnet 5 defaultně (bez "thinking") běží ADAPTIVNÍ thinking — u
+    // krátkého jednoduchého námětu jen zbytečně přidává latenci
+    thinking: { type: "disabled" },
     messages: [{ role: "user", content: prompt }],
   });
   return raw.trim().replace(/^["'„]|["'"]$/g, "");
@@ -783,6 +786,7 @@ export async function expandTopicIdea(
     // umí instrukci „~280 slov" přehlušit a 2000 uřízlo osnovu uprostřed
     // věty („…Habsburg") — 4096 dává reálný prostor i tomuhle případu
     max_tokens: 4096,
+    thinking: { type: "disabled" },
     messages: [{ role: "user", content }],
   });
   return raw.trim();
@@ -797,6 +801,7 @@ export async function translateTopicText(target: "cs" | "en", text: string): Pro
   const raw = await callAnthropicApi({
     model,
     max_tokens: 4096,
+    thinking: { type: "disabled" },
     messages: [{ role: "user", content: prompt }],
   });
   return raw.trim();
@@ -812,6 +817,7 @@ export async function extractPdfBrief(language: "cs" | "en", pdfBase64: string):
   const raw = await callAnthropicApi({
     model,
     max_tokens: 800,
+    thinking: { type: "disabled" },
     messages: [{
       role: "user",
       content: [
@@ -855,6 +861,7 @@ export async function studyWorld(
   const raw = await callAnthropicApi({
     model,
     max_tokens: 1000,
+    thinking: { type: "disabled" },
     messages: [{ role: "user", content: prompt }],
   });
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -934,6 +941,12 @@ export async function generateStory(
     const continuation = await callAnthropicApi({
       model,
       max_tokens: 16384, // 20 scén s vyprávěním a popisy obrázků se do 8k nevešlo
+      // ⏱ Sonnet 5 bez explicitního "thinking" tiše běží ADAPTIVNÍ thinking
+      // (tichá změna oproti Sonnet 4.6, kde bez něj thinking neběžel vůbec) —
+      // appka navíc thinking_delta eventy ve streamu vůbec nezpracovává, takže
+      // se to dřív projevovalo jako neviditelný „mrtvý" čas (klidně 100+ s bez
+      // jediného znaku) předtím, než začal přitékat viditelný text.
+      thinking: { type: "disabled" },
       // Prompt caching: velký systémový prompt (~4k tokenů) je neměnný —
       // opakovaná čtení (fronta pohádek, restarty, navázání) stojí ~1/10.
       // Menší prompty (náměty, překlad) jsou pod kešovatelným minimem.
