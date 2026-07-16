@@ -2892,9 +2892,9 @@ export default function Home() {
   // s fallbackem na souřadnice — Claude místo pozná) → návrh pohádky z okolí.
   // Poloha se nikam neukládá, použije se jen pro tento jeden návrh.
   const [gpsLoading, setGpsLoading] = useState(false);
-  // ✅ Krátký oranžový záblesk tlačítka po úspěchu — jinak jediná viditelná
-  // změna byla text v poli přání, což šlo snadno přehlédnout (appka „nic
-  // nepotvrdila").
+  // ✅ Oranžové potvrzení po úspěchu — jinak jediná viditelná změna byla
+  // text v poli přání, což šlo snadno přehlédnout (appka „nic nepotvrdila").
+  // Zůstává, dokud se nezkusí znovu (viz reset v suggestFromLocation).
   const [gpsSuccess, setGpsSuccess] = useState(false);
   async function suggestFromLocation() {
     if (gpsLoading || ideaLoading) return;
@@ -2915,6 +2915,7 @@ export default function Home() {
       if (perm?.state === "denied") { await appAlert(t.gpsErr); return; }
     } catch {}
     setGpsLoading(true);
+    setGpsSuccess(false); // nový pokus ruší potvrzení z toho minulého
     try {
       // ⏱ Volání getCurrentPosition někdy (typicky když má telefon úplně
       // vypnuté systémové služby polohy) NEZAVOLÁ ani úspěšný, ani chybový
@@ -2940,10 +2941,9 @@ export default function Home() {
         place = [g.locality || g.city, g.principalSubdivision, g.countryName].filter(Boolean).join(", ");
       } catch {}
       const ok = await suggestIdea(place || `GPS ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`);
-      if (ok) {
-        setGpsSuccess(true);
-        setTimeout(() => setGpsSuccess(false), 1800);
-      }
+      // ✅ Zůstává oranžové (potvrzení), dokud uživatel nezkusí znovu —
+      // dřív po 1,8 s zhaslo, což šlo snadno přehlédnout
+      if (ok) setGpsSuccess(true);
     } catch {
       await appAlert(t.gpsErr);
     } finally {
