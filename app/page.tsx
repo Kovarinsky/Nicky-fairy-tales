@@ -2849,7 +2849,7 @@ export default function Home() {
       setExpandLoading(false);
     }
   }
-  async function suggestIdea(locationHint?: string) {
+  async function suggestIdea(locationHint?: string): Promise<boolean> {
     setIdeaLoading(true);
     try {
       const names = [
@@ -2881,8 +2881,9 @@ export default function Home() {
         }),
       });
       const d = await safeJson<{ idea?: string }>(res);
-      if (res.ok && d.idea) setTopic(d.idea);
-    } catch {} finally {
+      if (res.ok && d.idea) { setTopic(d.idea); return true; }
+      return false;
+    } catch { return false; } finally {
       setIdeaLoading(false);
     }
   }
@@ -2891,6 +2892,10 @@ export default function Home() {
   // s fallbackem na souřadnice — Claude místo pozná) → návrh pohádky z okolí.
   // Poloha se nikam neukládá, použije se jen pro tento jeden návrh.
   const [gpsLoading, setGpsLoading] = useState(false);
+  // ✅ Krátký oranžový záblesk tlačítka po úspěchu — jinak jediná viditelná
+  // změna byla text v poli přání, což šlo snadno přehlédnout (appka „nic
+  // nepotvrdila").
+  const [gpsSuccess, setGpsSuccess] = useState(false);
   async function suggestFromLocation() {
     if (gpsLoading || ideaLoading) return;
     if (!navigator.geolocation) { await appAlert(t.gpsErr); return; }
@@ -2934,7 +2939,11 @@ export default function Home() {
         const g = (await r.json()) as { locality?: string; city?: string; principalSubdivision?: string; countryName?: string };
         place = [g.locality || g.city, g.principalSubdivision, g.countryName].filter(Boolean).join(", ");
       } catch {}
-      await suggestIdea(place || `GPS ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`);
+      const ok = await suggestIdea(place || `GPS ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`);
+      if (ok) {
+        setGpsSuccess(true);
+        setTimeout(() => setGpsSuccess(false), 1800);
+      }
     } catch {
       await appAlert(t.gpsErr);
     } finally {
@@ -3811,9 +3820,9 @@ export default function Home() {
               </button>
             </div>
             {/* 📍 Pohádka podle mé lokality — návrh námětu z okolí */}
-            <button type="button" className={`chip chip-btn chip-full ${gpsLoading ? "chip-on" : ""}`}
+            <button type="button" className={`chip chip-btn chip-full ${gpsLoading ? "chip-on" : ""}${gpsSuccess ? " chip-success" : ""}`}
               onClick={suggestFromLocation} disabled={gpsLoading || ideaLoading} title={t.gpsHint}>
-              {gpsLoading ? "⏳ " : "📍 "}{t.gpsBtn}
+              {gpsSuccess ? "✓ " : gpsLoading ? "⏳ " : "📍 "}{t.gpsBtn}
             </button>
             {addingTheme && (
               <div className="add-char-panel">
@@ -4197,8 +4206,11 @@ export default function Home() {
                         </span>
                         {/* živý stav: poslední krok z 📋 deníku — ROLUJE, ať jde
                             přečíst i delší hlášku, ne jen useknutý začátek;
-                            key na textu = animace se restartuje s KAŽDÝM novým krokem */}
-                        {j.phase === "generating" && j.log?.length ? (
+                            key na textu = animace se restartuje s KAŽDÝM novým krokem.
+                            Dřív se ukazovalo jen při kreslení — psaní (60–200 s)
+                            vypadalo jako mrtvé, i když deník živě hlásil postup
+                            („píšu… 3900 znaků, 51s"). */}
+                        {(j.phase === "generating" || j.phase === "writing") && j.log?.length ? (
                           <span className="job-live-note-clip">
                             <span className="job-live-note" key={j.log[j.log.length - 1].t}>
                               {j.log[j.log.length - 1].m}

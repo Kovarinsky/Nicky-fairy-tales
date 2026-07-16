@@ -615,6 +615,15 @@ textarea {
   color: #fff;
 }
 
+/* ✓ krátké oranžové potvrzení (stejná konvence jako .panel-ok) — appka
+   „nabrala" a použila výsledek (např. návrh pohádky podle GPS polohy) */
+.chip-success {
+  background: linear-gradient(135deg, #ff9800, #f4511e) !important;
+  border-color: #f4511e !important;
+  color: #fff !important;
+  transition: background 0.2s ease;
+}
+
 /* hide raw checkbox — chip label acts as the toggle */
 .chip input[type="checkbox"] {
   display: none;
