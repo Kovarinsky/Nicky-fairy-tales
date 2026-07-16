@@ -76,9 +76,15 @@ type GeminiCandidate = {
 // promise nikdy nedospěla k resolve ani reject). req.setTimeout je NEČINNOSTNÍ
 // limit (žádná data po tuto dobu) — destroy(err) vyvolá "error" a promise
 // se rejectne, takže existující retry/backoff/fallback logika převezme řízení.
-const GEMINI_REQUEST_TIMEOUT_MS = 90_000;
+// Dva different stropy: kreslení (4K archy legitimně trvají déle) vs. textové
+// volání (sanitizace/QA kontrola vrací pár vět JSON — nemá důvod běžet skoro
+// tak dlouho jako samotné kreslení; 90 s tu jen zbytečně natahovalo worst-case
+// jedné scény, když se ověření muselo opakovat).
+const GEMINI_IMAGE_TIMEOUT_MS = 60_000;
+const GEMINI_TEXT_TIMEOUT_MS = 45_000;
+const GEMINI_VERIFY_TIMEOUT_MS = 30_000;
 
-function geminiPost(apiKey: string, model: string, body: object): Promise<string> {
+function geminiPost(apiKey: string, model: string, body: object, timeoutMs = GEMINI_TEXT_TIMEOUT_MS): Promise<string> {
   const bodyBuf = Buffer.from(JSON.stringify(body), "utf-8");
   const path = `/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   return new Promise((resolve, reject) => {
@@ -92,8 +98,8 @@ function geminiPost(apiKey: string, model: string, body: object): Promise<string
         res.on("error", reject);
       }
     );
-    req.setTimeout(GEMINI_REQUEST_TIMEOUT_MS, () => {
-      req.destroy(new Error(`Gemini request timed out after ${GEMINI_REQUEST_TIMEOUT_MS / 1000}s (no response)`));
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`Gemini request timed out after ${timeoutMs / 1000}s (no response)`));
     });
     req.on("error", reject);
     req.write(bodyBuf);
@@ -234,8 +240,8 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
     // stál a do 📋 deníku se nezapsalo nic, protože ta promise nikdy nedospěla
     // k resolve ani reject. destroy(err) vyvolá "error" → existující retry/
     // backoff/model-fallback logika v generateSceneImage převezme řízení.
-    req.setTimeout(GEMINI_REQUEST_TIMEOUT_MS, () => {
-      req.destroy(new Error(`Gemini request timed out after ${GEMINI_REQUEST_TIMEOUT_MS / 1000}s (no response)`));
+    req.setTimeout(GEMINI_IMAGE_TIMEOUT_MS, () => {
+      req.destroy(new Error(`Gemini request timed out after ${GEMINI_IMAGE_TIMEOUT_MS / 1000}s (no response)`));
     });
     req.on("error", reject);
     req.write(bodyBuf);
@@ -245,13 +251,17 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
 
 // ── Vision QA: kontrola desatera na KAŽDÉM obrázku ─────────────────────────
 // Běží na SERVERU, takže platí pro všechna zařízení a všechny cesty generování.
-// Odolnost: až 3 pokusy o samotnou kontrolu (výpadek/429 kontrolu neumlčí),
+// Odolnost: až 2 pokusy o samotnou kontrolu (výpadek/429 kontrolu neumlčí),
 // JSON režim + dostatečný limit tokenů (utržená odpověď dřív prošla jako „ok").
-// Vrací null, jen když se kontrola ani na 3. pokus nepovedla — volající pak
+// Vrací null, jen když se kontrola ani na 2. pokus nepovedla — volající pak
 // NEPŘEPISUJE poslední ověřený stav neověřeným obrázkem.
+// deadline: když čas na TENTO běh dochází, kontrola se rovnou vzdá (žádné
+// další čekání/pokusy) — dřív mohla sama o sobě natáhnout jednu scénu o
+// stovky sekund a připravit ji tak o šanci na bezpečné předání štafety.
 export async function verifySceneImage(
   apiKey: string, img: ImageResult, heroDescription: string, scenePrompt = "",
-  refs: ReferenceImage[] = [] // 🕵️ kanonické portréty — inspektor porovnává TVÁŘE, ne jen text
+  refs: ReferenceImage[] = [], // 🕵️ kanonické portréty — inspektor porovnává TVÁŘE, ne jen text
+  deadline?: number
 ): Promise<{ ok: boolean; problems: string; badRules: number } | null> {
   // Referenční portréty jdou inspektorovi PŘED kontrolovaný obrázek — dřív
   // soudil jen podle textu a „Bella jako černoška" mu nemohla padnout do oka
@@ -259,7 +269,7 @@ export async function verifySceneImage(
     { text: `REFERENCE ${i + 1} — ${(r.label || (r.name ? `canonical portrait of ${r.name}` : "reference image")).slice(0, 300)}:` },
     { inlineData: { data: r.data, mimeType: r.mimeType } },
   ]);
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const raw = await geminiPost(apiKey, VERIFY_MODEL, {
         contents: [{
@@ -305,7 +315,7 @@ export async function verifySceneImage(
           responseMimeType: "application/json",
           ...(VERIFY_MODEL.includes("2.5") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
         },
-      });
+      }, GEMINI_VERIFY_TIMEOUT_MS);
       const data = JSON.parse(raw) as { candidates?: GeminiCandidate[] };
       const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
       const m = text.match(/\{[\s\S]*\}/);
@@ -324,11 +334,14 @@ export async function verifySceneImage(
       return { ok, problems, badRules };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`[Gemini QA] verify attempt ${attempt}/3 failed: ${msg}`);
-      if (attempt < 3) await new Promise(r => setTimeout(r, 2500 * attempt));
+      console.warn(`[Gemini QA] verify attempt ${attempt}/2 failed: ${msg}`);
+      // Času se nedostává — další pokus by jen ukrajoval z rozpočtu na
+      // dokreslení/předání štafety, aniž by měl reálnou šanci stihnout se
+      if (deadline !== undefined && Date.now() > deadline) break;
+      if (attempt < 2) await new Promise(r => setTimeout(r, 2500 * attempt));
     }
   }
-  console.warn("[Gemini QA] verify UNAVAILABLE after 3 attempts — image accepted unchecked");
+  console.warn("[Gemini QA] verify UNAVAILABLE after retries — image accepted unchecked");
   return null;
 }
 
@@ -405,8 +418,18 @@ export async function generateBackgroundImage(prompt: string, refImages: Referen
   throw lastErr;
 }
 
+// 🎯 Vytáhne jmenovaný obsazovací seznam ze zavedené konvence, kterou vypravěč
+// VŽDY píše na konec imagePromptu ("Only X, Y present — no other people…").
+// Používá se jak pro explicitní "CAST:" popisek panelu v archu, tak pro
+// seskupování scén se STEJNÝM obsazením do jednoho archu (job-runner.ts) —
+// méně různých lidí v jednom obrázku = menší riziko zaměněných identit.
+export function sceneCastList(imagePrompt: string): string | null {
+  const m = /Only\s+([^—-]+?)\s+present\b/i.exec(imagePrompt);
+  return m ? m[1].trim() : null;
+}
+
 // Sdílené stavební kameny promptů (sólo obrázek i arch scén)
-const STYLE_SUFFIX = "Hand-painted 2D storybook illustration, soft painterly brushwork in classic Disney animated-film style, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. Strictly FLAT 2D painting — NOT a 3D render, no CGI, no plastic skin, no photorealism. Correct natural anatomy: every person has EXACTLY two arms, two legs and five fingers on each hand — no extra, missing or deformed limbs; bicycles have exactly two wheels. Absolutely no text, letters, words, signs, labels, captions, subtitles, watermarks, or artist signatures of any kind anywhere in the image.";
+const STYLE_SUFFIX ="Hand-painted 2D storybook illustration, soft painterly brushwork in classic Disney animated-film style, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. Strictly FLAT 2D painting — NOT a 3D render, no CGI, no plastic skin, no photorealism. Correct natural anatomy: every person has EXACTLY two arms, two legs and five fingers on each hand — no extra, missing or deformed limbs; bicycles have exactly two wheels. Absolutely no text, letters, words, signs, labels, captions, subtitles, watermarks, or artist signatures of any kind anywhere in the image.";
 
 function buildAppearanceLock(heroDescription: string): { open: string; close: string } {
   if (!heroDescription) return { open: "", close: "" };
@@ -469,37 +492,36 @@ export async function generateSceneImage(
         // Drží se NEJLEPŠÍ OVĚŘENÝ pokus (nejméně porušených pravidel) —
         // neověřený obrázek nikdy nenahradí ověřený.
         if (heroDescription) {
-          let v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt, refImages);
-          if (!v0) {
-            // Kontrola 3× selhala (typicky rate-limit) → po pauze ještě jednou;
+          let v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt, refImages, deadline);
+          if (!v0 && !(deadline !== undefined && Date.now() > deadline)) {
+            // Kontrola 2× selhala (typicky rate-limit) → po pauze ještě jednou;
             // teprve pak se obrázek přijme s varováním (jinak by se nic nedokreslilo)
             await new Promise(r => setTimeout(r, 6000));
-            v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt, refImages);
+            v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt, refImages, deadline);
             if (!v0) console.warn(`[Gemini QA] scene ${scene.index}: kontrola opakovaně selhala — obrázek přijat NEOVĚŘENÝ`);
           }
           if (v0 && !v0.ok && deadline !== undefined && Date.now() > deadline) {
-            console.warn(`[Gemini QA] scene ${scene.index}: REJECTED [${v0.badRules} rules] (${v0.problems}) but GLOBAL DEADLINE passed → accepted as-is, no redraw`);
+            console.warn(`[Gemini QA] scene ${scene.index}: REJECTED [${v0.badRules} rules] (${v0.problems}) but DEADLINE passed → accepted as-is, no redraw`);
           } else if (v0 && !v0.ok) {
             let best = { img, badRules: v0.badRules, problems: v0.problems };
-            for (let fix = 1; fix <= 3 && best.badRules > 0 && !(deadline !== undefined && Date.now() > deadline); fix++) {
-              const fresh = fix === 3; // poslední kolo = čerstvý pokus bez korekce
-              console.warn(`[Gemini QA] scene ${scene.index}: REJECTED [${best.badRules} rules] (${best.problems}) → ${fresh ? "fresh redraw" : `correction ${fix}/2`}`);
+            // 1 kolo (jen cílená korekce s výčtem porušených pravidel) — cena
+            // vs. kvalita: méně kol = nižší náklad na scénách, které mají
+            // problém, ale víc nedokonalých obrázků projde bez další opravy
+            for (let fix = 1; fix <= 1 && best.badRules > 0 && !(deadline !== undefined && Date.now() > deadline); fix++) {
+              console.warn(`[Gemini QA] scene ${scene.index}: REJECTED [${best.badRules} rules] (${best.problems}) → correction`);
               try {
-                const prompt2 = fresh
-                  ? safePrompt
-                  : `${safePrompt} ⚠ CORRECTION ${fix}: the previous attempt violated these rules: ${best.problems}. Fix EXACTLY these issues — follow the APPEARANCE LOCK precisely, draw ONLY the named characters, each EXACTLY ONCE, with their own hair colors and outfits.`;
+                const prompt2 = `${safePrompt} ⚠ CORRECTION: the previous attempt violated these rules: ${best.problems}. Fix EXACTLY these issues — follow the APPEARANCE LOCK precisely, draw ONLY the named characters, each EXACTLY ONCE, with their own hair colors and outfits.`;
                 const img2 = await callGeminiImage(apiKey, m, prompt2, withAspect ? "16:9" : null, refImages);
-                const v2 = await verifySceneImage(apiKey, img2, heroDescription, scene.imagePrompt, refImages);
+                const v2 = await verifySceneImage(apiKey, img2, heroDescription, scene.imagePrompt, refImages, deadline);
                 if (v2 && (v2.ok || v2.badRules < best.badRules)) {
                   best = { img: img2, badRules: v2.ok ? 0 : v2.badRules, problems: v2.problems };
                 }
               } catch (e2) {
-                console.warn(`[Gemini QA] scene ${scene.index}: redraw ${fix} failed (${e2 instanceof Error ? e2.message : e2})`);
-                break;
+                console.warn(`[Gemini QA] scene ${scene.index}: redraw failed (${e2 instanceof Error ? e2.message : e2})`);
               }
             }
             img = best.img;
-            if (best.badRules > 0) console.warn(`[Gemini QA] scene ${scene.index}: still imperfect after redraws [${best.badRules} rules] (${best.problems})`);
+            if (best.badRules > 0) console.warn(`[Gemini QA] scene ${scene.index}: still imperfect after redraw [${best.badRules} rules] (${best.problems})`);
             else console.log(`[Gemini QA] scene ${scene.index}: fixed after redraw ✓`);
           }
         }
@@ -596,22 +618,44 @@ async function sliceSheet(img: ImageResult, grid: number): Promise<ImageResult[]
       }
       return cnt ? sum / cnt : 0;
     };
+    // 🎯 Model občas netrefí dělicí linku PŘESNĚ na 1/grid, 2/grid… (pár px
+    // odchylka) — dřív to celý arch zahodilo (mřížka „nesedí"), i když byl
+    // vizuálně v pořádku, a drahý 4K pokus přišel vniveč (plus následné sólo
+    // dokreslení všech scén za plnou cenu). Teď se v okolí očekávané pozice
+    // (±4 % rozměru) hledá NEJBĚLEJŠÍ linka a řeže se přesně tam.
+    const findLine = (vertical: boolean, size: number, k: number): number | null => {
+      const expected = Math.round((size * k) / grid);
+      const span = Math.round(size * 0.04);
+      let best = expected, bestWhite = -1;
+      for (let p = Math.max(4, expected - span); p <= Math.min(size - 4, expected + span); p += 2) {
+        const w = lineWhite(vertical, p);
+        if (w > bestWhite) { bestWhite = w; best = p; }
+      }
+      return bestWhite >= 195 ? best : null;
+    };
+    const vLines: number[] = [0];
+    const hLines: number[] = [0];
     for (let k = 1; k < grid; k++) {
-      const wx = lineWhite(true, Math.round((info.width * k) / grid));
-      const wy = lineWhite(false, Math.round((info.height * k) / grid));
-      if (wx < 210 || wy < 210) {
-        console.warn(`[Gemini sheet] mřížka nesedí (jas linky ${Math.round(wx)}/${Math.round(wy)}) → arch zamítnut`);
+      const vx = findLine(true, info.width, k);
+      const hy = findLine(false, info.height, k);
+      if (vx === null || hy === null) {
+        console.warn(`[Gemini sheet] mřížka nesedí (linka ${k}/${grid} nenalezena) → arch zamítnut`);
         return null;
       }
+      vLines.push(vx);
+      hLines.push(hy);
     }
-    const W = Math.floor(info.width / grid);
-    const H = Math.floor(info.height / grid);
-    const G = Math.round(W * 0.015); // odsazení od bílých mezer
+    vLines.push(info.width);
+    hLines.push(info.height);
     const out: ImageResult[] = [];
     for (let r = 0; r < grid; r++) {
       for (let c = 0; c < grid; c++) {
+        const left = vLines[c], right = vLines[c + 1];
+        const top = hLines[r], bottom = hLines[r + 1];
+        const gx = Math.round((right - left) * 0.015); // odsazení od bílých mezer
+        const gy = Math.round((bottom - top) * 0.015);
         const buf = await sharp(img.buffer)
-          .extract({ left: c * W + G, top: r * H + G, width: W - 2 * G, height: H - 2 * G })
+          .extract({ left: left + gx, top: top + gy, width: Math.max(1, right - left - 2 * gx), height: Math.max(1, bottom - top - 2 * gy) })
           .png()
           .toBuffer();
         out.push({ buffer: buf, mimeType: "image/png" });
@@ -650,11 +694,14 @@ export async function generateSceneSheet(
   for (let i = 0; i < cells; i++) {
     const r = Math.floor(i / grid) + 1;
     const c = (i % grid) + 1;
-    panelLines.push(
-      i < n
-        ? `PANEL ${i + 1} (row ${r}, column ${c}): ${scenes[i].imagePrompt}`
-        : `PANEL ${i + 1} (row ${r}, column ${c}): a quiet, empty scenery view from the same story world — NO people, NO creatures.`
-    );
+    if (i < n) {
+      const cast = sceneCastList(scenes[i].imagePrompt);
+      panelLines.push(
+        `PANEL ${i + 1} (row ${r}, column ${c})${cast ? ` — CAST: ONLY ${cast}, nobody else` : ""}: ${scenes[i].imagePrompt}`
+      );
+    } else {
+      panelLines.push(`PANEL ${i + 1} (row ${r}, column ${c}) — CAST: nobody: a quiet, empty scenery view from the same story world — NO people, NO creatures.`);
+    }
   }
   const gutterPos = grid === 2
     ? "exactly through the horizontal and vertical center of the image"
@@ -664,7 +711,7 @@ export async function generateSceneSheet(
     `Compose each panel like a FINISHED book illustration: every character and every key object (boat, vehicle, building, the moon…) FULLY inside its panel with a comfortable breathing margin — nothing important may touch or cross the white gutters or panel edges. No cropped heads, no half-cut characters or objects.`,
     lockOpen,
     ...panelLines,
-    `⚠ PANEL CAST RULE: each panel shows ONLY the characters explicitly named in ITS OWN description — nobody else. No extra children, adults, or background figures in ANY panel. A character not named in a panel's description must NOT appear in that panel, even though their description or portrait is provided for other panels. EXCEPTION: when a panel's description itself mentions a group (a team, other players, opponents, the crowd…), paint that group as smaller BACKGROUND figures who never resemble the named heroes.`,
+    `⚠ PANEL CAST RULE: each panel shows ONLY the characters listed in its own CAST — nobody else. A character NOT listed in a panel's CAST must NOT appear in that panel, even though their reference photo or description is provided for other panels. A character LISTED in a panel's CAST must NOT be missing or replaced by a generic/unnamed figure. NEVER invent an extra person who merely resembles a named character (e.g. another small child who looks like one of the heroes) — if a panel's CAST doesn't include them, that person is simply not in the panel at all, not replaced by a look-alike. EXCEPTION: when a panel's CAST or description mentions a group (a team, other players, opponents, the crowd…), paint that group as smaller BACKGROUND figures who never resemble the named heroes.`,
     correction ? `⚠ CORRECTION — a previous attempt violated these rules, fix EXACTLY these issues: ${correction.slice(0, 600)}` : "",
     lockClose,
     STYLE_SUFFIX,

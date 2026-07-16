@@ -176,3 +176,36 @@ export function refsForText(entries: PortraitRefEntry[], text: string): Referenc
   const hit = entries.filter(e => e.keys.some(wordHit));
   return (hit.length > 0 ? hit : entries).map(e => e.ref);
 }
+
+// ── Reference pro ARCH (víc scén v jednom obrázku) ──────────────────────────
+// Arch dostává portréty CELÉHO obsazení scén v archu najednou (víc postav než
+// jedna sólo scéna) — bez vazby na konkrétní panel model u obsazení 3-4+
+// postav míchal/vymýšlel obličeje (viz „Unknown children instead of Nicolas
+// a Valentýna"). Každý portrét proto dostane navíc popisek „použij jen pro
+// PANEL X" podle toho, ve kterých panelech se ta postava jmenovitě objevuje.
+export function refsForPanels(entries: PortraitRefEntry[], panelTexts: string[]): ReferenceImage[] {
+  const low = panelTexts.map(t => ` ${t.toLowerCase()} `);
+  const wordHit = (text: string, k: string) => {
+    const i = text.indexOf(k);
+    if (i < 0) return false;
+    const isLetter = (ch: string) => /[a-záčďéěíňóřšťúůýž]/i.test(ch);
+    for (let p = i; p >= 0; p = text.indexOf(k, p + 1)) {
+      if (!isLetter(text[p - 1] || " ") && !isLetter(text[p + k.length] || " ")) return true;
+    }
+    return false;
+  };
+  const out: ReferenceImage[] = [];
+  let anyMatched = false;
+  for (const e of entries) {
+    const panelNums: number[] = [];
+    low.forEach((t, idx) => { if (e.keys.some(k => wordHit(t, k))) panelNums.push(idx + 1); });
+    if (panelNums.length > 0) {
+      anyMatched = true;
+      out.push({
+        ...e.ref,
+        label: `${e.ref.label || ""} Use this reference ONLY for PANEL ${panelNums.join(", ")} of this sheet — this person does NOT appear in any other panel, ignore this photo when drawing the rest.`.trim(),
+      });
+    }
+  }
+  return anyMatched ? out : entries.map(e => e.ref);
+}

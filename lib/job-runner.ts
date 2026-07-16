@@ -6,9 +6,9 @@
 
 import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, peekEarlyScene, enforceCanonicalAppearance, type StoryExtras } from "@/lib/claude";
-import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, isCreditsDepletedError, isSpendCapError } from "@/lib/gemini";
+import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, isCreditsDepletedError, isSpendCapError, sceneCastList } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
-import { loadPortraitRefEntries, refsForText } from "@/lib/portraits";
+import { loadPortraitRefEntries, refsForText, refsForPanels } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/types";
 import { blobToken } from "@/lib/blob-token";
@@ -175,7 +175,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   // job a „příprava" přes hodinu. Teď se job před limitem sám předá další
   // funkci přes /api/job/continue (force přeskočí pojistku čerstvého stavu).
   const runStartedAt = Date.now();
-  const SELF_KICK_AT = 240_000;   // kontroly mezi scénami/archy
+  const SELF_KICK_AT = 200_000;   // kontroly mezi scénami/archy (víc rezervy do tvrdého 300s killu)
   const WRITING_KICK_AT = 280_000; // psaní = jeden dlouhý stream → časovač (zbytečné řetězy stojí čas)
   const timeUp = () => Date.now() - runStartedAt > SELF_KICK_AT;
 
@@ -188,6 +188,18 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   const HARD_DEADLINE_MS = 280_000; // 4:40 — necháváme ~20 s na dopsání a zápis
   const hardDeadlineAt = st.createdAt + HARD_DEADLINE_MS;
   const overallTimeUp = () => Date.now() > hardDeadlineAt;
+
+  // 🛟 Strop PRO TENTO BĚH: i když je do globálního limitu ještě daleko, jedna
+  // jediná scéna nesměla dosud sama o sobě utéct přes bezpečnou rezervu do
+  // tvrdého 300s killu Vercelu — verifySceneImage/generateSceneImage uvnitř
+  // umí zkoušet znovu (kontrola 2×, překreslení 2 kola), a v nepříznivém
+  // případě to dohromady dokázalo přetéct dřív, než stihl proběhnout
+  // selfContinue() — funkce pak spadla na tvrdém limitu UPROSTŘED scény
+  // (žádný catch to nezachytí, Vercel proces prostě zabije). sceneDeadline()
+  // je MIN z globálního stropu a rezervy TOHOTO běhu — cokoliv níž předává
+  // appce (generateSceneImage) jako signál „už nezkoušej, přijmi co je".
+  const invocationSafeDeadlineAt = runStartedAt + 260_000;
+  const sceneDeadline = () => Math.min(hardDeadlineAt, invocationSafeDeadlineAt);
   let selfKicked = false;
   const selfContinue = async (): Promise<void> => {
     if (selfKicked) return;
@@ -362,7 +374,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           for (const ci of (Array.isArray(body.customCharacterImages) ? (body.customCharacterImages as Array<{ data?: string; mimeType?: string }>) : [])) {
             if (ci?.data && ci?.mimeType) early.push({ data: ci.data, mimeType: ci.mimeType, name: "a custom story character" });
           }
-          const img = await generateSceneImage(peek.scene, hero, early, hardDeadlineAt);
+          const img = await generateSceneImage(peek.scene, hero, early, sceneDeadline());
           earlyImg = img;
           logEv("⚡ scéna 1 dokreslena během psaní");
           return img;
@@ -511,7 +523,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       // 🎙️ Hlas se NEVYRÁBÍ při generování — namluvení vzniká líně až při
       // čtení hotové pohádky (klient si ho vyžádá přes /api/scene audioOnly).
       // Nepřehrané pohádky tak hlas vůbec neplatí.
-      const img = await generateSceneImage(scene, heroDescription, refs, hardDeadlineAt).catch((e: Error) => {
+      const img = await generateSceneImage(scene, heroDescription, refs, sceneDeadline()).catch((e: Error) => {
         logEv(`🎨 scéna ${i + 1} CHYBA po ${secsSince(tScene)}s: ${e.message.slice(0, 140)}`);
         st.imgError = e.message.slice(0, 220);
         if (isDailyQuotaError(e.message)) quotaExhausted = true;
@@ -571,8 +583,14 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       for (let round = 1; round <= 2 && !quotaExhausted && !timeUp() && !budgetBlown() && !overallTimeUp(); round++) {
         const pend = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
         if (pend.length < 2) break;
+        // 🎯 Scény se STEJNÝM obsazením seskupit do stejného archu — čím míň
+        // různých lidí v jednom obrázku, tím menší riziko zaměněných identit
+        // (pořadí panelů v archu na příběhu nezáleží, výřezy se ukládají
+        // zpátky podle PŮVODNÍHO indexu scény, ne podle pozice v archu).
+        const castKey = (i: number) => (sceneCastList(scenesScript[i].imagePrompt) || "").toLowerCase().split(",").map(s => s.trim()).sort().join(",");
+        const pendGrouped = [...pend].sort((a, b) => castKey(a).localeCompare(castKey(b)));
         const groups: number[][] = [];
-        for (let g = 0; g < pend.length; g += maxCells) groups.push(pend.slice(g, g + maxCells));
+        for (let g = 0; g < pendGrouped.length; g += maxCells) groups.push(pendGrouped.slice(g, g + maxCells));
         // poslední skupina o 1 scéně nemá jako arch smysl — dokreslí ji sólo fáze
         if (groups.length > 1 && groups[groups.length - 1].length < 2) groups.pop();
         const before = Object.keys(st.sceneUrls!).length;
@@ -583,8 +601,11 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         await Promise.all(groups.map(async group => {
           const tSheet = Date.now();
           try {
-            const groupText = group.map(i => `${scenesScript[i].imagePrompt} ${scenesScript[i].narration}`).join(" ");
-            const groupRefs = refsFor(groupText);
+            // 🎯 Panel-aware reference: každý portrét dostane popisek „jen pro
+            // PANEL X" — bez toho model při 3+ postavách v archu míchal/
+            // vymýšlel obličeje (nevěděl, který portrét patří ke kterému panelu)
+            const panelTexts = group.map(i => `${scenesScript[i].imagePrompt} ${scenesScript[i].narration}`);
+            const groupRefs = [...refsForPanels(refEntries, panelTexts), ...customRefs];
             const refs = anchor ? [...groupRefs, anchor] : groupRefs;
             const { results, report } = await generateSceneSheet(group.map(i => scenesScript[i]), heroDescription, refs, prevRoundReports);
             if (report) roundReports.push(report);
