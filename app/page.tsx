@@ -2890,9 +2890,15 @@ export default function Home() {
     if (gpsLoading || ideaLoading) return;
     if (!navigator.geolocation) { await appAlert(t.gpsErr); return; }
     // Systémové povolovací okno nejde stylovat — před PRVNÍM dotazem se proto
-    // ukáže vlastní okno v designu appky, které vysvětlí, co bude následovat
+    // ukáže vlastní okno v designu appky, které vysvětlí, co bude následovat.
+    // ⏱ permissions.query() na některých mobilních prohlížečích (WebView,
+    // in-app prohlížeče) nikdy nedospěje k výsledku — vlastní timeout, ať se
+    // appka nezasekne ještě PŘED zeptáním na polohu.
     try {
-      const perm = await navigator.permissions?.query?.({ name: "geolocation" as PermissionName });
+      const permP = navigator.permissions?.query?.({ name: "geolocation" as PermissionName });
+      const perm = permP
+        ? await Promise.race([permP, new Promise<undefined>(resolve => setTimeout(() => resolve(undefined), 3_000))])
+        : undefined;
       if (!perm || perm.state === "prompt") {
         if (!(await appConfirm(t.gpsAsk))) return;
       }
@@ -2900,9 +2906,19 @@ export default function Home() {
     } catch {}
     setGpsLoading(true);
     try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 12_000, maximumAge: 600_000 })
-      );
+      // ⏱ Volání getCurrentPosition někdy (typicky když má telefon úplně
+      // vypnuté systémové služby polohy) NEZAVOLÁ ani úspěšný, ani chybový
+      // callback vůbec — a to i přes nastavený `timeout` níže, který některé
+      // prohlížeče ignorují. Bez vlastní pojistky appka zůstane „točit se"
+      // navěky. Vlastní časovač zaručí, že se vždy něco stane.
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        const bail = setTimeout(() => reject(new Error("gps-timeout")), 15_000);
+        navigator.geolocation.getCurrentPosition(
+          p => { clearTimeout(bail); resolve(p); },
+          e => { clearTimeout(bail); reject(e); },
+          { timeout: 12_000, maximumAge: 600_000 }
+        );
+      });
       const { latitude, longitude } = pos.coords;
       let place = "";
       try {

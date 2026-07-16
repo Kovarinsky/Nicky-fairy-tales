@@ -610,6 +610,7 @@ async function callAnthropicApi(body: object, onDelta?: (chars: number, fullText
   const decoder = new TextDecoder();
   let buf = "";
   let out = "";
+  let stopReason: string | undefined;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -620,16 +621,21 @@ async function callAnthropicApi(body: object, onDelta?: (chars: number, fullText
       if (!line.startsWith("data:")) continue;
       const payload = line.slice(5).trim();
       if (!payload) continue;
-      let ev: { type?: string; delta?: { type?: string; text?: string }; error?: { message?: string } };
+      let ev: { type?: string; delta?: { type?: string; text?: string; stop_reason?: string }; error?: { message?: string } };
       try { ev = JSON.parse(payload); } catch { continue; }
       if (ev.type === "error" || ev.error) throw new Error(`Anthropic stream error: ${ev.error?.message || "unknown"}`);
       if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) {
         out += ev.delta.text;
         onDelta?.(out.length, out);
       }
+      if (ev.type === "message_delta" && ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
     }
   }
   if (!out) throw new Error("Claude nevrátil text (prázdný stream).");
+  // ✂️ max_tokens uřízne odpověď uprostřed věty beze slova varování — dřív
+  // se to nikde nekontrolovalo, appka tichý ořez prostě přijala jako hotový
+  // text (viz „Enrich" u bohatého zadání, uříznuté u „A Habsburg…")
+  if (stopReason === "max_tokens") console.warn(`[Claude] odpověď uřízlá limitem max_tokens (${out.length} znaků)`);
   return out;
 }
 
@@ -725,9 +731,11 @@ export async function expandTopicIdea(
     : prompt;
   const raw = await callAnthropicApi({
     model,
-    // Strop je jen pojistka — délku řídí instrukce; 900 utínalo delší
-    // osnovy uprostřed věty („…vede král")
-    max_tokens: 2000,
+    // Strop je jen pojistka — délku řídí instrukce; ale bohaté zadání
+    // (víc míst/postav/epoch, např. „10 chorvatských ostrovů v čase")
+    // umí instrukci „~280 slov" přehlušit a 2000 uřízlo osnovu uprostřed
+    // věty („…Habsburg") — 4096 dává reálný prostor i tomuhle případu
+    max_tokens: 4096,
     messages: [{ role: "user", content }],
   });
   return raw.trim();
@@ -741,7 +749,7 @@ export async function translateTopicText(target: "cs" | "en", text: string): Pro
     : `Přelož následující zadání pohádky do přirozené češtiny. Jména osob nech beze změny. Odpověz POUZE překladem:\n\n${text.slice(0, 4000)}`;
   const raw = await callAnthropicApi({
     model,
-    max_tokens: 2000,
+    max_tokens: 4096,
     messages: [{ role: "user", content: prompt }],
   });
   return raw.trim();
