@@ -579,64 +579,96 @@ async function callAnthropicApi(body: object, onDelta?: (chars: number, fullText
   // nemusel vejít do 250s timeoutu jednoho pokusu — job pak umíral ve fázi
   // „Píšu…" a točil se dokola. Se streamem text přitéká průběžně a onDelta
   // umožňuje heartbeat (appka nehlásí falešné zaseknutí).
-  let res: Response | null = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": ANTHROPIC_VERSION,
-      },
-      body: JSON.stringify({ ...body, stream: true }),
-      signal: AbortSignal.timeout(280_000),
-    });
-    if (res.status !== 429 && res.status !== 529) break;
-    await res.text().catch(() => "");
-    const retryAfter = Number(res.headers.get("retry-after"));
-    const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter, 30) * 1000 : 12_000;
-    console.warn(`[Claude] ${res.status}, retry in ${waitMs / 1000}s (attempt ${attempt + 1})`);
-    await new Promise(r => setTimeout(r, waitMs));
-  }
-  if (!res) throw new Error("Anthropic: no response");
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`Anthropic ${res.status}: ${errText.slice(0, 400)}`);
-  }
-  if (!res.body) throw new Error("Anthropic: empty stream");
-
-  // SSE: posbírat text_delta kousky; event error → výjimka
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  let out = "";
-  let stopReason: string | undefined;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const lines = buf.split("\n");
-    buf = lines.pop() ?? ""; // poslední (možná neúplný) řádek nechat v bufferu
-    for (const line of lines) {
-      if (!line.startsWith("data:")) continue;
-      const payload = line.slice(5).trim();
-      if (!payload) continue;
-      let ev: { type?: string; delta?: { type?: string; text?: string; stop_reason?: string }; error?: { message?: string } };
-      try { ev = JSON.parse(payload); } catch { continue; }
-      if (ev.type === "error" || ev.error) throw new Error(`Anthropic stream error: ${ev.error?.message || "unknown"}`);
-      if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) {
-        out += ev.delta.text;
-        onDelta?.(out.length, out);
-      }
-      if (ev.type === "message_delta" && ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
+  //
+  // ✂️ Celý pokus (spojení + čtení streamu) je teď v JEDNÉ retry smyčce —
+  // dřív se opakoval jen samotný HTTP dotaz při 429/529, ale PRÁZDNÝ stream
+  // (200 OK, spojení se ale přeruší uprostřed bez jediného text_delta —
+  // vzácný, ale reálný zádrhel na síti/serveru) skončil rovnou fatální
+  // chybou „Claude nevrátil text" bez jediného dalšího pokusu, a celá
+  // příprava pohádky s tím natvrdo umřela. Teď se to (i chybové eventy ve
+  // streamu) zkusí znovu, stejně jako 429/529.
+  const MAX_ATTEMPTS = 3;
+  let lastErr: Error | null = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": ANTHROPIC_VERSION,
+        },
+        body: JSON.stringify({ ...body, stream: true }),
+        signal: AbortSignal.timeout(280_000),
+      });
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+      console.warn(`[Claude] síťová chyba, zkouším znovu (pokus ${attempt + 1}): ${lastErr.message}`);
+      await new Promise(r => setTimeout(r, 5_000));
+      continue;
     }
+    if (res.status === 429 || res.status === 529) {
+      await res.text().catch(() => "");
+      const retryAfter = Number(res.headers.get("retry-after"));
+      const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter, 30) * 1000 : 12_000;
+      console.warn(`[Claude] ${res.status}, retry in ${waitMs / 1000}s (attempt ${attempt + 1})`);
+      lastErr = new Error(`Anthropic ${res.status}`);
+      await new Promise(r => setTimeout(r, waitMs));
+      continue;
+    }
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Anthropic ${res.status}: ${errText.slice(0, 400)}`);
+    }
+    if (!res.body) { lastErr = new Error("Anthropic: empty stream"); continue; }
+
+    // SSE: posbírat text_delta kousky; event error → zkusit znovu (ne fatálně)
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let out = "";
+    let stopReason: string | undefined;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? ""; // poslední (možná neúplný) řádek nechat v bufferu
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+          const payload = line.slice(5).trim();
+          if (!payload) continue;
+          let ev: { type?: string; delta?: { type?: string; text?: string; stop_reason?: string }; error?: { message?: string } };
+          try { ev = JSON.parse(payload); } catch { continue; }
+          if (ev.type === "error" || ev.error) throw new Error(`Anthropic stream error: ${ev.error?.message || "unknown"}`);
+          if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) {
+            out += ev.delta.text;
+            onDelta?.(out.length, out);
+          }
+          if (ev.type === "message_delta" && ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
+        }
+      }
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+      console.warn(`[Claude] chyba streamu, zkouším znovu (pokus ${attempt + 1}): ${lastErr.message}`);
+      await new Promise(r => setTimeout(r, 5_000));
+      continue;
+    }
+    if (!out) {
+      lastErr = new Error("Claude nevrátil text (prázdný stream).");
+      console.warn(`[Claude] prázdný stream, zkouším znovu (pokus ${attempt + 1})`);
+      await new Promise(r => setTimeout(r, 5_000));
+      continue;
+    }
+    // ✂️ max_tokens uřízne odpověď uprostřed věty beze slova varování — dřív
+    // se to nikde nekontrolovalo, appka tichý ořez prostě přijala jako hotový
+    // text (viz „Enrich" u bohatého zadání, uříznuté u „A Habsburg…")
+    if (stopReason === "max_tokens") console.warn(`[Claude] odpověď uřízlá limitem max_tokens (${out.length} znaků)`);
+    return out;
   }
-  if (!out) throw new Error("Claude nevrátil text (prázdný stream).");
-  // ✂️ max_tokens uřízne odpověď uprostřed věty beze slova varování — dřív
-  // se to nikde nekontrolovalo, appka tichý ořez prostě přijala jako hotový
-  // text (viz „Enrich" u bohatého zadání, uříznuté u „A Habsburg…")
-  if (stopReason === "max_tokens") console.warn(`[Claude] odpověď uřízlá limitem max_tokens (${out.length} znaků)`);
-  return out;
+  throw lastErr || new Error("Anthropic: no response");
 }
 
 /** Vymyslí jeden hravý námět na pohádku (1–2 věty) — pro tlačítko 🎲 v UI. */
