@@ -1028,6 +1028,42 @@ export function peekEarlyScene(partial: string): { heroDescription: string; scen
   }
 }
 
+// ── Kanonické relativní výšky knihovních postav — FIXNÍ, napříč VŠEMI
+// pohádkami stejné. Dřív si tuhle větu Claude vymýšlel nanovo v každé
+// pohádce jen podle volného příkladu v systémovém promptu — obvykle se
+// trefil, ale příležitostně ne (Valentýnka „vyrostla", protože nic
+// nevynucovalo, že je přesně o hlavu menší než Nicolas). Když je v obsazení
+// 2+ sledovaných postav, tahle věta PŘEPÍŠE, co si Claude napsal sám —
+// jde i do vizuální kontroly obrázku, takže i případnou chybu modelu při
+// kreslení appka pozná a nechá scénu předělat.
+// Škála: rozdíl 1 = "o půl hlavy", rozdíl 2 = "o celou hlavu", víc = "dospělý".
+const CANONICAL_HEIGHT_RANK: Record<string, number> = {
+  valentyna: 0, // nejmenší, batole
+  nicolas: 2,
+  james: 2,     // stejně vysoký jako Nicolas
+  bella: 3,     // o půl hlavy vyšší než James/Nicolas
+  jan: 8, jana: 8, eva: 8, jakob: 8, // dospělí
+};
+
+function canonicalHeightsEntry(characters: Character[]): string | null {
+  const present = characters
+    .map(c => ({ c, rank: CANONICAL_HEIGHT_RANK[c.id] }))
+    .filter((x): x is { c: Character; rank: number } => x.rank !== undefined);
+  if (present.length < 2) return null;
+  present.sort((a, b) => a.rank - b.rank);
+  const name = (c: Character) => c.nameEn || c.name;
+  const bits: string[] = [];
+  for (let i = 1; i < present.length; i++) {
+    const a = present[i - 1], b = present[i];
+    const diff = b.rank - a.rank;
+    if (diff === 0) bits.push(`${name(a.c)} and ${name(b.c)} are exactly the same height`);
+    else if (diff === 1) bits.push(`${name(b.c)} is about half a head taller than ${name(a.c)}`);
+    else if (diff === 2) bits.push(`${name(b.c)} is a full head taller than ${name(a.c)}`);
+    else bits.push(`${name(b.c)} is a grown-up, much taller than ${name(a.c)}`);
+  }
+  return `Heights: ${bits.join("; ")}.`;
+}
+
 export function enforceCanonicalAppearance(hero: string, req: StoryRequest, extras: StoryExtras = {}): string {
   const parts = hero.split("|").map(s => s.trim()).filter(Boolean);
   // Jména kanonických postav (cs + en varianta + jméno z popisu)
@@ -1046,14 +1082,20 @@ export function enforceCanonicalAppearance(hero: string, req: StoryRequest, extr
     }
     return false;
   };
+  // Fixní věta o výškách (jen pokud jsou v obsazení 2+ sledované postavy) —
+  // Claudovu vlastní "Heights:" větu zahodit JEN tehdy, když ji máme čím
+  // nahradit; jinak zůstává jeho volná verze (např. čistě vymyšlené obsazení)
+  const canonicalHeights = canonicalHeightsEntry(req.characters);
   // Claudovy verze kanonických postav pryč (nahradí je doslovná kartotéka),
   // vše ostatní v původním pořadí zůstává
-  const kept = parts.filter(p => !isCanonEntry(p));
+  const kept = parts.filter(p => !isCanonEntry(p) && !(canonicalHeights && /^heights\s*:/i.test(p)));
   const canonical = req.characters.map(c => c.description).filter(Boolean);
   // Vlastní postava bez záznamu → doplnit z jejího popisu
   for (const cc of extras.customCharacters || []) {
     const has = kept.some(p => p.toLowerCase().startsWith(cc.name.toLowerCase() + ":"));
     if (!has && cc.description) kept.push(`${cc.name}: ${cc.description}`);
   }
-  return [...canonical, ...kept].join(" | ");
+  const finalParts = [...canonical, ...kept];
+  if (canonicalHeights) finalParts.push(canonicalHeights);
+  return finalParts.join(" | ");
 }

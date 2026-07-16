@@ -9,7 +9,7 @@
   {
     "id": "valentyna",
     "name": "Valentýnka",
-    "description": "Valentýna: wavy light-blonde hair with large pink fabric bow, brown eyes, fair light skin, yellow dress with small white flower print and white collar, white sandals, small girl — the top of her head reaches Nicolas's shoulders",
+    "description": "Valentýna: wavy light-blonde hair with large pink fabric bow, brown eyes, fair light skin, yellow dress with small white flower print and white collar, white sandals, small toddler girl — a full head shorter than Nicolas, the top of her head reaches only to his shoulders",
     "referenceFile": "valentyna.jpg",
     "nameEn": "Valentina"
   },
@@ -41,14 +41,14 @@
   {
     "id": "james",
     "name": "James",
-    "description": "James: 6-year-old boy with straight mid-brown hair with a fringe, dark brown eyes, fair light skin, cheeky warm smile, green T-shirt with cartoon dog print, white shorts, black sneakers with orange laces; Nicolas's best friend from Riverside school, exactly the SAME height as Nicolas",
+    "description": "James: boy with straight mid-brown hair with a fringe, dark brown eyes, fair light skin, cheeky warm smile, green T-shirt with cartoon dog print, white shorts, black sneakers with orange laces; Nicolas's best friend from Riverside school, exactly the SAME height as Nicolas",
     "referenceFile": "james.jpg",
     "nameEn": "James"
   },
   {
     "id": "bella",
     "name": "Bella",
-    "description": "Bella: 8-year-old girl with very long straight light-brown hair, blue-grey eyes, fair light skin, bright friendly smile, small shell earrings, cream sweatshirt, blue-grey shorts, pink sneakers; James's big sister, slightly taller than the boys",
+    "description": "Bella: girl with very long straight light-brown hair, blue-grey eyes, fair light skin, bright friendly smile, small shell earrings, cream sweatshirt, blue-grey shorts, pink sneakers; James's big sister, about half a head taller than James and Nicolas (who are the same height as each other)",
     "referenceFile": "bella.jpg",
     "nameEn": "Bella"
   },
