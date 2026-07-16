@@ -2091,11 +2091,25 @@ button:disabled {
   font-size: 0.95rem;
 }
 
-/* Doplňující otázka Clauda při nastudování vlastního světa */
+/* Doplňující otázka Clauda při nastudování vlastního světa — celé je to
+   tlačítko (ťuknutí rovnou otevře editor popisu, kam se odpověď píše) */
 .world-question {
   color: #fbbf24;
   text-align: left;
   font-size: 0.85rem;
+}
+.world-question-btn {
+  display: block;
+  width: 100%;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.world-question-btn:active {
+  background: rgba(251, 191, 36, 0.22);
 }
 
 .gen-cards {

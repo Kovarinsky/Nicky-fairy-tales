@@ -3660,7 +3660,11 @@ export default function Home() {
                       {worldStudyLoading ? "⏳ " : "🧠 "}{t.studyWorldBtn}
                     </button>
                   </div>
-                  {worldQuestion && <p className="gen-step-hint world-question">❓ {worldQuestion} — {t.worldQuestionHint}</p>}
+                  {worldQuestion && (
+                    <button type="button" className="gen-step-hint world-question world-question-btn" onClick={openWorldEditor}>
+                      ❓ {worldQuestion} — {t.worldQuestionHint}
+                    </button>
+                  )}
                   {worldStudyError && <p className="gen-step-hint">{t.worldStudyError}</p>}
                 </div>
                 <div className="panel-actions">
