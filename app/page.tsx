@@ -2312,10 +2312,15 @@ export default function Home() {
   }
 
   // When done/total stops moving for too long, the server function most
-  // likely hit Vercel's 5-minute limit → ask /api/job/continue to resume
-  function maybeKickContinue(jobId: string, st: { phase: string; done?: number; total?: number }, stalledNow?: boolean) {
+  // likely hit Vercel's 5-minute limit → ask /api/job/continue to resume.
+  // ⚠️ done/total se ale během PSANÍ vůbec nehýbou (nastaví se, až je
+  // scénář hotový) — appka dřív hlásila ⚠️ „zaseknuto" i při zdravém psaní
+  // (běžně > 4 min u delších/anglických pohádek, i se zdravým restartem
+  // uprostřed), protože sig zůstal furt stejný. updatedAt se ale hýbe s
+  // každým heartbeatem (~20s), takže teď sig vidí i zdravý živý postup.
+  function maybeKickContinue(jobId: string, st: { phase: string; done?: number; total?: number; updatedAt?: number }, stalledNow?: boolean) {
     const w = stallStateFor(jobId);
-    const sig = `${st.phase}|${st.done ?? -1}/${st.total ?? -1}`;
+    const sig = `${st.phase}|${st.done ?? -1}/${st.total ?? -1}|${st.updatedAt ?? -1}`;
     const now = Date.now();
     if (sig !== w.lastSig) {
       w.lastSig = sig; w.lastChange = now;
