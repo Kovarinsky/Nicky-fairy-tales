@@ -2112,6 +2112,34 @@ button:disabled {
   background: rgba(251, 191, 36, 0.22);
 }
 
+/* 👤 Účet — chip pod nadpisem + přihlašovací/registrační panel */
+.account-chip {
+  margin: 0.1rem auto 0.75rem;
+  display: block;
+  width: fit-content;
+}
+.account-panel .field {
+  margin-bottom: 0.6rem;
+}
+.account-panel input[type="text"],
+.account-panel input[type="password"] {
+  width: 100%;
+  box-sizing: border-box;
+}
+.account-switch-mode {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+  font-family: inherit;
+  margin-top: 0.5rem;
+}
+.account-err {
+  color: #f87171;
+}
+
 .gen-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));

@@ -2937,6 +2937,160 @@ export default function Home() {
     }
   }
 
+  // ── 👤 Účet: postavy, historie a nastavení napříč zařízeními ─────────────
+  // Server drží jen JSON (žádné obrázky/audio — ty se stejně jen dočasně
+  // cachují v IndexedDB a při chybění se dokreslí znovu), takže sync je
+  // malý a rychlý. Sloučení při přihlášení je vždy JEN přidávání (union
+  // podle id) — nikdy nic nesmaže, ať se na žádném zařízení nic neztratí.
+  interface SyncPayload {
+    history?: HistoryEntry[];
+    customChars?: CustomChar[];
+    customThemes?: Array<{ id: string; name: string; prompt: string }>;
+    settings?: SavedSettings;
+    voicePref?: string;
+    agePref?: string;
+    hiddenVoices?: string[];
+    uiLang?: UILang;
+  }
+  const [account, setAccount] = useState<{ username: string } | null>(null);
+  const [accountChecked, setAccountChecked] = useState(false);
+  const [accountPanelOpen, setAccountPanelOpen] = useState(false);
+  const [accountMode, setAccountMode] = useState<"login" | "register">("login");
+  const [accountUsername, setAccountUsername] = useState("");
+  const [accountPassword, setAccountPassword] = useState("");
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountError, setAccountError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/account/me")
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.username) setAccount({ username: d.username }); })
+      .catch(() => {})
+      .finally(() => setAccountChecked(true));
+  }, []);
+
+  function readJsonLS<T>(key: string, fallback: T): T {
+    try { return JSON.parse(localStorage.getItem(key) || "") as T; } catch { return fallback; }
+  }
+
+  function collectSyncData(): SyncPayload {
+    return {
+      history: loadHistory(),
+      customChars: readJsonLS(CUSTOM_CHARS_KEY, [] as CustomChar[]),
+      customThemes: readJsonLS(CUSTOM_THEMES_KEY, [] as Array<{ id: string; name: string; prompt: string }>),
+      settings: loadSettings(),
+      voicePref: localStorage.getItem(VOICE_PREF_KEY) || undefined,
+      agePref: localStorage.getItem(AGE_PREF_KEY) || undefined,
+      hiddenVoices: readJsonLS(HIDDEN_VOICES_KEY, [] as string[]),
+      uiLang: (localStorage.getItem(UI_LANG_KEY) as UILang) || undefined,
+    };
+  }
+
+  // Union podle id (nikdy nemaže) — použito pro historii/postavy/světy
+  function unionById<T extends { id: string }>(local: T[], remote: T[] | undefined): T[] {
+    if (!remote?.length) return local;
+    const map = new Map(local.map(x => [x.id, x] as const));
+    for (const r of remote) if (!map.has(r.id)) map.set(r.id, r);
+    return Array.from(map.values());
+  }
+
+  function applySyncData(data: SyncPayload | null | undefined) {
+    if (!data) return;
+    if (data.history) {
+      const merged = unionById(loadHistory(), data.history)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, HISTORY_MAX);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(merged));
+      setStoryHistory(merged);
+    }
+    if (data.customChars) {
+      const merged = unionById(readJsonLS(CUSTOM_CHARS_KEY, [] as CustomChar[]), data.customChars);
+      localStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(merged));
+      setCustomChars(merged);
+    }
+    if (data.customThemes) {
+      const merged = unionById(readJsonLS(CUSTOM_THEMES_KEY, [] as Array<{ id: string; name: string; prompt: string }>), data.customThemes);
+      localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(merged));
+      setCustomThemes(merged);
+    }
+    // Nastavení a preference: hodnoty z účtu vyhrají jen tam, kde je
+    // zařízení ještě nemá (první přihlášení na novém telefonu/tabletu)
+    if (data.settings && !localStorage.getItem(SETTINGS_KEY)) saveSettings(data.settings);
+    if (data.voicePref && !localStorage.getItem(VOICE_PREF_KEY)) { localStorage.setItem(VOICE_PREF_KEY, data.voicePref); setVoicePref(data.voicePref); }
+    if (data.agePref && !localStorage.getItem(AGE_PREF_KEY)) { localStorage.setItem(AGE_PREF_KEY, data.agePref); setAgePref(data.agePref); }
+    if (data.hiddenVoices && !localStorage.getItem(HIDDEN_VOICES_KEY)) { localStorage.setItem(HIDDEN_VOICES_KEY, JSON.stringify(data.hiddenVoices)); setHiddenVoices(data.hiddenVoices); }
+    if (data.uiLang && !localStorage.getItem(UI_LANG_KEY)) { localStorage.setItem(UI_LANG_KEY, data.uiLang); setUiLang(data.uiLang); }
+  }
+
+  async function accountRegister() {
+    const username = accountUsername.trim();
+    if (!username || accountPassword.length < 6) { setAccountError(t.accountErrShort); return; }
+    setAccountBusy(true); setAccountError("");
+    try {
+      const res = await fetch("/api/account/register", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password: accountPassword, data: collectSyncData() }),
+      });
+      const d = await safeJson<{ username?: string; error?: string }>(res);
+      if (!res.ok || !d.username) { setAccountError(d.error || t.accountErrGeneric); return; }
+      setAccount({ username: d.username });
+      setAccountPanelOpen(false);
+      setAccountUsername(""); setAccountPassword("");
+    } catch {
+      setAccountError(t.accountErrGeneric);
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
+  async function accountLogin() {
+    const username = accountUsername.trim();
+    if (!username || !accountPassword) { setAccountError(t.accountErrShort); return; }
+    setAccountBusy(true); setAccountError("");
+    try {
+      const res = await fetch("/api/account/login", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password: accountPassword }),
+      });
+      const d = await safeJson<{ username?: string; data?: SyncPayload; error?: string }>(res);
+      if (!res.ok || !d.username) { setAccountError(d.error || t.accountErrGeneric); return; }
+      applySyncData(d.data);
+      setAccount({ username: d.username });
+      setAccountPanelOpen(false);
+      setAccountUsername(""); setAccountPassword("");
+      // Po sloučení hned pošli zpět celek, ať je účet od teď zdrojem pravdy
+      void fetch("/api/account/sync", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: collectSyncData() }),
+      });
+    } catch {
+      setAccountError(t.accountErrGeneric);
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
+  async function accountLogout() {
+    setAccount(null);
+    try { await fetch("/api/account/logout", { method: "POST" }); } catch {}
+  }
+
+  // ☁️ Průběžný zápis na server po každé změně (s prodlevou) — appka
+  // nemusí mít žádné tlačítko „Uložit", prostě to na pozadí drží v syncu
+  const accountSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!account) return;
+    if (accountSyncTimerRef.current) clearTimeout(accountSyncTimerRef.current);
+    accountSyncTimerRef.current = setTimeout(() => {
+      void fetch("/api/account/sync", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: collectSyncData() }),
+      }).catch(() => {});
+    }, 2500);
+    return () => { if (accountSyncTimerRef.current) clearTimeout(accountSyncTimerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account, storyHistory, customChars, customThemes, voicePref, agePref, hiddenVoices, uiLang]);
+
   // ── Delete a story from history (localStorage + IndexedDB + memory) ──────
   // Stylové mazání bez systémového dialogu: ťuknutí na 🗑️ nebo swipe doleva
   // „odjistí" položku (odsune se a ukáže červené Smazat), druhé ťuknutí maže.
@@ -3455,6 +3609,14 @@ export default function Home() {
       )}
       <h1>📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"} <span className="version-badge">v{APP_VERSION}</span></h1>
       <p className="subtitle">{t.subtitle}</p>
+
+      {/* 👤 Účet — postavy/historii/nastavení jde přenést na jiné zařízení */}
+      {accountChecked && (
+        <button type="button" className="chip chip-btn account-chip"
+          onClick={() => { setAccountPanelOpen(true); setAccountError(""); }}>
+          👤 {account ? account.username : t.accountLoginChip}
+        </button>
+      )}
 
       {/* ── Vrátit se na starší pohádku ── */}
 
@@ -4513,6 +4675,51 @@ export default function Home() {
               </button>
               <button type="button" className="btn-span2" onClick={() => setTopicEditorOpen(false)}>✓ OK</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 👤 Přihlášení/registrace účtu — přenos postav a historie mezi zařízeními */}
+      {accountPanelOpen && (
+        <div className="app-confirm-overlay" onClick={() => setAccountPanelOpen(false)}>
+          <div className="app-confirm account-panel" onClick={e => e.stopPropagation()}>
+            {account ? (
+              <>
+                <p className="app-confirm-msg">👤 {t.accountLoggedInAs(account.username)}</p>
+                <p className="gen-step-hint">{t.accountSyncHint}</p>
+                <div className="app-confirm-btns">
+                  <button type="button" className="cancel-btn" onClick={() => setAccountPanelOpen(false)}>✕ {t.cancel}</button>
+                  <button type="button" className="btn-span2" onClick={accountLogout}>🚪 {t.accountLogoutBtn}</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="app-confirm-msg">👤 {accountMode === "login" ? t.accountLoginTitle : t.accountRegisterTitle}</p>
+                <p className="gen-step-hint">{t.accountHint}</p>
+                <div className="field">
+                  <input type="text" value={accountUsername} onChange={e => setAccountUsername(e.target.value)}
+                    placeholder={t.accountUsernamePh} autoCapitalize="none" autoCorrect="off" autoComplete="username" />
+                </div>
+                <div className="field">
+                  <input type="password" value={accountPassword} onChange={e => setAccountPassword(e.target.value)}
+                    placeholder={t.accountPasswordPh}
+                    autoComplete={accountMode === "login" ? "current-password" : "new-password"}
+                    onKeyDown={e => { if (e.key === "Enter") (accountMode === "login" ? accountLogin() : accountRegister()); }} />
+                </div>
+                {accountError && <p className="gen-step-hint account-err">{accountError}</p>}
+                <div className="app-confirm-btns">
+                  <button type="button" className="cancel-btn" onClick={() => setAccountPanelOpen(false)}>✕ {t.cancel}</button>
+                  <button type="button" className="btn-span2" disabled={accountBusy}
+                    onClick={accountMode === "login" ? accountLogin : accountRegister}>
+                    {accountBusy ? "⏳" : accountMode === "login" ? "🔓" : "✨"} {accountMode === "login" ? t.accountLoginBtn : t.accountRegisterBtn}
+                  </button>
+                </div>
+                <button type="button" className="gen-step-hint account-switch-mode"
+                  onClick={() => { setAccountMode(m => (m === "login" ? "register" : "login")); setAccountError(""); }}>
+                  {accountMode === "login" ? t.accountSwitchToRegister : t.accountSwitchToLogin}
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
