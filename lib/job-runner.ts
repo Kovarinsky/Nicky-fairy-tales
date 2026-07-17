@@ -614,8 +614,12 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           cur.push(i);
         }
         if (cur.length) groups.push(cur);
-        // 1scénové "archy" nemají smysl (stejná cena jako sólo) — dokreslí je sólo fáze
-        for (let g = groups.length - 1; g >= 0; g--) if (groups[g].length < 2) groups.splice(g, 1);
+        // 💰 Arch stojí PAUŠÁLNĚ $0.151 bez ohledu na počet panelů uvnitř —
+        // u 2 scén (2×$0.067 sólo = $0.134) je tedy arch VŽDY DRAŽŠÍ než sólo,
+        // i když se to celé povede. Vyplatí se až od 3 scén ($0.151/3 < $0.067).
+        // Testem odhaleno: 2panelový arch v run2 uspěl kvalitativně, ale
+        // ekonomicky prodělal — proto se tu neseskupuje jen na "≥2", ale "≥3".
+        for (let g = groups.length - 1; g >= 0; g--) if (groups[g].length < 3) groups.splice(g, 1);
         if (groups.length === 0) break;
         const before = Object.keys(st.sceneUrls!).length;
         st.imgSpent = spentNow();
