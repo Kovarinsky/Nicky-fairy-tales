@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateSceneImage, genCounter } from "@/lib/gemini";
-import { narrateScene, prepareNarrationText } from "@/lib/elevenlabs";
+import { narrateScene, prepareNarrationText, getCloneTuning } from "@/lib/elevenlabs";
 import { narrateWithGemini } from "@/lib/gemini-tts";
 import { charactersByIds, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefEntries, refsForText } from "@/lib/portraits";
@@ -17,6 +17,10 @@ export async function POST(req: NextRequest) {
     const heroDescription = String(body.heroDescription || "");
     const voiceId: string | undefined = typeof body.voiceId === "string" && body.voiceId ? body.voiceId : undefined;
     const audioOnly: boolean = body.audioOnly === true;
+    // Nezavěšené doladění z panelu „Doladit hlas“ — zkouší se PŘED uložením
+    const voiceTuningOverride = body.voiceTuning && typeof body.voiceTuning === "object"
+      ? body.voiceTuning as { stability?: number; similarityBoost?: number; style?: number }
+      : undefined;
 
     if (!scene?.narration || (!audioOnly && !scene?.imagePrompt)) {
       return NextResponse.json({ error: "Neplatná scéna." }, { status: 400 });
@@ -27,7 +31,8 @@ export async function POST(req: NextRequest) {
       if (voiceId?.startsWith("gemini:")) {
         return narrateWithGemini(prepareNarrationText(scene.narration), voiceId.slice(7));
       }
-      return { buffer: await narrateScene(scene, voiceId), mimeType: "audio/mpeg" };
+      const tuning = voiceTuningOverride || (voiceId ? await getCloneTuning(voiceId) : undefined);
+      return { buffer: await narrateScene(scene, voiceId, tuning), mimeType: "audio/mpeg" };
     };
 
     if (audioOnly) {

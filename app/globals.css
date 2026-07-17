@@ -2013,6 +2013,28 @@ button:disabled {
 }
 
 .voice-play + .folk-remove { margin-left: 0.35rem; }
+.voice-play + .folk-tune { margin-left: 0.35rem; }
+.folk-tune + .folk-remove { margin-left: 0.35rem; }
+.folk-tune:hover { color: #ff9800; }
+
+/* ⚙️ Doladění klonovaného hlasu (stabilita/podobnost/styl) — vysune se pod
+   řádek hlasu, posuvníky se hned zkoušejí ukázkou před uložením */
+.voice-tune-panel {
+  padding: 0.7rem 0.9rem 0.9rem;
+  margin: 0 0.4rem 0.4rem;
+  background: rgba(124, 77, 255, 0.12);
+  border-radius: 10px;
+}
+.tune-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.tune-row span { flex-shrink: 0; width: 8.5rem; }
+.tune-row input[type="range"] { flex: 1; accent-color: #ff9800; }
 
 /* ── Fotky vlastního světa (až 8, mřížka náhledů s ×) ── */
 .world-photo-grid {

@@ -51,6 +51,9 @@ const SERVER_JOB_KEY = "nicky-server-job";
 // 🔒 Souhlas se zpracováním hlasové nahrávky jako biometrického údaje —
 // ptá se JEDNOU na tomto zařízení/účtu, ne při každém klonování zvlášť
 const VOICE_CONSENT_KEY = "nicky-voice-consent-v1";
+interface CloneTuning { stability: number; similarityBoost: number; style: number }
+// Stejné defaulty jako v lib/elevenlabs.ts (ELEVEN_STABILITY/SIMILARITY/STYLE env)
+const DEFAULT_CLONE_TUNING: CloneTuning = { stability: 0.42, similarityBoost: 0.8, style: 0.35 };
 const HISTORY_MAX = 20; // offline zásoba: posledních 20 pohádek v telefonu
 const SETTINGS_KEY = "nicky-settings";
 const DRAFT_KEY = "nicky-story-draft";
@@ -479,7 +482,22 @@ export default function Home() {
 
   // 🎙️ Klon rodičovského hlasu — nahrání, vytvoření, ukázka, smazání
   const [voiceOpen, setVoiceOpen] = useState(false);
-  const [clones, setClones] = useState<Array<{ id: string; name: string }>>([]);
+  const [clones, setClones] = useState<Array<{ id: string; name: string; settings?: CloneTuning }>>([]);
+  // 🎚️ Doladění klonovaného hlasu (stabilita/podobnost/styl) — playback
+  // nastavení uložené na serveru per hlas, jde vyzkoušet před uložením
+  const [cloneTuning, setCloneTuning] = useState<Record<string, CloneTuning>>({});
+  const [tuneOpenId, setTuneOpenId] = useState<string | null>(null);
+  const [tuneSaving, setTuneSaving] = useState<string | null>(null);
+  useEffect(() => {
+    setCloneTuning(prev => {
+      let changed = false;
+      const next = { ...prev };
+      for (const c of clones) {
+        if (!next[c.id]) { next[c.id] = { ...DEFAULT_CLONE_TUNING, ...(c.settings || {}) }; changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [clones]);
   const [cloneName, setCloneName] = useState("");
   const [recState, setRecState] = useState<"idle" | "ready" | "rec" | "done" | "uploading">("idle");
   const [recSecs, setRecSecs] = useState(0);
@@ -601,20 +619,46 @@ export default function Home() {
   }
   /** Krátká namluvená ukázka hlasu — text v jazyce hlasu (🇭🇷 chorvatsky),
    *  u vícejazyčných hlasů podle jazyka prostředí */
-  async function voiceSampleUrl(id: string): Promise<string | null> {
+  async function voiceSampleUrl(id: string, tuningOverride?: CloneTuning): Promise<string | null> {
     const vLang = voices.find(v => v.id === id)?.language;
     const text = SAMPLE_BY_LANG[isStoryLang(vLang) ? vLang! : uiLang] || SAMPLE_BY_LANG.cs;
     const res = await fetch("/api/scene", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: AbortSignal.timeout(45_000),
-      body: JSON.stringify({ scene: { index: 0, narration: text, imagePrompt: "x" }, audioOnly: true, voiceId: id }),
+      body: JSON.stringify({
+        scene: { index: 0, narration: text, imagePrompt: "x" },
+        audioOnly: true,
+        voiceId: id,
+        ...(tuningOverride ? { voiceTuning: tuningOverride } : {}),
+      }),
     });
     const d = await safeJson<{ audioUrl?: string }>(res);
     return res.ok && d.audioUrl ? d.audioUrl : null;
   }
   function testVoice(id: string) {
     void playPreview(`voice:${id}`, () => voiceSampleUrl(id));
+  }
+  /** Vyzkouší rozehrané (ještě neuložené) doladění hlasu — bez uložení */
+  function testCloneTuning(id: string) {
+    void playPreview(`tune:${id}`, () => voiceSampleUrl(id, cloneTuning[id] || DEFAULT_CLONE_TUNING));
+  }
+  async function saveCloneTuning(id: string) {
+    const val = cloneTuning[id] || DEFAULT_CLONE_TUNING;
+    setTuneSaving(id);
+    try {
+      const res = await fetch("/api/voice-clone", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, settings: val }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!res.ok) throw new Error();
+      await appAlert(`✓ ${t.tuneSaved}`);
+    } catch {
+      await appAlert(t.tuneSaveErr);
+    }
+    setTuneSaving(null);
   }
   /** Znovu načte seznam hlasů ze serveru (zdroj pravdy) vč. seznamu klonů */
   async function refreshVoices() {
@@ -3933,11 +3977,61 @@ export default function Home() {
                   const head = meta
                     ? `${meta.flag} ${uiLang === "en" ? meta.en : meta.cs}`
                     : `🌍 ${uiLang === "en" ? "Multilingual & custom" : "Vícejazyčné a vlastní"}`;
-                  return [<p key={`vg-${gl}`} className="folk-group">{head}</p>, ...group.map(v => {
+                  return [<p key={`vg-${gl}`} className="folk-group">{head}</p>, ...group.flatMap(v => {
                   const pk = `voice:${v.id}`;
                   const playIcon = preview?.key === pk ? (preview.phase === "loading" ? "⏳" : "⏹") : "▶";
                   // název hlasu podle jazyka prostředí (klony/vymyšlené mají jen name)
                   const vName = uiLang === "en" && v.nameEn ? v.nameEn : v.name;
+                  if (v.kind === "clone") {
+                    const tuneOpen = tuneOpenId === v.id;
+                    const val = cloneTuning[v.id] || DEFAULT_CLONE_TUNING;
+                    const tk = `tune:${v.id}`;
+                    const tuneIcon = preview?.key === tk ? (preview.phase === "loading" ? "⏳" : "⏹") : "▶";
+                    const setVal = (patch: Partial<CloneTuning>) => setCloneTuning(p => ({ ...p, [v.id]: { ...val, ...patch } }));
+                    return [
+                      <div key={v.id} role="button" tabIndex={0}
+                        className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
+                        onClick={() => { pickVoice(v.id); testVoice(v.id); }}
+                        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { pickVoice(v.id); testVoice(v.id); } }}>
+                        <span className="folk-emoji">{v.emoji}</span>
+                        <span>{vName}</span>
+                        {voicePref === v.id && <span className="voice-check" aria-hidden>✓</span>}
+                        <span className="voice-play" aria-hidden>{playIcon}</span>
+                        <button type="button" className="chip-remove folk-tune" aria-label={t.tuneLabel}
+                          onClick={e => { e.stopPropagation(); setTuneOpenId(p => p === v.id ? null : v.id); }}>⚙️</button>
+                        <button type="button" className="chip-remove folk-remove" aria-label={t.cloneDelete}
+                          onClick={e => { e.stopPropagation(); deleteClone(v.id); }}>×</button>
+                      </div>,
+                      ...(tuneOpen ? [
+                        <div key={`tune-${v.id}`} className="voice-tune-panel">
+                          <p className="gen-step-hint">{t.tuneHint}</p>
+                          <label className="tune-row">
+                            <span>{t.tuneStability}</span>
+                            <input type="range" min={0} max={1} step={0.01} value={val.stability}
+                              onChange={e => setVal({ stability: parseFloat(e.target.value) })} />
+                          </label>
+                          <label className="tune-row">
+                            <span>{t.tuneSimilarity}</span>
+                            <input type="range" min={0} max={1} step={0.01} value={val.similarityBoost}
+                              onChange={e => setVal({ similarityBoost: parseFloat(e.target.value) })} />
+                          </label>
+                          <label className="tune-row">
+                            <span>{t.tuneStyle}</span>
+                            <input type="range" min={0} max={1} step={0.01} value={val.style}
+                              onChange={e => setVal({ style: parseFloat(e.target.value) })} />
+                          </label>
+                          <div className="file-row">
+                            <button type="button" className="outline-btn" onClick={() => testCloneTuning(v.id)}>
+                              {tuneIcon} {t.tuneTry}
+                            </button>
+                            <button type="button" onClick={() => saveCloneTuning(v.id)} disabled={tuneSaving === v.id}>
+                              💾 {tuneSaving === v.id ? "…" : t.tuneSave}
+                            </button>
+                          </div>
+                        </div>,
+                      ] : []),
+                    ];
+                  }
                   return v.kind ? (
                   <div key={v.id} role="button" tabIndex={0}
                     className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
@@ -3948,7 +4042,7 @@ export default function Home() {
                     {voicePref === v.id && <span className="voice-check" aria-hidden>✓</span>}
                     <span className="voice-play" aria-hidden>{playIcon}</span>
                     <button type="button" className="chip-remove folk-remove" aria-label={t.cloneDelete}
-                      onClick={e => { e.stopPropagation(); if (v.kind === "clone") deleteClone(v.id); else deleteDesigned(v.id); }}>×</button>
+                      onClick={e => { e.stopPropagation(); deleteDesigned(v.id); }}>×</button>
                   </div>
                 ) : (
                   /* vestavěný hlas: × ho skryje na tomto zařízení (↺ vrátí) */

@@ -13,7 +13,8 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const CLONES_PATH = "voices/clones.json";
-interface CloneRecord { id: string; name: string; createdAt: number; consentAt?: number }
+interface VoiceTuning { stability?: number; similarityBoost?: number; style?: number }
+interface CloneRecord { id: string; name: string; createdAt: number; consentAt?: number; settings?: VoiceTuning }
 
 function apiKey(): string {
   return (process.env.ELEVENLABS_API_KEY || "").replace(/[^\x20-\x7E]/g, "").trim();
@@ -67,10 +68,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Máte už 4 klonované hlasy — nejdřív nějaký smažte (×)." }, { status: 400 });
     }
 
+    const denoise = String(form.get("denoise") ?? "true") !== "false";
     const out = new FormData();
     out.append("name", name);
     out.append("files", audio, audio.name || "voice-sample.webm");
-    out.append("remove_background_noise", "true");
+    out.append("remove_background_noise", denoise ? "true" : "false");
     const res = await fetch("https://api.elevenlabs.io/v1/voices/add", {
       method: "POST",
       headers: { "xi-api-key": apiKey() },
@@ -90,6 +92,26 @@ export async function POST(req: NextRequest) {
     const message = err instanceof Error ? err.message : "Neznámá chyba";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+// PATCH {id, settings:{stability?,similarityBoost?,style?}} → uloží doladění hlasu (jen playback nastavení, klon samotný se nemění)
+export async function PATCH(req: NextRequest) {
+  if (!blobToken()) return NextResponse.json({ error: "blob-not-configured" }, { status: 501 });
+  const body = await req.json().catch(() => ({}));
+  const id = String(body?.id || "");
+  if (!id) return NextResponse.json({ error: "Chybí id hlasu." }, { status: 400 });
+  const clamp = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : undefined);
+  const settings: VoiceTuning = {
+    stability: clamp(body?.settings?.stability),
+    similarityBoost: clamp(body?.settings?.similarityBoost),
+    style: clamp(body?.settings?.style),
+  };
+  const clones = await loadClones();
+  const idx = clones.findIndex(c => c.id === id);
+  if (idx === -1) return NextResponse.json({ error: "Hlas nenalezen." }, { status: 404 });
+  clones[idx] = { ...clones[idx], settings };
+  await putJson(CLONES_PATH, clones);
+  return NextResponse.json(clones[idx]);
 }
 
 export async function DELETE(req: NextRequest) {

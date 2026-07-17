@@ -1,4 +1,5 @@
 import type { Scene } from "./types";
+import { readJson } from "./job-runner";
 
 // Strip non-printable chars -- belt-and-suspenders before setting HTTP headers
 function sanitizeApiKey(key: string | undefined): string {
@@ -49,7 +50,19 @@ export function prepareNarrationText(text: string): string {
   return applyCzechPronunciations(sanitizeText(text));
 }
 
-export async function narrateScene(scene: Scene, overrideVoiceId?: string): Promise<Buffer> {
+export interface VoiceTuning {
+  stability?: number;
+  similarityBoost?: number;
+  style?: number;
+}
+
+/** Vlastní doladění klonovaného hlasu uložené přes PATCH /api/voice-clone (playback only) */
+export async function getCloneTuning(voiceId: string): Promise<VoiceTuning | undefined> {
+  const clones = await readJson<Array<{ id: string; settings?: VoiceTuning }>>("voices/clones.json");
+  return Array.isArray(clones) ? clones.find(c => c.id === voiceId)?.settings : undefined;
+}
+
+export async function narrateScene(scene: Scene, overrideVoiceId?: string, tuning?: VoiceTuning): Promise<Buffer> {
   const apiKey = sanitizeApiKey(process.env.ELEVENLABS_API_KEY);
   if (!apiKey) throw new Error("Chybi ELEVENLABS_API_KEY.");
 
@@ -77,9 +90,9 @@ export async function narrateScene(scene: Scene, overrideVoiceId?: string): Prom
         // Ladění bez nasazování: env ELEVEN_STABILITY / ELEVEN_STYLE /
         // ELEVEN_SIMILARITY (0–1) a ELEVEN_SPEED (0.7–1.2) ve Vercelu
         voice_settings: {
-          stability: envNum("ELEVEN_STABILITY", 0.42),
-          similarity_boost: envNum("ELEVEN_SIMILARITY", 0.8),
-          style: envNum("ELEVEN_STYLE", 0.35),
+          stability: tuning?.stability ?? envNum("ELEVEN_STABILITY", 0.42),
+          similarity_boost: tuning?.similarityBoost ?? envNum("ELEVEN_SIMILARITY", 0.8),
+          style: tuning?.style ?? envNum("ELEVEN_STYLE", 0.35),
           use_speaker_boost: true,
           ...(process.env.ELEVEN_SPEED
             ? { speed: Math.min(1.2, Math.max(0.7, parseFloat(process.env.ELEVEN_SPEED) || 1)) }
