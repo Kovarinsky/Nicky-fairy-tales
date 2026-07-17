@@ -491,7 +491,11 @@ export async function generateSceneImage(
         // (nový pokus bez korekce často opraví, co korekce nespraví).
         // Drží se NEJLEPŠÍ OVĚŘENÝ pokus (nejméně porušených pravidel) —
         // neověřený obrázek nikdy nenahradí ověřený.
-        if (heroDescription) {
+        // 💰 Scény BEZ jmenované postavy (čistě scenérie/atmosféra) nemají
+        // žádnou identitu k ochraně — kontrola + případné překreslení tam jen
+        // pálí náklady bez přínosu. Stejný signál (sceneCastList === null)
+        // už appka spolehlivě používá i pro "CAST: nobody" v archových panelech.
+        if (heroDescription && sceneCastList(scene.imagePrompt)) {
           let v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt, refImages, deadline);
           if (!v0 && !(deadline !== undefined && Date.now() > deadline)) {
             // Kontrola 2× selhala (typicky rate-limit) → po pauze ještě jednou;
