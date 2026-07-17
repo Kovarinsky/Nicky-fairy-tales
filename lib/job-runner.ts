@@ -571,18 +571,21 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // až 9 scén za cenu jednoho obrázku), rozřezané a zkontrolované jedenácterem
     // per panel. Neprošlé/nevygenerované panely dokreslí sólo kola níže.
     // IMAGE_SHEET_MODE: "3x3" (výchozí) | "2x2" | "off"
-    // ⚠ U 3+ pojmenovaných postav se archy v testech ukázaly nespolehlivé
-    // (model při víc referenčních tvářích v jednom obrázku míchá identity —
-    // napříč běhy prošlo 0/8, 0/8, 5/8, 4/8 panelů) a ekonomika vychází kolem
-    // nuly nebo ztrátová (3,5 Kč za arch skoro vždy, úspora nejistá) — u
-    // bohatšího obsazení jde appka rovnou sólo cestou, u 1-2 postav archy
-    // prokazatelně fungují a zůstávají zapnuté.
+    // 🧪 EXPERIMENT (test větev): dřív appka u 3+ postav CELÉ pohádky vypínala
+    // archy úplně (0/8, 0/8, 5/8, 4/8 prošlých panelů napříč testy). Ale
+    // castSize je součet postav VYBRANÝCH pro celou pohádku — spousta scén
+    // v takové pohádce ve skutečnosti zobrazuje jen 1-2 z nich pohromadě.
+    // Nově se nespolehlivost řeší PER SKUPINA: do archu smí jen scény, jejichž
+    // VLASTNÍ obsazení (sceneCastList té konkrétní scény) má ≤2 lidi — scény
+    // se 3+ lidmi v jednom panelu jdou vždy rovnou sólo, i v jinak "bohaté"
+    // pohádce. Sleduj debug-logy (🗂️ vs 🎨 poměr a prošlé panely) a v případě
+    // špatných výsledků vrať `castSize >= 3` větev z historie.
     const castSize = (Array.isArray(body.characterIds) ? (body.characterIds as unknown[]).length : 0)
       + (Array.isArray(body.customCharacters) ? (body.customCharacters as unknown[]).length : 0);
     const sheetMode = (process.env.IMAGE_SHEET_MODE || "3x3").toLowerCase();
     if (st.sheetGaveUp) logEv("🗂️ archová fáze už dřív vzdala (žádný nový panel) → rovnou sólo");
-    else if (castSize >= 3) logEv(`🗂️ archová fáze přeskočena (${castSize} postav — u 3+ nespolehlivé) → rovnou sólo`);
-    if (sheetMode !== "off" && castSize < 3 && !quotaExhausted && !st.sheetGaveUp && st.sceneUrls![0]) {
+    else if (castSize >= 3) logEv(`🧪 ${castSize} postav v pohádce — archy zkusí jen scény s ≤2 lidmi v panelu, zbytek sólo`);
+    if (sheetMode !== "off" && !quotaExhausted && !st.sheetGaveUp && st.sceneUrls![0]) {
       const maxCells = sheetMode === "2x2" ? 4 : 9;
       // ⚡ Archy jedné vlny běží PARALELNĚ (15 stránek = archy 9+5 najednou —
       // 4K arch generuje ~stejně dlouho jako jedna 1K scéna, sériově to byla
@@ -596,12 +599,24 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         // různých lidí v jednom obrázku, tím menší riziko zaměněných identit
         // (pořadí panelů v archu na příběhu nezáleží, výřezy se ukládají
         // zpátky podle PŮVODNÍHO indexu scény, ne podle pozice v archu).
-        const castKey = (i: number) => (sceneCastList(scenesScript[i].imagePrompt) || "").toLowerCase().split(",").map(s => s.trim()).sort().join(",");
-        const pendGrouped = [...pend].sort((a, b) => castKey(a).localeCompare(castKey(b)));
+        const castKey = (i: number) => (sceneCastList(scenesScript[i].imagePrompt) || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean).sort().join(",");
+        const castPeople = (key: string) => key ? key.split(",").filter(Boolean).length : 0;
+        // ≥3 lidí v JEDNOM panelu → vždy sólo, bez ohledu na castSize celé pohádky
+        const pendGrouped = pend.filter(i => castPeople(castKey(i)) <= 2)
+          .sort((a, b) => castKey(a).localeCompare(castKey(b)));
         const groups: number[][] = [];
-        for (let g = 0; g < pendGrouped.length; g += maxCells) groups.push(pendGrouped.slice(g, g + maxCells));
-        // poslední skupina o 1 scéně nemá jako arch smysl — dokreslí ji sólo fáze
-        if (groups.length > 1 && groups[groups.length - 1].length < 2) groups.pop();
+        let cur: number[] = [];
+        let curKey: string | null = null;
+        for (const i of pendGrouped) {
+          const k = castKey(i);
+          if (curKey !== null && (k !== curKey || cur.length >= maxCells)) { groups.push(cur); cur = []; }
+          curKey = k;
+          cur.push(i);
+        }
+        if (cur.length) groups.push(cur);
+        // 1scénové "archy" nemají smysl (stejná cena jako sólo) — dokreslí je sólo fáze
+        for (let g = groups.length - 1; g >= 0; g--) if (groups[g].length < 2) groups.splice(g, 1);
+        if (groups.length === 0) break;
         const before = Object.keys(st.sceneUrls!).length;
         st.imgSpent = spentNow();
         logEv(`🗂️ kreslím ${groups.length > 1 ? `${groups.length} archy paralelně` : "arch"} (${groups.map(g => g.length).join("+")} scén)`);
