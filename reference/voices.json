@@ -1,50 +1,50 @@
 [
   {
     "id": "8l5r0apxY5VWrLx8u6t6",
-    "name": "Vypravěč",
-    "nameEn": "Czech Narrator",
+    "name": "Vypravěč Prémium",
+    "nameEn": "Narrator Premium",
     "emoji": "🇨🇿",
-    "description": "Profesionální vypravěč (ElevenLabs)",
+    "description": "Profesionální vypravěč — vyšší kvalita hlasu (ElevenLabs)",
     "language": "cs"
   },
   {
     "id": "gemini:Iapetus:cs",
-    "name": "Gemini vypravěč (test)",
-    "nameEn": "Gemini narrator CZ (test)",
-    "emoji": "🧪",
-    "description": "Testovací mužský hlas Google Gemini — vypráví česky",
+    "name": "Vypravěč",
+    "nameEn": "Narrator",
+    "emoji": "🇨🇿",
+    "description": "Mužský vypravěčský hlas (Google Gemini) — vypráví česky",
     "language": "cs"
   },
   {
     "id": "gemini:Sulafat:cs",
-    "name": "Gemini vypravěčka (test)",
-    "nameEn": "Gemini narrator CZ — female (test)",
-    "emoji": "🧪",
-    "description": "Testovací ženský hlas Google Gemini — vypráví česky",
+    "name": "Vypravěčka",
+    "nameEn": "Narrator (female)",
+    "emoji": "🇨🇿",
+    "description": "Ženský vypravěčský hlas (Google Gemini) — vypráví česky",
     "language": "cs"
   },
   {
     "id": "thfYL0Elyru2qqTtNQsE",
-    "name": "Anglický vypravěč",
-    "nameEn": "English Narrator",
+    "name": "Anglický vypravěč Prémium",
+    "nameEn": "Narrator Premium",
     "emoji": "🇬🇧",
-    "description": "English fairy tale narrator (ElevenLabs)",
+    "description": "English fairy tale narrator — higher voice quality (ElevenLabs)",
     "language": "en"
   },
   {
     "id": "gemini:Iapetus:en",
-    "name": "Gemini vypravěč EN (test)",
-    "nameEn": "Gemini narrator EN (test)",
-    "emoji": "🧪",
-    "description": "Testovací mužský hlas Google Gemini — vypráví anglicky",
+    "name": "Narrator EN",
+    "nameEn": "Narrator",
+    "emoji": "🇬🇧",
+    "description": "Male narrator voice (Google Gemini) — English",
     "language": "en"
   },
   {
     "id": "gemini:Sulafat:en",
-    "name": "Gemini vypravěčka EN (test)",
-    "nameEn": "Gemini narrator EN — female (test)",
-    "emoji": "🧪",
-    "description": "Testovací ženský hlas Google Gemini — vypráví anglicky",
+    "name": "Narrator EN (female)",
+    "nameEn": "Narrator (female)",
+    "emoji": "🇬🇧",
+    "description": "Female narrator voice (Google Gemini) — English",
     "language": "en"
   },
   {

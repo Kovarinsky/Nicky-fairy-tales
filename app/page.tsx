@@ -48,6 +48,9 @@ const VOICE_PREF_KEY = "nicky-voice-pref";
 const AGE_PREF_KEY = "nicky-age-pref";       // ruční věkové pásmo ("auto" = podle vybraných postav)
 const HIDDEN_VOICES_KEY = "nicky-hidden-voices"; // vestavěné hlasy odebrané × (na tomto zařízení)
 const SERVER_JOB_KEY = "nicky-server-job";
+// 🔒 Souhlas se zpracováním hlasové nahrávky jako biometrického údaje —
+// ptá se JEDNOU na tomto zařízení/účtu, ne při každém klonování zvlášť
+const VOICE_CONSENT_KEY = "nicky-voice-consent-v1";
 const HISTORY_MAX = 20; // offline zásoba: posledních 20 pohádek v telefonu
 const SETTINGS_KEY = "nicky-settings";
 const DRAFT_KEY = "nicky-story-draft";
@@ -465,7 +468,11 @@ export default function Home() {
       if (visible.some(v => v.id === voicePref)) { setSelectedVoiceId(voicePref); return; }
       if (voices.length > 0) pickVoice("auto"); // vybraný hlas zmizel (smazaný/skrytý)
     }
-    const match = visible.find(v => v.language === uiLang);
+    // 💰 Výchozí ("auto") hlas přednostně Gemini TTS (~4 Kč/pohádka), ne
+    // ElevenLabs (~8 Kč) — ElevenLabs zůstává volitelný (vyšší vnímaná
+    // kvalita) a jediný možný pro klonované rodinné hlasy.
+    const match = visible.find(v => v.language === uiLang && v.id.startsWith("gemini:"))
+      || visible.find(v => v.language === uiLang);
     if (match) setSelectedVoiceId(match.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voices, uiLang, voicePref, hiddenVoices]);
@@ -496,7 +503,24 @@ export default function Home() {
     fetch("/api/voice-clone").then(r => r.json()).then(d => { if (Array.isArray(d?.clones)) setClones(d.clones); }).catch(() => {});
   }, []);
 
+  /** Souhlas se zpracováním hlasu jako biometrického údaje — nahrávka jde
+   *  vždy jen po tomhle potvrzení, ne po tichém předpokladu z info bubliny. */
+  async function ensureVoiceConsent(): Promise<boolean> {
+    try {
+      if (localStorage.getItem(VOICE_CONSENT_KEY)) return true;
+    } catch {}
+    const ok = await appConfirm(t.voiceConsentAsk, {
+      okLabel: t.voiceConsentAgree,
+      link: { label: t.privacyLinkLabel, href: "/privacy" },
+    });
+    if (ok) {
+      try { localStorage.setItem(VOICE_CONSENT_KEY, String(Date.now())); } catch {}
+    }
+    return ok;
+  }
+
   async function startRec() {
+    if (!(await ensureVoiceConsent())) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const rec = new MediaRecorder(stream);
@@ -535,6 +559,9 @@ export default function Home() {
       const form = new FormData();
       form.append("audio", blob, "voice-sample.webm");
       form.append("name", cloneName.trim() || (uiLang === "en" ? "Family voice" : "Rodinný hlas"));
+      // 🔒 Server ověří, že souhlas se zpracováním biometrického údaje
+      // opravdu proběhl — ne jen že to tvrdí klient
+      form.append("consentAt", localStorage.getItem(VOICE_CONSENT_KEY) || "");
       const res = await fetch("/api/voice-clone", { method: "POST", body: form, signal: AbortSignal.timeout(60_000) });
       const d = await safeJson<{ id?: string; name?: string; error?: string }>(res);
       if (!res.ok || !d.id) throw new Error(d.error || "clone failed");
@@ -1198,9 +1225,12 @@ export default function Home() {
   }, [topic]);
 
   // Stylové potvrzovací okno místo ošklivého systémového window.confirm
-  const [confirmBox, setConfirmBox] = useState<{ msg: string; resolve: (ok: boolean) => void; alert?: boolean } | null>(null);
-  function appConfirm(msg: string): Promise<boolean> {
-    return new Promise(resolve => setConfirmBox({ msg, resolve }));
+  // (volitelně vlastní text OK tlačítka + odkaz — u souhlasu s klonováním
+  // hlasu potřebujeme jasné "Souhlasím" a proklik na zásady ochrany soukromí,
+  // ne generické OK)
+  const [confirmBox, setConfirmBox] = useState<{ msg: string; resolve: (ok: boolean) => void; alert?: boolean; okLabel?: string; link?: { label: string; href: string } } | null>(null);
+  function appConfirm(msg: string, opts?: { okLabel?: string; link?: { label: string; href: string } }): Promise<boolean> {
+    return new Promise(resolve => setConfirmBox({ msg, resolve, ...opts }));
   }
   // Stylová hláška jen s OK (náhrada systémového window.alert)
   function appAlert(msg: string): Promise<boolean> {
@@ -4866,11 +4896,16 @@ export default function Home() {
         <div className="app-confirm-overlay" onClick={() => answerConfirm(false)}>
           <div className="app-confirm" onClick={e => e.stopPropagation()}>
             <p className="app-confirm-msg">{confirmBox.msg}</p>
+            {confirmBox.link && (
+              <a href={confirmBox.link.href} target="_blank" rel="noopener noreferrer" className="app-confirm-link">
+                {confirmBox.link.label} →
+              </a>
+            )}
             <div className="app-confirm-btns">
               {!confirmBox.alert && (
                 <button type="button" className="cancel-btn" onClick={() => answerConfirm(false)}>✕ {t.cancel}</button>
               )}
-              <button type="button" onClick={() => answerConfirm(true)}>OK</button>
+              <button type="button" onClick={() => answerConfirm(true)}>{confirmBox.okLabel || "OK"}</button>
             </div>
           </div>
         </div>

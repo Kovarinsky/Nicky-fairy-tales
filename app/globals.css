@@ -2088,6 +2088,15 @@ button:disabled {
   line-height: 1.55;
 }
 
+.app-confirm-link {
+  display: inline-block;
+  margin: -0.4rem 0 1rem;
+  color: #f59e0b;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: underline;
+}
+
 .app-confirm-btns {
   display: grid;
   grid-template-columns: 1fr 1fr;

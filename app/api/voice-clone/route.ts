@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const CLONES_PATH = "voices/clones.json";
-interface CloneRecord { id: string; name: string; createdAt: number }
+interface CloneRecord { id: string; name: string; createdAt: number; consentAt?: number }
 
 function apiKey(): string {
   return (process.env.ELEVENLABS_API_KEY || "").replace(/[^\x20-\x7E]/g, "").trim();
@@ -52,6 +52,15 @@ export async function POST(req: NextRequest) {
     if (audio.size > 9 * 1024 * 1024) {
       return NextResponse.json({ error: "Nahrávka je příliš velká." }, { status: 400 });
     }
+    // 🔒 Hlasová nahrávka je biometrický údaj (i u dítěte) — appka klonování
+    // nesmí provést bez odsouhlaseného souhlasu. Klient posílá časové
+    // razítko z appConfirm() dialogu; nevěříme jen tomu, že přišlo (mohl by
+    // je poslat i přímý dotaz na API bez proběhlého dialogu), ale bez NĚJAKÉ
+    // hodnoty požadavek rovnou odmítneme — obrana do hloubky vedle UI brány.
+    const consentAt = Number(form.get("consentAt"));
+    if (!Number.isFinite(consentAt) || consentAt <= 0) {
+      return NextResponse.json({ error: "Chybí potvrzený souhlas se zpracováním hlasové nahrávky — zkuste to prosím znovu z appky." }, { status: 400 });
+    }
     const name = String(form.get("name") || "Rodinný hlas").trim().slice(0, 40) || "Rodinný hlas";
     const clones = await loadClones();
     if (clones.length >= 4) {
@@ -73,7 +82,7 @@ export async function POST(req: NextRequest) {
       const detail = typeof data.detail === "string" ? data.detail : data.detail?.message || `ElevenLabs ${res.status}`;
       return NextResponse.json({ error: detail.slice(0, 300) }, { status: 502 });
     }
-    const rec: CloneRecord = { id: data.voice_id, name, createdAt: Date.now() };
+    const rec: CloneRecord = { id: data.voice_id, name, createdAt: Date.now(), consentAt };
     await putJson(CLONES_PATH, [...clones, rec]);
     await putJson("voices/clone.json", {}); // starý formát vyprázdnit
     return NextResponse.json(rec);

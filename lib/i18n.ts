@@ -54,6 +54,11 @@ export const UI = {
     cloneDelete: "Smazat hlas",
     cloneDeleteAsk: "Smazat naklonovaný rodičovský hlas? Smaže se i u ElevenLabs včetně nahrávky.",
     clonePrivacy: "🔒 Nahrávka se použije jen na vytvoření hlasu u ElevenLabs a v appce se neukládá. Hlas kdykoliv smažete jedním ťuknutím.",
+    // 🔒 Samostatný souhlas PŘED nahráváním (ne jen info bublina) — hlasová
+    // nahrávka je biometrický údaj. Ptá se JEDNOU na zařízení/účet.
+    voiceConsentAsk: "🔒 Klonování hlasu zpracovává hlasovou nahrávku jako biometrický údaj (i pokud jde o hlas dítěte). Ťuknutím na „Souhlasím“ potvrzujete, že jste rodič/zákonný zástupce nahrávané osoby (nebo nahráváte svůj vlastní hlas), a souhlasíte se zpracováním nahrávky u ElevenLabs za účelem vytvoření AI klonu hlasu. Víc v Zásadách ochrany soukromí.",
+    voiceConsentAgree: "Souhlasím",
+    privacyLinkLabel: "Zásady ochrany soukromí",
     cloneErr: "Hlas se nepodařilo vytvořit — zkontrolujte, že váš ElevenLabs tarif podporuje klonování (Starter a vyšší).",
     cloneMicErr: "Mikrofon není dostupný — povolte prosím přístup k mikrofonu.",
     designTitle: "Vymyslet hlas podle popisu",
@@ -276,6 +281,9 @@ export const UI = {
     cloneDelete: "Delete voice",
     cloneDeleteAsk: "Delete the cloned parent voice? It will also be removed from ElevenLabs including the recording.",
     clonePrivacy: "🔒 The recording is used only to create the voice at ElevenLabs and is never stored in the app. You can delete the voice anytime with one tap.",
+    voiceConsentAsk: "🔒 Voice cloning processes a voice recording as biometric data (even if it's a child's voice). By tapping “I agree” you confirm you are the parent/legal guardian of the person being recorded (or you're recording your own voice), and you consent to the recording being processed at ElevenLabs to create an AI voice clone. See the Privacy Policy for details.",
+    voiceConsentAgree: "I agree",
+    privacyLinkLabel: "Privacy Policy",
     cloneErr: "The voice could not be created — check that your ElevenLabs plan supports cloning (Starter and up).",
     cloneMicErr: "Microphone is not available — please allow microphone access.",
     designTitle: "Design a voice from a description",
