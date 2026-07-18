@@ -2603,6 +2603,14 @@ textarea.ta-accent {
   min-height: 175px;
   border: 1.5px solid rgba(255, 152, 0, 0.65);
   box-shadow: 0 0 0 1px rgba(244, 81, 30, 0.12);
+  /* 🩺 Globální `textarea { resize: vertical }` dovoloval přetáhnout i
+     tohle READ-ONLY náhledové pole (ťuknutí stejně jen otevře velký
+     editor) na obří výšku prstem za roh — pak zůstalo prázdné obrovské
+     pole s textem schovaným až dole (viz "vyjde měsíc." na dně obrazovky
+     plné modré rozostřené prázdnoty). Náhledové pole se samo nepíše,
+     nemá tedy co „roztahovat" — vypnuto úplně.
+  */
+  resize: none;
 }
 
 textarea.ta-accent:focus {
