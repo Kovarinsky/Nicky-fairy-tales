@@ -1736,7 +1736,15 @@ export default function Home() {
   const [imgErr, setImgErr] = useState<string | null>(null);
   async function ensureAudio(i: number) {
     const s = scenes[i];
-    if (!s || s.audioUrl || !s.narration || isPlaceholderImg(s.imageUrl)) return;
+    // 🎙️ Namlouvání dřív ČEKALO na hotový obrázek scény (isPlaceholderImg
+    // gate) — text scény je ale hotový hned, jak appka dopíše scénář,
+    // dávno před tím, než se obrázek vůbec začne kreslit. Kreslení a
+    // namlouvání tak byla zbytečně SERIALIZOVANÁ: hlas se do fronty dostal
+    // až PO obrázku, i když nemusel čekat vůbec — čtenář to viděl jako
+    // "obrázek je, hlas furt ⏳" (viz stránka 3/15, obrázek hotový, hlas
+    // ne). Teď namlouvání startuje, jakmile appka zná text scény, souběžně
+    // s kreslením obrázku.
+    if (!s || s.audioUrl || !s.narration) return;
     const fetchKey = `${readerEntryIdRef.current || "x"}:${i}`;
     if (audioFetchRef.current.has(fetchKey)) return;
     audioFetchRef.current.add(fetchKey);
@@ -4627,8 +4635,10 @@ export default function Home() {
             <div className="book-controls" onClick={e => e.stopPropagation()}>
               <button type="button" className={`ctrl-cell ctrl-cell-primary${!current.audioUrl || regenAudio ? " ctrl-cell-loading" : ""}`}
                 onClick={togglePlay} disabled={!current.audioUrl || regenAudio}>
-                <span className="ctrl-ico">{!current.audioUrl && !regenAudio ? "⏳" : isPlaying ? "⏸" : "▶"}</span>
-                <span className="ctrl-txt">{isPlaying ? t.pause : t.play}</span>
+                <span className={`ctrl-ico${!current.audioUrl && !regenAudio ? " ctrl-ico-spin" : ""}`}>
+                  {!current.audioUrl && !regenAudio ? "⏳" : isPlaying ? "⏸" : "▶"}
+                </span>
+                <span className="ctrl-txt">{!current.audioUrl && !regenAudio ? t.voiceLoading : isPlaying ? t.pause : t.play}</span>
               </button>
 
               <div className="ctrl-cell ctrl-cell-info">

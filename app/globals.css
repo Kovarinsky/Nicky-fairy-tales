@@ -1422,6 +1422,14 @@ button:disabled {
   line-height: 1;
 }
 
+/* ⏳ „namlouvám" — ikona se sama pomalu otáčí, ať vypadá živě a ne jako
+   zamrzlá/prázdná (dřív jen statický hourglass bez jakéhokoli pohybu) */
+.ctrl-ico-spin {
+  display: inline-block;
+  animation: ico-spin 1.6s linear infinite;
+}
+@keyframes ico-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
 /* Ležatý telefon = „otoč na šířku" */
 .ico-rot {
   display: inline-block;
