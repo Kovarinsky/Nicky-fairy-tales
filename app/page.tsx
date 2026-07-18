@@ -4399,8 +4399,13 @@ export default function Home() {
               {isGenerating && (
                 <div className="gen-cards" style={{ marginTop: '0.25rem' }}>
                   {cardScenes.map((s, i) => {
+                    // ⚠️ „i === done" předpokládá, že se kreslí scény POŘADĚ —
+                    // ale běží souběžně, takže hotová scéna může „přeskočit"
+                    // tu zaseknutou (viz scéna 12 zaseknutá, zatímco 13–15 už
+                    // hotové: i===done nikdy nesedí, appka pak ukazovala ⏳
+                    // navěky, i když job hlásí konkrétní chybu obrázku)
                     const st = (bgGen || jobGen)
-                      ? (!isPlaceholderImg(s?.imageUrl) ? "done" : i === done ? "generating" : "waiting")
+                      ? (!isPlaceholderImg(s?.imageUrl) ? "done" : i === done ? "generating" : newestJob?.imgError ? "error" : "waiting")
                       : (s ? (sceneStatuses[i] ?? "waiting") : "waiting");
                     const showImg = s?.imageUrl && !isPlaceholderImg(s.imageUrl);
                     return (
