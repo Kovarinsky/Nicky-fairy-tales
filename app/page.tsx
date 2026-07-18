@@ -3138,7 +3138,20 @@ export default function Home() {
   useEffect(() => {
     fetch("/api/account/me")
       .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (d?.username) setAccount({ username: d.username }); })
+      .then(d => {
+        if (!d?.username) return;
+        setAccount({ username: d.username });
+        // ☁️ Doplnit z účtu i tehdy, když appka ZŮSTALA přihlášená (cookie
+        // přežila), ale místní úložiště (historie pohádek) se ztratilo —
+        // třeba vymazáním dat appky/prohlížeče. Dřív se sloučení dat z
+        // účtu spouštělo JEN po ruční akci "Přihlásit se", takže tichý,
+        // automatický návrat přihlášení (přes /api/account/me) historii
+        // nikdy neobnovil, i když appka byla po celou dobu přihlášená.
+        fetch("/api/account/sync")
+          .then(r => (r.ok ? r.json() : null))
+          .then(sd => { if (sd?.data) applySyncData(sd.data as SyncPayload); })
+          .catch(() => {});
+      })
       .catch(() => {})
       .finally(() => setAccountChecked(true));
   }, []);
