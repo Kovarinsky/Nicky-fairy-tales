@@ -606,6 +606,24 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // Scene 1 first (anchor), then the rest in parallel
     if (!timeUp() && !overallTimeUp()) await doScene(0);
 
+    // 🕵️ Kotva VYMYŠLENÝCH postav musí vzniknout z jejich PRVNÍ scény PODLE
+    // PŘÍBĚHU, ne z toho, co náhodou dokreslí dřív — jinak dvě scény
+    // zmiňující STEJNOU novou postavu, které začnou kreslit SOUBĚŽNĚ (sheet
+    // mode i sólo kreslíři níže běží paralelně), nemají v tu chvíli ještě
+    // žádnou kotvu, a každá si tak nezávisle „vymyslí" jiný vzhled (viz
+    // „Ötzli" — v úvodní scéně obyčejný horal s lucernou, o pár scén dál
+    // najednou bledý ledový přízrak). Přesně tohle byla dřív jen POJISTKA
+    // BEST-EFFORT (viz komentář u refsFor/doScene): řešila to, jen když
+    // druhá zmínka přišla AŽ PO dokreslení té první. Teď appka pro každé
+    // vymyšlené jméno nejdřív SEKVENČNĚ (ne souběžně) dokreslí jeho
+    // nejnižší-indexovou scénu, než vůbec spustí archy/paralelní kreslíře
+    // níže — kotva tak vždy vznikne z opravdu prvního výskytu v ději.
+    for (const name of inventedNames) {
+      if (inventedRefs.has(name) || timeUp() || overallTimeUp()) continue;
+      const firstIdx = [...Array(total).keys()].find(i => !st.sceneUrls![i] && nameHit(scenesScript[i].imagePrompt, name));
+      if (firstIdx !== undefined) await doScene(firstIdx);
+    }
+
     // 🗂️ Režim archů: zbylé scény po skupinách v JEDNOM obrázku (3×3 ve 4K =
     // až 9 scén za cenu jednoho obrázku), rozřezané a zkontrolované jedenácterem
     // per panel. Neprošlé/nevygenerované panely dokreslí sólo kola níže.
