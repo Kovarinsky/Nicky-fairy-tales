@@ -1101,3 +1101,33 @@ export function enforceCanonicalAppearance(hero: string, req: StoryRequest, extr
   if (canonicalHeights) finalParts.push(canonicalHeights);
   return finalParts.join(" | ");
 }
+
+// Sekce v heroDescription, které NEJSOU jména postav (aby je invented-jméno
+// parser nebral omylem jako vymyšlenou postavu)
+const HERO_DESC_NON_CHARACTER_SECTIONS = new Set(["heights", "key objects", "story outfits", "world & setting lock", "world and setting lock"]);
+
+/** 🕵️ Jména postav VYMYŠLENÝCH pro tuhle konkrétní pohádku (ne z kartotéky) —
+ *  ty NEMAJÍ malovaný referenční portrét, takže bez obrázkové kotvy jejich
+ *  vzhled mezi scénami „plave" (viz „Bora" — jednou elf, jednou kočkovitá
+ *  příšera, jednou skřítek). Používá job-runner k tomu, aby si po PRVNÍM
+ *  úspěšném nakreslení takové postavy uložil obrázek jako její vlastní kotvu
+ *  pro všechny další scény, kde se jmenovitě objeví. */
+export function inventedCharacterNames(heroDescription: string, req: StoryRequest, extras: StoryExtras = {}): string[] {
+  const canonNames = new Set<string>();
+  for (const c of req.characters) {
+    if (c.name) canonNames.add(c.name.toLowerCase());
+    if (c.nameEn) canonNames.add(c.nameEn.toLowerCase());
+  }
+  for (const cc of extras.customCharacters || []) {
+    if (cc.name) canonNames.add(cc.name.toLowerCase());
+  }
+  const names: string[] = [];
+  for (const p of heroDescription.split("|").map(s => s.trim()).filter(Boolean)) {
+    const name = p.split(":")[0]?.trim();
+    if (!name || name.length > 40) continue;
+    const low = name.toLowerCase();
+    if (HERO_DESC_NON_CHARACTER_SECTIONS.has(low) || canonNames.has(low)) continue;
+    names.push(name);
+  }
+  return names;
+}

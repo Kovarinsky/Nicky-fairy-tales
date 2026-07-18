@@ -5,7 +5,7 @@
 // napsaný příběh i hotové scény a dodělá jen chybějící.
 
 import { put, head } from "@vercel/blob";
-import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, peekEarlyScene, enforceCanonicalAppearance, type StoryExtras } from "@/lib/claude";
+import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, peekEarlyScene, enforceCanonicalAppearance, inventedCharacterNames, type StoryExtras } from "@/lib/claude";
 import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, isCreditsDepletedError, isSpendCapError, sceneCastList } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefEntries, refsForText, refsForPanels } from "@/lib/portraits";
@@ -476,7 +476,34 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     for (const ci of customImages) {
       if (ci?.data && ci?.mimeType) customRefs.push({ data: ci.data, mimeType: ci.mimeType, name: "a custom story character" });
     }
-    const refsFor = (txt: string): ReferenceImage[] => [...refsForText(refEntries, txt), ...customRefs];
+    // 🕵️ Postavy VYMYŠLENÉ pro tuhle pohádku (ne z kartotéky, tedy bez
+    // malovaného portrétu) — bez obrázkové kotvy jejich vzhled mezi scénami
+    // „plave" (viz „Bora": jednou elf, jednou kočkovitá příšera, jednou
+    // skřítek). Jakmile appka takovou postavu poprvé úspěšně nakreslí, uloží
+    // si tu scénu jako JEJÍ VLASTNÍ kotvu pro všechny další scény, kde se
+    // jmenovitě objeví — stejný trik jako `anchor` níže, jen na míru postavě.
+    const idsForNames: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
+    const charactersForNames = idsForNames.length ? charactersByIds(idsForNames) : loadCharacters();
+    const rawCustomForNames = Array.isArray(body.customCharacters) ? (body.customCharacters as StoryExtras["customCharacters"]) : [];
+    const inventedNames = inventedCharacterNames(
+      heroDescription,
+      { characters: charactersForNames } as StoryRequest,
+      { customCharacters: rawCustomForNames } as StoryExtras
+    );
+    const inventedRefs = new Map<string, ReferenceImage>();
+    const nameHit = (text: string, name: string): boolean => {
+      const low = ` ${text.toLowerCase()} `;
+      const k = name.toLowerCase();
+      const i = low.indexOf(k);
+      if (i < 0) return false;
+      const isLetter = (ch: string) => /[a-záčďéěíňóřšťúůýž]/i.test(ch);
+      return !isLetter(low[i - 1] || " ") && !isLetter(low[i + k.length] || " ");
+    };
+    const refsFor = (txt: string): ReferenceImage[] => [
+      ...refsForText(refEntries, txt),
+      ...customRefs,
+      ...inventedNames.filter(n => inventedRefs.has(n) && nameHit(txt, n)).map(n => inventedRefs.get(n)!),
+    ];
 
     let anchor: ReferenceImage | null = null;
     // Navázání: kotva konzistence = už hotová scéna 1 z minulého běhu
@@ -544,6 +571,18 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       await write();
       if (i === 0 && !anchor) {
         anchor = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: ANCHOR_LABEL };
+      }
+      // 🕵️ První úspěšné nakreslení vymyšlené postavy = její vlastní kotva
+      // pro všechny další scény, kde se jmenovitě objeví (viz komentář výše
+      // u refsFor) — best-effort: dvě scény, které stejnou NOVOU postavu
+      // kreslí souběžně (4 paralelní kreslíři), se ještě navzájem nechytí.
+      for (const name of inventedNames) {
+        if (!inventedRefs.has(name) && nameHit(scene.imagePrompt, name)) {
+          inventedRefs.set(name, {
+            data: img.buffer.toString("base64"), mimeType: img.mimeType, name,
+            label: `REFERENCE — ${name}'s design as established earlier in THIS story. Match EXACTLY: species/what it's made of, body shape, colors, distinguishing features, size relative to the other characters:`,
+          });
+        }
       }
     }
 
