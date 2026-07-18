@@ -1991,12 +1991,17 @@ export default function Home() {
       a.play().catch(() => {});
       setCtrlsOpen(false);              // hide the panel when narration starts
       if (viewMode !== "reader") setViewMode("reader"); // play from main screen → reader mode
-      // ⛶ Fullscreen na ▶: dřív to uměl jen přehrávač POSLANÉ pohádky (/s/),
-      // tady v appce se muselo pokaždé ťuknout ručně na ⛶. Best-effort — na
-      // zařízeních/prohlížečích bez podpory (typicky iOS Safari mimo video)
-      // se to jen tiše nepovede, appka funguje dál stejně jako předtím.
+      // ⛶ Celá obrazovka NA ŠÍŘKU při ▶: stejný postup jako ruční tlačítko ⛶
+      // (toggleForcedLandscape) — dřív to uměl jen přehrávač POSLANÉ pohádky.
+      // Best-effort — na zařízeních/prohlížečích bez podpory (typicky iOS
+      // Safari mimo video, nebo desktop bez orientation.lock) appka jen
+      // tiše zůstane, jak byla, bez chyby.
       if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen?.().catch(() => {});
+        const so = (screen as Screen & { orientation?: { lock?: (o: string) => Promise<void> } }).orientation;
+        document.documentElement.requestFullscreen?.()
+          .then(() => so?.lock?.("landscape").catch(() => {}))
+          .then(() => setForcedLs(true))
+          .catch(() => {});
       }
     }
   }
@@ -3534,9 +3539,15 @@ export default function Home() {
       const finalScenes = await generateMedia(entry.title, entry.heroDescription, entry.scenes, [], selectedVoiceId, false, entry.id, partial);
       renderedMapRef.current.set(entry.id, finalScenes);
       cacheStory(entry.id, finalScenes).catch(() => {});
-      // 🖼️ Uživatel mezitím mohl otevřít JINOU (už hotovou) pohádku — tahle
-      // dokreslila na pozadí a uložila se do cache správně, ale nesmí teď
-      // přepsat obrazovku, na které svítí něco úplně jiného
+      // 🩺 Appka právě dokreslila chybějící obrázky SAMA (přímo přes /api/scene),
+      // ne přes serverový job — ten o tom neví a jeho záznam (jobId === entry.id)
+      // by jinak navždy zůstal „generating" na svém posledním stavu, appka by
+      // ho pořád pollovala a ukazovala starou zastaralou lištu/dlaždice i po
+      // tom, co je pohádka dávno hotová a uložená. Zrušit sledování jobu ručně.
+      if (finalScenes.every(s => !isPlaceholderImg(s.imageUrl)) && serverJobsRef.current.some(j => j.jobId === entry.id)) {
+        stopJobPolling(entry.id);
+        removeServerJob(entry.id);
+      }
       if (readerEntryIdRef.current === entry.id) {
         setStatus(t.statusReady);
         setViewMode("reader");
