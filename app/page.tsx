@@ -2473,6 +2473,17 @@ export default function Home() {
     stopJobPolling(jobId);
     const tick = async () => {
       try {
+        // 🩺 Pojistka proti „přízračnému" jobu: appka mohla stránku dokreslit
+        // JINOU cestou (přímo přes /api/scene, viz v4.40) a uložit ji do
+        // historie, aniž by o tom tenhle job vůbec věděl — server pak jeho
+        // stav nikdy neaktualizuje a appka by ho pollovala navěky se starým
+        // „generating" snímkem. Pokud je jobId už v uložené historii, je
+        // hotovo, ať server říká cokoli — přestat sledovat.
+        if (loadHistory().some(e => e.id === jobId)) {
+          stopJobPolling(jobId);
+          removeServerJob(jobId);
+          return;
+        }
         const res = await fetch(`/api/job/status?id=${jobId}`, { cache: "no-store" });
         if (res.status === 404) {
           // Status was never written — the server start died before its first
@@ -3485,6 +3496,15 @@ export default function Home() {
       setViewMode("reader");
       setHistoryOpen(false);
       isAutoAdvanceRef.current = true; // start narration right away
+      // 🩺 Pohádka se otevírá RYCHLOU cestou (z paměti/IndexedDB, ne z
+      // dokreslování) — pokud je už celá hotová, ale appka na ni pořád
+      // omylem drží starý serverový job (viz v4.40 — tahle větev jím dřív
+      // vůbec neprocházela, takže se stará lišta/dlaždice nikdy neuklidily),
+      // sledování takového osamoceného jobu zrušit i tady.
+      if (readyScenes.every(s => !isPlaceholderImg(s.imageUrl)) && serverJobsRef.current.some(j => j.jobId === entry.id)) {
+        stopJobPolling(entry.id);
+        removeServerJob(entry.id);
+      }
       // 📖 Zkopírovaná (poslaná/přijatá) pohádka nemá heroDescription —
       // na pozadí si appka „nastuduje svět", ať 🖌 překreslení dostane
       // zámek vzhledu a kontrolu konzistence (dřív nemělo ani jedno)
