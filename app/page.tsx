@@ -2061,11 +2061,18 @@ export default function Home() {
     // 2 scenes in parallel — Gemini/ElevenLabs handle it, halves total wait time
     const CONCURRENCY = 2;
 
+    // 🖼️ Když uživatel MEZITÍM otevře jinou (už hotovou) pohádku, tenhle běh
+    // dobíhá dál na pozadí (dokreslí a uloží se do cache), ale nesmí přepsat
+    // stav CIZÍ pohádky, která teď svítí na obrazovce — dřív se stalo, že
+    // stará „14/15 scén" lišta i rozkreslené scény zůstaly viset PŘES nově
+    // otevřenou pohádku, protože sdílené UI stavy (scenes/doneCount/status)
+    // patří jen jedné, poslední otevřené pohádce.
+    const stillOnScreen = () => background || !entryId || readerEntryIdRef.current === entryId;
     const publish = () => {
       lastProgressRef.current = Date.now();   // heartbeat for the stall watchdog
       if (background) {
         setBgProgress({ done: realDone(), total: scriptScenes.length });
-      } else {
+      } else if (stillOnScreen()) {
         setDoneCount(realDone());
         setScenes([...localScenes]);
       }
@@ -2081,7 +2088,7 @@ export default function Home() {
     };
 
     async function runScene(i: number) {
-      if (!background) setSceneStatuses(prev => { const n = [...prev]; n[i] = "generating"; return n; });
+      if (!background && stillOnScreen()) setSceneStatuses(prev => { const n = [...prev]; n[i] = "generating"; return n; });
       try {
         const res = await fetch("/api/scene", {
           method: "POST",
@@ -2102,13 +2109,13 @@ export default function Home() {
         if (!res.ok) throw new Error(media.error || `Scéna ${i + 1} selhala.`);
         localScenes[i] = { ...localScenes[i], imageUrl: media.imageUrl, audioUrl: media.audioUrl };
         publish();
-        if (!background) setSceneStatuses(prev => { const n = [...prev]; n[i] = isPlaceholderImg(media.imageUrl) ? "error" : "done"; return n; });
+        if (!background && stillOnScreen()) setSceneStatuses(prev => { const n = [...prev]; n[i] = isPlaceholderImg(media.imageUrl) ? "error" : "done"; return n; });
         // Progressive cache — a finished scene survives reload/app kill
         if (entryId && !isPlaceholderImg(media.imageUrl)) {
           cacheStory(entryId, localScenes).catch(() => {});
         }
       } catch {
-        if (!background) setSceneStatuses(prev => { const n = [...prev]; n[i] = "error"; return n; });
+        if (!background && stillOnScreen()) setSceneStatuses(prev => { const n = [...prev]; n[i] = "error"; return n; });
       }
     }
 
@@ -2133,7 +2140,7 @@ export default function Home() {
     for (let round = 1; round <= 3; round++) {
       const failed = localScenes.map((s, i) => (isPlaceholderImg(s.imageUrl) ? i : -1)).filter(i => i >= 0);
       if (failed.length === 0) break;
-      if (!background) setStatus(t.statusRepairing(failed.length));
+      if (!background && stillOnScreen()) setStatus(t.statusRepairing(failed.length));
       await new Promise(r => setTimeout(r, 2500 * round));
       await runPool(failed);
     }
@@ -3527,13 +3534,22 @@ export default function Home() {
       const finalScenes = await generateMedia(entry.title, entry.heroDescription, entry.scenes, [], selectedVoiceId, false, entry.id, partial);
       renderedMapRef.current.set(entry.id, finalScenes);
       cacheStory(entry.id, finalScenes).catch(() => {});
-      setStatus(t.statusReady);
-      setViewMode("reader");
+      // 🖼️ Uživatel mezitím mohl otevřít JINOU (už hotovou) pohádku — tahle
+      // dokreslila na pozadí a uložila se do cache správně, ale nesmí teď
+      // přepsat obrazovku, na které svítí něco úplně jiného
+      if (readerEntryIdRef.current === entry.id) {
+        setStatus(t.statusReady);
+        setViewMode("reader");
+      }
     } catch (err) {
-      const msg2 = err instanceof Error ? err.message : t.errReplay;
-      setError(msg2 === "Failed to fetch" || msg2.includes("AbortError") ? "FETCH_ABORT" : msg2);
-      setStatus("");
+      if (readerEntryIdRef.current === entry.id) {
+        const msg2 = err instanceof Error ? err.message : t.errReplay;
+        setError(msg2 === "Failed to fetch" || msg2.includes("AbortError") ? "FETCH_ABORT" : msg2);
+        setStatus("");
+      }
     } finally {
+      // loading se resetuje VŽDY (i pro odloženou/zastíněnou pohádku) — jinak
+      // by zůstalo natrvalo zamčené a další ✕ replay by se už nikdy nespustil
       setLoading(false);
     }
   }
