@@ -1725,6 +1725,11 @@ export default function Home() {
   // 🔇 Namluvení selhalo (vyčerpaný kredit, výpadek TTS…) — dřív se chyba
   // tiše spolkla a Přehrát ukazovalo ⏳ donekonečna; teď se čtenáři ukáže
   const [audioErr, setAudioErr] = useState<string | null>(null);
+  // 🖼️ Proč se obrázek opakovaně nekreslí (bezpečnostní filtr Gemini,
+  // vyčerpaná kvóta…) — /api/scene tenhle důvod vrací (imageDebug), ale
+  // dřív se nikde neukázal, takže „Vygenerovat obrázek" mlčky selhávalo
+  // pořád dokola beze stopy PROČ
+  const [imgErr, setImgErr] = useState<string | null>(null);
   async function ensureAudio(i: number) {
     const s = scenes[i];
     if (!s || s.audioUrl || !s.narration || isPlaceholderImg(s.imageUrl)) return;
@@ -2147,6 +2152,7 @@ export default function Home() {
     const scene = scenes[i];
     if (!scene || fixingScene !== null) return;
     setFixingScene(i);
+    setImgErr(null);
     // Anchor the repair to the story's first image for consistency
     const a0 = i > 0 ? scenes[0]?.imageUrl : undefined;
     const m = a0 && !isPlaceholderImg(a0) ? a0.match(/^data:(image\/[a-z.+-]+);base64,(.+)$/) : null;
@@ -2167,7 +2173,7 @@ export default function Home() {
           ...(m ? { styleAnchor: { mimeType: m[1], data: m[2] } } : {}),
         }),
       });
-      const media = await safeJson<{ imageUrl?: string; audioUrl?: string; error?: string }>(res);
+      const media = await safeJson<{ imageUrl?: string; audioUrl?: string; error?: string; imageDebug?: string }>(res);
       if (res.ok && media.imageUrl && !isPlaceholderImg(media.imageUrl)) {
         setScenes(prev => {
           const n = [...prev];
@@ -2180,8 +2186,14 @@ export default function Home() {
           }
           return n;
         });
+      } else {
+        // 🖼️ /api/scene vrací i při neúspěchu 200 (placeholder obrázek) —
+        // skutečný důvod je v imageDebug, dřív se nikde neukázal
+        setImgErr(media.imageDebug || media.error || t.imgFailed);
       }
-    } catch {} finally {
+    } catch (e) {
+      setImgErr(e instanceof Error ? e.message : t.imgFailed);
+    } finally {
       setFixingScene(null);
     }
   }
@@ -4468,6 +4480,7 @@ export default function Home() {
                 ) : (
                   <>
                     <span>{t.imgFailed}</span>
+                    {imgErr && <span className="img-err-detail">{imgErr.slice(0, 220)}</span>}
                     <button type="button" className="btn-retry" onClick={() => repairSceneImage(page)}>
                       {t.regenImg}
                     </button>

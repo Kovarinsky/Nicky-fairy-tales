@@ -1243,6 +1243,16 @@ button:disabled {
 }
 .audio-err .btn-retry { flex-shrink: 0; }
 
+.img-err-detail {
+  display: block;
+  max-width: 88%;
+  margin: 0.2rem auto 0;
+  color: #ffd7d7;
+  font-size: 0.75rem;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+
 .img-redraw {
   position: absolute;
   top: 8px;
