@@ -4602,8 +4602,8 @@ export default function Home() {
               </div>
             )}
 
-            {/* 4 tlačítka: řada na šířku obrázku (portrét) / sloupec na výšku
-                obrázku (fullscreen). Hlas a hudba se nastavují v hlavním menu,
+            {/* 5 tlačítek: řada na šířku obrázku (portrét) / sloupec na výšku
+                obrázku (fullscreen). Hlas se nastavuje v hlavním menu,
                 auto-přechod scén je zapnutý vždy. */}
             <div className="book-controls" onClick={e => e.stopPropagation()}>
               <button type="button" className={`ctrl-cell ctrl-cell-primary${!current.audioUrl || regenAudio ? " ctrl-cell-loading" : ""}`}
@@ -4616,6 +4616,17 @@ export default function Home() {
                 <span className="ctrl-ico">📖</span>
                 <span className="ctrl-txt">{pagePos + 1} / {visiblePages.length}{storyChoice && branch === null ? "+" : ""}</span>
               </div>
+
+              {/* 🎵 Hudba/zvuky — dřív šlo přepnout jen ve formuláři PŘED
+                  vytvořením pohádky; při otevření uložené pohádky z historie
+                  se ale formulář vůbec nezobrazí, takže nebyl žádný způsob,
+                  jak hudbu zapnout/vypnout za čtení. Tlačítko teď je i přímo
+                  v přehrávači. */}
+              <button type="button" className={`ctrl-cell${musicOn ? " ctrl-cell-on" : ""}`}
+                onClick={() => setMusicOn(p => !p)}>
+                <span className="ctrl-ico">{musicOn ? "🎵" : "🔇"}</span>
+                <span className="ctrl-txt">{t.musicLabel}</span>
+              </button>
 
               <button type="button" className={`ctrl-cell${forcedLs ? " ctrl-cell-on" : ""}`}
                 onClick={toggleForcedLandscape}>

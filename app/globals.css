@@ -990,7 +990,7 @@ button:disabled {
 }
 
 /* Controls: hidden; tap → panel pinned to the BOTTOM of the screen */
-/* Reader (portrét): jedna řada 4 tlačítek na spodní hraně, na šířku obrázku.
+/* Reader (portrét): jedna řada 5 tlačítek na spodní hraně, na šířku obrázku.
    Panel VYJÍŽDÍ zpoza spodní hrany (ťuknutí) a po 5 s zase ZAJEDE. */
 .reader-mode .book-controls {
   position: absolute;
@@ -1000,7 +1000,7 @@ button:disabled {
   margin: 0;
   z-index: 6;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 0.4rem;
   padding: 0.45rem 0.5rem;
   border-radius: 16px 16px 0 0;
@@ -1100,7 +1100,7 @@ button:disabled {
     aspect-ratio: auto;
     align-self: auto;
   }
-  /* Landscape (fullscreen): sloupec 4 tlačítek na výšku obrázku; panel
+  /* Landscape (fullscreen): sloupec 5 tlačítek na výšku obrázku; panel
      VYJÍŽDÍ zpoza pravé hrany a zase ZAJEDE */
   .reader-mode .book-controls {
     position: absolute;
@@ -1110,7 +1110,7 @@ button:disabled {
     top: 0.45rem;
     bottom: 3.4rem; /* nad bílým pruhem titulků */
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(4, 1fr);
+    grid-template-rows: repeat(5, 1fr);
     gap: 0.35rem;
     width: 116px;
     padding: 0.4rem;
@@ -1344,10 +1344,10 @@ button:disabled {
 }
 
 /* ── Unified control bar ── */
-/* 4 tlačítka v jedné řadě na šířku obrázku */
+/* 5 tlačítek v jedné řadě na šířku obrázku */
 .book-controls {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 0.5rem;
   padding: 0.7rem 1rem 0.8rem;
   border-top: 1.5px solid rgba(196, 190, 235, 0.45);
