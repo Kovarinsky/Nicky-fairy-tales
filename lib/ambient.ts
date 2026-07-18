@@ -246,6 +246,91 @@ function buildCozy(ctx: AudioContext, dest: AudioNode, rev: AudioNode): Cleanup 
   };
 }
 
+// ── 🔊 Jednorázové zvukové efekty podle děje (na rozdíl od Soundscape výše,
+// což je jen nálada hrající na pozadí celé scény) ───────────────────────────
+
+function playWaves(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  // Dvě překrývající se "vlny": filtrovaný šum s pomalou obálkou (nádech-výdech)
+  for (const delay of [0, 0.9]) {
+    setTimeout(() => {
+      const t = ctx.currentTime;
+      const src = noiseSource(ctx, noiseBuf);
+      const filt = ctx.createBiquadFilter();
+      filt.type = "lowpass";
+      filt.frequency.setValueAtTime(300, t);
+      filt.frequency.linearRampToValueAtTime(900, t + 1.1);
+      filt.frequency.linearRampToValueAtTime(200, t + 2.6);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.16, t + 1.0);
+      g.gain.linearRampToValueAtTime(0, t + 2.6);
+      src.connect(filt);
+      filt.connect(g);
+      g.connect(dest);
+      src.start(t);
+      src.stop(t + 2.7);
+    }, delay * 1000);
+  }
+}
+
+function playThunder(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  const t = ctx.currentTime;
+  // Ostrý úder (krátký širokopásmový šum)
+  const crack = noiseSource(ctx, noiseBuf);
+  const crackF = ctx.createBiquadFilter();
+  crackF.type = "highpass";
+  crackF.frequency.value = 900;
+  const crackG = ctx.createGain();
+  crackG.gain.setValueAtTime(0.22, t);
+  crackG.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+  crack.connect(crackF);
+  crackF.connect(crackG);
+  crackG.connect(dest);
+  crack.start(t);
+  crack.stop(t + 0.25);
+  // Dlouhé dunivé dozvíjení (nízkofrekvenční šum s pomalým doznětem)
+  const rumble = noiseSource(ctx, noiseBuf);
+  const rumbleF = ctx.createBiquadFilter();
+  rumbleF.type = "lowpass";
+  rumbleF.frequency.value = 140;
+  const rumbleG = ctx.createGain();
+  rumbleG.gain.setValueAtTime(0, t);
+  rumbleG.gain.linearRampToValueAtTime(0.28, t + 0.08);
+  rumbleG.gain.exponentialRampToValueAtTime(0.001, t + 3.2);
+  rumble.connect(rumbleF);
+  rumbleF.connect(rumbleG);
+  rumbleG.connect(dest);
+  rumble.start(t);
+  rumble.stop(t + 3.3);
+}
+
+function playSnore(ctx: AudioContext, dest: AudioNode): void {
+  // 2 nádech-výdech cykly: nízký tón s bzučivým vibratem, hlasitěji na nádechu
+  for (let i = 0; i < 2; i++) {
+    setTimeout(() => {
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(70, t);
+      osc.frequency.linearRampToValueAtTime(95, t + 0.35);
+      osc.frequency.linearRampToValueAtTime(55, t + 0.75);
+      const filt = ctx.createBiquadFilter();
+      filt.type = "lowpass";
+      filt.frequency.value = 320;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.14, t + 0.2);
+      g.gain.linearRampToValueAtTime(0.03, t + 0.45);
+      g.gain.linearRampToValueAtTime(0, t + 0.8);
+      osc.connect(filt);
+      filt.connect(g);
+      g.connect(dest);
+      osc.start(t);
+      osc.stop(t + 0.85);
+    }, i * 950);
+  }
+}
+
 // ── AmbientPlayer ─────────────────────────────────────────────────────────────
 export class AmbientPlayer {
   private ctx: AudioContext | null = null;
@@ -359,6 +444,39 @@ export class AmbientPlayer {
       g.connect(rev);
       osc.start(t);
       osc.stop(t + 2.5);
+    });
+  }
+
+  /** 🔊 Jednorázový zvukový efekt podle děje scény (vlny/hrom/chrápání) —
+   *  hraje JEDNOU navrch aktuálního soundscape, ignorováno když appka mlčí */
+  playEffect(effect: "waves" | "thunder" | "snore" | undefined): void {
+    if (!effect || !this.running) return;
+    const { ctx, rev } = this.setup();
+    switch (effect) {
+      case "waves":   playWaves(ctx, rev, this.getNoiseBuffer(ctx)); break;
+      case "thunder": playThunder(ctx, rev, this.getNoiseBuffer(ctx)); break;
+      case "snore":   playSnore(ctx, rev); break;
+    }
+  }
+
+  /** Klesající, usínající melodie — zavolat jednou na úplně poslední stránce */
+  playOutro(): void {
+    if (!this.running) return;
+    const { ctx, rev } = this.setup();
+    const notes = [523.25, 392.00, 329.63, 261.63]; // C5 G4 E4 C4 (sestupně)
+    notes.forEach((freq, i) => {
+      const t = ctx.currentTime + i * 0.42 + 0.1;
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.16, t + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + (i === notes.length - 1 ? 3.5 : 1.6));
+      osc.connect(g);
+      g.connect(rev);
+      osc.start(t);
+      osc.stop(t + (i === notes.length - 1 ? 3.6 : 1.8));
     });
   }
 

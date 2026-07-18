@@ -47,6 +47,10 @@ export interface StoryRequest {
 /** Zvukový svět scény – řídí procedurální ambient hudbu */
 export type Soundscape = "magic" | "forest" | "night" | "adventure" | "cozy";
 
+/** 🔊 Jednorázový zvukový efekt PODLE DĚJE téhle konkrétní scény (na rozdíl
+ *  od soundscape, což je jen obecná nálada hrající na pozadí celé scény) */
+export type SoundEffect = "waves" | "thunder" | "snore";
+
 /** Jedna scéna = jedna stránka knížky */
 export interface Scene {
   /** Pořadí scény od 1 */
@@ -57,6 +61,8 @@ export interface Scene {
   imagePrompt: string;
   /** Ambient sound world for this scene */
   soundscape?: Soundscape;
+  /** Jednorázový zvukový efekt, pokud ho děj TÉTO scény výslovně zmiňuje */
+  sfx?: SoundEffect;
 }
 
 /** Výstup Claude – hotový scénář */

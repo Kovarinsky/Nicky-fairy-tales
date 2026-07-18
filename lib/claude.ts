@@ -122,11 +122,18 @@ function buildSystemPrompt(language: string): string {
       '  "adventure" — movement, adventure, challenge, danger, rescue',
       '  "cozy"      — home, food, hugs, safety, family, warmth, story ending',
       "",
+      "═══ SOUND EFFECT (sfx) ═══",
+      "Optional `sfx` field on a scene — a ONE-SHOT sound effect for something the NARRATION OF THAT SCENE explicitly describes happening, on top of the ambient soundscape. Only add it when the text truly calls for it — most scenes have none:",
+      '  "waves"   — the sea/ocean waves crashing or lapping are part of THIS scene',
+      '  "thunder" — thunder, a storm, lightning striking in THIS scene',
+      '  "snore"   — a character audibly snoring/sleeping in THIS scene',
+      "Omit `sfx` entirely when none of these apply — do not force it.",
+      "",
       "═══ OUTPUT ═══",
       "Reply with ONLY valid RFC 8259 JSON — no markdown, no code fences, no // comments, no trailing commas.",
-      "Required fields per scene: index (number), narration (string), imagePrompt (string), soundscape (one of the 5 values).",
+      "Required fields per scene: index (number), narration (string), imagePrompt (string), soundscape (one of the 5 values). Optional: sfx.",
       "Compact example structure (fill in real content):",
-      '{"title":"...","heroDescription":"...","worldNotes":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"forest"}]}',
+      '{"title":"...","heroDescription":"...","worldNotes":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"night","sfx":"snore"}]}',
     ].join("\n");
   }
 
@@ -209,11 +216,18 @@ function buildSystemPrompt(language: string): string {
     '  "adventure" — pohyb, dobrodružství, výzva, nebezpečí, záchrana',
     '  "cozy"      — domov, jídlo, objetí, bezpečí, rodina, teplo, konec pohádky',
     "",
+    "═══ ZVUKOVÝ EFEKT (sfx) ═══",
+    "Volitelné pole `sfx` u scény — JEDNORÁZOVÝ zvukový efekt navíc k ambientnímu soundscape, jen když to DĚJ TÉTO KONKRÉTNÍ scény výslovně popisuje. Přidej ho, jen když to text opravdu vyžaduje — většina scén ho mít nebude:",
+    '  "waves"   — mořské/oceánské vlny narážejí na břeh nebo šplouchají PŘÍMO v téhle scéně',
+    '  "thunder" — hrom, bouřka, blesk udeří v téhle scéně',
+    '  "snore"   — postava slyšitelně chrápe/spí v téhle scéně',
+    "Pokud nic z toho neplatí, pole `sfx` úplně vynech — nevynucuj ho.",
+    "",
     "═══ VÝSTUP ═══",
     "Odpověz POUZE validním RFC 8259 JSON — bez markdown, bez ``` obalení, bez // komentářů, bez trailing čárek.",
-    "Povinné pole na každou scénu: index (číslo), narration (string), imagePrompt (string), soundscape (jedna z 5 hodnot).",
+    "Povinné pole na každou scénu: index (číslo), narration (string), imagePrompt (string), soundscape (jedna z 5 hodnot). Volitelné: sfx.",
     "Příklad struktury (vyplň reálným obsahem):",
-    '{"title":"...","heroDescription":"...","worldNotes":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"forest"}]}',
+    '{"title":"...","heroDescription":"...","worldNotes":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"night","sfx":"snore"}]}',
   ].join("\n");
 }
 

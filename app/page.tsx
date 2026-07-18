@@ -1011,6 +1011,18 @@ export default function Home() {
     ambientRef.current?.setScene(scenes[page]?.soundscape);
   }, [page, bookReady, scenes]);
 
+  // 🔊 Jednorázový zvukový efekt podle děje TÉTO scény (vlny/hrom/chrápání) —
+  // jednou na stránku (ref hlídá, ať se nespustí znovu při každém re-renderu)
+  const sfxFiredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!bookReady) return;
+    const key = `${readerEntryIdRef.current || "x"}:${page}`;
+    if (sfxFiredRef.current === key) return;
+    sfxFiredRef.current = key;
+    ambientRef.current?.playEffect(scenes[page]?.sfx);
+  }, [page, bookReady, scenes]);
+
+
   // Intro fanfare when reader opens
   const introFiredRef = useRef(false);
   useEffect(() => {
@@ -1486,6 +1498,16 @@ export default function Home() {
   const pagePos = Math.max(0, visiblePages.indexOf(page));
   const nextVisible = pagePos + 1 < visiblePages.length ? visiblePages[pagePos + 1] : null;
   const prevVisible = pagePos > 0 ? visiblePages[pagePos - 1] : null;
+
+  // 🌙 Klesající usínací melodie na úplně poslední stránce (respektuje větev)
+  const outroFiredRef = useRef(false);
+  useEffect(() => {
+    if (!bookReady) { outroFiredRef.current = false; return; }
+    if (nextVisible === null && !outroFiredRef.current) {
+      outroFiredRef.current = true;
+      ambientRef.current?.playOutro();
+    }
+  }, [bookReady, nextVisible]);
 
   async function pickBranch(b: "A" | "B") {
     if (!storyChoice) return;
