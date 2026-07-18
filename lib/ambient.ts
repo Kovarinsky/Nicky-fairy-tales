@@ -2,8 +2,8 @@
 // No external files. Each Soundscape has its own synthesis layer.
 // Layers crossfade over ~1.5s when the scene changes.
 
-import type { Soundscape } from "./types";
-export type { Soundscape };
+import type { Soundscape, SoundEffect } from "./types";
+export type { Soundscape, SoundEffect };
 
 // ── Frequency tables ──────────────────────────────────────────────────────────
 const BELLS_MAGIC  = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50]; // C5-C6 major pent
@@ -331,6 +331,257 @@ function playSnore(ctx: AudioContext, dest: AudioNode): void {
   }
 }
 
+// ── Generic one-shot helpers (used by the expanded sfx taxonomy below) ────────
+
+function voiceTone(ctx: AudioContext, dest: AudioNode, o: {
+  freqStart: number; freqEnd?: number; dur: number; gain: number;
+  type?: OscillatorType; filterFreq?: number; filterQ?: number; delay?: number;
+}): void {
+  const t = ctx.currentTime + (o.delay || 0);
+  const osc = ctx.createOscillator();
+  osc.type = o.type || "sawtooth";
+  osc.frequency.setValueAtTime(o.freqStart, t);
+  osc.frequency.linearRampToValueAtTime(o.freqEnd ?? o.freqStart, t + o.dur * 0.75);
+  let node: AudioNode = osc;
+  if (o.filterFreq) {
+    const filt = ctx.createBiquadFilter();
+    filt.type = "lowpass";
+    filt.frequency.value = o.filterFreq;
+    filt.Q.value = o.filterQ ?? 1;
+    osc.connect(filt);
+    node = filt;
+  }
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(o.gain, t + Math.min(0.03, o.dur * 0.2));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+  node.connect(g);
+  g.connect(dest);
+  osc.start(t);
+  osc.stop(t + o.dur + 0.05);
+}
+
+function noiseBurst(ctx: AudioContext, dest: AudioNode, buf: AudioBuffer, o: {
+  filterType?: BiquadFilterType; freq?: number; freqEnd?: number; Q?: number; dur: number; gain: number; delay?: number;
+}): void {
+  const t = ctx.currentTime + (o.delay || 0);
+  const src = noiseSource(ctx, buf);
+  const filt = ctx.createBiquadFilter();
+  filt.type = o.filterType || "bandpass";
+  filt.frequency.setValueAtTime(o.freq ?? 1000, t);
+  if (o.freqEnd) filt.frequency.linearRampToValueAtTime(o.freqEnd, t + o.dur * 0.8);
+  filt.Q.value = o.Q ?? 1;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(o.gain, t + Math.min(0.02, o.dur * 0.15));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+  src.connect(filt);
+  filt.connect(g);
+  g.connect(dest);
+  src.start(t);
+  src.stop(t + o.dur + 0.05);
+}
+
+function pingTone(ctx: AudioContext, dest: AudioNode, freqs: number[], dur: number, gain: number, delay = 0): void {
+  const t = ctx.currentTime + delay;
+  for (const f of freqs) {
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = f;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g);
+    g.connect(dest);
+    osc.start(t);
+    osc.stop(t + dur + 0.05);
+  }
+}
+
+// ── 🌦️ Počasí ──────────────────────────────────────────────────────────────
+
+function playWindGust(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  noiseBurst(ctx, dest, noiseBuf, { filterType: "bandpass", freq: 250, freqEnd: 950, Q: 0.6, dur: 1.3, gain: 0.18 });
+  noiseBurst(ctx, dest, noiseBuf, { filterType: "bandpass", freq: 900, freqEnd: 300, Q: 0.6, dur: 1.0, gain: 0.10, delay: 0.5 });
+}
+
+function playRain(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  noiseBurst(ctx, dest, noiseBuf, { filterType: "highpass", freq: 1800, dur: 2.4, gain: 0.10 });
+  for (let i = 0; i < 6; i++) {
+    setTimeout(() => noiseBurst(ctx, dest, noiseBuf, { filterType: "bandpass", freq: rand(2500, 5000), Q: 4, dur: 0.06, gain: 0.05 }), rand(0, 2000));
+  }
+}
+
+function playSnowCrunch(ctx: AudioContext, dest: AudioNode): void {
+  for (let i = 0; i < 3; i++) setTimeout(() => crackle(ctx, dest), i * 260 + rand(0, 60));
+}
+
+// ── 🐾 Zvířata ─────────────────────────────────────────────────────────────
+
+function playCow(ctx: AudioContext, dest: AudioNode): void {
+  voiceTone(ctx, dest, { freqStart: 95, freqEnd: 72, dur: 0.9, gain: 0.22, type: "sawtooth", filterFreq: 500 });
+}
+
+function playPig(ctx: AudioContext, dest: AudioNode): void {
+  [0, 0.22].forEach(d => voiceTone(ctx, dest, { freqStart: 320, freqEnd: 190, dur: 0.16, gain: 0.2, type: "square", filterFreq: 900, delay: d }));
+}
+
+function playChicken(ctx: AudioContext, dest: AudioNode): void {
+  [0, 0.16, 0.34].forEach(d => voiceTone(ctx, dest, { freqStart: 520, freqEnd: 340, dur: 0.12, gain: 0.16, type: "square", filterFreq: 1400, delay: d }));
+}
+
+function playSheep(ctx: AudioContext, dest: AudioNode): void {
+  voiceTone(ctx, dest, { freqStart: 300, freqEnd: 400, dur: 0.6, gain: 0.2, type: "sawtooth", filterFreq: 700 });
+}
+
+function playHorse(ctx: AudioContext, dest: AudioNode): void {
+  voiceTone(ctx, dest, { freqStart: 160, freqEnd: 650, dur: 0.18, gain: 0.2, type: "sawtooth", filterFreq: 1300 });
+  voiceTone(ctx, dest, { freqStart: 650, freqEnd: 200, dur: 0.6, gain: 0.18, type: "sawtooth", filterFreq: 1300, delay: 0.18 });
+}
+
+function playDuck(ctx: AudioContext, dest: AudioNode): void {
+  [0, 0.2].forEach(d => voiceTone(ctx, dest, { freqStart: 260, freqEnd: 170, dur: 0.18, gain: 0.2, type: "square", filterFreq: 1000, delay: d }));
+}
+
+function playDog(ctx: AudioContext, dest: AudioNode): void {
+  [0, 0.26].forEach(d => voiceTone(ctx, dest, { freqStart: 380, freqEnd: 170, dur: 0.15, gain: 0.24, type: "sawtooth", filterFreq: 1500, delay: d }));
+}
+
+function playCat(ctx: AudioContext, dest: AudioNode): void {
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(400, t);
+  osc.frequency.linearRampToValueAtTime(750, t + 0.14);
+  osc.frequency.linearRampToValueAtTime(350, t + 0.4);
+  const filt = ctx.createBiquadFilter();
+  filt.type = "lowpass";
+  filt.frequency.value = 1600;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.18, t + 0.05);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+  osc.connect(filt);
+  filt.connect(g);
+  g.connect(dest);
+  osc.start(t);
+  osc.stop(t + 0.45);
+}
+
+function playFrog(ctx: AudioContext, dest: AudioNode): void {
+  [0, 0.24].forEach(d => voiceTone(ctx, dest, { freqStart: 150, freqEnd: 95, dur: 0.13, gain: 0.2, type: "square", filterFreq: 600, delay: d }));
+}
+
+function playOwl(ctx: AudioContext, dest: AudioNode): void {
+  [0, 0.65].forEach(d => voiceTone(ctx, dest, { freqStart: 480, freqEnd: 360, dur: 0.5, gain: 0.15, type: "sine", delay: d }));
+}
+
+function playRooster(ctx: AudioContext, dest: AudioNode): void {
+  [[500, 0], [700, 0.16], [850, 0.32], [600, 0.52]].forEach(([f, d]) =>
+    voiceTone(ctx, dest, { freqStart: f, freqEnd: f * 0.9, dur: 0.18, gain: 0.18, type: "sawtooth", filterFreq: 1300, delay: d }));
+}
+
+function playBee(ctx: AudioContext, dest: AudioNode): void {
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  osc.type = "sawtooth";
+  osc.frequency.value = 180;
+  const trem = ctx.createOscillator();
+  trem.frequency.value = 32;
+  const tremG = ctx.createGain();
+  tremG.gain.value = 0.06;
+  trem.connect(tremG);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.09, t + 0.1);
+  tremG.connect(g.gain);
+  g.gain.setTargetAtTime(0.0001, t + 1.2, 0.15);
+  osc.connect(g);
+  g.connect(dest);
+  osc.start(t);
+  trem.start(t);
+  osc.stop(t + 1.5);
+  trem.stop(t + 1.5);
+}
+
+// ── ⚙️ Stroje / doprava ────────────────────────────────────────────────────
+
+function playCarEngine(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  noiseBurst(ctx, dest, noiseBuf, { filterType: "lowpass", freq: 500, dur: 0.3, gain: 0.15 });
+  voiceTone(ctx, dest, { freqStart: 55, freqEnd: 95, dur: 1.0, gain: 0.2, type: "sawtooth", filterFreq: 300, delay: 0.1 });
+}
+
+function playTrain(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  for (let i = 0; i < 4; i++) {
+    setTimeout(() => noiseBurst(ctx, dest, noiseBuf, { filterType: "lowpass", freq: 260, dur: 0.16, gain: 0.16 }), i * (280 - i * 20));
+  }
+  voiceTone(ctx, dest, { freqStart: 330, freqEnd: 330, dur: 1.0, gain: 0.14, type: "sawtooth", filterFreq: 900, delay: 1.3 });
+  voiceTone(ctx, dest, { freqStart: 440, freqEnd: 440, dur: 1.0, gain: 0.1, type: "sawtooth", filterFreq: 900, delay: 1.3 });
+}
+
+function playBoatHorn(ctx: AudioContext, dest: AudioNode): void {
+  voiceTone(ctx, dest, { freqStart: 110, freqEnd: 110, dur: 1.8, gain: 0.22, type: "sawtooth", filterFreq: 320 });
+  voiceTone(ctx, dest, { freqStart: 165, freqEnd: 165, dur: 1.8, gain: 0.1, type: "sawtooth", filterFreq: 320 });
+}
+
+function playClockTick(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  [0, 0.5, 1.0, 1.5].forEach(d => noiseBurst(ctx, dest, noiseBuf, { filterType: "highpass", freq: 2500, dur: 0.03, gain: 0.12, delay: d }));
+}
+
+function playDoorbell(ctx: AudioContext, dest: AudioNode): void {
+  pingTone(ctx, dest, [880], 0.6, 0.15);
+  pingTone(ctx, dest, [660], 0.7, 0.15, 0.35);
+}
+
+function playPhoneRing(ctx: AudioContext, dest: AudioNode): void {
+  [0, 0.45].forEach(d => { pingTone(ctx, dest, [950, 1400], 0.35, 0.12, d); });
+}
+
+// ── 🙋 Lidé / akce ─────────────────────────────────────────────────────────
+
+function playFootsteps(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  [0, 0.32, 0.64, 0.96].forEach(d => noiseBurst(ctx, dest, noiseBuf, { filterType: "lowpass", freq: 160, dur: 0.09, gain: 0.15, delay: d }));
+}
+
+function playApplause(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  const count = 14 + Math.floor(rand(0, 6));
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => noiseBurst(ctx, dest, noiseBuf, { filterType: "bandpass", freq: rand(2200, 4200), Q: 2, dur: 0.05, gain: 0.06 }), rand(0, 1200));
+  }
+}
+
+function playLaugh(ctx: AudioContext, dest: AudioNode): void {
+  [0, 0.18, 0.36, 0.54].forEach((d, i) => voiceTone(ctx, dest, { freqStart: 260 + i * 20, freqEnd: 220 + i * 20, dur: 0.16, gain: 0.14, type: "triangle", filterFreq: 1200, delay: d }));
+}
+
+function playSplash(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  noiseBurst(ctx, dest, noiseBuf, { filterType: "lowpass", freq: 2200, freqEnd: 250, dur: 0.5, gain: 0.24 });
+  for (let i = 0; i < 4; i++) setTimeout(() => noiseBurst(ctx, dest, noiseBuf, { filterType: "bandpass", freq: rand(1500, 3000), Q: 3, dur: 0.05, gain: 0.05 }), 150 + i * 90);
+}
+
+function playGlassClink(ctx: AudioContext, dest: AudioNode): void {
+  pingTone(ctx, dest, [2100, 3150], 0.4, 0.1);
+}
+
+// ── ✨ Náladové akcenty ─────────────────────────────────────────────────────
+
+function playMagicChime(ctx: AudioContext, dest: AudioNode): void {
+  [880, 1046.5, 1318.5, 1568].forEach((f, i) => pingTone(ctx, dest, [f], 0.8, 0.09, i * 0.09));
+}
+
+function playTriumphant(ctx: AudioContext, dest: AudioNode): void {
+  [523.25, 659.25, 783.99, 1046.5].forEach(f => voiceTone(ctx, dest, { freqStart: f, freqEnd: f, dur: 0.9, gain: 0.13, type: "sawtooth", filterFreq: 2200 }));
+}
+
+function playTenseSting(ctx: AudioContext, dest: AudioNode): void {
+  [440, 466.16].forEach(f => voiceTone(ctx, dest, { freqStart: f, freqEnd: f, dur: 0.35, gain: 0.2, type: "sawtooth", filterFreq: 1800 }));
+}
+
+function playSadTone(ctx: AudioContext, dest: AudioNode): void {
+  voiceTone(ctx, dest, { freqStart: 392, freqEnd: 293.66, dur: 1.8, gain: 0.14, type: "sine" });
+}
+
 // ── AmbientPlayer ─────────────────────────────────────────────────────────────
 export class AmbientPlayer {
   private ctx: AudioContext | null = null;
@@ -447,15 +698,52 @@ export class AmbientPlayer {
     });
   }
 
-  /** 🔊 Jednorázový zvukový efekt podle děje scény (vlny/hrom/chrápání) —
+  /** 🔊 Jednorázový zvukový efekt podle děje scény —
    *  hraje JEDNOU navrch aktuálního soundscape, ignorováno když appka mlčí */
-  playEffect(effect: "waves" | "thunder" | "snore" | undefined): void {
+  playEffect(effect: SoundEffect | undefined): void {
     if (!effect || !this.running) return;
     const { ctx, rev } = this.setup();
+    const nb = () => this.getNoiseBuffer(ctx);
     switch (effect) {
-      case "waves":   playWaves(ctx, rev, this.getNoiseBuffer(ctx)); break;
-      case "thunder": playThunder(ctx, rev, this.getNoiseBuffer(ctx)); break;
-      case "snore":   playSnore(ctx, rev); break;
+      // 🌦️ počasí
+      case "waves":       playWaves(ctx, rev, nb()); break;
+      case "thunder":     playThunder(ctx, rev, nb()); break;
+      case "wind_gust":   playWindGust(ctx, rev, nb()); break;
+      case "rain":        playRain(ctx, rev, nb()); break;
+      case "snow_crunch": playSnowCrunch(ctx, rev); break;
+      // 🐾 zvířata
+      case "cow":     playCow(ctx, rev); break;
+      case "pig":     playPig(ctx, rev); break;
+      case "chicken": playChicken(ctx, rev); break;
+      case "sheep":   playSheep(ctx, rev); break;
+      case "horse":   playHorse(ctx, rev); break;
+      case "duck":    playDuck(ctx, rev); break;
+      case "dog":     playDog(ctx, rev); break;
+      case "cat":     playCat(ctx, rev); break;
+      case "frog":    playFrog(ctx, rev); break;
+      case "owl":     playOwl(ctx, rev); break;
+      case "rooster": playRooster(ctx, rev); break;
+      case "bee":     playBee(ctx, rev); break;
+      // ⚙️ stroje/doprava
+      case "car_engine": playCarEngine(ctx, rev, nb()); break;
+      case "train":      playTrain(ctx, rev, nb()); break;
+      case "boat_horn":  playBoatHorn(ctx, rev); break;
+      case "clock_tick": playClockTick(ctx, rev, nb()); break;
+      case "doorbell":   playDoorbell(ctx, rev); break;
+      case "phone_ring": playPhoneRing(ctx, rev); break;
+      // 🙋 lidé/akce
+      case "footsteps":  playFootsteps(ctx, rev, nb()); break;
+      case "applause":   playApplause(ctx, rev, nb()); break;
+      case "laugh":      playLaugh(ctx, rev); break;
+      case "splash":     playSplash(ctx, rev, nb()); break;
+      case "glass_clink": playGlassClink(ctx, rev); break;
+      // ✨ náladové akcenty
+      case "magic_chime": playMagicChime(ctx, rev); break;
+      case "triumphant":  playTriumphant(ctx, rev); break;
+      case "tense_sting": playTenseSting(ctx, rev); break;
+      case "sad_tone":    playSadTone(ctx, rev); break;
+      // 😴 ostatní
+      case "snore": playSnore(ctx, rev); break;
     }
   }
 

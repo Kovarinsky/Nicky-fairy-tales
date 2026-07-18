@@ -48,8 +48,21 @@ export interface StoryRequest {
 export type Soundscape = "magic" | "forest" | "night" | "adventure" | "cozy";
 
 /** 🔊 Jednorázový zvukový efekt PODLE DĚJE téhle konkrétní scény (na rozdíl
- *  od soundscape, což je jen obecná nálada hrající na pozadí celé scény) */
-export type SoundEffect = "waves" | "thunder" | "snore";
+ *  od soundscape, což je jen obecná nálada hrající na pozadí celé scény).
+ *  Kategorie: zvířata, počasí, stroje, lidé/akce, náladové akcenty. */
+export type SoundEffect =
+  // 🌦️ počasí
+  | "waves" | "thunder" | "wind_gust" | "rain" | "snow_crunch"
+  // 🐾 zvířata
+  | "cow" | "pig" | "chicken" | "sheep" | "horse" | "duck" | "dog" | "cat" | "frog" | "owl" | "rooster" | "bee"
+  // ⚙️ stroje/doprava
+  | "car_engine" | "train" | "boat_horn" | "clock_tick" | "doorbell" | "phone_ring"
+  // 🙋 lidé/akce
+  | "footsteps" | "applause" | "laugh" | "splash" | "glass_clink"
+  // ✨ náladové akcenty
+  | "magic_chime" | "triumphant" | "tense_sting" | "sad_tone"
+  // 😴 ostatní
+  | "snore";
 
 /** Jedna scéna = jedna stránka knížky */
 export interface Scene {
