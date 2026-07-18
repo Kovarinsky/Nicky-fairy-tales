@@ -856,15 +856,19 @@ export async function studyWorld(
 ): Promise<{ prompt: string; question: string | null }> {
   const model = MODEL.trim();
   const sources = urlTexts.filter(Boolean).map((t, i) => `WEB SOURCE ${i + 1}:\n${t.slice(0, 2500)}`).join("\n\n");
+  const langName = language === "en" ? "ENGLISH" : "CZECH";
   const prompt = [
     `You are defining a fairy-tale "world" for a children's story generator. The user wants their stories to take place in this world.`,
     `USER'S WORLD NAME: ${name || "(none)"}`,
     `USER'S DESCRIPTION: ${description.slice(0, 1500)}`,
     sources ? `FETCHED WEB CONTENT the user linked to:\n${sources}` : "",
     ``,
-    `Write a world guide the story generator will follow. Format it like this, in ENGLISH:`,
+    // ✍️ Tohle pole čte a upravuje přímo UŽIVATEL v editovatelném poli (na
+    // rozdíl od heroDescription/imagePrompt, které appka nikdy neukazuje) —
+    // musí být v jazyce appky, jinak čech vidí anglický text ve svém popisu.
+    `Write a world guide the story generator will follow, in ${langName} (the user reads and edits this text directly — it must be in ${langName}, NOT English unless ${langName} is English). Format it like this:`,
     `1) One sentence: "Set the story in the world of X: ..." (setting, era, mood).`,
-    `2) If the world has well-known characters (from the description, web content, or your own knowledge of this fairy tale/show/book), add "CHARACTER REFERENCE:" with each character's EXACT visual look (colors, clothing, size), separated by " | ".`,
+    `2) If the world has well-known characters (from the description, web content, or your own knowledge of this fairy tale/show/book), add "CHARACTER REFERENCE:" (translate this label too) with each character's EXACT visual look (colors, clothing, size), separated by " | ".`,
     `3) One sentence about atmosphere/tone (gentle, adventurous...).`,
     `Max 180 words total. Recognize the fairy tale/show/book if you know it and use your knowledge of it.`,
     ``,
