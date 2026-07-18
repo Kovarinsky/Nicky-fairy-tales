@@ -1991,6 +1991,13 @@ export default function Home() {
       a.play().catch(() => {});
       setCtrlsOpen(false);              // hide the panel when narration starts
       if (viewMode !== "reader") setViewMode("reader"); // play from main screen → reader mode
+      // ⛶ Fullscreen na ▶: dřív to uměl jen přehrávač POSLANÉ pohádky (/s/),
+      // tady v appce se muselo pokaždé ťuknout ručně na ⛶. Best-effort — na
+      // zařízeních/prohlížečích bez podpory (typicky iOS Safari mimo video)
+      // se to jen tiše nepovede, appka funguje dál stejně jako předtím.
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen?.().catch(() => {});
+      }
     }
   }
 
