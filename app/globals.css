@@ -615,6 +615,16 @@ textarea {
   color: #fff;
 }
 
+/* 📍 Pohádka podle mé lokality — důležitá funkce, ať oproti ostatním
+   šedým tlačítkům výrazně vyčnívá (stejná oranžová jako .btn-create) */
+.chip-gps {
+  background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 3px 14px rgba(249, 115, 22, 0.4);
+}
+.chip-gps:active { transform: scale(0.98); }
+
 /* ✓ krátké oranžové potvrzení (stejná konvence jako .panel-ok) — appka
    „nabrala" a použila výsledek (např. návrh pohádky podle GPS polohy) */
 .chip-success {

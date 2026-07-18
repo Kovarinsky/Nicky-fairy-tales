@@ -4020,8 +4020,10 @@ export default function Home() {
                 {t.addWorldChip}
               </button>
             </div>
-            {/* 📍 Pohádka podle mé lokality — návrh námětu z okolí */}
-            <button type="button" className={`chip chip-btn chip-full ${gpsLoading ? "chip-on" : ""}${gpsSuccess ? " chip-success" : ""}`}
+            {/* 📍 Pohádka podle mé lokality — návrh námětu z okolí; oranžová
+                natrvalo (ne jen v chip-on/chip-success stavu), ať vyčnívá
+                oproti ostatním šedým tlačítkům jako důležitá funkce */}
+            <button type="button" className={`chip chip-btn chip-full chip-gps ${gpsLoading ? "chip-on" : ""}${gpsSuccess ? " chip-success" : ""}`}
               onClick={suggestFromLocation} disabled={gpsLoading || ideaLoading} title={t.gpsHint}>
               {gpsSuccess ? "✓ " : gpsLoading ? "⏳ " : "📍 "}{t.gpsBtn}
             </button>
