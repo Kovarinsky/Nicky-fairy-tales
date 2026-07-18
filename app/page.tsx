@@ -1591,6 +1591,10 @@ export default function Home() {
       setTimeout(() => setShowCredits(true), 800);
       return;
     }
+    // 🎼 Krátký hudební stinger na konci TÉTO scény, než appka otočí na
+    // další — poslední stránka místo toho dostane bohatší playOutro (viz
+    // efekt na nextVisible === null výše).
+    ambientRef.current?.playSceneEnd(scenes[page]?.soundscape);
     if (scenes[next]?.imageUrl && scenes[next]?.audioUrl) {
       isAutoAdvanceRef.current = true; // allow auto-play on the next slide
       setTimeout(() => goToPage(next), 1200);

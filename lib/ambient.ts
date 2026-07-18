@@ -697,25 +697,64 @@ export class AmbientPlayer {
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
-  /** Ascending C major arpeggio — call once when the story begins */
+  /** 🎺 Slavnostní hudební náběh na úplně první stránce: podkresové
+   *  crescendo + stoupající fráze přes dvě oktávy + jiskřivý vrchol.
+   *  Jde napřímo na effectGain (mimo ducking pod vyprávěním A mimo
+   *  jen-mokrou reverb cestu, viz v4.49 zjištění u sfx) — ať je náběh
+   *  OPRAVDU slyšet, ne jen tichý rozmazaný dozvuk. Jemný dotek `rev`
+   *  navrch pro dozvuk/lesk, ne jako jediná cesta ven. */
   playIntro(): void {
     const { ctx, rev } = this.setup();
     ctx.resume();
-    const notes = [261.63, 329.63, 392.00, 523.25]; // C4 E4 G4 C5
+    const fx = this.effectGain!;
+    const t0 = ctx.currentTime + 0.05;
+
+    // Podkresové crescendo — nízký pad pozvolna nastoupí a odezní
+    const pad = ctx.createOscillator();
+    pad.type = "sine";
+    pad.frequency.value = 130.81; // C3
+    const padG = ctx.createGain();
+    padG.gain.setValueAtTime(0, t0);
+    padG.gain.linearRampToValueAtTime(0.10, t0 + 1.0);
+    padG.gain.exponentialRampToValueAtTime(0.0001, t0 + 3.4);
+    pad.connect(padG);
+    padG.connect(fx);
+    pad.start(t0);
+    pad.stop(t0 + 3.5);
+
+    // Stoupající fráze přes dvě oktávy (C4 E4 G4 C5 E5 G5)
+    const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99];
     notes.forEach((freq, i) => {
-      const t = ctx.currentTime + i * 0.22 + 0.1;
+      const t = t0 + i * 0.2;
       const osc = ctx.createOscillator();
       osc.type = "sine";
       osc.frequency.value = freq;
       const g = ctx.createGain();
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.18, t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
+      g.gain.linearRampToValueAtTime(0.2, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
       osc.connect(g);
+      g.connect(fx);
       g.connect(rev);
       osc.start(t);
-      osc.stop(t + 2.5);
+      osc.stop(t + 2.0);
+
+      // slabý oktávový overtone pro plnější zvuk
+      const osc2 = ctx.createOscillator();
+      osc2.type = "triangle";
+      osc2.frequency.value = freq * 2;
+      const g2 = ctx.createGain();
+      g2.gain.setValueAtTime(0, t);
+      g2.gain.linearRampToValueAtTime(0.05, t + 0.02);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+      osc2.connect(g2);
+      g2.connect(fx);
+      osc2.start(t);
+      osc2.stop(t + 1.3);
     });
+
+    // Jiskřivý vrchol přesně na poslední notě fráze
+    pingTone(ctx, fx, [1046.50, 1318.51], 1.2, 0.12, (notes.length - 1) * 0.2 + 0.05);
   }
 
   /** 🔊 Jednorázový zvukový efekt podle děje scény —
@@ -768,24 +807,95 @@ export class AmbientPlayer {
     }
   }
 
-  /** Klesající, usínající melodie — zavolat jednou na úplně poslední stránce */
+  /** 🌙 Klesající, usínající melodie + bohatší závěrečný akord (kvinta
+   *  + tercie + bas) s dlouhým doznívajícím chvěním — zavolat jednou na
+   *  úplně poslední stránce. Napřímo na effectGain, stejný důvod jako
+   *  u playIntro (mimo ducking pod vyprávěním, mimo jen-mokrou reverb
+   *  cestu); jemný dotek `rev` navrch pro dozvuk. */
   playOutro(): void {
     if (!this.running) return;
     const { ctx, rev } = this.setup();
-    const notes = [523.25, 392.00, 329.63, 261.63]; // C5 G4 E4 C4 (sestupně)
+    const fx = this.effectGain!;
+    const t0 = ctx.currentTime + 0.1;
+
+    // Klesající fráze (G5 E5 C5)
+    const notes = [783.99, 659.25, 523.25];
     notes.forEach((freq, i) => {
-      const t = ctx.currentTime + i * 0.42 + 0.1;
+      const t = t0 + i * 0.45;
       const osc = ctx.createOscillator();
       osc.type = "sine";
       osc.frequency.value = freq;
       const g = ctx.createGain();
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.16, t + 0.05);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + (i === notes.length - 1 ? 3.5 : 1.6));
+      g.gain.linearRampToValueAtTime(0.17, t + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
       osc.connect(g);
+      g.connect(fx);
       g.connect(rev);
       osc.start(t);
-      osc.stop(t + (i === notes.length - 1 ? 3.6 : 1.8));
+      osc.stop(t + 1.8);
+    });
+
+    // Závěrečný akord (C4 durový trojzvuk) s dlouhým doznívajícím chvěním
+    const chordT = t0 + notes.length * 0.45;
+    [261.63, 329.63, 392.00].forEach(freq => {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, chordT);
+      g.gain.linearRampToValueAtTime(0.14, chordT + 0.08);
+      g.gain.exponentialRampToValueAtTime(0.0001, chordT + 4.5);
+      osc.connect(g);
+      g.connect(fx);
+      g.connect(rev);
+      osc.start(chordT);
+      osc.stop(chordT + 4.6);
+    });
+
+    // Jemný basový podklad pod finálním akordem — dodá "váhu" závěru
+    const bass = ctx.createOscillator();
+    bass.type = "sine";
+    bass.frequency.value = 130.81; // C3
+    const bassG = ctx.createGain();
+    bassG.gain.setValueAtTime(0, chordT);
+    bassG.gain.linearRampToValueAtTime(0.10, chordT + 0.1);
+    bassG.gain.exponentialRampToValueAtTime(0.0001, chordT + 4.5);
+    bass.connect(bassG);
+    bassG.connect(fx);
+    bass.start(chordT);
+    bass.stop(chordT + 4.6);
+  }
+
+  /** 🎼 Krátký hudební "stinger" na konci KAŽDÉ scény (kromě té úplně
+   *  poslední — tam hraje playOutro): naváže na náladu AKTUÁLNÍ scény
+   *  (stejné tóny jako její soundscape), ať čtení zní jako jeden ucelený
+   *  hudební celek s jasnou tečkou za každou stránkou, ne jen ticho. */
+  playSceneEnd(scene?: Soundscape): void {
+    if (!this.running) return;
+    const { ctx } = this.setup();
+    const fx = this.effectGain!;
+    const table = scene === "night" ? BELLS_NIGHT
+      : scene === "adventure" ? BELLS_ADVENT
+      : scene === "cozy" ? BELLS_COZY
+      : BELLS_MAGIC;
+    const t0 = ctx.currentTime + 0.02;
+    // Malá "hotovo" kadence — vyšší tón, pak o kvintu níž
+    const hi = table[table.length - 1];
+    const lo = table[Math.max(0, table.length - 3)];
+    [[hi, 0], [lo, 0.16]].forEach(([freq, d]) => {
+      const t = t0 + d;
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.14, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+      osc.connect(g);
+      g.connect(fx);
+      osc.start(t);
+      osc.stop(t + 1.0);
     });
   }
 
