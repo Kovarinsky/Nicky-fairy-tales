@@ -587,11 +587,24 @@ export class AmbientPlayer {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private reverbSend: GainNode | null = null;
+  // 🔊 Jednorázové zvukové efekty (playEffect) dřív jely JEN přes reverbSend
+  // (`rev`) — ten se ale k reproduktoru dostane pouze přes zpožděnou/zpětno-
+  // vazební ozvěnu (rev → delay 0.32s → feedback 0.34 → lowpass → master),
+  // ŽÁDNÁ suchá/přímá cesta k výstupu neexistovala. Krátký, ostrý zvuk
+  // (štěknutí, zvonek, cinknutí skla…) tak dorazil jen jako tichý, rozmazaný
+  // dozvuk o třetinu sekundy později — u vyprávění navíc PŘEKRYTÝ tím, že se
+  // `master` (jehož ozvěna používá) sám ztišuje na 5 % během mluveného slova
+  // (viz setVolume). Efekty tak byly prakticky neslyšitelné. `effectGain` je
+  // samostatná PŘÍMÁ cesta k reproduktoru, mimo `master` a jeho ducking —
+  // jednorázový efekt tak zazní hned a zřetelně, přesně v okamžiku, kdy ho
+  // vyprávění zmiňuje, místo aby soutěžil s hlasem o týž ztišený kanál.
+  private effectGain: GainNode | null = null;
   private noiseBuf: AudioBuffer | null = null;
   private layer: Layer | null = null;
   private currentScene: Soundscape = "magic";
   private running = false;
   private vol = 0.22;
+  private readonly EFFECT_VOL = 0.34;
 
   private setup(): { ctx: AudioContext; master: GainNode; rev: GainNode } {
     if (this.ctx && this.master && this.reverbSend) {
@@ -620,6 +633,13 @@ export class AmbientPlayer {
     const rev = ctx.createGain();
     rev.gain.value = 1;
     rev.connect(delay);
+
+    // 🔊 Přímá (suchá) cesta pro jednorázové efekty — viz komentář u pole
+    // effectGain výše. Mimo master, takže ho neztiší ducking pod vyprávěním.
+    const fx = ctx.createGain();
+    fx.gain.value = 0;
+    fx.connect(ctx.destination);
+    this.effectGain = fx;
 
     // Resume on first user gesture (browser autoplay policy)
     const unlock = () => {
@@ -702,48 +722,49 @@ export class AmbientPlayer {
    *  hraje JEDNOU navrch aktuálního soundscape, ignorováno když appka mlčí */
   playEffect(effect: SoundEffect | undefined): void {
     if (!effect || !this.running) return;
-    const { ctx, rev } = this.setup();
+    const { ctx } = this.setup();
+    const fx = this.effectGain!;
     const nb = () => this.getNoiseBuffer(ctx);
     switch (effect) {
       // 🌦️ počasí
-      case "waves":       playWaves(ctx, rev, nb()); break;
-      case "thunder":     playThunder(ctx, rev, nb()); break;
-      case "wind_gust":   playWindGust(ctx, rev, nb()); break;
-      case "rain":        playRain(ctx, rev, nb()); break;
-      case "snow_crunch": playSnowCrunch(ctx, rev); break;
+      case "waves":       playWaves(ctx, fx, nb()); break;
+      case "thunder":     playThunder(ctx, fx, nb()); break;
+      case "wind_gust":   playWindGust(ctx, fx, nb()); break;
+      case "rain":        playRain(ctx, fx, nb()); break;
+      case "snow_crunch": playSnowCrunch(ctx, fx); break;
       // 🐾 zvířata
-      case "cow":     playCow(ctx, rev); break;
-      case "pig":     playPig(ctx, rev); break;
-      case "chicken": playChicken(ctx, rev); break;
-      case "sheep":   playSheep(ctx, rev); break;
-      case "horse":   playHorse(ctx, rev); break;
-      case "duck":    playDuck(ctx, rev); break;
-      case "dog":     playDog(ctx, rev); break;
-      case "cat":     playCat(ctx, rev); break;
-      case "frog":    playFrog(ctx, rev); break;
-      case "owl":     playOwl(ctx, rev); break;
-      case "rooster": playRooster(ctx, rev); break;
-      case "bee":     playBee(ctx, rev); break;
+      case "cow":     playCow(ctx, fx); break;
+      case "pig":     playPig(ctx, fx); break;
+      case "chicken": playChicken(ctx, fx); break;
+      case "sheep":   playSheep(ctx, fx); break;
+      case "horse":   playHorse(ctx, fx); break;
+      case "duck":    playDuck(ctx, fx); break;
+      case "dog":     playDog(ctx, fx); break;
+      case "cat":     playCat(ctx, fx); break;
+      case "frog":    playFrog(ctx, fx); break;
+      case "owl":     playOwl(ctx, fx); break;
+      case "rooster": playRooster(ctx, fx); break;
+      case "bee":     playBee(ctx, fx); break;
       // ⚙️ stroje/doprava
-      case "car_engine": playCarEngine(ctx, rev, nb()); break;
-      case "train":      playTrain(ctx, rev, nb()); break;
-      case "boat_horn":  playBoatHorn(ctx, rev); break;
-      case "clock_tick": playClockTick(ctx, rev, nb()); break;
-      case "doorbell":   playDoorbell(ctx, rev); break;
-      case "phone_ring": playPhoneRing(ctx, rev); break;
+      case "car_engine": playCarEngine(ctx, fx, nb()); break;
+      case "train":      playTrain(ctx, fx, nb()); break;
+      case "boat_horn":  playBoatHorn(ctx, fx); break;
+      case "clock_tick": playClockTick(ctx, fx, nb()); break;
+      case "doorbell":   playDoorbell(ctx, fx); break;
+      case "phone_ring": playPhoneRing(ctx, fx); break;
       // 🙋 lidé/akce
-      case "footsteps":  playFootsteps(ctx, rev, nb()); break;
-      case "applause":   playApplause(ctx, rev, nb()); break;
-      case "laugh":      playLaugh(ctx, rev); break;
-      case "splash":     playSplash(ctx, rev, nb()); break;
-      case "glass_clink": playGlassClink(ctx, rev); break;
+      case "footsteps":  playFootsteps(ctx, fx, nb()); break;
+      case "applause":   playApplause(ctx, fx, nb()); break;
+      case "laugh":      playLaugh(ctx, fx); break;
+      case "splash":     playSplash(ctx, fx, nb()); break;
+      case "glass_clink": playGlassClink(ctx, fx); break;
       // ✨ náladové akcenty
-      case "magic_chime": playMagicChime(ctx, rev); break;
-      case "triumphant":  playTriumphant(ctx, rev); break;
-      case "tense_sting": playTenseSting(ctx, rev); break;
-      case "sad_tone":    playSadTone(ctx, rev); break;
+      case "magic_chime": playMagicChime(ctx, fx); break;
+      case "triumphant":  playTriumphant(ctx, fx); break;
+      case "tense_sting": playTenseSting(ctx, fx); break;
+      case "sad_tone":    playSadTone(ctx, fx); break;
       // 😴 ostatní
-      case "snore": playSnore(ctx, rev); break;
+      case "snore": playSnore(ctx, fx); break;
     }
   }
 
@@ -784,6 +805,9 @@ export class AmbientPlayer {
     this.running = true;
     master.gain.cancelScheduledValues(ctx.currentTime);
     master.gain.setTargetAtTime(this.vol, ctx.currentTime, 0.8);
+    // 🔊 effectGain NEZÁVISLE na ducking pod vyprávěním (viz komentář u pole
+    // effectGain výše) — jen zapnuto/vypnuto společně s hudbou/zvuky.
+    this.effectGain?.gain.setTargetAtTime(this.EFFECT_VOL, ctx.currentTime, 0.8);
     if (!this.layer) this.crossfade(this.currentScene);
   }
 
@@ -792,6 +816,7 @@ export class AmbientPlayer {
     this.running = false;
     if (this.master && this.ctx) {
       this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.5);
+      this.effectGain?.gain.setTargetAtTime(0, this.ctx.currentTime, 0.5);
     }
   }
 
@@ -822,6 +847,7 @@ export class AmbientPlayer {
     this.ctx = null;
     this.master = null;
     this.reverbSend = null;
+    this.effectGain = null;
     this.layer = null;
   }
 }
