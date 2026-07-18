@@ -2445,7 +2445,17 @@ export default function Home() {
     const sig = `${st.phase}|${st.done ?? -1}/${st.total ?? -1}|${st.updatedAt ?? -1}`;
     const now = Date.now();
     if (sig !== w.lastSig) {
-      w.lastSig = sig; w.lastChange = now;
+      w.lastSig = sig;
+      // 🩺 Kotva na SERVEROVÉM updatedAt, ne na chvíli, kdy appka náhodou
+      // začala pollovat: tenhle stav žije jen v paměti stránky (useRef) a
+      // při každém znovuotevření appky (uzamčený telefon, přepnutí appky,
+      // odebraná karta z paměti) se vynuluje. Dřív se hodiny „jak dlouho to
+      // stojí" pokaždé restartovaly od nuly na aktuální `now` — job mrtvý na
+      // serveru už dávno tak vypadal furt „čerstvě" a auto-oživení se nikdy
+      // nedostalo k prvnímu kicku, pokud appka neběžela v popředí nepřetržitě
+      // dost dlouho. Teď appka hned na PRVNÍM pollu po otevření pozná (podle
+      // stáří updatedAt), že je job stará zaseklina, a rovnou spustí oživení.
+      w.lastChange = typeof st.updatedAt === "number" ? st.updatedAt : now;
       w.autoKicks = 0; // posun vpřed → počítadlo oživení se nuluje
       lastProgressRef.current = now; // server progress feeds the local stall watchdog too
       if (stalledNow) updateServerJob(jobId, { stalled: false });
