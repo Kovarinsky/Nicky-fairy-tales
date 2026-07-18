@@ -225,22 +225,18 @@ const SAMPLE_BY_LANG: Record<string, string> = {
 };
 const isStoryLang = (l?: string) => !!l && STORY_LANGS.some(x => x.code === l);
 
-// 🌙 Dobrou noc JMENOVITĚ všem postavám aktuální pohádky, v jazyce vyprávění
-const GOODNIGHT_BY_LANG: Record<string, { hello: string; tail: string; and: string }> = {
-  cs: { hello: "Dobrou noc", tail: "Sladké sny!", and: "a" },
-  en: { hello: "Good night", tail: "Sweet dreams!", and: "and" },
-  hr: { hello: "Laku noć", tail: "Slatki snovi!", and: "i" },
-  da: { hello: "Godnat", tail: "Sov godt, søde drømme!", and: "og" },
-  sk: { hello: "Dobrú noc", tail: "Sladké sny!", and: "a" },
+// 🌙 Dobrou noc — jen pozdrav, bez výčtu jmen (ta už jsou v sekci „Hrdinové"
+// těsně nad tím, jmenovat je tam znovu bylo zbytečné opakování)
+const GOODNIGHT_BY_LANG: Record<string, { hello: string; tail: string }> = {
+  cs: { hello: "Dobrou noc", tail: "Sladké sny!" },
+  en: { hello: "Good night", tail: "Sweet dreams!" },
+  hr: { hello: "Laku noć", tail: "Slatki snovi!" },
+  da: { hello: "Godnat", tail: "Sov godt, søde drømme!" },
+  sk: { hello: "Dobrú noc", tail: "Sladké sny!" },
 };
-function goodnightText(lang: string, names: string[]): string {
+function goodnightText(lang: string): string {
   const g = GOODNIGHT_BY_LANG[lang] || GOODNIGHT_BY_LANG.cs;
-  const who = names.length === 0
-    ? ""
-    : names.length === 1
-      ? `, ${names[0]}`
-      : `, ${names.slice(0, -1).join(", ")} ${g.and} ${names[names.length - 1]}`;
-  return `${g.hello}${who}. ${g.tail}`;
+  return `${g.hello}. ${g.tail}`;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -1160,9 +1156,8 @@ export default function Home() {
       goodnightAudioRef.current = null;
       return;
     }
-    // Dobrou noc JMENOVITĚ všem postavám této pohádky, v jazyce vyprávění
     const lang = goodnightLang();
-    const text = goodnightText(lang, storyCharNames());
+    const text = goodnightText(lang);
     const key = `${selectedVoiceId}|${lang}|${text}`;
     let cancelled = false;
     (async () => {
@@ -4805,8 +4800,7 @@ export default function Home() {
               <p className="credits-item">{uiLang === "en" ? "for Nicky's Fairy Tales" : "pro Nickyho pohádky"}</p>
               <p className="credits-item">© {new Date().getFullYear()}</p>
 
-              {/* 🌙 dobrou noc jmenovitě všem postavám pohádky */}
-              <p className="credits-goodnight">🌙 {goodnightText(goodnightLang(), storyCharNames())} 🌙</p>
+              <p className="credits-goodnight">🌙 {goodnightText(goodnightLang())} 🌙</p>
 
               <p className="credits-tap">— klikni pro zavření —</p>
             </div>
