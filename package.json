@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:voice": "node scripts/test-voice.mjs"
+    "test:voice": "node scripts/test-voice.mjs",
+    "gen:music-lib": "node scripts/generate-music-lib.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.0",
