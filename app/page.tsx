@@ -2278,6 +2278,23 @@ export default function Home() {
     }).catch(() => null);
   }
 
+  // 🩺 /api/job/continue vrátí 404 „request-not-found", když appka pro tenhle
+  // job smazala jobs/<id>/request.json (úklid storage — viz /api/job/cleanup)
+  // dřív, než byla pohádka opravdu hotová. Takový job je NAVŽDY neopravitelný
+  // — žádný počet dalších kicků/reloadů appky mu nepomůže, protože běh nemá
+  // odkud vzít původní zadání. `kickContinue()` se dřív volal jako fire-and-
+  // -forget a appka tuhle definitivní chybu ignorovala — job pak vypadal
+  // „furt se snaž ožít" navěky, i když bylo jasné hned po prvním kicku, že
+  // se to nikdy nepovede (viz „Zvuky zvířátek na farmě" — 14/15 scén, scéna
+  // 12 věčně ⏳ i po mnoha znovuotevřeních appky).
+  async function kickContinueChecked(jobId: string): Promise<void> {
+    const res = await kickContinue(jobId);
+    if (res && res.status === 404) {
+      stopJobPolling(jobId);
+      updateServerJob(jobId, { phase: "error", error: t.errGeneric });
+    }
+  }
+
   function stopJobPolling(jobId: string) {
     const tm = jobTimersRef.current.get(jobId);
     if (tm) { clearInterval(tm); jobTimersRef.current.delete(jobId); }
@@ -2476,7 +2493,7 @@ export default function Home() {
     }
     w.autoKicks++;
     w.lastKick = now;
-    kickContinue(jobId);
+    void kickContinueChecked(jobId);
   }
 
   function startJobPolling(jobId: string) {
@@ -4380,11 +4397,11 @@ export default function Home() {
                           : j.stalled ? async () => {
                               const w = stallStateFor(j.jobId);
                               if (w.manualKicks === 0) {
-                                if (await appConfirm(t.stuckKickAsk)) { w.manualKicks++; w.lastKick = Date.now(); kickContinue(j.jobId); }
+                                if (await appConfirm(t.stuckKickAsk)) { w.manualKicks++; w.lastKick = Date.now(); void kickContinueChecked(j.jobId); }
                               } else if (await appConfirm(t.stuckRemoveAsk)) {
                                 stopJobPolling(j.jobId);
                                 removeServerJob(j.jobId);
-                              } else { w.lastKick = Date.now(); kickContinue(j.jobId); }
+                              } else { w.lastKick = Date.now(); void kickContinueChecked(j.jobId); }
                             }
                           : () => setFocusJobId(j.jobId)}
                         role="button"
