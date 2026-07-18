@@ -923,7 +923,7 @@ export async function generateStory(
 
   const language = req.language || "cs";
 
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
     // Navázání rozepsaného textu: jen v 1. pokusu — když navázaný text nejde
     // zparsovat, 2. pokus píše celý příběh od začátku. POZOR: modely Claude 5
     // NEPODPORUJÍ assistant prefill (Anthropic 400) — pokračuje se proto
@@ -969,8 +969,8 @@ export async function generateStory(
       }
       return script;
     } catch (e) {
-      if (attempt === 2) throw e;
-      const msg = `📄 Claude: scénář se nedal přečíst (JSON), zkouším ještě jednou celý od začátku: ${e instanceof Error ? e.message.slice(0, 140) : e}`;
+      if (attempt === 3) throw e;
+      const msg = `📄 Claude: scénář se nedal přečíst (JSON), zkouším ještě jednou celý od začátku (${attempt}/3): ${e instanceof Error ? e.message.slice(0, 140) : e}`;
       console.warn(msg);
       onLog?.(msg);
     }
