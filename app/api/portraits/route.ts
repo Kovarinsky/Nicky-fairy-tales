@@ -17,13 +17,20 @@ export async function GET(req: NextRequest) {
   const out: Array<{ id: string; name: string; url: string | null; drawn: boolean }> = [];
   for (const c of chars) {
     const force = redraw === c.id;
-    const had = !force && !!(await portraitUrl(c));
+    // Portrét, co už existuje a nenutíme překreslení: stačí 1 head() na URL —
+    // getCharacterPortrait by navíc zbytečně stáhl celý obrázek jen kvůli
+    // in-memory cache, kterou tenhle přehledový endpoint vůbec nepotřebuje.
+    const existingUrl = force ? null : await portraitUrl(c);
+    if (existingUrl) {
+      out.push({ id: c.id, name: c.name, url: existingUrl, drawn: false });
+      continue;
+    }
     const p = await getCharacterPortrait(c, force);
     out.push({
       id: c.id,
       name: c.name,
       url: p ? await portraitUrl(c) : null,
-      drawn: !!p && (!had || force),
+      drawn: !!p,
     });
   }
   return NextResponse.json(

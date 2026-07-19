@@ -1118,15 +1118,11 @@ export default function Home() {
     if (viewMode === "reader" && !bookReady) setViewMode("form");
   }, [viewMode, bookReady]);
 
-  // Reader controls: show briefly when reader opens, then auto-hide
+  // Reader controls: show briefly when reader opens (auto-hide timer is
+  // the single effect further down — this used to be duplicated here too)
   useEffect(() => {
     if (viewMode === "reader") setCtrlsOpen(true);
   }, [viewMode]);
-  useEffect(() => {
-    if (!ctrlsOpen || viewMode !== "reader") return;
-    const t = setTimeout(() => setCtrlsOpen(false), 6000);
-    return () => clearTimeout(t);
-  }, [ctrlsOpen, viewMode]);
 
   // Re-run layout-dependent effects when the device rotates (portrait ⇄
   // landscape) — ALE i vstup/výstup z fullscreen a obyčejný resize mění

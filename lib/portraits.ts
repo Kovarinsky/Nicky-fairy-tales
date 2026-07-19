@@ -69,7 +69,11 @@ export async function getCharacterPortrait(c: Character, force = false): Promise
   // 1) Už namalovaný portrét v Blobu
   if (!force) try {
     const h = await head(pathName, { token });
-    const r = await fetch(`${h.url}?t=${Date.now()}`, { cache: "no-store" });
+    // Portrét je NEMĚNNÝ na tuhle cestu (verze v názvu souboru bump-ne, když
+    // se vzhled změní) — na rozdíl od jobs/*.json tu není důvod cache mařit
+    // timestampem/no-store; zbytečně to nutilo znovu stahovat stejný obrázek
+    // na každý studený start funkce (/api/scene ho čte na scénu zvlášť).
+    const r = await fetch(h.url, { cache: "force-cache" });
     if (r.ok) {
       const buf = Buffer.from(await r.arrayBuffer());
       const ref: ReferenceImage = {
