@@ -371,7 +371,12 @@ export default function Home() {
   // bookReady: all images present (SVG fallback always set) — use for UI display and FS trigger
   // ▶ Čtení začíná, jakmile je hotová PRVNÍ scéna — zbytek se dokresluje
   // na pozadí (čtečka na nedokreslené stránky počká)
-  const bookReady = scenes.length > 0 && !!scenes[0]?.imageUrl;
+  // 🔒 TVRDÉ PRAVIDLO: "hotová" scéna 1 znamená OPRAVDU hotová — skutečný
+  // (ne placeholder) obrázek A hotový hlas zároveň. Dřív stačil jen
+  // JAKÝKOLI imageUrl (i placeholder), takže appka mohla ukázat čtečku
+  // (a titulní obrazovku) dřív, než bylo co číst.
+  const bookReady = scenes.length > 0 && !!scenes[0]?.imageUrl
+    && !isPlaceholderImg(scenes[0].imageUrl) && !!scenes[0]?.audioUrl;
 
   // Reader mode: explicit switch so old story stays in memory when form opens
   const [viewMode, setViewMode] = useState<"form" | "reader">("form");
