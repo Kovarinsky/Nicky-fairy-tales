@@ -181,12 +181,17 @@ const THEME_INTROS = {
 };
 
 // ── 🎼 Stingery — krátká kadence na konci KAŽDÉ scény, jedna na náladu ────
+// 🤫 Přehrává se na konci KAŽDÉ scény (mezi každým otočením stránky) — musí
+// být VELMI jemné a tiché, nikdy fanfárovité/dramatické (dřív "adventure"
+// s dechovým nástrojem a "triumphant" zněním působilo rušivě, když se
+// opakuje desetkrát za pohádku). Žádný dechový nástroj, žádné "triumphant"/
+// "flourish" — jen tichý dozvuk v barvě dané nálady.
 const STINGERS = {
-  magic: "Very short magical sparkling chime cadence, two notes descending, dreamy resolving flourish, instrumental",
-  forest: "Very short gentle acoustic resolving phrase, soft chime, peaceful, instrumental",
-  night: "Very short soft lullaby resolving chime, slow gentle bells, instrumental",
-  adventure: "Very short playful triumphant resolving flourish, light brass accent, instrumental",
-  cozy: "Very short warm gentle resolving chime, soft piano, cozy, instrumental",
+  magic: "Very short gentle chime, two soft notes descending, dreamy and quiet, no sharp attack, instrumental",
+  forest: "Very short gentle acoustic phrase, soft muted chime, calm and quiet, instrumental",
+  night: "Very short soft lullaby chime, slow gentle bells, hushed and quiet, instrumental",
+  adventure: "Very short gentle resolving phrase, soft plucked strings, warm and quiet, no brass, no fanfare, instrumental",
+  cozy: "Very short warm gentle chime, soft piano, quiet and cozy, instrumental",
 };
 
 // ── 🔊 Jednorázové zvukové efekty (text, trvání v s, smyčka?) ─────────────

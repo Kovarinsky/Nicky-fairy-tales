@@ -301,6 +301,9 @@ export default function Home() {
   const [storyChoice, setStoryChoice] = useState<StoryChoiceMeta | null>(null);
   const [branch, setBranch] = useState<"A" | "B" | null>(null);
   const [slideKey, setSlideKey] = useState(0);
+  // 🌙 Jemný fade-out staré stránky PŘED automatickým otočením (viz
+  // handleAudioEnded) — ať přechod mezi scénami není ostrý střih.
+  const [pageLeaving, setPageLeaving] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [musicOn, setMusicOn] = useState(false); // ambient music/sounds off by default
@@ -1020,6 +1023,17 @@ export default function Home() {
   }, [page, bookReady, scenes]);
 
 
+  // 📖 Titulní obrazovka: název pohádky + úvodní fanfára, PŘED prvním slidem
+  // — teprve po jejím zavření appka ukáže scénu 1 a spustí namlouvání.
+  const [titleCardOpen, setTitleCardOpen] = useState(false);
+  // Sama zmizí po chvíli, kdyby na ni malý čtenář zapomněl ťuknout — jinak by
+  // pohádka zůstala navěky "zaseknutá" na titulní obrazovce.
+  useEffect(() => {
+    if (!titleCardOpen) return;
+    const t = setTimeout(() => setTitleCardOpen(false), 7000);
+    return () => clearTimeout(t);
+  }, [titleCardOpen]);
+
   // Intro fanfare when reader opens — dá přednost tématu SVĚTA (Krteček,
   // Autíčka, konkrétní pohádka…) před náladou 1. scény; vlastní/žádný svět
   // (bez pevného souboru) se sám přehodí na náladu uvnitř AmbientPlayer.
@@ -1027,6 +1041,7 @@ export default function Home() {
   useEffect(() => {
     if (!bookReady || introFiredRef.current) return;
     introFiredRef.current = true;
+    setTitleCardOpen(true);
     const themeAudioKey = (THEMES.some(t => t.id === selectedTheme) || FOLK_TALES.some(t => t.id === selectedTheme))
       ? selectedTheme
       : undefined;
@@ -1036,7 +1051,7 @@ export default function Home() {
 
   // Reset intro flag when new story starts
   useEffect(() => {
-    if (scenes.length === 0) introFiredRef.current = false;
+    if (scenes.length === 0) { introFiredRef.current = false; setTitleCardOpen(false); }
   }, [scenes.length]);
 
   // ── Anti-stuck guards ──────────────────────────────────────────────────────
@@ -1432,12 +1447,12 @@ export default function Home() {
   const isAutoAdvanceRef = useRef(false);
   const currentAudioUrl = scenes[page]?.audioUrl;
   useEffect(() => {
-    if (!currentAudioUrl || !bookReady) return;
+    if (!currentAudioUrl || !bookReady || titleCardOpen) return;
     if (!isAutoAdvanceRef.current) return;
     isAutoAdvanceRef.current = false;
     const t = setTimeout(() => audioRef.current?.play().catch(() => {}), 420);
     return () => clearTimeout(t);
-  }, [page, currentAudioUrl, allScenesReady, slideKey]);
+  }, [page, currentAudioUrl, allScenesReady, slideKey, titleCardOpen]);
 
   // ── Swipe navigation ──
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -1605,7 +1620,8 @@ export default function Home() {
     ambientRef.current?.playSceneEnd(scenes[page]?.soundscape);
     if (scenes[next]?.imageUrl && scenes[next]?.audioUrl) {
       isAutoAdvanceRef.current = true; // allow auto-play on the next slide
-      setTimeout(() => goToPage(next), 1200);
+      setPageLeaving(true); // gentle fade-out starts right away, swap follows after it settles
+      setTimeout(() => { goToPage(next); setPageLeaving(false); }, 1200);
     } else {
       pendingPageRef.current = next;
     }
@@ -4582,11 +4598,20 @@ export default function Home() {
         <div className={`book${ctrlsOpen ? " ctrls-open" : ""}`} ref={bookRef}>
           <h2 className="book-title">{title}</h2>
 
-          <div className="book-card" key={slideKey}
+          <div className={`book-card${pageLeaving ? " book-card-leaving" : ""}`} key={slideKey}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
             onClick={() => { if (readerMode) setCtrlsOpen(v => !v); }}
           >
+            {/* 📖 Titulní obrazovka: název + úvodní fanfára, PŘED prvním slidem —
+                scéna 1 se pod ní klidně dokresluje/čeká, ať je hned vidět po zavření. */}
+            {titleCardOpen && (
+              <div className="title-card" onClick={e => { e.stopPropagation(); setTitleCardOpen(false); }}>
+                <div className="title-card-emoji">📖</div>
+                <div className="title-card-title">{title}</div>
+                <div className="title-card-tap">{t.titleCardTap}</div>
+              </div>
+            )}
             {current.imageUrl && !isPlaceholderImg(current.imageUrl) ? (
               <div className="page-image-wrap">
                 {/* eslint-disable-next-line @next/next/no-img-element */}

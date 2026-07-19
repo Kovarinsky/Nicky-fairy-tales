@@ -1214,6 +1214,18 @@ button:disabled {
   to   { opacity: 1; transform: translateY(0)   scale(1);      }
 }
 
+/* 🌙 Fade-out staré scény PŘED automatickým otočením stránky (viz
+   pageLeaving/handleAudioEnded v app/page.tsx) — jinak byl přechod mezi
+   scénami ostrý střih, ne plynulé odeznění. */
+@keyframes pageFadeOut {
+  from { opacity: 1; transform: scale(1);     }
+  to   { opacity: 0; transform: scale(0.985); }
+}
+
+.book-card-leaving {
+  animation: pageFadeOut 0.6s ease both !important;
+}
+
 .book-card {
   background: var(--bg-card);
   backdrop-filter: blur(16px);
@@ -1263,6 +1275,46 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 .audio-err .btn-retry { flex-shrink: 0; }
+
+/* 📖 Titulní obrazovka: název pohádky + úvodní fanfára, PŘED prvním slidem
+   (viz titleCardOpen v app/page.tsx) — leží NA obrázku scény 1, ať je po
+   zavření hned vidět beze zvláštního načítání. */
+.title-card {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  padding: 2rem;
+  text-align: center;
+  background: linear-gradient(160deg, rgba(36, 16, 70, 0.97) 0%, rgba(28, 11, 56, 0.97) 55%, rgba(10, 8, 30, 0.98) 100%);
+  cursor: pointer;
+  animation: pageFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.title-card-emoji {
+  font-size: 3.2rem;
+  filter: drop-shadow(0 4px 18px rgba(124, 77, 255, 0.5));
+}
+
+.title-card-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.35;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.4);
+  max-width: 26ch;
+}
+
+.title-card-tap {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+}
 
 .img-err-detail {
   display: block;
