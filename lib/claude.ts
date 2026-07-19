@@ -75,7 +75,7 @@ function buildSystemPrompt(language: string): string {
       "- END heroDescription with a 'Heights:' entry stating the RELATIVE heights of all characters WITHOUT age words, e.g. 'Heights: Valentýna is the smallest — the top of her head reaches Nicolas's shoulders; James is exactly the same height as Nicolas; Jana and Jan are grown-ups, much taller than all the children.' This keeps body sizes consistent across every image.",
       "- IF THE PLOT ITSELF involves a character's height/size changing partway through (a growth spurt, magically shrinking, an injury, anything that changes body proportions ON PURPOSE) — this is NOT a consistency error, it must be drawn as a deliberate stage change: (1) the 'Heights:' entry states the STARTING relationship only (before the change), and (2) EVERY scene's imagePrompt from the change onward ends with an explicit override of the current relationship for THAT scene, e.g. '(Nicolas now stands noticeably taller than James, about half a head above him)'. Scenes before the change need no such note (the default Heights: applies). Never let the transformation show up gradually/randomly across unrelated scenes — it happens ONLY at the exact scene where the plot causes it, and every scene after stays at the NEW stage consistently.",
       "- FIGURATIVE growth is NOT physical growth: phrases like 'grows into a legend/star/hero' or 'grows braver' describe skill, fame or confidence, NOT a literal change in age or body size — unless the plot has one CONCRETE, named transformation event (a specific magic food, spell, or injury), draw the character at their canonical child size/age in EVERY single scene, including the very last one. Never let a character quietly look older or taller in a late-story 'triumphant' or 'grown-up' scene without such an explicit event.",
-      "- If the story features a RECURRING OBJECT (the car they travel in, a magic item, a favourite toy), add a 'Key objects:' entry to heroDescription with its EXACT appearance ('an old sky-blue pickup truck with a rusty crane, round friendly headlight eyes'). In imagePrompts refer to it by ONE short fixed tag (e.g. 'the sky-blue pickup truck') — the full description is injected into the image model automatically. The object NEVER changes type, shape or color between scenes — the same car stays the same car for the whole story.",
+      "- If the story features a RECURRING OBJECT (the car they travel in, a magic item, a favourite toy, or ANY everyday prop a character repeatedly carries/steals/uses — a basket, a cooking pot, a lantern, a tool — however small or mundane), add a 'Key objects:' entry to heroDescription with its EXACT appearance AND, if the character has more than one, the EXACT COUNT ('a single battered copper pot' vs 'three mismatched wooden baskets'). In imagePrompts refer to it by ONE short fixed tag (e.g. 'the sky-blue pickup truck', 'the copper pot') — the full description is injected into the image model automatically. The object NEVER changes type, shape, color OR COUNT between scenes — a single pot never multiplies into several in one image or across scenes, the same car stays the same car for the whole story.",
       "- SPORTS EQUIPMENT IS ALWAYS A KEY OBJECT: if a character rides a bike, skis, swims etc., lock the equipment in 'Key objects:' with exact type and colors (e.g. 'a black triathlon time-trial bike with aero handlebars and deep black racing wheels'). A time-trial bike never becomes a road bike.",
       "- If the plot requires DIFFERENT CLOTHING than a character's canonical description (sports, winter, swimming, costume), do NOT edit the character entry — add a separate 'Story outfits:' entry instead, e.g. 'Story outfits: Jan wears a sleeveless navy-and-white triathlon suit with a red stripe and white cycling shoes — IDENTICAL in every scene (overrides his default clothing).' One outfit per character for the WHOLE story.",
       "- WEATHER & SEASON LOGIC (MANDATORY): decide the season and climate from the setting. If it is NOT mild weather, give EVERY character a weather WARDROBE in the 'Story outfits:' entry with TWO fixed variants: 'outdoors: ...' (snow/winter → warm winter jacket, hat, scarf, gloves, snow boots; hot summer/beach → light clothes, sandals, swimsuits when swimming; rain → raincoat and rubber boots) and 'indoors: ...' (what they wear underneath — usually their canonical clothes, jacket and hat taken off). Keep each character's signature colors so they stay recognizable (a boy known for a white T-shirt with red stripes gets a red-and-white striped winter hat). Each variant is IDENTICAL every time it appears — the same jacket in every outdoor scene.",
@@ -178,7 +178,7 @@ function buildSystemPrompt(language: string): string {
     "- heroDescription ZAKONČI záznamem 'Heights:' s RELATIVNÍMI výškami všech postav BEZ věkových slov, např. 'Heights: Valentýna is the smallest — the top of her head reaches Nicolas's shoulders; James is exactly the same height as Nicolas; Jana and Jan are grown-ups, much taller than all the children.' Tím zůstanou velikosti těl konzistentní na všech obrázcích.",
     "- POKUD SAMOTNÝ DĚJ zahrnuje změnu výšky/velikosti postavy v průběhu příběhu (růstový skok, kouzelné zmenšení, zranění — cokoli, co ZÁMĚRNĚ mění tělesné proporce) — NENÍ to chyba konzistence, musí se to nakreslit jako záměrná změna stavu: (1) záznam 'Heights:' popisuje jen POČÁTEČNÍ poměr (před změnou), (2) KAŽDÝ imagePrompt od scény změny dál KONČÍ výslovným přepsáním aktuálního poměru pro TU scénu, např. '(Nicolas now stands noticeably taller than James, about half a head above him)'. Scény před změnou takovou poznámku nepotřebují (platí výchozí Heights:). Proměna se nikdy nesmí projevit postupně/náhodně napříč nesouvisejícími scénami — nastane JEN v přesné scéně, kde ji způsobí děj, a všechny scény po ní zůstávají důsledně v NOVÉM stavu.",
     "- OBRAZNÝ růst NENÍ fyzický růst: fráze jako 'roste ve hvězdu/legendu/hrdinu' nebo 'roste v odvaze' popisují dovednost, slávu nebo sebevědomí, NE doslovnou změnu věku či velikosti těla — pokud děj nemá JEDNU KONKRÉTNÍ, pojmenovanou proměňující událost (konkrétní kouzelné jídlo, kouzlo, zranění), kresli postavu v kanonické dětské velikosti/věku ve VŠECH scénách, včetně úplně poslední. Nikdy nenech postavu v pozdní 'triumfální' nebo 'dospělé' scéně tiše vypadat starší nebo vyšší bez takové výslovné události.",
-    "- Pokud v příběhu vystupuje OPAKUJÍCÍ SE PŘEDMĚT (auto, kterým jedou, kouzelný předmět, oblíbená hračka), přidej do heroDescription záznam 'Key objects:' s jeho PŘESNÝM vzhledem ('an old sky-blue pickup truck with a rusty crane, round friendly headlight eyes'). V imagePromptech na něj odkazuj JEDNÍM krátkým stálým označením (např. 'the sky-blue pickup truck') — plný popis se do obrázkového modelu vkládá automaticky. Předmět NIKDY nemění typ, tvar ani barvu mezi scénami — stejné auto zůstává stejným autem celou pohádku.",
+    "- Pokud v příběhu vystupuje OPAKUJÍCÍ SE PŘEDMĚT (auto, kterým jedou, kouzelný předmět, oblíbená hračka, nebo JAKÁKOLI všední rekvizita, kterou postava opakovaně nosí/krade/používá — košík, hrnec, lucerna, nářadí — byť malá a nenápadná), přidej do heroDescription záznam 'Key objects:' s jeho PŘESNÝM vzhledem A — pokud jich postava má víc než jeden — PŘESNÝM POČTEM ('jeden otlučený měděný hrnec' vs. 'tři nesourodé proutěné košíky'). V imagePromptech na něj odkazuj JEDNÍM krátkým stálým označením (např. 'the sky-blue pickup truck', 'the copper pot') — plný popis se do obrázkového modelu vkládá automaticky. Předmět NIKDY nemění typ, tvar, barvu ANI POČET mezi scénami — jeden hrnec se nikdy nerozmnoží na několik v jednom obrázku ani napříč scénami, stejné auto zůstává stejným autem celou pohádku.",
     "- SPORTOVNÍ VYBAVENÍ JE VŽDY KEY OBJECT: když postava jede na kole, lyžuje, plave apod., zamkni vybavení v 'Key objects:' s přesným typem a barvami (anglicky, např. 'a black triathlon time-trial bike with aero handlebars and deep black racing wheels'). Časovkářské kolo se nikdy nezmění v silniční.",
     "- Pokud děj vyžaduje JINÉ OBLEČENÍ než kanonický popis postavy (sport, zima, plavání, kostým), NEUPRAVUJ záznam postavy — přidej samostatný záznam 'Story outfits:', např. 'Story outfits: Jan wears a sleeveless navy-and-white triathlon suit with a red stripe and white cycling shoes — IDENTICAL in every scene (overrides his default clothing).' Jeden převlek na postavu pro CELÝ příběh.",
     "- LOGIKA POČASÍ A ROČNÍHO OBDOBÍ (POVINNÁ): urči roční období a podnebí podle prostředí. Pokud NENÍ mírné počasí, dej KAŽDÉ postavě počasový ŠATNÍK v záznamu 'Story outfits:' (anglicky) se DVĚMA pevnými variantami: 'outdoors: ...' (sníh/zima → teplá zimní bunda, čepice, šála, rukavice, sněhule; horké léto/pláž → lehké oblečení, sandály, při koupání plavky; déšť → pláštěnka a holínky) a 'indoors: ...' (co mají vespod — obvykle kanonické oblečení, bunda a čepice sundané). Zachovej typické barvy postav, ať zůstanou rozpoznatelné (kluk známý bílým tričkem s červenými pruhy dostane červeno-bílou pruhovanou čepici). Každá varianta je IDENTICKÁ pokaždé, když se objeví — stejná bunda v každé venkovní scéně.",
@@ -1066,39 +1066,61 @@ export function peekEarlyScene(partial: string): { heroDescription: string; scen
   }
 }
 
-// ── Kanonické relativní výšky knihovních postav — FIXNÍ, napříč VŠEMI
-// pohádkami stejné. Dřív si tuhle větu Claude vymýšlel nanovo v každé
-// pohádce jen podle volného příkladu v systémovém promptu — obvykle se
-// trefil, ale příležitostně ne (Valentýnka „vyrostla", protože nic
-// nevynucovalo, že je přesně o hlavu menší než Nicolas). Když je v obsazení
-// 2+ sledovaných postav, tahle věta PŘEPÍŠE, co si Claude napsal sám —
-// jde i do vizuální kontroly obrázku, takže i případnou chybu modelu při
-// kreslení appka pozná a nechá scénu předělat.
-// Škála: rozdíl 1 = "o půl hlavy", rozdíl 2 = "o celou hlavu", víc = "dospělý".
-const CANONICAL_HEIGHT_RANK: Record<string, number> = {
-  valentyna: 0, // nejmenší, batole
-  nicolas: 2,
-  james: 2,     // stejně vysoký jako Nicolas
-  bella: 3,     // o půl hlavy vyšší než James/Nicolas
-  jan: 8, jana: 8, eva: 8, jakob: 8, // dospělí
+// ── Kanonické výšky knihovních postav — FIXNÍ, napříč VŠEMI pohádkami
+// stejné. Dřív si tuhle větu Claude vymýšlel nanovo v každé pohádce jen
+// podle volného příkladu v systémovém promptu — obvykle se trefil, ale
+// příležitostně ne (Valentýnka „vyrostla", Nicolásek jednou stejně vysoký
+// jako James, jindy ne). Když je v obsazení 1+ sledovaná postava, tahle
+// věta PŘEPÍŠE, co si Claude napsal sám — jde i do vizuální kontroly
+// obrázku, takže i případnou chybu modelu při kreslení appka pozná a
+// nechá scénu předělat.
+// Dospělí i Nicolásek mají SKUTEČNÉ cm (reálná fakta rodiny); zbytek dětí
+// nemá přesné cm, jen ověřený vztah k jinému dítěti (mění se, jen když
+// rodina naměří nové skutečné číslo — neodhaduj/nedopočítávej sám).
+const CANONICAL_HEIGHT_CM: Record<string, number> = {
+  nicolas: 111,
+  jan: 185,
+  jana: 172,
+  eva: 173,
+  jakob: 182,
 };
 
 function canonicalHeightsEntry(characters: Character[]): string | null {
-  const present = characters
-    .map(c => ({ c, rank: CANONICAL_HEIGHT_RANK[c.id] }))
-    .filter((x): x is { c: Character; rank: number } => x.rank !== undefined);
-  if (present.length < 2) return null;
-  present.sort((a, b) => a.rank - b.rank);
-  const name = (c: Character) => c.nameEn || c.name;
+  const ids = new Set(characters.map(c => c.id));
+  const name = (id: string): string => {
+    const c = characters.find(x => x.id === id);
+    return c ? (c.nameEn || c.name) : id;
+  };
   const bits: string[] = [];
-  for (let i = 1; i < present.length; i++) {
-    const a = present[i - 1], b = present[i];
-    const diff = b.rank - a.rank;
-    if (diff === 0) bits.push(`${name(a.c)} and ${name(b.c)} are exactly the same height`);
-    else if (diff === 1) bits.push(`${name(b.c)} is about half a head taller than ${name(a.c)}`);
-    else if (diff === 2) bits.push(`${name(b.c)} is a full head taller than ${name(a.c)}`);
-    else bits.push(`${name(b.c)} is a grown-up, much taller than ${name(a.c)}`);
+
+  // Nicolásek: přesná výška; o něco menší než James (dřív mylně "stejně vysocí")
+  if (ids.has("nicolas")) {
+    bits.push(`${name("nicolas")} is 111 cm tall`);
+    if (ids.has("james")) {
+      bits.push(`${name("james")} is a little taller than ${name("nicolas")} — the top of ${name("nicolas")}'s head reaches only to ${name("james")}'s ears`);
+    }
   }
+
+  // Valentýnka: nejmenší dítě, po bradu Nicoláska
+  if (ids.has("valentyna") && ids.has("nicolas")) {
+    bits.push(`${name("valentyna")} is the smallest — the top of her head reaches only to ${name("nicolas")}'s chin`);
+  }
+
+  // Bella: o půl hlavy vyšší než James a Nicolásek (beze změny)
+  if (ids.has("bella")) {
+    const anchors = ["james", "nicolas"].filter(id => ids.has(id)).map(name);
+    if (anchors.length) bits.push(`${name("bella")} is about half a head taller than ${anchors.join(" and ")}`);
+  }
+
+  // Dospělí: přesné cm
+  for (const id of ["jan", "jana", "eva", "jakob"] as const) {
+    if (ids.has(id)) bits.push(`${name(id)} is ${CANONICAL_HEIGHT_CM[id]} cm tall`);
+  }
+  const anyAdult = ["jan", "jana", "eva", "jakob"].some(id => ids.has(id));
+  const anyChild = ["nicolas", "valentyna", "james", "bella"].some(id => ids.has(id));
+  if (anyAdult && anyChild) bits.push("all the adults are much taller than the children");
+
+  if (bits.length === 0) return null;
   return `Heights: ${bits.join("; ")}.`;
 }
 
