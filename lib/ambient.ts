@@ -16,6 +16,23 @@ const BELLS_NIGHT  = [220.00, 261.63, 311.13, 369.99, 440.00];          // A3-A4
 const BELLS_ADVENT = [392.00, 493.88, 587.33, 698.46, 880.00];          // G4-A5 pentatonic
 const BELLS_COZY   = [523.25, 659.25, 783.99];                          // C5 E5 G5 soft
 
+// 🎨 Homepage: ambientní hudba podle vybraného SVĚTA POZADÍ appky (lib/backgrounds.ts
+// BG_SCENES — noc/les/hory/vesmír/džungle/moře/závody/pouť/kouzlo), NEZÁVISLE na
+// náladě scény při čtení pohádky (viz setBackgroundWorld). Kde se vibe kryje s
+// existující náladou 1:1, vrstva se rovnou SDÍLÍ (žádný nový soubor navíc); zbytek
+// má vlastní vyhrazenou smyčku public/music-lib/bg-<id>.mp3.
+const BG_AUDIO_KEY: Record<string, string> = {
+  night: "soundscape-night",
+  forest: "soundscape-forest",
+  fantasy: "soundscape-magic",
+  mountains: "bg-mountains",
+  space: "bg-space",
+  dino: "bg-dino",
+  bay: "bg-bay",
+  road: "bg-road",
+  cartoon: "bg-cartoon",
+};
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Cleanup = () => void;
 
@@ -686,6 +703,14 @@ export class AmbientPlayer {
   private noiseBuf: AudioBuffer | null = null;
   private layer: Layer | null = null;
   private currentScene: Soundscape = "magic";
+  // 🔑 Souborový klíč AKTUÁLNĚ znějící smyčky — sdíleno mezi setScene (nálada
+  // scény při čtení) a setBackgroundWorld (nálada podle světa pozadí na
+  // homepage), ať přepnutí mezi appka-je-na-homepage a appka-čte-pohádku
+  // vždy skutečně vymění vrstvu, i kdyby `currentScene` náhodou vyšla stejná
+  // (jinak by např. homepage smyčka "bg-space" zůstala hrát i po spuštění
+  // čtení pohádky s náladou 1. scény "magic", protože currentScene by se
+  // dřívějším porovnáním jevila „neměnná").
+  private currentLayerKey: string | null = null;
   private running = false;
   private vol = 0.22;
   private readonly EFFECT_VOL = 0.34;
@@ -835,6 +860,7 @@ export class AmbientPlayer {
 
   private crossfade(next: Soundscape): void {
     const { ctx, rev } = this.setup();
+    this.currentLayerKey = `soundscape-${next}`;
     this.crossfadeToLayer(this.buildLayer(next, ctx, rev));
   }
 
@@ -1124,17 +1150,31 @@ export class AmbientPlayer {
   enterSleepMode(): void {
     if (!this.running) return;
     const { ctx, rev } = this.setup();
+    this.currentLayerKey = "soundscape-lullaby";
     const newLayer = this.buildLayerByKey("soundscape-lullaby", (c, g, r) => buildCozy(c, g, r), ctx, rev);
     this.crossfadeToLayer(newLayer, 1.2, 2.0);
     this.master?.gain.setTargetAtTime(this.vol * 0.55, ctx.currentTime, 1.5);
   }
 
+  /** 🎨 Homepage: nálada podle vybraného SVĚTA POZADÍ appky (viz BG_AUDIO_KEY
+   *  výše) — zcela nezávislé na náladě scény při čtení (setScene). Volat na
+   *  homepage při každé změně vybraného pozadí; ignorováno když appka mlčí. */
+  setBackgroundWorld(bgId: string | undefined): void {
+    if (!this.running) return;
+    const key = (bgId && BG_AUDIO_KEY[bgId]) || BG_AUDIO_KEY.fantasy;
+    if (key === this.currentLayerKey && this.layer) return;
+    this.currentLayerKey = key;
+    const { ctx, rev } = this.setup();
+    const newLayer = this.buildLayerByKey(key, (c, g, r) => buildMagic(c, g, r), ctx, rev);
+    this.crossfadeToLayer(newLayer, 0.4, 0.6);
+  }
+
   /** Switch soundscape — smooth crossfade; ignored when muted */
   setScene(scene: Soundscape | undefined): void {
     const next = scene || "magic";
-    if (next === this.currentScene && this.layer) return;
     this.currentScene = next;
     if (!this.running) return;
+    if (`soundscape-${next}` === this.currentLayerKey && this.layer) return;
     this.crossfade(next);
   }
 

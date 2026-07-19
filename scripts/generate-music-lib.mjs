@@ -114,6 +114,19 @@ const FANFARES = {
   "intro-cozy": { prompt: "Short warm gentle opening phrase, soft rising piano and strings flourish, homely and comforting opening for a children's storybook, instrumental", ms: 6000 },
 };
 
+// ── 🎨 Homepage: nálada podle SVĚTA POZADÍ appky (lib/backgrounds.ts BG_SCENES) ─
+// Nezávislé na náladě scény při čtení. Noc/Les/Kouzlo znějí stejně jako už
+// existující soundscape-night/-forest/-magic (viz BG_AUDIO_KEY v lib/ambient.ts)
+// — proto tu jsou jen zbylé světy, které ještě vlastní smyčku nemají.
+const BG_AMBIENT = {
+  mountains: "Peaceful snowy mountain ambient music loop, soft warm horns and gentle strings, crisp and cozy, no drums, seamless loop, instrumental",
+  space: "Sparkling outer-space ambient music loop, shimmering bells and slow floating pad, wondrous and calm, no drums, seamless loop, instrumental",
+  dino: "Warm prehistoric jungle ambient music loop, soft mallet percussion and gentle woodwind, curious and calm, no drums, seamless loop, instrumental",
+  bay: "Gentle seaside ambient music loop, soft strings and airy flute over distant waves, calm and warm, no drums, seamless loop, instrumental",
+  road: "Playful road-trip ambient music loop, light acoustic guitar and a bouncy rhythmic pulse, cheerful and breezy, seamless loop, instrumental",
+  cartoon: "Cheerful funfair ambient music loop, playful music-box-like bells and light accordion, whimsical and fun, no drums, seamless loop, instrumental",
+};
+
 // ── 🎺 Intro podle SVĚTA/TÉMATU pohádky (Krteček, Autíčka, konkrétní pohádka…) ─
 // Přednost před náladou scény (viz AmbientPlayer.playIntro) — appka je zkusí
 // jako `intro-theme-<id>`, id musí sedět s lib/themes.ts (THEMES) / lib/folk-
@@ -251,6 +264,15 @@ async function main() {
     if (shouldSkip(path)) { manifest[key] = statSync(path).size; console.log(`   ⏭️  ${key} (už existuje)`); continue; }
     const buf = await withRetry(() => composeMusic(prompt, ms), key);
     if (buf) { writeFileSync(path, buf); manifest[key] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
+    else fail++;
+  }
+
+  console.log(`🎨 Homepage podle světa pozadí (${Object.keys(BG_AMBIENT).length})`);
+  for (const [key, prompt] of Object.entries(BG_AMBIENT)) {
+    const path = `${OUT_DIR}/bg-${key}.mp3`;
+    if (shouldSkip(path)) { manifest[`bg-${key}`] = statSync(path).size; console.log(`   ⏭️  ${key} (už existuje)`); continue; }
+    const buf = await withRetry(() => composeMusic(prompt, 24000), `bg:${key}`);
+    if (buf) { writeFileSync(path, buf); manifest[`bg-${key}`] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
     else fail++;
   }
 

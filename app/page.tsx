@@ -2866,6 +2866,15 @@ export default function Home() {
         ?? (customThemes.some(ct => ct.id === selectedTheme) || folkTaleById(selectedTheme) ? "fantasy" : "night"))
     : "night";
   const activeBg = bgChoice === "auto" ? autoBg : bgChoice;
+
+  // 🎨 Homepage: ambientní hudba podle vybraného světa pozadí appky — zcela
+  // nezávisle na náladě scény při čtení pohádky (ta se nastavuje jinde,
+  // viz setScene výše, a beze změny).
+  useEffect(() => {
+    if (viewMode !== "form" || !musicOn) return;
+    ambientRef.current?.setBackgroundWorld(activeBg);
+  }, [viewMode, activeBg, musicOn]);
+
   const bgUrlCacheRef = useRef<Record<string, string>>({});
   useEffect(() => {
     // Gradient scény naskočí hned (data-bg), ilustrace se přes něj položí,
