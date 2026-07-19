@@ -19,7 +19,14 @@ function loadEnv() {
     if (!existsSync(file)) continue;
     for (const line of readFileSync(file, "utf8").split("\n")) {
       const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-      if (m && !(m[1] in process.env)) process.env[m[1]] = m[2];
+      if (m && !(m[1] in process.env)) {
+        // Vercel CLI zapisuje hodnoty do uvozovek (a někdy i s \r\n uvnitř) —
+        // bez odstranění uvozovek šla do API hlaviček doslova "hodnota" i s
+        // uvozovkami, což server logicky odmítl jako neplatný klíč.
+        let v = m[2].trim();
+        if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
+        process.env[m[1]] = v.replace(/\\r\\n$/, "").replace(/\\n$/, "");
+      }
     }
   }
 }
