@@ -295,6 +295,34 @@ function playWaves(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): v
   }
 }
 
+function playWaterFlow(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  // Klidné zurčení (řeka/potok/fontánka) — na rozdíl od playWaves BEZ velké
+  // dechové obálky, jen stálý jemně kolísavý bandpass šum.
+  const t = ctx.currentTime;
+  const src = noiseSource(ctx, noiseBuf);
+  const filt = ctx.createBiquadFilter();
+  filt.type = "bandpass";
+  filt.frequency.setValueAtTime(1100, t);
+  filt.Q.value = 0.8;
+  const lfo = ctx.createOscillator();
+  lfo.frequency.value = 0.3;
+  const lfoG = ctx.createGain();
+  lfoG.gain.value = 220;
+  lfo.connect(lfoG);
+  lfoG.connect(filt.frequency);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.11, t + 0.3);
+  g.gain.linearRampToValueAtTime(0, t + 2.8);
+  src.connect(filt);
+  filt.connect(g);
+  g.connect(dest);
+  src.start(t);
+  lfo.start(t);
+  src.stop(t + 2.9);
+  lfo.stop(t + 2.9);
+}
+
 function playThunder(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
   const t = ctx.currentTime;
   // Ostrý úder (krátký širokopásmový šum)
@@ -975,6 +1003,7 @@ export class AmbientPlayer {
     switch (effect) {
       // 🌦️ počasí
       case "waves":       playWaves(ctx, fx, nb()); break;
+      case "water_flow":  playWaterFlow(ctx, fx, nb()); break;
       case "thunder":     playThunder(ctx, fx, nb()); break;
       case "wind_gust":   playWindGust(ctx, fx, nb()); break;
       case "rain":        playRain(ctx, fx, nb()); break;

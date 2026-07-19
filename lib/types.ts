@@ -52,7 +52,7 @@ export type Soundscape = "magic" | "forest" | "night" | "adventure" | "cozy";
  *  Kategorie: zvířata, počasí, stroje, lidé/akce, náladové akcenty. */
 export type SoundEffect =
   // 🌦️ počasí
-  | "waves" | "thunder" | "wind_gust" | "rain" | "snow_crunch"
+  | "waves" | "thunder" | "wind_gust" | "rain" | "snow_crunch" | "water_flow"
   // 🐾 zvířata
   | "cow" | "pig" | "chicken" | "sheep" | "horse" | "duck" | "dog" | "cat" | "frog" | "owl" | "rooster" | "bee"
   // ⚙️ stroje/doprava

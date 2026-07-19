@@ -197,6 +197,7 @@ const STINGERS = {
 // ── 🔊 Jednorázové zvukové efekty (text, trvání v s, smyčka?) ─────────────
 const SFX = {
   waves: ["gentle ocean waves lapping and receding on a shore", 3.5, true],
+  water_flow: ["a calm river or stream gently flowing and trickling", 3.5, true],
   thunder: ["a single distant rumbling thunder clap with rolling echo", 3.0, false],
   wind_gust: ["a sudden gust of wind whooshing through trees", 2.5, false],
   rain: ["steady gentle rain falling", 3.0, true],

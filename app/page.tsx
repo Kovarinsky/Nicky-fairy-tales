@@ -3825,6 +3825,24 @@ export default function Home() {
   const hasPrev = prevVisible !== null;
   const totalScenes = scenes.length;
 
+  // 🚧 Dočasně (než se generování obrázků zoptimalizuje): appka NIKDY
+  // neukáže dead-end "obrázek se nepovedl" s ručním tlačítkem — místo toho
+  // tiše zkouší dál na pozadí (rostoucí prodleva, strop 30 s), dokud se to
+  // nepovede. Čtenář vidí jen "kreslím", pohádka prostě počká, než bude hotová.
+  const autoRetryRef = useRef<{ page: number; attempt: number } | null>(null);
+  useEffect(() => {
+    const failed = !!current?.imageUrl && isPlaceholderImg(current.imageUrl) && fixingScene !== page;
+    if (!failed) { autoRetryRef.current = null; return; }
+    if (autoRetryRef.current?.page !== page) autoRetryRef.current = { page, attempt: 0 };
+    const attempt = autoRetryRef.current.attempt;
+    const delay = Math.min(5000 * (attempt + 1), 30000);
+    const t = setTimeout(() => {
+      if (autoRetryRef.current) autoRetryRef.current.attempt = attempt + 1;
+      repairSceneImage(page);
+    }, delay);
+    return () => clearTimeout(t);
+  }, [current?.imageUrl, page, fixingScene]);
+
   return (
     <div className={readerMode ? "container reader-mode" : "container"}>
 
@@ -4638,12 +4656,14 @@ export default function Home() {
             {titleCardOpen && (
               <div className="title-card"
                 onClick={e => { e.stopPropagation(); if (scene1Ready) closeTitleCard(); }}>
-                {/* 🖼️ Blur na SAMOSTATNÉ vrstvě — jen podkres, ne text nad ním.
-                    Rozmazané+ztmavené schválně, ať titulka vypadá jako obálka
-                    knihy, ne jako doslovná kopie ostré scény 1 hned pod ní
-                    (viz nahlášené "proč je to same jako první slide"). */}
-                {scene1Ready && (
-                  <div className="title-card-bg" style={{ backgroundImage: `url(${scenes[0].imageUrl})` }} />
+                {/* 🖼️ Podklad = ilustrace SVĚTA POZADÍ appky (stejná jako na
+                    homepage, viz bgUrlCacheRef/activeBg) — schválně JINÝ obrázek
+                    než scéna 1 (dřív to byla rozmazaná scéna 1, ale uživatel
+                    chtěl titulku jako opravdu SAMOSTATNÝ úvod/obálku, ne odvozeninu
+                    z pohádky samotné). Dostupný skoro okamžitě (homepage ho
+                    stahuje už během vyplňování formuláře), ne až po 1. scéně. */}
+                {bgUrlCacheRef.current[activeBg] && (
+                  <div className="title-card-bg" style={{ backgroundImage: `url(${bgUrlCacheRef.current[activeBg]})` }} />
                 )}
                 <div className="title-card-scrim" />
                 <div className="title-card-content">
@@ -4673,21 +4693,13 @@ export default function Home() {
                 )}
               </div>
             ) : current.imageUrl ? (
+              // 🚧 Dočasně (než se generování zoptimalizuje): appka NIKDY neukáže
+              // dead-end "obrázek se nepovedl" s tlačítkem — misto toho tiše
+              // zkouší dál na pozadí (viz autoRetryRef efekt výš), uživatel
+              // vidí jen "kreslím", pohádka prostě počká, až to bude hotové.
               <div className="page-image placeholder">
-                {fixingScene === page ? (
-                  <>
-                    <div className="placeholder-spinner" />
-                    <span>{t.drawingScene(page + 1)}</span>
-                  </>
-                ) : (
-                  <>
-                    <span>{t.imgFailed}</span>
-                    {imgErr && <span className="img-err-detail">{imgErr.slice(0, 220)}</span>}
-                    <button type="button" className="btn-retry" onClick={() => repairSceneImage(page)}>
-                      {t.regenImg}
-                    </button>
-                  </>
-                )}
+                <div className="placeholder-spinner" />
+                <span>{t.drawingScene(page + 1)}</span>
               </div>
             ) : (
               <div className="page-image placeholder">
