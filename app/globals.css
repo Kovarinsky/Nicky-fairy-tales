@@ -1277,12 +1277,33 @@ button:disabled {
 .audio-err .btn-retry { flex-shrink: 0; }
 
 /* 📖 Titulní obrazovka: název pohádky + úvodní fanfára, PŘED prvním slidem
-   (viz titleCardOpen v app/page.tsx) — leží NA obrázku scény 1, ať je po
-   zavření hned vidět beze zvláštního načítání. */
+   (viz titleCardOpen v app/page.tsx) — leží NA obrázku scény 1 (jakmile je
+   hotový; do té doby jen tmavý gradient), ať je po zavření hned vidět beze
+   zvláštního načítání. Zavřít jde jen když je scéna 1 fakt hotová (viz
+   scene1Ready) — do té doby ukazuje "Připravuji pohádku…" a nereaguje na klik. */
 .title-card {
   position: absolute;
   inset: 0;
   z-index: 8;
+  background: linear-gradient(160deg, #241046 0%, #1c0b38 100%) center / cover;
+  cursor: pointer;
+  animation: pageFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.title-card-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg,
+    rgba(10, 8, 30, 0.55) 0%,
+    rgba(10, 8, 30, 0.35) 45%,
+    rgba(10, 8, 30, 0.88) 100%
+  );
+}
+
+.title-card-content {
+  position: relative;
+  z-index: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1290,9 +1311,6 @@ button:disabled {
   gap: 0.9rem;
   padding: 2rem;
   text-align: center;
-  background: linear-gradient(160deg, rgba(36, 16, 70, 0.97) 0%, rgba(28, 11, 56, 0.97) 55%, rgba(10, 8, 30, 0.98) 100%);
-  cursor: pointer;
-  animation: pageFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .title-card-emoji {
@@ -1311,9 +1329,11 @@ button:disabled {
 
 .title-card-tap {
   margin-top: 0.4rem;
+  display: flex;
+  align-items: center;
   font-size: 0.85rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .img-err-detail {
@@ -1378,6 +1398,15 @@ button:disabled {
   border-top-color: rgba(255,255,255,0.8);
   border-radius: 50%;
   animation: spin 1s linear infinite;
+}
+
+.placeholder-spinner-sm {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+  vertical-align: -2px;
+  margin-right: 0.4rem;
 }
 
 @keyframes spin {

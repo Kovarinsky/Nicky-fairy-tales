@@ -1026,13 +1026,30 @@ export default function Home() {
   // 📖 Titulní obrazovka: název pohádky + úvodní fanfára, PŘED prvním slidem
   // — teprve po jejím zavření appka ukáže scénu 1 a spustí namlouvání.
   const [titleCardOpen, setTitleCardOpen] = useState(false);
-  // Sama zmizí po chvíli, kdyby na ni malý čtenář zapomněl ťuknout — jinak by
-  // pohádka zůstala navěky "zaseknutá" na titulní obrazovce.
+  // Ref zrcadlí stav SYNCHRONNĚ (na rozdíl od state, který se promítne až
+  // příštím renderem) — auto-play efekt níž ho čte OKAMŽITĚ. Bez něj mohl
+  // efekt "spotřebovat" isAutoAdvanceRef HNED při otevření čtečky, ještě než
+  // se titleCardOpen (state) vůbec stihl nastavit na true ve stejném průchodu
+  // efektů — pak po ťuknutí na titulku už nebylo co spustit („nic se nestalo").
+  const titleCardOpenRef = useRef(false);
+  // Scéna 1 musí mít HOTOVÝ (ne placeholder) obrázek A hlas, než appku vůbec
+  // jde spustit — appka na to zatím jen ČEKÁ (a fanfára/obrázek mezitím
+  // doběhne), místo aby ukázala rozbitou první stránku.
+  const scene1Ready = !!(scenes[0]?.imageUrl && !isPlaceholderImg(scenes[0].imageUrl) && scenes[0]?.audioUrl);
+  const closeTitleCard = useCallback(() => {
+    titleCardOpenRef.current = false;
+    setTitleCardOpen(false);
+    isAutoAdvanceRef.current = true; // (znovu) natáhne spuštění namlouvání
+  }, []);
+
+  // Sama zmizí po chvíli, kdyby na ni malý čtenář zapomněl ťuknout — ale jen
+  // KDYŽ je scéna 1 už opravdu hotová; jinak by appka „spustila" rozbitou
+  // stránku jen proto, že vypršel čas.
   useEffect(() => {
-    if (!titleCardOpen) return;
-    const t = setTimeout(() => setTitleCardOpen(false), 7000);
+    if (!titleCardOpen || !scene1Ready) return;
+    const t = setTimeout(() => closeTitleCard(), 7000);
     return () => clearTimeout(t);
-  }, [titleCardOpen]);
+  }, [titleCardOpen, scene1Ready, closeTitleCard]);
 
   // Intro fanfare when reader opens — dá přednost tématu SVĚTA (Krteček,
   // Autíčka, konkrétní pohádka…) před náladou 1. scény; vlastní/žádný svět
@@ -1041,6 +1058,7 @@ export default function Home() {
   useEffect(() => {
     if (!bookReady || introFiredRef.current) return;
     introFiredRef.current = true;
+    titleCardOpenRef.current = true;
     setTitleCardOpen(true);
     const themeAudioKey = (THEMES.some(t => t.id === selectedTheme) || FOLK_TALES.some(t => t.id === selectedTheme))
       ? selectedTheme
@@ -1051,7 +1069,7 @@ export default function Home() {
 
   // Reset intro flag when new story starts
   useEffect(() => {
-    if (scenes.length === 0) { introFiredRef.current = false; setTitleCardOpen(false); }
+    if (scenes.length === 0) { introFiredRef.current = false; titleCardOpenRef.current = false; setTitleCardOpen(false); }
   }, [scenes.length]);
 
   // ── Anti-stuck guards ──────────────────────────────────────────────────────
@@ -1447,7 +1465,12 @@ export default function Home() {
   const isAutoAdvanceRef = useRef(false);
   const currentAudioUrl = scenes[page]?.audioUrl;
   useEffect(() => {
-    if (!currentAudioUrl || !bookReady || titleCardOpen) return;
+    // 🔑 titleCardOpenRef (ne titleCardOpen state) — čte se OKAMŽITĚ, i v
+    // tomtéž průchodu efektů, kdy titulka teprve PRÁVĚ otevírá (viz komentář
+    // u titleCardOpenRef výš). Bez toho by tenhle efekt mohl vystřelit dřív,
+    // než se titleCardOpen vůbec stihl promítnout, a "spotřebovat"
+    // isAutoAdvanceRef ještě před tím, než uživatel titulku vůbec zavřel.
+    if (!currentAudioUrl || !bookReady || titleCardOpenRef.current) return;
     if (!isAutoAdvanceRef.current) return;
     isAutoAdvanceRef.current = false;
     const t = setTimeout(() => audioRef.current?.play().catch(() => {}), 420);
@@ -4604,12 +4627,21 @@ export default function Home() {
             onClick={() => { if (readerMode) setCtrlsOpen(v => !v); }}
           >
             {/* 📖 Titulní obrazovka: název + úvodní fanfára, PŘED prvním slidem —
-                scéna 1 se pod ní klidně dokresluje/čeká, ať je hned vidět po zavření. */}
+                scéna 1 se pod ní klidně dokresluje/čeká, ať je hned vidět po zavření.
+                Zavřít (ťuknutím i časem) jde JEN když je scéna 1 fakt hotová
+                (obrázek i hlas) — jinak by appka spustila rozbitou stránku. */}
             {titleCardOpen && (
-              <div className="title-card" onClick={e => { e.stopPropagation(); setTitleCardOpen(false); }}>
-                <div className="title-card-emoji">📖</div>
-                <div className="title-card-title">{title}</div>
-                <div className="title-card-tap">{t.titleCardTap}</div>
+              <div className="title-card"
+                style={scene1Ready ? { backgroundImage: `url(${scenes[0].imageUrl})` } : undefined}
+                onClick={e => { e.stopPropagation(); if (scene1Ready) closeTitleCard(); }}>
+                <div className="title-card-scrim" />
+                <div className="title-card-content">
+                  <div className="title-card-emoji">📖</div>
+                  <div className="title-card-title">{title}</div>
+                  <div className="title-card-tap">
+                    {scene1Ready ? t.titleCardTap : <><span className="placeholder-spinner placeholder-spinner-sm" />{t.titleCardPreparing}</>}
+                  </div>
+                </div>
               </div>
             )}
             {current.imageUrl && !isPlaceholderImg(current.imageUrl) ? (
@@ -4719,7 +4751,20 @@ export default function Home() {
 
           {/* Nav arrows + dots outside the card — no overflow clipping */}
           <div className="book-nav" ref={navRef}>
-            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => prevVisible !== null && goToPage(prevVisible)} disabled={!hasPrev} aria-label={t.prev}>←</button>
+            {/* 🔙 Na první stránce vede šipka zpět na titulní obrazovku (jinak
+                by na první scéně nešlo nikam couvnout — je to jediná stránka
+                bez skutečné "předchozí" scény). */}
+            <button type="button" className="ctrl-btn ctrl-nav"
+              onClick={() => {
+                if (prevVisible !== null) { goToPage(prevVisible); return; }
+                if (pagePos === 0) {
+                  audioRef.current?.pause();
+                  setIsPlaying(false);
+                  titleCardOpenRef.current = true;
+                  setTitleCardOpen(true);
+                }
+              }}
+              disabled={!hasPrev && pagePos !== 0} aria-label={t.prev}>←</button>
             <div className="page-dots">
               {visiblePages.map((i, pos) => (
                 <button key={i} type="button"
