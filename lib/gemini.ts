@@ -288,7 +288,7 @@ export async function verifySceneImage(
               "0) STYLE: the image MUST be a hand-painted 2D storybook ILLUSTRATION. A photograph, photorealistic render, 3D/CGI look, or stock-photo style image = FAIL immediately (this alone fails the image, regardless of content).",
               "1) IDENTIFY every visible person one by one and match each to a named character by hair, face and outfit. COUNT them: the number of visible people MUST EQUAL the number of characters named in the scene description — more OR fewer = FAIL. ANY person you cannot confidently match (extra child, stranger, background figure) = FAIL. A character named in the scene description who is MISSING = FAIL. A person who mixes features of TWO characters (one character's face with another's outfit or hairstyle — swapped/merged identities) = FAIL. EXCEPTION: when the scene description itself mentions a GROUP (a team, other players, opponents, the crowd, the audience, villagers…), unnamed background figures belonging to that group are ALLOWED — list them as 'group:<what>' in people, they don't fail the count; but none of them may look like a copy of a named hero.",
               "2) Each named character appears EXACTLY ONCE — two similar children or two similar adults = FAIL.",
-              "3) HAIR COLOR of EVERY person matches their sheet entry (blond stays blond, brown stays brown, dark stays dark) — check person by person. SKIN TONE/ethnicity must also match (a character described with fair light skin drawn as a different ethnicity/race, or vice versa, = FAIL) — but ALLOW natural lighting variation: a slightly warmer, sun-kissed, tanned or shadowed rendering of the SAME underlying skin tone (e.g. bright outdoor/beach/summer light) is NOT a violation. Only flag a clear ethnicity/race change, not a shade difference plausibly caused by lighting.",
+              "3) HAIR COLOR of EVERY person matches their sheet entry (blond stays blond, brown stays brown, dark stays dark) — check person by person. SKIN TONE/ethnicity must also match (a character described with fair light skin drawn as a different ethnicity/race, or vice versa, = FAIL) — but ALLOW natural lighting variation: a slightly warmer, sun-kissed, tanned or shadowed rendering of the SAME underlying skin tone (e.g. bright outdoor/beach/summer light) is NOT a violation. Only flag a clear ethnicity/race change, not a shade difference plausibly caused by lighting. For a named ANIMAL, the SPECIES/BREED and coat color/pattern must match its sheet entry exactly — a different dog breed than described (wrong ear shape, wrong build, wrong coat pattern) = FAIL.",
               "4) Hair LENGTH and STYLE match the sheet (short stays short, long stays long; beard per sheet).",
               "5) CLOTHING: each character wears THEIR OWN outfit (or their 'Story outfits:'/'Team kits:' variant for this scene). A signature outfit on the WRONG person (e.g. a different child wearing Nicolas's white T-shirt with red stripes) = FAIL. The SAME signature garment on TWO different people (two lilac hoodies, two striped polos) = FAIL. An adult's signature outfit worn by a child (or vice versa) = FAIL. If the sheet has a 'Team kits:' entry and this scene shows that group activity happening, everyone taking part MUST wear their group's stated uniform, NOT default/casual clothes — someone in everyday clothes during the activity = FAIL; members of the SAME group must all match each other's uniform, a rival/opposing group must be in their clearly different stated uniform.",
               "6) Dressing level is UNIFORM for the scene: no winter coat next to a T-shirt; indoors without jackets/hats; never summer clothes in snow.",
@@ -442,7 +442,7 @@ function buildAppearanceLock(heroDescription: string): { open: string; close: st
     open: [
       `⚠ APPEARANCE LOCK — IMMUTABLE across every image in this story:`,
       heroDescription,
-      `1) Every named character MUST look IDENTICAL to this description in EVERY image: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes — AND the same AGE, same BODY SIZE and PROPORTIONS. Relative heights between characters NEVER change: a toddler stays toddler-sized, a child stays child-sized, adults stay adult-sized.`,
+      `1) Every named character MUST look IDENTICAL to this description in EVERY image: same hair color, same hair style, same eye color, same exact clothing items and colors, same shoes — AND the same AGE, same BODY SIZE and PROPORTIONS. Relative heights between characters NEVER change: a toddler stays toddler-sized, a child stays child-sized, adults stay adult-sized. For a named ANIMAL character this means the SAME SPECIES and BREED too — a dog never changes breed (a Staffordshire Bull Terrier never becomes a Doberman, a German Shepherd, or any other breed), and its exact coat color/pattern (brindle, patches, markings) stays identical in every scene.`,
       `2) Any recurring OBJECT listed above (vehicle, magic item, toy) keeps IDENTICAL type, shape and colors in every scene — the same car stays the same car, and each key object exists ONCE in the world: NEVER draw two copies of it in one image.`,
       `3) If 'Story outfits:' defines outdoor/indoor variants, draw the variant stated at the end of the scene description — and ALL characters in the scene share the SAME dressing level (never one in a winter coat while another wears a T-shirt).`,
       `4) ONLY the characters named in the scene are visible — zero additional people, strangers, or background human figures (EXCEPTION: a group the scene itself mentions — a team, opponents, the crowd — may appear as smaller background figures who never resemble the named heroes). Each named character appears EXACTLY ONCE in the image — NEVER draw two copies of the same person.`,
@@ -496,16 +496,19 @@ export async function generateSceneImage(
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
         let img = await callGeminiImage(apiKey, m, safePrompt, withAspect ? "16:9" : null, refImages);
-        // Desatero konzistence: každý obrázek projde kontrolou; vadný se
+        // Bible konzistence: každý obrázek projde kontrolou; vadný se
         // překresluje — 2 opravná kola s výčtem chyb + 1 ČERSTVÉ překreslení
         // (nový pokus bez korekce často opraví, co korekce nespraví).
         // Drží se NEJLEPŠÍ OVĚŘENÝ pokus (nejméně porušených pravidel) —
         // neověřený obrázek nikdy nenahradí ověřený.
-        // 💰 Scény BEZ jmenované postavy (čistě scenérie/atmosféra) nemají
-        // žádnou identitu k ochraně — kontrola + případné překreslení tam jen
-        // pálí náklady bez přínosu. Stejný signál (sceneCastList === null)
-        // už appka spolehlivě používá i pro "CAST: nobody" v archových panelech.
-        if (heroDescription && sceneCastList(scene.imagePrompt)) {
+        // ⚠️ Dřív appka kontrolu PŘESKOČILA, když `sceneCastList` nenašel
+        // přesnou uzavírací větu "Only X present" v imagePromptu — jenže
+        // Claude tuhle větu občas zapomene napsat i u scény, která postavy
+        // MÁ (viz nahlášený bug: jmenovky přímo v obrázku prošly bez kontroly,
+        // protože scéna "neměla detekovaný cast"). Kontrola teď běží VŽDY,
+        // když appka vůbec zná obsazení pohádky (heroDescription) — dražší,
+        // ale zavřená mezera je tu důležitější než pár ušetřených requestů.
+        if (heroDescription) {
           let v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt, refImages, deadline);
           if (!v0 && !(deadline !== undefined && Date.now() > deadline)) {
             // Kontrola 2× selhala (typicky rate-limit) → po pauze ještě jednou;

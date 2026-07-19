@@ -4637,8 +4637,14 @@ export default function Home() {
                 (obrázek i hlas) — jinak by appka spustila rozbitou stránku. */}
             {titleCardOpen && (
               <div className="title-card"
-                style={scene1Ready ? { backgroundImage: `url(${scenes[0].imageUrl})` } : undefined}
                 onClick={e => { e.stopPropagation(); if (scene1Ready) closeTitleCard(); }}>
+                {/* 🖼️ Blur na SAMOSTATNÉ vrstvě — jen podkres, ne text nad ním.
+                    Rozmazané+ztmavené schválně, ať titulka vypadá jako obálka
+                    knihy, ne jako doslovná kopie ostré scény 1 hned pod ní
+                    (viz nahlášené "proč je to same jako první slide"). */}
+                {scene1Ready && (
+                  <div className="title-card-bg" style={{ backgroundImage: `url(${scenes[0].imageUrl})` }} />
+                )}
                 <div className="title-card-scrim" />
                 <div className="title-card-content">
                   <div className="title-card-emoji">📖</div>

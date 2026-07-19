@@ -1212,17 +1212,23 @@ button:disabled {
 }
 
 /* Slide-in animation – triggered by key change */
+/* 🐛 `opacity` by tu prozradilo appky VLASTNÍ pozadí appky (--bg-img za
+   čtečkou) — opacity < 1 zprůhlední CELÝ prvek včetně jeho vlastního pozadí,
+   takže na zlomek vteřiny prosvítalo, co je za kartou (viz nahlášený bug
+   "proč jsou při přechodu vidět obrázky pozadí appky"). `filter: brightness`
+   dá vizuálně STEJNÝ efekt (ztmavnutí do černé a zpět), ale prvek zůstává
+   po celou dobu neprůhledný — nic za ním prosvítat nemůže. */
 @keyframes pageFadeIn {
-  from { opacity: 0; transform: translateY(14px) scale(0.985); }
-  to   { opacity: 1; transform: translateY(0)   scale(1);      }
+  from { filter: brightness(0); transform: translateY(14px) scale(0.985); }
+  to   { filter: brightness(1); transform: translateY(0)   scale(1);      }
 }
 
 /* 🌙 Fade-out staré scény PŘED automatickým otočením stránky (viz
    pageLeaving/handleAudioEnded v app/page.tsx) — jinak byl přechod mezi
    scénami ostrý střih, ne plynulé odeznění. */
 @keyframes pageFadeOut {
-  from { opacity: 1; transform: scale(1);     }
-  to   { opacity: 0; transform: scale(0.985); }
+  from { filter: brightness(1); transform: scale(1);     }
+  to   { filter: brightness(0); transform: scale(0.985); }
 }
 
 .book-card-leaving {
@@ -1288,9 +1294,22 @@ button:disabled {
   position: absolute;
   inset: 0;
   z-index: 8;
-  background: linear-gradient(160deg, #241046 0%, #1c0b38 100%) center / cover;
+  background: linear-gradient(160deg, #241046 0%, #1c0b38 100%);
   cursor: pointer;
   animation: pageFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  overflow: hidden;
+}
+
+/* Rozmazaný+zvětšený podklad — schválně vypadá jako obálka knihy, ne jako
+   ostrá kopie scény 1 hned pod ní (viz nahlášené "proč je to stejné jako
+   první slide"). Vlastní vrstva, ať blur nezasáhne text v .title-card-content. */
+.title-card-bg {
+  position: absolute;
+  inset: -14px; /* kryje okraje rozostřené blurem */
+  background-size: cover;
+  background-position: center;
+  filter: blur(10px) brightness(0.6) saturate(0.85);
+  transform: scale(1.08);
 }
 
 .title-card-scrim {
@@ -1298,7 +1317,7 @@ button:disabled {
   inset: 0;
   background: linear-gradient(180deg,
     rgba(10, 8, 30, 0.55) 0%,
-    rgba(10, 8, 30, 0.35) 45%,
+    rgba(10, 8, 30, 0.4) 45%,
     rgba(10, 8, 30, 0.88) 100%
   );
 }
