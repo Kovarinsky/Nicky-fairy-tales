@@ -256,6 +256,11 @@ export default function Home() {
   const [newCharDesc, setNewCharDesc] = useState("");
   const [newCharPhotos, setNewCharPhotos] = useState<Array<{ data: string; mimeType: string; previewUrl: string }>>([]);
   const charPhotoRef = useRef<HTMLInputElement>(null);
+  // 📸 Živá fotka přímo z foťáku (capture="environment") — samostatný
+  // vstup vedle běžného výběru z galerie, protože obyčejný file input bez
+  // capture na některých telefonech/prohlížečích otevře rovnou galerii
+  // (viz Android Fotky) a fotoaparát vůbec nenabídne jako možnost.
+  const charCameraRef = useRef<HTMLInputElement>(null);
   const [topic, setTopic] = useState("");
   const [inspImages, setInspImages] = useState<InspImage[]>([]);
   const [inspUrlActive, setInspUrlActive] = useState(false);
@@ -265,6 +270,8 @@ export default function Home() {
   // Přepínač: PDF zůstává nahrané, ale dá se dočasně vypnout z generování
   const [inspPdfUse, setInspPdfUse] = useState(true);
   const inspImageRef = useRef<HTMLInputElement>(null);
+  // 📸 Živá fotka přímo z foťáku — viz komentář u charCameraRef výše.
+  const inspCameraRef = useRef<HTMLInputElement>(null);
   const inspPdfRef = useRef<HTMLInputElement>(null);
   const [sceneCount, setSceneCount] = useState(6);
   // Výběr postav a nastavení se ukládá PRŮBĚŽNĚ (dřív jen při generování —
@@ -4004,7 +4011,11 @@ export default function Home() {
               <div className="file-row">
                 <button type="button" className="outline-btn" onClick={() => charPhotoRef.current?.click()}
                   disabled={newCharPhotos.length >= MAX_CHAR_PHOTOS}>
-                  📷 {t.uploadPhoto} ({newCharPhotos.length}/{MAX_CHAR_PHOTOS})
+                  🖼️ {t.uploadPhoto} ({newCharPhotos.length}/{MAX_CHAR_PHOTOS})
+                </button>
+                <button type="button" className="outline-btn" onClick={() => charCameraRef.current?.click()}
+                  disabled={newCharPhotos.length >= MAX_CHAR_PHOTOS}>
+                  📸 {t.takePhoto}
                 </button>
               </div>
               {newCharPhotos.length > 0 && (
@@ -4021,6 +4032,14 @@ export default function Home() {
               <input ref={charPhotoRef} type="file" accept="image/*" multiple style={{ display: "none" }}
                 onChange={async e => {
                   for (const f of Array.from(e.target.files || []).slice(0, MAX_CHAR_PHOTOS - newCharPhotos.length)) await handleCharPhoto(f);
+                  e.target.value = "";
+                }} />
+              {/* 📸 capture="environment" otevře rovnou zadní fotoaparát na
+                  mobilech, místo obyčejného výběru z galerie/Fotek */}
+              <input ref={charCameraRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }}
+                onChange={async e => {
+                  const f = e.target.files?.[0];
+                  if (f && newCharPhotos.length < MAX_CHAR_PHOTOS) await handleCharPhoto(f);
                   e.target.value = "";
                 }} />
             </div>
@@ -4380,7 +4399,10 @@ export default function Home() {
             )}
             <button type="button" className={`insp-btn ${inspImages.length > 0 ? "chip-on" : ""}`}
               onClick={() => inspImageRef.current?.click()} disabled={inspImages.length >= 8}>
-              📷 {t.photoBtn}{inspImages.length > 0 ? ` (${inspImages.length})` : ""}
+              🖼️ {t.photoBtn}{inspImages.length > 0 ? ` (${inspImages.length})` : ""}
+            </button>
+            <button type="button" className="insp-btn" onClick={() => inspCameraRef.current?.click()} disabled={inspImages.length >= 8}>
+              📸 {t.takePhoto}
             </button>
             <button type="button" className={`insp-btn ${inspUrlActive ? "chip-on" : ""}`} onClick={() => setInspUrlActive(p => !p)}>🔗 {t.webBtn}</button>
             <button type="button" className={`insp-btn ${inspPdf ? "chip-on" : ""}`} onClick={() => inspPdfRef.current?.click()} disabled={pdfUploading}>
@@ -4389,6 +4411,10 @@ export default function Home() {
           </div>
           <input ref={inspImageRef} type="file" accept="image/*" multiple style={{ display: "none" }}
             onChange={async e => { for (const f of Array.from(e.target.files || []).slice(0, 8 - inspImages.length)) await handleInspImage(f); e.target.value = ""; }} />
+          {/* 📸 capture="environment" otevře rovnou zadní fotoaparát na
+              mobilech, místo obyčejného výběru z galerie/Fotek */}
+          <input ref={inspCameraRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }}
+            onChange={async e => { const f = e.target.files?.[0]; if (f && inspImages.length < 8) await handleInspImage(f); e.target.value = ""; }} />
           <input ref={inspPdfRef} type="file" accept=".pdf,application/pdf" style={{ display: "none" }}
             onChange={e => { const f = e.target.files?.[0]; if (f) handleInspPdf(f); e.target.value = ""; }} />
           {inspUrlActive && <input type="url" value={inspUrl} onChange={e => setInspUrl(e.target.value)} placeholder="https://cs.wikipedia.org/wiki/Krteček" className="url-input" />}
@@ -4656,18 +4682,22 @@ export default function Home() {
             {titleCardOpen && (
               <div className="title-card"
                 onClick={e => { e.stopPropagation(); if (scene1Ready) closeTitleCard(); }}>
-                {/* 🖼️ Podklad = ilustrace SVĚTA POZADÍ appky (stejná jako na
-                    homepage, viz bgUrlCacheRef/activeBg) — schválně JINÝ obrázek
-                    než scéna 1 (dřív to byla rozmazaná scéna 1, ale uživatel
-                    chtěl titulku jako opravdu SAMOSTATNÝ úvod/obálku, ne odvozeninu
-                    z pohádky samotné). Dostupný skoro okamžitě (homepage ho
-                    stahuje už během vyplňování formuláře), ne až po 1. scéně. */}
-                {bgUrlCacheRef.current[activeBg] && (
+                {/* 🖼️ Jakmile je hotová SKUTEČNÁ ilustrace scény 1 (s postavami
+                    z pohádky), použije se rovnou jako obálka — appka dřív
+                    schválně ukazovala jen obecné pozadí appky + ikonu knihy
+                    ("ať je titulka samostatná, ne odvozenina z pohádky"), ale
+                    to znamenalo, že úvodní obrazovka NIKDY neukázala žádný
+                    obrázek z pohádky samotné, jen prázdnou ikonu. Dokud scéna 1
+                    ještě kreslí, ukáže se aspoň obecné pozadí appky jako
+                    dočasná záplata (dostupné skoro okamžitě). */}
+                {scene1Ready && scenes[0]?.imageUrl ? (
+                  <div className="title-card-bg" style={{ backgroundImage: `url(${scenes[0].imageUrl})` }} />
+                ) : bgUrlCacheRef.current[activeBg] ? (
                   <div className="title-card-bg" style={{ backgroundImage: `url(${bgUrlCacheRef.current[activeBg]})` }} />
-                )}
+                ) : null}
                 <div className="title-card-scrim" />
                 <div className="title-card-content">
-                  <div className="title-card-emoji">📖</div>
+                  {!scene1Ready && <div className="title-card-emoji">📖</div>}
                   <div className="title-card-title">{title}</div>
                   <div className="title-card-tap">
                     {scene1Ready ? t.titleCardTap : <><span className="placeholder-spinner placeholder-spinner-sm" />{t.titleCardPreparing}</>}
