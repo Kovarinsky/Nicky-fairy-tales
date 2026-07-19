@@ -136,7 +136,12 @@ body {
   z-index: 0;
   background-image: var(--bg-img, none);
   background-size: cover;
-  background-position: center;
+  /* Ilustrace se generuje NA VÝŠKU (portrét) s Nicoláskem a Valentýnkou dole
+     ve scéně — na širokém desktopu (nízký, široký výřez) by "center" ořízlo
+     stejně shora i zdola a děti by zmizely úplně mimo záběr (viz nahlášený
+     bug: na PC "nikde nejsou vidět"). "bottom" upřednostní spodní část
+     obrázku při ořezu na všech poměrech stran, ať zůstanou vidět všude. */
+  background-position: center bottom;
   opacity: 0;
   transition: opacity 0.8s ease;
 }
