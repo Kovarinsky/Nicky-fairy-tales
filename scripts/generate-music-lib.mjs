@@ -8,11 +8,13 @@
 // Spouštěj u sebe, kde funguje síť a je ELEVENLABS_API_KEY v .env.local:
 //   npm run gen:music-lib
 //
-// Bezpečné znovuspuštění: přepíše existující soubory (pro doladění promptů).
+// Bezpečné znovuspuštění: defaultně PŘESKOČÍ soubory, co už existují (rychlé
+// a levné přidání nových položek do knihovny) — přidej `--force`, chceš-li
+// přegenerovat i ty stávající (např. při doladění promptu).
 // Cena je jednorázová (ne za pohádku) — Music API ~$0.15/min, Sound Effects
 // řádově centy za klip; celá knihovna vyjde na pár dolarů celkem.
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, statSync, mkdirSync } from "node:fs";
 
 function loadEnv() {
   for (const file of [".env.local", ".env"]) {
@@ -41,6 +43,14 @@ if (!KEY) {
 const headers = { "xi-api-key": KEY, "Content-Type": "application/json" };
 const OUT_DIR = "public/music-lib";
 mkdirSync(OUT_DIR, { recursive: true });
+
+// Výchozí: přeskoč soubory, co už existují (šetří čas i peníze při přidávání
+// NOVÝCH položek do knihovny). --force přegeneruje úplně všechno (pro
+// doladění existujících promptů).
+const FORCE = process.argv.includes("--force");
+function shouldSkip(path) {
+  return !FORCE && existsSync(path);
+}
 
 async function withRetry(fn, label) {
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -102,6 +112,59 @@ const FANFARES = {
   "intro-night": { prompt: "Short gentle dreamy opening phrase, soft rising bells and warm pad, hushed starry opening for a children's bedtime story, instrumental", ms: 6000 },
   "intro-adventure": { prompt: "Short bold adventurous fanfare, rising brass and strings flourish, energetic and hopeful opening for a children's storybook, instrumental", ms: 6000 },
   "intro-cozy": { prompt: "Short warm gentle opening phrase, soft rising piano and strings flourish, homely and comforting opening for a children's storybook, instrumental", ms: 6000 },
+};
+
+// ── 🎺 Intro podle SVĚTA/TÉMATU pohádky (Krteček, Autíčka, konkrétní pohádka…) ─
+// Přednost před náladou scény (viz AmbientPlayer.playIntro) — appka je zkusí
+// jako `intro-theme-<id>`, id musí sedět s lib/themes.ts (THEMES) / lib/folk-
+// tales.ts (FOLK_TALES). Původní instrumentální nálada, NIKDY doslovná melodie
+// známé znělky (copyright) — jen žánr/energie/nástroje odpovídající světu.
+// Vlastní (fotka/popis) svět zde záměrně NENÍ — nejde předem vyrobit pevný
+// soubor, appka se sama přehodí na náladu 1. scény.
+const THEME_INTROS = {
+  krtek: "Short gentle whimsical woodland fanfare, soft flute and pizzicato strings, playful and kind, instrumental",
+  "paw-patrol": "Short upbeat heroic rescue-team fanfare, bright brass and light percussion, energetic and friendly, instrumental",
+  krkonose: "Short majestic folk mountain fanfare, warm horns and a folk fiddle flourish, grand and kind, instrumental",
+  mickey: "Short cheerful classic cartoon fanfare, bouncy clarinet and pizzicato strings, playful and bright, instrumental",
+  dinosauri: "Short gentle prehistoric adventure fanfare, deep warm brass and soft mallet percussion, curious and friendly, instrumental",
+  vesmir: "Short sparkling space adventure fanfare, shimmering bells and rising strings, wondrous and hopeful, instrumental",
+  pokemon: "Short cheerful adventurous fanfare, bright bells and playful strings, friendly and energetic, instrumental",
+  sonic: "Short fast bright energetic fanfare, playful arpeggio and light percussion, upbeat and fun, instrumental",
+  auticka: "Short peppy revving fanfare, playful brass with a light engine-like rhythmic pulse, fun and energetic, instrumental",
+  folk_karkulka: "Short gentle forest fairytale fanfare, soft strings and woodwind, warm and a little mysterious, instrumental",
+  folk_chaloupka: "Short playful sweet fairytale fanfare, twinkling bells and light woodwind, whimsical and cozy, instrumental",
+  folk_popelka: "Short elegant royal ball fanfare, sparkling strings and harp, graceful and magical, instrumental",
+  folk_ruzenka: "Short dreamy enchanted fanfare, soft harp and slow strings, magical and gentle, instrumental",
+  folk_snehurka: "Short warm woodland fairytale fanfare, gentle bells and soft strings, kind and magical, instrumental",
+  folk_zlatovlaska: "Short golden fairytale fanfare, shimmering harp and warm strings, regal and magical, instrumental",
+  folk_dlouhy: "Short jolly heroic folk fanfare, playful brass and strings, adventurous and funny, instrumental",
+  folk_vsevedy: "Short warm golden journey fanfare, rising strings and gentle brass, hopeful and grand, instrumental",
+  folk_smolicek: "Short gentle forest fanfare, soft flute and pizzicato strings, tender and magical, instrumental",
+  folk_budulinek: "Short playful folksy fanfare, cheerful fiddle and light strings, cozy and mischievous, instrumental",
+  folk_kobli: "Short bouncy playful fanfare, cheerful woodwind and pizzicato strings, cheeky and fun, instrumental",
+  folk_repa: "Short jolly village fanfare, warm folk strings and light percussion, cheerful and communal, instrumental",
+  folk_hrnecek: "Short cozy village fanfare, playful woodwind and warm strings, gentle and humorous, instrumental",
+  folk_mesicky: "Short magical seasonal fanfare, warm strings and soft bells, wondrous and gentle, instrumental",
+  folk_kaca: "Short comic folk dance fanfare, playful fiddle and accordion-like strings, cheeky and fun, instrumental",
+  folk_otesanek: "Short comic folksy fanfare, bouncy woodwind and pizzicato strings, playful and warm, instrumental",
+  folk_sul: "Short stately royal fanfare, warm brass and strings, dignified and gentle, instrumental",
+  folk_honza: "Short cheerful road fanfare, playful strings and light brass, warm and hopeful, instrumental",
+  folk_palecek: "Short tiny playful fanfare, light pizzicato strings and soft bells, whimsical and nimble, instrumental",
+  folk_obusek: "Short comic folk justice fanfare, jaunty strings and brass, playful and triumphant, instrumental",
+  folk_petrovsti: "Short playful animal-friends fanfare, warm strings and light woodwind, cozy and cheerful, instrumental",
+  folk_kocour: "Short elegant clever-trickster fanfare, playful strings and light brass, witty and grand, instrumental",
+  folk_kralovna: "Short icy magical fanfare, shimmering bells and cold strings, wondrous and gentle, instrumental",
+  folk_kacatko: "Short tender seasonal fanfare, soft strings and gentle woodwind, warm and hopeful, instrumental",
+  folk_saty: "Short comic royal parade fanfare, playful brass and strings, cheeky and grand, instrumental",
+  folk_hrasek: "Short cozy royal fanfare, gentle strings and soft harp, warm and playful, instrumental",
+  folk_vila: "Short dreamy underwater fanfare, shimmering harp and flowing strings, magical and gentle, instrumental",
+  folk_malenka: "Short tiny delicate fanfare, soft strings and light bells, gentle and whimsical, instrumental",
+  folk_vojacek: "Short brave toy-soldier fanfare, playful marching brass and light percussion, warm and gentle, instrumental",
+  folk_labute: "Short graceful swan fanfare, soft strings and gentle harp, tender and hopeful, instrumental",
+  folk_slavik: "Short delicate songbird fanfare, soft flute and gentle strings, tender and warm, instrumental",
+  folk_kufr: "Short whimsical flying-adventure fanfare, playful strings and light brass, magical and warm, instrumental",
+  folk_kuzlatka: "Short cozy protective fanfare, warm strings and soft woodwind, gentle and reassuring, instrumental",
+  folk_muzikanti: "Short jaunty animal-band fanfare, playful strings and brass, warm and comic, instrumental",
 };
 
 // ── 🎼 Stingery — krátká kadence na konci KAŽDÉ scény, jedna na náladu ────
@@ -175,29 +238,46 @@ async function main() {
 
   console.log(`🎼 Nálady (${Object.keys(SOUNDSCAPES).length})`);
   for (const [key, prompt] of Object.entries(SOUNDSCAPES)) {
+    const path = `${OUT_DIR}/soundscape-${key}.mp3`;
+    if (shouldSkip(path)) { manifest[`soundscape-${key}`] = statSync(path).size; console.log(`   ⏭️  ${key} (už existuje)`); continue; }
     const buf = await withRetry(() => composeMusic(prompt, 24000), `soundscape:${key}`);
-    if (buf) { writeFileSync(`${OUT_DIR}/soundscape-${key}.mp3`, buf); manifest[`soundscape-${key}`] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
+    if (buf) { writeFileSync(path, buf); manifest[`soundscape-${key}`] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
     else fail++;
   }
 
   console.log(`🎺 Intro/outro`);
   for (const [key, { prompt, ms }] of Object.entries(FANFARES)) {
+    const path = `${OUT_DIR}/${key}.mp3`;
+    if (shouldSkip(path)) { manifest[key] = statSync(path).size; console.log(`   ⏭️  ${key} (už existuje)`); continue; }
     const buf = await withRetry(() => composeMusic(prompt, ms), key);
-    if (buf) { writeFileSync(`${OUT_DIR}/${key}.mp3`, buf); manifest[key] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
+    if (buf) { writeFileSync(path, buf); manifest[key] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
+    else fail++;
+  }
+
+  console.log(`🎺 Intro podle světa/tématu (${Object.keys(THEME_INTROS).length})`);
+  for (const [key, prompt] of Object.entries(THEME_INTROS)) {
+    const path = `${OUT_DIR}/intro-theme-${key}.mp3`;
+    if (shouldSkip(path)) { manifest[`intro-theme-${key}`] = statSync(path).size; console.log(`   ⏭️  ${key} (už existuje)`); continue; }
+    const buf = await withRetry(() => composeMusic(prompt, 6000), `intro-theme:${key}`);
+    if (buf) { writeFileSync(path, buf); manifest[`intro-theme-${key}`] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
     else fail++;
   }
 
   console.log(`🎼 Stingery (${Object.keys(STINGERS).length})`);
   for (const [key, prompt] of Object.entries(STINGERS)) {
+    const path = `${OUT_DIR}/stinger-${key}.mp3`;
+    if (shouldSkip(path)) { manifest[`stinger-${key}`] = statSync(path).size; console.log(`   ⏭️  ${key} (už existuje)`); continue; }
     const buf = await withRetry(() => composeMusic(prompt, 3000), `stinger:${key}`);
-    if (buf) { writeFileSync(`${OUT_DIR}/stinger-${key}.mp3`, buf); manifest[`stinger-${key}`] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
+    if (buf) { writeFileSync(path, buf); manifest[`stinger-${key}`] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
     else fail++;
   }
 
   console.log(`🔊 Zvukové efekty (${Object.keys(SFX).length})`);
   for (const [key, [text, dur, loop]] of Object.entries(SFX)) {
+    const path = `${OUT_DIR}/sfx-${key}.mp3`;
+    if (shouldSkip(path)) { manifest[`sfx-${key}`] = statSync(path).size; console.log(`   ⏭️  ${key} (už existuje)`); continue; }
     const buf = await withRetry(() => generateSfx(text, dur, loop), `sfx:${key}`);
-    if (buf) { writeFileSync(`${OUT_DIR}/sfx-${key}.mp3`, buf); manifest[`sfx-${key}`] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
+    if (buf) { writeFileSync(path, buf); manifest[`sfx-${key}`] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
     else fail++;
     await new Promise(r => setTimeout(r, 300)); // šetrné tempo k API
   }

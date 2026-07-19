@@ -846,20 +846,32 @@ export class AmbientPlayer {
    *  jen-mokrou reverb cestu, viz v4.49 zjištění u sfx) — ať je náběh
    *  OPRAVDU slyšet, ne jen tichý rozmazaný dozvuk. Jemný dotek `rev`
    *  navrch pro dozvuk/lesk, ne jako jediná cesta ven. */
-  /** 🎺 Úvodní fanfára — zkusí nahrávku LADĚNOU podle prostředí první scény
-   *  (public/music-lib/intro-<scene>.mp3), pak obecnou (intro.mp3), při
-   *  chybě spadne na procedurální syntézu níže. */
-  playIntro(scene?: Soundscape): void {
+  /** 🎺 Úvodní fanfára — zkusí PŘEDNOSTNĚ nahrávku LADĚNOU podle vybraného
+   *  SVĚTA/TÉMATU pohádky (public/music-lib/intro-theme-<themeKey>.mp3 —
+   *  Krteček, Autíčka, konkrétní pohádka…), pak podle nálady první scény
+   *  (intro-<scene>.mp3), pak obecnou (intro.mp3), při chybě nakonec spadne
+   *  na procedurální syntézu níže. `themeKey` je `undefined` pro vlastní
+   *  (fotka/popis) nebo žádný svět — tam nejde předem vyrobit pevný soubor,
+   *  takže se rovnou přeskočí na nálad-podle-scény. */
+  playIntro(scene?: Soundscape, themeKey?: string): void {
     const { ctx } = this.setup();
     ctx.resume();
     const fx = this.effectGain!;
-    this.loadBuffer(ctx, `intro-${scene || "magic"}`).then(buf => {
+    const byMood = () => this.loadBuffer(ctx, `intro-${scene || "magic"}`).then(buf => {
       if (buf) { this.playOneShot(ctx, buf, fx); return; }
       this.loadBuffer(ctx, "intro").then(buf2 => {
         if (buf2) this.playOneShot(ctx, buf2, fx);
         else this.playIntroSynth();
       });
     });
+    if (themeKey) {
+      this.loadBuffer(ctx, `intro-theme-${themeKey}`).then(buf => {
+        if (buf) this.playOneShot(ctx, buf, fx);
+        else byMood();
+      });
+    } else {
+      byMood();
+    }
   }
 
   private playIntroSynth(): void {

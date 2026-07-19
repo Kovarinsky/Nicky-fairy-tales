@@ -8,6 +8,7 @@ import { APP_VERSION } from "@/lib/version";
 import { UI, UI_LANG_KEY, type UILang } from "@/lib/i18n";
 import { BG_SCENES, bgSceneById, THEME_BG } from "@/lib/backgrounds";
 import { FOLK_TALES, folkTaleById } from "@/lib/folk-tales";
+import { THEMES } from "@/lib/themes";
 import { upload as uploadToBlob } from "@vercel/blob/client";
 
 // ── Local types ─────────────────────────────────────────────────────────────
@@ -1019,14 +1020,19 @@ export default function Home() {
   }, [page, bookReady, scenes]);
 
 
-  // Intro fanfare when reader opens
+  // Intro fanfare when reader opens — dá přednost tématu SVĚTA (Krteček,
+  // Autíčka, konkrétní pohádka…) před náladou 1. scény; vlastní/žádný svět
+  // (bez pevného souboru) se sám přehodí na náladu uvnitř AmbientPlayer.
   const introFiredRef = useRef(false);
   useEffect(() => {
     if (!bookReady || introFiredRef.current) return;
     introFiredRef.current = true;
-    if (musicOn) ambientRef.current?.playIntro(scenes[0]?.soundscape);
+    const themeAudioKey = (THEMES.some(t => t.id === selectedTheme) || FOLK_TALES.some(t => t.id === selectedTheme))
+      ? selectedTheme
+      : undefined;
+    if (musicOn) ambientRef.current?.playIntro(scenes[0]?.soundscape, themeAudioKey);
     ambientRef.current?.setScene(scenes[0]?.soundscape);
-  }, [bookReady, viewMode, scenes, musicOn]);
+  }, [bookReady, viewMode, scenes, musicOn, selectedTheme]);
 
   // Reset intro flag when new story starts
   useEffect(() => {
