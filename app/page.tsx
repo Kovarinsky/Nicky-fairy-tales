@@ -1024,7 +1024,7 @@ export default function Home() {
   useEffect(() => {
     if (!bookReady || introFiredRef.current) return;
     introFiredRef.current = true;
-    if (musicOn) ambientRef.current?.playIntro();
+    if (musicOn) ambientRef.current?.playIntro(scenes[0]?.soundscape);
     ambientRef.current?.setScene(scenes[0]?.soundscape);
   }, [bookReady, viewMode, scenes, musicOn]);
 
@@ -1144,6 +1144,12 @@ export default function Home() {
       document.removeEventListener("fullscreenchange", onChange);
     };
   }, []);
+
+  // 🌙 Hudba se ztiší a přejde do usínací podkresové smyčky, jakmile se
+  // zobrazí titulky — zůstane hrát jako tichá uklidňující melodie.
+  useEffect(() => {
+    if (showCredits) ambientRef.current?.enterSleepMode();
+  }, [showCredits]);
 
   // Spoken "good night" when the credits roll at the end of the story
   useEffect(() => {

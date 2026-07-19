@@ -569,6 +569,85 @@ function playGlassClink(ctx: AudioContext, dest: AudioNode): void {
   pingTone(ctx, dest, [2100, 3150], 0.4, 0.1);
 }
 
+// ── 🎻 Nástroje / předměty (fallback syntéza, dokud/pokud reálný klip chybí) ─
+
+function melody(ctx: AudioContext, dest: AudioNode, freqs: number[], o: { type?: OscillatorType; dur: number; gain: number; gap: number; filterFreq?: number }): void {
+  freqs.forEach((f, i) => voiceTone(ctx, dest, { freqStart: f, freqEnd: f, dur: o.dur, gain: o.gain, type: o.type || "sine", filterFreq: o.filterFreq, delay: i * o.gap }));
+}
+
+function playViolin(ctx: AudioContext, dest: AudioNode): void {
+  melody(ctx, dest, [392.00, 440.00, 493.88, 440.00], { type: "sawtooth", dur: 0.4, gain: 0.15, gap: 0.19, filterFreq: 3200 });
+}
+
+function playPiano(ctx: AudioContext, dest: AudioNode): void {
+  melody(ctx, dest, [523.25, 659.25, 783.99], { type: "triangle", dur: 0.55, gain: 0.18, gap: 0.16, filterFreq: 4200 });
+}
+
+function playGuitar(ctx: AudioContext, dest: AudioNode): void {
+  pingTone(ctx, dest, [196.00, 246.94, 293.66], 1.1, 0.13);
+  pingTone(ctx, dest, [196.00, 246.94, 293.66], 0.8, 0.08, 0.5);
+}
+
+function playFlute(ctx: AudioContext, dest: AudioNode): void {
+  melody(ctx, dest, [523.25, 587.33, 659.25, 783.99], { type: "sine", dur: 0.42, gain: 0.14, gap: 0.21, filterFreq: 2600 });
+}
+
+function playDrum(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  [0, 0.28, 0.42, 0.7].forEach(d => noiseBurst(ctx, dest, noiseBuf, { filterType: "lowpass", freq: 140, dur: 0.14, gain: 0.22, delay: d }));
+}
+
+function playTrumpet(ctx: AudioContext, dest: AudioNode): void {
+  melody(ctx, dest, [523.25, 659.25, 783.99], { type: "sawtooth", dur: 0.4, gain: 0.2, gap: 0.16, filterFreq: 2200 });
+}
+
+function playHarp(ctx: AudioContext, dest: AudioNode): void {
+  [261.63, 329.63, 392.00, 523.25, 659.25].forEach((f, i) => pingTone(ctx, dest, [f], 0.9, 0.11, i * 0.06));
+}
+
+function playAccordion(ctx: AudioContext, dest: AudioNode): void {
+  melody(ctx, dest, [293.66, 349.23, 392.00], { type: "sawtooth", dur: 0.45, gain: 0.15, gap: 0.2, filterFreq: 1500 });
+}
+
+function playXylophone(ctx: AudioContext, dest: AudioNode): void {
+  [783.99, 880.00, 987.77, 880.00].forEach((f, i) => pingTone(ctx, dest, [f], 0.3, 0.12, i * 0.12));
+}
+
+function playMusicBox(ctx: AudioContext, dest: AudioNode): void {
+  [523.25, 659.25, 783.99, 1046.50].forEach((f, i) => pingTone(ctx, dest, [f], 1.0, 0.08, i * 0.28));
+}
+
+function playTambourine(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  [0, 0.1, 0.2, 0.32].forEach(d => noiseBurst(ctx, dest, noiseBuf, { filterType: "highpass", freq: 4500, dur: 0.08, gain: 0.09, delay: d }));
+}
+
+function playHarmonica(ctx: AudioContext, dest: AudioNode): void {
+  melody(ctx, dest, [392.00, 440.00, 392.00], { type: "sawtooth", dur: 0.35, gain: 0.16, gap: 0.22, filterFreq: 1800 });
+}
+
+function playBellRing(ctx: AudioContext, dest: AudioNode): void {
+  pingTone(ctx, dest, [880.00, 1760.00], 1.6, 0.14);
+}
+
+function playPageTurn(ctx: AudioContext, dest: AudioNode): void {
+  crackle(ctx, dest);
+  setTimeout(() => crackle(ctx, dest), 90);
+}
+
+function playKeyTurn(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  noiseBurst(ctx, dest, noiseBuf, { filterType: "bandpass", freq: 2600, Q: 3, dur: 0.12, gain: 0.14 });
+  noiseBurst(ctx, dest, noiseBuf, { filterType: "bandpass", freq: 1800, Q: 3, dur: 0.1, gain: 0.1, delay: 0.18 });
+}
+
+function playSwordClash(ctx: AudioContext, dest: AudioNode, noiseBuf: AudioBuffer): void {
+  noiseBurst(ctx, dest, noiseBuf, { filterType: "bandpass", freq: 3200, Q: 9, dur: 0.4, gain: 0.22 });
+  noiseBurst(ctx, dest, noiseBuf, { filterType: "highpass", freq: 5000, dur: 0.15, gain: 0.1 });
+}
+
+function playWhistle(ctx: AudioContext, dest: AudioNode): void {
+  voiceTone(ctx, dest, { freqStart: 700, freqEnd: 950, dur: 0.3, gain: 0.15, type: "sine" });
+  voiceTone(ctx, dest, { freqStart: 950, freqEnd: 750, dur: 0.35, gain: 0.14, type: "sine", delay: 0.32 });
+}
+
 // ── ✨ Náladové akcenty ─────────────────────────────────────────────────────
 
 function playMagicChime(ctx: AudioContext, dest: AudioNode): void {
@@ -705,14 +784,18 @@ export class AmbientPlayer {
    *  dosavadní procedurální syntézu — gain uzel vzniká hned synchronně
    *  (kvůli plynulému crossfade), zdroj zvuku se do něj zapojí, jakmile
    *  je hotový (buffer je po prvním načtení instantně z cache). */
-  private buildLayer(scene: Soundscape, ctx: AudioContext, rev: GainNode): Layer {
+  /** Obecná stavba smyčkovatelné vrstvy podle libovolného souborového klíče —
+   *  sdíleno mezi per-scénovými náladami (soundscape-<scene>) a samostatnou
+   *  usínací podkresovou smyčkou pro titulky (soundscape-lullaby, viz
+   *  enterSleepMode), ať obě používají stejný fetch+cache+fallback mechanismus. */
+  private buildLayerByKey(fileKey: string, fallback: (ctx: AudioContext, gain: GainNode, rev: GainNode) => Cleanup, ctx: AudioContext, rev: GainNode): Layer {
     const gain = ctx.createGain();
     gain.gain.value = 0;
     gain.connect(this.master!);
 
     let cancelled = false;
     let cleanup: Cleanup = () => {};
-    this.loadBuffer(ctx, `soundscape-${scene}`).then(buf => {
+    this.loadBuffer(ctx, fileKey).then(buf => {
       if (cancelled) return;
       if (buf) {
         const src = ctx.createBufferSource();
@@ -722,28 +805,37 @@ export class AmbientPlayer {
         src.start();
         cleanup = () => { try { src.stop(); } catch { /* already stopped */ } };
       } else {
-        cleanup = this.buildProceduralLayer(scene, ctx, gain, rev);
+        cleanup = fallback(ctx, gain, rev);
       }
     });
     return { gain, cleanup: () => { cancelled = true; cleanup(); } };
   }
 
-  private crossfade(next: Soundscape): void {
-    const { ctx, rev } = this.setup();
+  private buildLayer(scene: Soundscape, ctx: AudioContext, rev: GainNode): Layer {
+    return this.buildLayerByKey(`soundscape-${scene}`, (c, g, r) => this.buildProceduralLayer(scene, c, g, r), ctx, rev);
+  }
+
+  /** Crossfade z aktuální vrstvy (pokud existuje) do už připravené `newLayer`
+   *  — sdíleno mezi setScene (nálada podle scény) a enterSleepMode (přechod
+   *  do usínací smyčky pro titulky), jen s jinými časy prolnutí. */
+  private crossfadeToLayer(newLayer: Layer, fadeOutSec = 0.4, fadeInSec = 0.5): void {
+    const { ctx } = this.setup();
     const t = ctx.currentTime;
 
-    // Fade out + destroy old layer
     if (this.layer) {
       const old = this.layer;
-      old.gain.gain.setTargetAtTime(0, t, 0.4);
-      setTimeout(() => old.cleanup(), 2500);
+      old.gain.gain.setTargetAtTime(0, t, fadeOutSec);
+      setTimeout(() => old.cleanup(), fadeOutSec * 6000);
     }
 
-    // Build + fade in new layer
-    const newLayer = this.buildLayer(next, ctx, rev);
     newLayer.gain.gain.setValueAtTime(0, t);
-    newLayer.gain.gain.setTargetAtTime(1, t + 0.05, 0.5);
+    newLayer.gain.gain.setTargetAtTime(1, t + 0.05, fadeInSec);
     this.layer = newLayer;
+  }
+
+  private crossfade(next: Soundscape): void {
+    const { ctx, rev } = this.setup();
+    this.crossfadeToLayer(this.buildLayer(next, ctx, rev));
   }
 
   // ── Public API ──────────────────────────────────────────────────────────────
@@ -754,15 +846,19 @@ export class AmbientPlayer {
    *  jen-mokrou reverb cestu, viz v4.49 zjištění u sfx) — ať je náběh
    *  OPRAVDU slyšet, ne jen tichý rozmazaný dozvuk. Jemný dotek `rev`
    *  navrch pro dozvuk/lesk, ne jako jediná cesta ven. */
-  /** 🎺 Úvodní fanfára — zkusí reálnou nahrávku (public/music-lib/intro.mp3),
-   *  při chybě spadne na procedurální syntézu níže. */
-  playIntro(): void {
+  /** 🎺 Úvodní fanfára — zkusí nahrávku LADĚNOU podle prostředí první scény
+   *  (public/music-lib/intro-<scene>.mp3), pak obecnou (intro.mp3), při
+   *  chybě spadne na procedurální syntézu níže. */
+  playIntro(scene?: Soundscape): void {
     const { ctx } = this.setup();
     ctx.resume();
     const fx = this.effectGain!;
-    this.loadBuffer(ctx, "intro").then(buf => {
-      if (buf) this.playOneShot(ctx, buf, fx);
-      else this.playIntroSynth();
+    this.loadBuffer(ctx, `intro-${scene || "magic"}`).then(buf => {
+      if (buf) { this.playOneShot(ctx, buf, fx); return; }
+      this.loadBuffer(ctx, "intro").then(buf2 => {
+        if (buf2) this.playOneShot(ctx, buf2, fx);
+        else this.playIntroSynth();
+      });
     });
   }
 
@@ -871,6 +967,24 @@ export class AmbientPlayer {
       case "laugh":      playLaugh(ctx, fx); break;
       case "splash":     playSplash(ctx, fx, nb()); break;
       case "glass_clink": playGlassClink(ctx, fx); break;
+      // 🎻 nástroje/předměty
+      case "violin":     playViolin(ctx, fx); break;
+      case "piano":      playPiano(ctx, fx); break;
+      case "guitar":     playGuitar(ctx, fx); break;
+      case "flute":      playFlute(ctx, fx); break;
+      case "drum":       playDrum(ctx, fx, nb()); break;
+      case "trumpet":    playTrumpet(ctx, fx); break;
+      case "harp":       playHarp(ctx, fx); break;
+      case "accordion":  playAccordion(ctx, fx); break;
+      case "xylophone":  playXylophone(ctx, fx); break;
+      case "music_box":  playMusicBox(ctx, fx); break;
+      case "tambourine": playTambourine(ctx, fx, nb()); break;
+      case "harmonica":  playHarmonica(ctx, fx); break;
+      case "bell_ring":  playBellRing(ctx, fx); break;
+      case "page_turn":  playPageTurn(ctx, fx); break;
+      case "key_turn":   playKeyTurn(ctx, fx, nb()); break;
+      case "sword_clash": playSwordClash(ctx, fx, nb()); break;
+      case "whistle":    playWhistle(ctx, fx); break;
       // ✨ náladové akcenty
       case "magic_chime": playMagicChime(ctx, fx); break;
       case "triumphant":  playTriumphant(ctx, fx); break;
@@ -987,6 +1101,20 @@ export class AmbientPlayer {
       osc.start(t);
       osc.stop(t + 1.0);
     });
+  }
+
+  /** 🌙 Přechod do klidového režimu pro závěrečné titulky: aktuální nálada
+   *  se ztlumí a plynule vymění za samostatnou usínací podkresovou smyčku
+   *  (public/music-lib/soundscape-lullaby.mp3, fallback na buildCozy) a
+   *  celková hlasitost se navíc sníží — hudba tak ZŮSTANE hrát, jen jako
+   *  tichá uklidňující melodie, dokud titulky běží. Volat jednou, když se
+   *  titulky zobrazí. */
+  enterSleepMode(): void {
+    if (!this.running) return;
+    const { ctx, rev } = this.setup();
+    const newLayer = this.buildLayerByKey("soundscape-lullaby", (c, g, r) => buildCozy(c, g, r), ctx, rev);
+    this.crossfadeToLayer(newLayer, 1.2, 2.0);
+    this.master?.gain.setTargetAtTime(this.vol * 0.55, ctx.currentTime, 1.5);
   }
 
   /** Switch soundscape — smooth crossfade; ignored when muted */

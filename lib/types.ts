@@ -59,6 +59,10 @@ export type SoundEffect =
   | "car_engine" | "train" | "boat_horn" | "clock_tick" | "doorbell" | "phone_ring"
   // 🙋 lidé/akce
   | "footsteps" | "applause" | "laugh" | "splash" | "glass_clink"
+  // 🎻 nástroje/předměty, kterými se v ději právě zahraje/manipuluje
+  | "violin" | "piano" | "guitar" | "flute" | "drum" | "trumpet" | "harp" | "accordion"
+  | "xylophone" | "music_box" | "tambourine" | "harmonica" | "bell_ring"
+  | "page_turn" | "key_turn" | "sword_clash" | "whistle"
   // ✨ náladové akcenty
   | "magic_chime" | "triumphant" | "tense_sting" | "sad_tone"
   // 😴 ostatní

@@ -84,12 +84,24 @@ const SOUNDSCAPES = {
   night: "Calm nighttime lullaby ambient music loop, soft dreamy pad, slow gentle bells, cozy and soothing, no drums, seamless loop, instrumental",
   adventure: "Adventurous storybook orchestral music loop, light rhythmic pulse, hopeful and energetic, playful brass and strings, seamless loop, instrumental",
   cozy: "Warm cozy fireside music loop, soft acoustic guitar and piano, gentle and comforting, seamless loop, instrumental",
+  // 🌙 NENÍ vybíratelná scénová nálada (Scene.soundscape) — hraje jen pod
+  // závěrečnými titulky (AmbientPlayer.enterSleepMode), samostatný soubor
+  // soundscape-lullaby.mp3, proto v tomto configu, ne v app/lib/types.ts.
+  lullaby: "Very gentle sleepy lullaby ambient music loop, soft solo music box and hushed strings, minimal, slow and deeply calming, no drums, seamless loop, instrumental",
 };
 
 // ── 🎺 Intro/outro — jednou na celou pohádku ──────────────────────────────
 const FANFARES = {
   intro: { prompt: "Short triumphant magical fanfare, rising sparkling orchestral flourish, joyful opening for a children's storybook, instrumental", ms: 6000 },
   outro: { prompt: "Short gentle descending lullaby melody, warm resolving orchestral chord, sleepy and peaceful ending for a children's bedtime story, instrumental", ms: 8000 },
+  // 🎺 Úvodní fanfáry LADĚNÉ podle prostředí první scény (viz AmbientPlayer.
+  // playIntro) — appka zkusí intro-<scene> první, "intro" výše je jen obecný
+  // záchranný fallback, kdyby konkrétní varianta chyběla/selhala.
+  "intro-magic": { prompt: "Short triumphant magical fanfare, rising sparkling orchestral flourish, joyful and wondrous opening for a children's storybook, instrumental", ms: 6000 },
+  "intro-forest": { prompt: "Short cheerful woodland fanfare, rising acoustic flourish with light woodwind and strings, fresh outdoorsy opening for a children's storybook, instrumental", ms: 6000 },
+  "intro-night": { prompt: "Short gentle dreamy opening phrase, soft rising bells and warm pad, hushed starry opening for a children's bedtime story, instrumental", ms: 6000 },
+  "intro-adventure": { prompt: "Short bold adventurous fanfare, rising brass and strings flourish, energetic and hopeful opening for a children's storybook, instrumental", ms: 6000 },
+  "intro-cozy": { prompt: "Short warm gentle opening phrase, soft rising piano and strings flourish, homely and comforting opening for a children's storybook, instrumental", ms: 6000 },
 };
 
 // ── 🎼 Stingery — krátká kadence na konci KAŽDÉ scény, jedna na náladu ────
@@ -136,6 +148,25 @@ const SFX = {
   tense_sting: ["a short suspenseful dramatic musical sting, sudden tension", 1.0, false],
   sad_tone: ["a short sorrowful gentle musical tone, tender and sad", 1.5, false],
   snore: ["a person gently snoring twice, sleeping", 2.0, false],
+  // 🎻 nástroje/předměty — obecný "masterprompt" pokrývá jakýkoli konkrétní
+  // nástroj/objekt, kterým se v ději právě zahraje/manipuluje (viz lib/claude.ts)
+  violin: ["a short cheerful violin melody being played, a simple folk tune", 3.0, false],
+  piano: ["a short cheerful piano melody, a few notes played", 2.5, false],
+  guitar: ["a short acoustic guitar strum, a couple of gentle chords", 2.5, false],
+  flute: ["a short playful flute melody, a few notes", 2.5, false],
+  drum: ["a few simple drum beats, a short rhythmic pattern", 1.5, false],
+  trumpet: ["a short cheerful trumpet fanfare, a few notes", 2.0, false],
+  harp: ["a short gentle harp glissando, a few plucked notes rising", 2.0, false],
+  accordion: ["a short cheerful accordion melody, a folk dance tune", 2.5, false],
+  xylophone: ["a short playful xylophone melody, a few bright notes", 2.0, false],
+  music_box: ["a delicate music box melody, a few tinkling notes", 2.5, false],
+  tambourine: ["a tambourine shaking and jingling briefly", 1.5, false],
+  harmonica: ["a short cheerful harmonica melody, a few notes", 2.5, false],
+  bell_ring: ["a single clear hand bell ringing once", 1.5, false],
+  page_turn: ["a book page turning, a soft paper rustle", 1.0, false],
+  key_turn: ["a metal key turning in a lock, a single click", 1.0, false],
+  sword_clash: ["two swords clashing together once, a metallic clang", 1.0, false],
+  whistle: ["a person whistling a short cheerful tune", 2.0, false],
 };
 
 async function main() {
