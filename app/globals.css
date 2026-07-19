@@ -1133,6 +1133,12 @@ button:disabled {
   .reader-mode .ctrls-open .book-controls {
     transform: translateX(0);
   }
+  /* Šipky navigace: panel se v landscape/fullscreen přesunul na PRAVÝ okraj
+     jako svislý sloupec (116px, viz .book-controls výše) — šipka doprava se
+     proto musí posunout stranou, jinak by se s panelem překrývala. */
+  .reader-mode .book-nav {
+    right: 132px;
+  }
   .reader-mode .ctrl-cell {
     min-height: 0;
     font-size: 0.7rem;
