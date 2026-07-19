@@ -135,13 +135,16 @@ body {
   inset: 0;
   z-index: 0;
   background-image: var(--bg-img, none);
-  background-size: cover;
-  /* Ilustrace se generuje NA VÝŠKU (portrét) s Nicoláskem a Valentýnkou dole
-     ve scéně — na širokém desktopu (nízký, široký výřez) by "center" ořízlo
-     stejně shora i zdola a děti by zmizely úplně mimo záběr (viz nahlášený
-     bug: na PC "nikde nejsou vidět"). "bottom" upřednostní spodní část
-     obrázku při ořezu na všech poměrech stran, ať zůstanou vidět všude. */
-  background-position: center bottom;
+  /* Ilustrace se generuje NA VÝŠKU (portrét) — na širokém/nízkém výřezu
+     (PC monitor) by "cover" ať s jakoukoli pozicí VŽDY něco oříznul (viz dvě
+     dřívější nahlášené varianty bugu: "center" schovalo děti úplně mimo
+     záběr, "bottom" zase uřízlo hlavy). "contain" zobrazí CELÝ obrázek
+     zmenšený tak, aby se vešel na KAŽDÉ rozlišení/monitor beze ztráty —
+     případné pruhy po stranách/nahoře-dole vyplní barevný gradient scény
+     pod touhle vrstvou (viz :root[data-bg="…"] .photo-bg níž). */
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
   opacity: 0;
   transition: opacity 0.8s ease;
 }
