@@ -1,6 +1,11 @@
-// Browser-only: procedural ambient music via Web Audio API.
-// No external files. Each Soundscape has its own synthesis layer.
-// Layers crossfade over ~1.5s when the scene changes.
+// Browser-only ambient music/sfx via Web Audio API.
+// Prefers REAL produced audio from ElevenLabs Music/Sound Effects
+// (public/music-lib/*.mp3, see scripts/generate-music-lib.mjs) — buffers are
+// fetched + decoded once and cached, then looped/one-shot via Web Audio nodes
+// so the existing crossfade/ducking/volume graph applies unchanged. Every
+// call site keeps a fallback to the ORIGINAL procedural synthesis below
+// (oscillators, no files) in case a file is missing or fails to load —
+// appka must never go silent just because a music file 404s.
 
 import type { Soundscape, SoundEffect } from "./types";
 export type { Soundscape, SoundEffect };
@@ -605,6 +610,30 @@ export class AmbientPlayer {
   private running = false;
   private vol = 0.22;
   private readonly EFFECT_VOL = 0.34;
+  // 🎧 Reálné soubory (public/music-lib/<key>.mp3) — fetch+decode JEDNOU,
+  // dál se jen přehrává z cache. Promise samo funguje jako "in-flight" zámek
+  // (souběžné volání téhož klíče nezpůsobí druhý fetch).
+  private bufferCache = new Map<string, Promise<AudioBuffer | null>>();
+
+  private loadBuffer(ctx: AudioContext, key: string): Promise<AudioBuffer | null> {
+    let p = this.bufferCache.get(key);
+    if (!p) {
+      p = fetch(`/music-lib/${key}.mp3`)
+        .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`))))
+        .then(buf => ctx.decodeAudioData(buf))
+        .catch(() => null);
+      this.bufferCache.set(key, p);
+    }
+    return p;
+  }
+
+  /** Jednorázový přehrávač už DEKÓDOVANÉHO bufferu na danou cestu (dry/fx nebo master). */
+  private playOneShot(ctx: AudioContext, buf: AudioBuffer, dest: AudioNode): void {
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(dest);
+    src.start();
+  }
 
   private setup(): { ctx: AudioContext; master: GainNode; rev: GainNode } {
     if (this.ctx && this.master && this.reverbSend) {
@@ -661,20 +690,42 @@ export class AmbientPlayer {
     return this.noiseBuf;
   }
 
+  private buildProceduralLayer(scene: Soundscape, ctx: AudioContext, gain: GainNode, rev: GainNode): Cleanup {
+    switch (scene) {
+      case "forest":    return buildForest(ctx, gain, rev, this.getNoiseBuffer(ctx));
+      case "night":     return buildNight(ctx, gain, rev);
+      case "adventure": return buildAdventure(ctx, gain, rev);
+      case "cozy":      return buildCozy(ctx, gain, rev);
+      default:          return buildMagic(ctx, gain, rev);
+    }
+  }
+
+  /** Nálada na pozadí: nejdřív zkusí smyčkovat REÁLNOU stopu
+   *  (public/music-lib/soundscape-<scene>.mp3), při chybě/404 spadne na
+   *  dosavadní procedurální syntézu — gain uzel vzniká hned synchronně
+   *  (kvůli plynulému crossfade), zdroj zvuku se do něj zapojí, jakmile
+   *  je hotový (buffer je po prvním načtení instantně z cache). */
   private buildLayer(scene: Soundscape, ctx: AudioContext, rev: GainNode): Layer {
     const gain = ctx.createGain();
     gain.gain.value = 0;
     gain.connect(this.master!);
 
-    let cleanup: Cleanup;
-    switch (scene) {
-      case "forest":    cleanup = buildForest(ctx, gain, rev, this.getNoiseBuffer(ctx)); break;
-      case "night":     cleanup = buildNight(ctx, gain, rev); break;
-      case "adventure": cleanup = buildAdventure(ctx, gain, rev); break;
-      case "cozy":      cleanup = buildCozy(ctx, gain, rev); break;
-      default:          cleanup = buildMagic(ctx, gain, rev); break;
-    }
-    return { gain, cleanup };
+    let cancelled = false;
+    let cleanup: Cleanup = () => {};
+    this.loadBuffer(ctx, `soundscape-${scene}`).then(buf => {
+      if (cancelled) return;
+      if (buf) {
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.loop = true;
+        src.connect(gain);
+        src.start();
+        cleanup = () => { try { src.stop(); } catch { /* already stopped */ } };
+      } else {
+        cleanup = this.buildProceduralLayer(scene, ctx, gain, rev);
+      }
+    });
+    return { gain, cleanup: () => { cancelled = true; cleanup(); } };
   }
 
   private crossfade(next: Soundscape): void {
@@ -703,7 +754,19 @@ export class AmbientPlayer {
    *  jen-mokrou reverb cestu, viz v4.49 zjištění u sfx) — ať je náběh
    *  OPRAVDU slyšet, ne jen tichý rozmazaný dozvuk. Jemný dotek `rev`
    *  navrch pro dozvuk/lesk, ne jako jediná cesta ven. */
+  /** 🎺 Úvodní fanfára — zkusí reálnou nahrávku (public/music-lib/intro.mp3),
+   *  při chybě spadne na procedurální syntézu níže. */
   playIntro(): void {
+    const { ctx } = this.setup();
+    ctx.resume();
+    const fx = this.effectGain!;
+    this.loadBuffer(ctx, "intro").then(buf => {
+      if (buf) this.playOneShot(ctx, buf, fx);
+      else this.playIntroSynth();
+    });
+  }
+
+  private playIntroSynth(): void {
     const { ctx, rev } = this.setup();
     ctx.resume();
     const fx = this.effectGain!;
@@ -757,9 +820,20 @@ export class AmbientPlayer {
     pingTone(ctx, fx, [1046.50, 1318.51], 1.2, 0.12, (notes.length - 1) * 0.2 + 0.05);
   }
 
-  /** 🔊 Jednorázový zvukový efekt podle děje scény —
-   *  hraje JEDNOU navrch aktuálního soundscape, ignorováno když appka mlčí */
+  /** 🔊 Jednorázový zvukový efekt podle děje scény — zkusí reálnou nahrávku
+   *  (public/music-lib/sfx-<effect>.mp3), při chybě spadne na syntézu. Hraje
+   *  JEDNOU navrch aktuálního soundscape, ignorováno když appka mlčí. */
   playEffect(effect: SoundEffect | undefined): void {
+    if (!effect || !this.running) return;
+    const { ctx } = this.setup();
+    const fx = this.effectGain!;
+    this.loadBuffer(ctx, `sfx-${effect}`).then(buf => {
+      if (buf) this.playOneShot(ctx, buf, fx);
+      else this.playEffectSynth(effect);
+    });
+  }
+
+  private playEffectSynth(effect: SoundEffect | undefined): void {
     if (!effect || !this.running) return;
     const { ctx } = this.setup();
     const fx = this.effectGain!;
@@ -807,12 +881,19 @@ export class AmbientPlayer {
     }
   }
 
-  /** 🌙 Klesající, usínající melodie + bohatší závěrečný akord (kvinta
-   *  + tercie + bas) s dlouhým doznívajícím chvěním — zavolat jednou na
-   *  úplně poslední stránce. Napřímo na effectGain, stejný důvod jako
-   *  u playIntro (mimo ducking pod vyprávěním, mimo jen-mokrou reverb
-   *  cestu); jemný dotek `rev` navrch pro dozvuk. */
+  /** 🌙 Závěrečná melodie — zkusí reálnou nahrávku (public/music-lib/outro.mp3),
+   *  při chybě spadne na procedurální syntézu (viz playOutroSynth). */
   playOutro(): void {
+    if (!this.running) return;
+    const { ctx } = this.setup();
+    const fx = this.effectGain!;
+    this.loadBuffer(ctx, "outro").then(buf => {
+      if (buf) this.playOneShot(ctx, buf, fx);
+      else this.playOutroSynth();
+    });
+  }
+
+  private playOutroSynth(): void {
     if (!this.running) return;
     const { ctx, rev } = this.setup();
     const fx = this.effectGain!;
@@ -868,10 +949,19 @@ export class AmbientPlayer {
   }
 
   /** 🎼 Krátký hudební "stinger" na konci KAŽDÉ scény (kromě té úplně
-   *  poslední — tam hraje playOutro): naváže na náladu AKTUÁLNÍ scény
-   *  (stejné tóny jako její soundscape), ať čtení zní jako jeden ucelený
-   *  hudební celek s jasnou tečkou za každou stránkou, ne jen ticho. */
+   *  poslední — tam hraje playOutro): zkusí reálnou nahrávku podle nálady
+   *  (public/music-lib/stinger-<scene>.mp3), při chybě spadne na syntézu. */
   playSceneEnd(scene?: Soundscape): void {
+    if (!this.running) return;
+    const { ctx } = this.setup();
+    const fx = this.effectGain!;
+    this.loadBuffer(ctx, `stinger-${scene || "magic"}`).then(buf => {
+      if (buf) this.playOneShot(ctx, buf, fx);
+      else this.playSceneEndSynth(scene);
+    });
+  }
+
+  private playSceneEndSynth(scene?: Soundscape): void {
     if (!this.running) return;
     const { ctx } = this.setup();
     const fx = this.effectGain!;

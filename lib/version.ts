@@ -1,6 +1,8 @@
-export const APP_VERSION = "4.55";
+export const APP_VERSION = "4.56";
 
 // Changelog (newest first)
+// 4.56 - 🎼 HUDBA A ZVUKY TEĎ SKUTEČNÉ, NE SYNTETICKÉ: appka dřív pro veškerou hudbu (nálady na pozadí, intro/outro, stingery, 33 zvukových efektů) používala čistě procedurální syntézu (Web Audio oscilátory) — teď nejdřív zkusí přehrát reálnou nahrávku z ElevenLabs Music/Sound Effects (viz v4.55), a JEN když soubor chybí nebo se nenačte, potichu spadne zpátky na starou syntézu (appka tak nikdy neztichne kvůli chybějícímu souboru). Veřejné rozhraní `AmbientPlayer` (setScene/playIntro/playOutro/playSceneEnd/playEffect) beze změny — appka volající kód (čtečka) se vůbec neupravovala.
+
 // 4.55 - 🎼 VYGENEROVÁNA REÁLNÁ ZVUKOVÁ KNIHOVNA (ElevenLabs Music + Sound Effects): 5 nálad, intro/outro fanfáry, 5 stingerů a 33 zvukových efektů uloženo do `public/music-lib/` — nahrazují dosavadní čistě syntetickou (Web Audio oscilátory) hudbu skutečně vyrobenou. Cesta appky si je zatím NEPŘEHRÁVÁ (`lib/ambient.ts` přepojení na tyhle soubory je další krok, zatím nedotčeno). Mimochodem opraven bug v generujícím skriptu — vlastní `.env` parser nesundával uvozovky kolem hodnot, takže do ElevenLabs API hlaviček šel klíč doslova s uvozovkami (401 Invalid API key).
 
 // 4.54 - 🧹 DROBNÉ ÚSPORY Z CODE REVIEW: přehled portrétů (`/api/portraits`) dřív pro KAŽDOU už namalovanou postavu stahoval celý obrázek jen aby zjistil, že existuje (3 volání Blobu místo 1) — teď stačí 1 rychlá kontrola, obrázek se stahuje jen když se má fakt (pře)kreslit. Portréty postav (neměnné, verzované) se navíc přestaly stahovat s cache-busting parametrem, který jim bránil se vůbec kešovat — každý studený start funkce tak zbytečně stahoval stejné obrázky znovu. Smazán i zdvojený časovač schovávání ovládacích prvků čtečky (dva identické efekty vedle sebe, pozůstatek refaktoru).
