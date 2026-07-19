@@ -2867,13 +2867,17 @@ export default function Home() {
     : "night";
   const activeBg = bgChoice === "auto" ? autoBg : bgChoice;
 
-  // 🎨 Homepage: ambientní hudba podle vybraného světa pozadí appky — zcela
-  // nezávisle na náladě scény při čtení pohádky (ta se nastavuje jinde,
-  // viz setScene výše, a beze změny).
+  // 🎨 Homepage: ambientní hudba podle SVĚTA POZADÍ — ale JEN když si ho
+  // uživatel výslovně vybral ručně. V "auto" (výchozí, nezvoleno) appka hraje
+  // původní obecnou melodii (setBackgroundWorld bez bgId spadne na "fantasy"
+  // klíč = stejná znělka jako dřív, PŘED touhle funkcí) — jinak by kvůli
+  // autoBg (odvozenému z tématu, bez tématu default "night") ta původní
+  // oblíbená melodie na homepage zmizela hned od začátku, ještě než si
+  // kdokoli cokoli vybral. Nálada scény při čtení pohádky je nedotčená.
   useEffect(() => {
     if (viewMode !== "form" || !musicOn) return;
-    ambientRef.current?.setBackgroundWorld(activeBg);
-  }, [viewMode, activeBg, musicOn]);
+    ambientRef.current?.setBackgroundWorld(bgChoice === "auto" ? undefined : bgChoice);
+  }, [viewMode, bgChoice, musicOn]);
 
   const bgUrlCacheRef = useRef<Record<string, string>>({});
   useEffect(() => {
