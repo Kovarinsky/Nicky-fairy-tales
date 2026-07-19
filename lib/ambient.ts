@@ -746,6 +746,30 @@ export class AmbientPlayer {
   // dál se jen přehrává z cache. Promise samo funguje jako "in-flight" zámek
   // (souběžné volání téhož klíče nezpůsobí druhý fetch).
   private bufferCache = new Map<string, Promise<AudioBuffer | null>>();
+  // 🔊 Vyrovnání hlasitosti napříč knihovnou: jednotlivé vygenerované klipy
+  // mají velmi ROZDÍLNOU vlastní hlasitost (naměřeno 0.01–1.0 špička mezi
+  // klipy, i 40× rozdíl u JEDNÉ konkrétní nahrávky — např. stinger-magic.mp3
+  // vyšel skoro tichý oproti stinger-cozy.mp3 ze stejného zadání) — appka
+  // teď při prvním načtení klipu jednou změří jeho špičku a dopočítá
+  // kompenzační zisk k cílové hladině. STROPOVANÉ (max 4×): extrémně
+  // tichý/rozbitý klip (šum místo obsahu) tak nezhlasitá na nepříjemný šum,
+  // jen zůstane nápadně tišší než ostatní — signál, že ho treba znovu
+  // vygenerovat (`npm run gen:music-lib` po smazání souboru), ne že by to
+  // gain kompenzací „spravil".
+  private normCache = new Map<string, number>();
+  private static readonly NORM_TARGET_PEAK = 0.7;
+  private static readonly NORM_MIN_BOOST = 0.4;
+  private static readonly NORM_MAX_BOOST = 4;
+
+  private measurePeak(buffer: AudioBuffer): number {
+    const data = buffer.getChannelData(0);
+    let peak = 0;
+    for (let i = 0; i < data.length; i += 25) {
+      const a = Math.abs(data[i]);
+      if (a > peak) peak = a;
+    }
+    return peak;
+  }
 
   private loadBuffer(ctx: AudioContext, key: string): Promise<AudioBuffer | null> {
     let p = this.bufferCache.get(key);
@@ -753,14 +777,28 @@ export class AmbientPlayer {
       p = fetch(`/music-lib/${key}.mp3`)
         .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`))))
         .then(buf => ctx.decodeAudioData(buf))
+        .then(buffer => {
+          const peak = this.measurePeak(buffer);
+          const boost = peak > 0.001 ? AmbientPlayer.NORM_TARGET_PEAK / peak : 1;
+          this.normCache.set(key, Math.min(AmbientPlayer.NORM_MAX_BOOST, Math.max(AmbientPlayer.NORM_MIN_BOOST, boost)));
+          return buffer;
+        })
         .catch(() => null);
       this.bufferCache.set(key, p);
     }
     return p;
   }
 
-  /** Jednorázový přehrávač už DEKÓDOVANÉHO bufferu na danou cestu (dry/fx nebo master). */
-  private playOneShot(ctx: AudioContext, buf: AudioBuffer, dest: AudioNode): void {
+  /** Jednorázový přehrávač už DEKÓDOVANÉHO bufferu na danou cestu (dry/fx nebo master) —
+   *  `key` (volitelný) aplikuje kompenzační zisk z normCache pro vyrovnanou hlasitost. */
+  private playOneShot(ctx: AudioContext, buf: AudioBuffer, dest: AudioNode, key?: string): void {
+    const norm = key ? (this.normCache.get(key) ?? 1) : 1;
+    if (norm !== 1) {
+      const g = ctx.createGain();
+      g.gain.value = norm;
+      g.connect(dest);
+      dest = g;
+    }
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.connect(dest);
@@ -854,7 +892,15 @@ export class AmbientPlayer {
         const src = ctx.createBufferSource();
         src.buffer = buf;
         src.loop = true;
-        src.connect(gain);
+        const norm = this.normCache.get(fileKey) ?? 1;
+        if (norm !== 1) {
+          const g = ctx.createGain();
+          g.gain.value = norm;
+          src.connect(g);
+          g.connect(gain);
+        } else {
+          src.connect(gain);
+        }
         src.start();
         cleanup = () => { try { src.stop(); } catch { /* already stopped */ } };
       } else {
@@ -912,15 +958,15 @@ export class AmbientPlayer {
     ctx.resume();
     const fx = this.effectGain!;
     const byMood = () => this.loadBuffer(ctx, `intro-${scene || "magic"}`).then(buf => {
-      if (buf) { this.playOneShot(ctx, buf, fx); return; }
+      if (buf) { this.playOneShot(ctx, buf, fx, `intro-${scene || "magic"}`); return; }
       this.loadBuffer(ctx, "intro").then(buf2 => {
-        if (buf2) this.playOneShot(ctx, buf2, fx);
+        if (buf2) this.playOneShot(ctx, buf2, fx, "intro");
         else this.playIntroSynth();
       });
     });
     if (themeKey) {
       this.loadBuffer(ctx, `intro-theme-${themeKey}`).then(buf => {
-        if (buf) this.playOneShot(ctx, buf, fx);
+        if (buf) this.playOneShot(ctx, buf, fx, `intro-theme-${themeKey}`);
         else byMood();
       });
     } else {
@@ -990,7 +1036,7 @@ export class AmbientPlayer {
     const { ctx } = this.setup();
     const fx = this.effectGain!;
     this.loadBuffer(ctx, `sfx-${effect}`).then(buf => {
-      if (buf) this.playOneShot(ctx, buf, fx);
+      if (buf) this.playOneShot(ctx, buf, fx, `sfx-${effect}`);
       else this.playEffectSynth(effect);
     });
   }
@@ -1069,7 +1115,7 @@ export class AmbientPlayer {
     const { ctx } = this.setup();
     const fx = this.effectGain!;
     this.loadBuffer(ctx, "outro").then(buf => {
-      if (buf) this.playOneShot(ctx, buf, fx);
+      if (buf) this.playOneShot(ctx, buf, fx, "outro");
       else this.playOutroSynth();
     });
   }
@@ -1137,7 +1183,7 @@ export class AmbientPlayer {
     const { ctx } = this.setup();
     const fx = this.effectGain!;
     this.loadBuffer(ctx, `stinger-${scene || "magic"}`).then(buf => {
-      if (buf) this.playOneShot(ctx, buf, fx);
+      if (buf) this.playOneShot(ctx, buf, fx, `stinger-${scene || "magic"}`);
       else this.playSceneEndSynth(scene);
     });
   }

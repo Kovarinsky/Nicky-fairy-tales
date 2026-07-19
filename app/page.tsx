@@ -1044,24 +1044,42 @@ export default function Home() {
   // se titleCardOpen (state) vůbec stihl nastavit na true ve stejném průchodu
   // efektů — pak po ťuknutí na titulku už nebylo co spustit („nic se nestalo").
   const titleCardOpenRef = useRef(false);
-  // Scéna 1 musí mít HOTOVÝ (ne placeholder) obrázek A hlas, než appku vůbec
-  // jde spustit — appka na to zatím jen ČEKÁ (a fanfára/obrázek mezitím
-  // doběhne), místo aby ukázala rozbitou první stránku.
+  // Scéna 1 musí mít HOTOVÝ (ne placeholder) obrázek A hlas — použito JEN
+  // pro obálku titulky (ukáže se hned, jak je hotová, viz níže v JSX), NE
+  // pro povolení začít číst (to teď čeká na CELOU pohádku, viz storyFullyReady).
   const scene1Ready = !!(scenes[0]?.imageUrl && !isPlaceholderImg(scenes[0].imageUrl) && scenes[0]?.audioUrl);
+  // 🚦 Číst appka smí začít, až je HOTOVÁ CELÁ pohádka (všechny obrázky i
+  // hlasy) — dřív stačila jen scéna 1 a zbytek se dokresloval na pozadí ZA
+  // čtenářem, což bylo rušivé (viditelné dokreslování uprostřed čtení).
+  // Titulka teď čeká na allScenesReady, ne jen na scénu 1.
+  const storyFullyReady = allScenesReady;
   const closeTitleCard = useCallback(() => {
     titleCardOpenRef.current = false;
     setTitleCardOpen(false);
     isAutoAdvanceRef.current = true; // (znovu) natáhne spuštění namlouvání
   }, []);
 
-  // Sama zmizí po chvíli, kdyby na ni malý čtenář zapomněl ťuknout — ale jen
-  // KDYŽ je scéna 1 už opravdu hotová; jinak by appka „spustila" rozbitou
-  // stránku jen proto, že vypršel čas.
+  // 🆘 Pojistka proti věčnému čekání: pokud se některá scéna nikdy nedokreslí
+  // (server narazí na tvrdý časový/rozpočtový strop a scéna zůstane
+  // placeholder navěky, viz HARD_DEADLINE_MS v job-runner.ts), storyFullyReady
+  // by nikdy nebylo true a titulka by čtenáře uvěznila na "připravuji se"
+  // navždy, bez možnosti uniknout. Po 45 s čekání appka nabídne ruční
+  // "Číst i tak" — čtenář se rozhodne sám, appka ho nenechá trčet napořád.
+  const [titleCardEscapeReady, setTitleCardEscapeReady] = useState(false);
   useEffect(() => {
-    if (!titleCardOpen || !scene1Ready) return;
+    if (!titleCardOpen || storyFullyReady) { setTitleCardEscapeReady(false); return; }
+    const t = setTimeout(() => setTitleCardEscapeReady(true), 45_000);
+    return () => clearTimeout(t);
+  }, [titleCardOpen, storyFullyReady]);
+
+  // Sama zmizí po chvíli, kdyby na ni malý čtenář zapomněl ťuknout — ale jen
+  // KDYŽ je CELÁ pohádka už opravdu hotová; jinak by appka „spustila"
+  // nedokreslenou pohádku jen proto, že vypršel čas.
+  useEffect(() => {
+    if (!titleCardOpen || !storyFullyReady) return;
     const t = setTimeout(() => closeTitleCard(), 7000);
     return () => clearTimeout(t);
-  }, [titleCardOpen, scene1Ready, closeTitleCard]);
+  }, [titleCardOpen, storyFullyReady, closeTitleCard]);
 
   // Intro fanfare when reader opens — dá přednost tématu SVĚTA (Krteček,
   // Autíčka, konkrétní pohádka…) před náladou 1. scény; vlastní/žádný svět
@@ -4677,11 +4695,13 @@ export default function Home() {
           >
             {/* 📖 Titulní obrazovka: název + úvodní fanfára, PŘED prvním slidem —
                 scéna 1 se pod ní klidně dokresluje/čeká, ať je hned vidět po zavření.
-                Zavřít (ťuknutím i časem) jde JEN když je scéna 1 fakt hotová
-                (obrázek i hlas) — jinak by appka spustila rozbitou stránku. */}
+                Zavřít (ťuknutím i časem) jde JEN když je CELÁ pohádka fakt
+                hotová (všechny obrázky i hlasy) — jinak by appka spustila
+                nedokreslenou pohádku a dokreslování by pak bylo vidět
+                rušivě uprostřed čtení. */}
             {titleCardOpen && (
               <div className="title-card"
-                onClick={e => { e.stopPropagation(); if (scene1Ready) closeTitleCard(); }}>
+                onClick={e => { e.stopPropagation(); if (storyFullyReady) closeTitleCard(); }}>
                 {/* 🖼️ Jakmile je hotová SKUTEČNÁ ilustrace scény 1 (s postavami
                     z pohádky), použije se rovnou jako obálka — appka dřív
                     schválně ukazovala jen obecné pozadí appky + ikonu knihy
@@ -4700,8 +4720,22 @@ export default function Home() {
                   {!scene1Ready && <div className="title-card-emoji">📖</div>}
                   <div className="title-card-title">{title}</div>
                   <div className="title-card-tap">
-                    {scene1Ready ? t.titleCardTap : <><span className="placeholder-spinner placeholder-spinner-sm" />{t.titleCardPreparing}</>}
+                    {/* 🚦 "Ťukni pro spuštění" se ukáže až pro CELOU hotovou
+                        pohádku (storyFullyReady), ne jen pro hotovou scénu 1 —
+                        appka měla dřív začínat číst dřív, než bylo vše
+                        dokreslené, a zbytek se dokresloval viditelně za
+                        čtenářem. */}
+                    {storyFullyReady ? t.titleCardTap : <><span className="placeholder-spinner placeholder-spinner-sm" />{t.titleCardPreparing}</>}
                   </div>
+                  {/* 🆘 Ruční únik, kdyby se scéna nikdy nedokreslila (server
+                      narazil na svůj tvrdý strop) — appka čtenáře nenechá
+                      trčet na "připravuji se" navěky bez jakékoli možnosti. */}
+                  {!storyFullyReady && titleCardEscapeReady && (
+                    <button type="button" className="title-card-escape"
+                      onClick={e => { e.stopPropagation(); closeTitleCard(); }}>
+                      {t.titleCardReadAnyway}
+                    </button>
+                  )}
                 </div>
               </div>
             )}

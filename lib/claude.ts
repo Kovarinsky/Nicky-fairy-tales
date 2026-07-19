@@ -1152,9 +1152,22 @@ export function enforceCanonicalAppearance(hero: string, req: StoryRequest, extr
   // Claudovu vlastní "Heights:" větu zahodit JEN tehdy, když ji máme čím
   // nahradit; jinak zůstává jeho volná verze (např. čistě vymyšlené obsazení)
   const canonicalHeights = canonicalHeightsEntry(req.characters);
+  // 🩺 canonicalHeightsEntry zná jen FIXNÍ knihovní postavy (Nicolásek,
+  // James, Valentýnka, Bella, dospělí) — dřív se jí ale úplně NAHRADILA
+  // Claudova VLASTNÍ Heights: věta, i když ta navíc obsahovala výšku
+  // VYMYŠLENÉ/vlastní postavy (např. "Vaja: o kousek menší než Nicolásek").
+  // Ta informace tak zmizela úplně a model si vzájemnou velikost dvou dětí
+  // musel po scénách "domýšlet" sám — proto viditelný drift (jednou 2× větší,
+  // pak skoro stejně velcí). Teď se Claudova vlastní věta zachová a fixní
+  // knihovní fakta se k ní jen PŘIDAJÍ (ne nahradí), ať zůstane i vztah k
+  // libovolné vymyšlené postavě, kterou zná jen Claude, ne tahle tabulka.
+  const ownHeights = parts.find(p => /^heights\s*:/i.test(p));
+  const mergedHeights = canonicalHeights && ownHeights
+    ? `${canonicalHeights} ${ownHeights.replace(/^heights\s*:\s*/i, "").trim()}`
+    : canonicalHeights || ownHeights || null;
   // Claudovy verze kanonických postav pryč (nahradí je doslovná kartotéka),
   // vše ostatní v původním pořadí zůstává
-  const kept = parts.filter(p => !isCanonEntry(p) && !(canonicalHeights && /^heights\s*:/i.test(p)));
+  const kept = parts.filter(p => !isCanonEntry(p) && !/^heights\s*:/i.test(p));
   const canonical = req.characters.map(c => c.description).filter(Boolean);
   // Vlastní postava bez záznamu → doplnit z jejího popisu
   for (const cc of extras.customCharacters || []) {
@@ -1162,7 +1175,7 @@ export function enforceCanonicalAppearance(hero: string, req: StoryRequest, extr
     if (!has && cc.description) kept.push(`${cc.name}: ${cc.description}`);
   }
   const finalParts = [...canonical, ...kept];
-  if (canonicalHeights) finalParts.push(canonicalHeights);
+  if (mergedHeights) finalParts.push(mergedHeights);
   return finalParts.join(" | ");
 }
 

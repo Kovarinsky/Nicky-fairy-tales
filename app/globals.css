@@ -1358,6 +1358,22 @@ button:disabled {
   color: rgba(255, 255, 255, 0.6);
 }
 
+/* 🆘 Ruční únik z titulky, kdyby se nějaká scéna nikdy nedokreslila —
+   objeví se až po 45 s čekání, ať appka nenechá čtenáře trčet napořád */
+.title-card-escape {
+  margin-top: 0.9rem;
+  padding: 0.55rem 1.1rem;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.title-card-escape:active { transform: scale(0.97); }
+
 .img-err-detail {
   display: block;
   max-width: 88%;
