@@ -2852,6 +2852,10 @@ export default function Home() {
   const [newThemeName, setNewThemeName] = useState("");
   const [newThemeDesc, setNewThemeDesc] = useState("");
   const [newThemePhotos, setNewThemePhotos] = useState<Array<{ data: string; mimeType: string; previewUrl: string }>>([]);
+  // ✏️ Editace už uloženého vlastního světa — stejný formulář jako přidání
+  // nového, jen předvyplněný a addCustomTheme() pak UPRAVÍ existující
+  // záznam (stejné id) místo založení nového.
+  const [editingThemeId, setEditingThemeId] = useState<string | null>(null);
   // 🧠 Nastudování světa: Claude z popisu (i odkazu) sestaví průvodce světem,
   // případně vrátí jednu doplňující otázku — uživatel doplní a nechá znovu
   const [worldStudyLoading, setWorldStudyLoading] = useState(false);
@@ -3772,25 +3776,48 @@ export default function Home() {
   }
   function addCustomTheme() {
     if (!newThemeName.trim() && !newThemeDesc.trim()) return;
-    const id = `ctheme_${Date.now()}`;
     const name = newThemeName.trim() || (uiLang === "en" ? "My world" : "Můj svět");
-    setCustomThemes(p => {
-      const next = [...p, {
-        id, name,
-        prompt: newThemeDesc.trim() || name,
-        photos: newThemePhotos.map(ph => ({ data: ph.data, mimeType: ph.mimeType })),
-        previewUrl: newThemePhotos[0]?.previewUrl,
-      }];
-      saveCustomThemes(next);
-      return next;
-    });
-    setSelectedTheme(id);
+    const photos = newThemePhotos.map(ph => ({ data: ph.data, mimeType: ph.mimeType }));
+    const previewUrl = newThemePhotos[0]?.previewUrl;
+    if (editingThemeId) {
+      // ✏️ Úprava existujícího světa — stejné id, jen přepsaný obsah.
+      // Fotky přepsat jen když uživatel vybral nějaké NOVÉ — jinak zůstávají
+      // ty stávající beze změny.
+      const id = editingThemeId;
+      setCustomThemes(p => {
+        const next = p.map(ct => ct.id !== id ? ct : {
+          ...ct, name, prompt: newThemeDesc.trim() || name,
+          ...(photos.length ? { photos, previewUrl } : {}),
+        });
+        saveCustomThemes(next);
+        return next;
+      });
+    } else {
+      const id = `ctheme_${Date.now()}`;
+      setCustomThemes(p => {
+        const next = [...p, { id, name, prompt: newThemeDesc.trim() || name, photos, previewUrl }];
+        saveCustomThemes(next);
+        return next;
+      });
+      setSelectedTheme(id);
+    }
     setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]);
+    setEditingThemeId(null); setWorldQuestion(null); setWorldStudyError(false);
+  }
+  function startEditCustomTheme(ct: CustomTheme) {
+    setEditingThemeId(ct.id);
+    setNewThemeName(ct.name);
+    setNewThemeDesc(ct.prompt);
+    const photos = ct.photos?.length ? ct.photos
+      : (ct.photoBase64 && ct.photoMimeType ? [{ data: ct.photoBase64, mimeType: ct.photoMimeType }] : []);
+    setNewThemePhotos(photos.map(ph => ({ ...ph, previewUrl: ct.previewUrl || `data:${ph.mimeType};base64,${ph.data}` })));
     setWorldQuestion(null); setWorldStudyError(false);
+    setAddingTheme(true);
   }
   function removeCustomTheme(id: string) {
     setCustomThemes(p => { const next = p.filter(c => c.id !== id); saveCustomThemes(next); return next; });
     setSelectedTheme(p => (p === id ? "" : p));
+    if (editingThemeId === id) { setEditingThemeId(null); setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]); }
   }
   async function handleInspPdf(file: File) {
     if (file.size > 10 * 1024 * 1024) { await appAlert(t.pdfTooBig); return; }
@@ -4104,10 +4131,17 @@ export default function Home() {
                 <div key={ct.id} className={`chip custom-chip ${selectedTheme === ct.id ? "chip-on" : ""}`}>
                   {ct.previewUrl && <img src={ct.previewUrl} alt={ct.name} className="chip-avatar" />}
                   <span className="chip-label" onClick={() => setSelectedTheme(p => p === ct.id ? "" : ct.id)}>🌍 {ct.name}</span>
+                  <button type="button" className="chip-edit" aria-label={t.editWorldBtn} title={t.editWorldBtn}
+                    onClick={e => { e.stopPropagation(); startEditCustomTheme(ct); }}>✏️</button>
                   <button type="button" className="chip-remove" onClick={() => removeCustomTheme(ct.id)}>×</button>
                 </div>
               ))}
-              <button type="button" className={`chip chip-btn ${addingTheme ? "chip-on" : ""}`} onClick={() => setAddingTheme(p => !p)}>
+              <button type="button" className={`chip chip-btn ${addingTheme ? "chip-on" : ""}`} onClick={() => {
+                if (addingTheme) { setAddingTheme(false); return; }
+                // Otevřít VŽDY čistý formulář — ať tu nezůstane rozjetá editace jiného světa
+                setEditingThemeId(null); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]);
+                setWorldQuestion(null); setWorldStudyError(false); setAddingTheme(true);
+              }}>
                 {t.addWorldChip}
               </button>
             </div>
@@ -4155,7 +4189,7 @@ export default function Home() {
                 </div>
                 <div className="panel-actions">
                   <button type="button" onClick={addCustomTheme} disabled={!newThemeName.trim() && !newThemeDesc.trim()}>{t.saveWorld}</button>
-                  <button type="button" className="cancel-btn" onClick={() => { setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]); setWorldQuestion(null); setWorldStudyError(false); }}>✕ {t.cancel}</button>
+                  <button type="button" className="cancel-btn" onClick={() => { setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]); setEditingThemeId(null); setWorldQuestion(null); setWorldStudyError(false); }}>✕ {t.cancel}</button>
                 </div>
               </div>
             )}

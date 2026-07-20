@@ -1779,6 +1779,35 @@ button:disabled {
   transform: none;
 }
 
+.chip-edit {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  font-size: 0.8rem;
+  padding: 0 2px;
+  line-height: 1;
+  min-width: unset;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+  transform: none;
+}
+
+.chip-edit:hover {
+  opacity: 1;
+  filter: none;
+  background: transparent;
+  transform: none;
+  box-shadow: none;
+}
+
+/* 📍 Vybraný vlastní svět natrvalo oranžově — stejný přístup jako u
+   "Pohádka podle mé lokality" (chip-gps), ať je jasně vidět, který vlastní
+   svět je právě zvolený, výrazněji než obecné fialové .chip-on jinde. */
+.custom-chip.chip-on {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.32), rgba(249, 115, 22, 0.32));
+  border-color: #f59e0b;
+}
+
 .chip-remove:hover {
   color: #dc2626;
   filter: none;
