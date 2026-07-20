@@ -1300,25 +1300,25 @@ button:disabled {
   overflow: hidden;
 }
 
-/* Rozmazaný+zvětšený podklad — schválně vypadá jako obálka knihy, ne jako
-   ostrá kopie scény 1 hned pod ní (viz nahlášené "proč je to stejné jako
-   první slide"). Vlastní vrstva, ať blur nezasáhne text v .title-card-content. */
+/* Ostrá obálka se scénou 1 — čtenář musí hlavní hrdiny na obálce vidět
+   zřetelně (dřívější silný blur+ztmavení dělalo obálku "šedou", viz
+   nahlášené "obrázek s hlavními hrdiny není vidět"). Jen jemný podklad,
+   ať je i tak dobře čitelný titulek přes .title-card-scrim. */
 .title-card-bg {
   position: absolute;
-  inset: -14px; /* kryje okraje rozostřené blurem */
+  inset: 0;
   background-size: cover;
   background-position: center;
-  filter: blur(10px) brightness(0.6) saturate(0.85);
-  transform: scale(1.08);
+  filter: brightness(0.82) saturate(1.05);
 }
 
 .title-card-scrim {
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg,
-    rgba(10, 8, 30, 0.55) 0%,
-    rgba(10, 8, 30, 0.4) 45%,
-    rgba(10, 8, 30, 0.88) 100%
+    rgba(10, 8, 30, 0.15) 0%,
+    rgba(10, 8, 30, 0.08) 45%,
+    rgba(10, 8, 30, 0.72) 100%
   );
 }
 
@@ -1357,6 +1357,23 @@ button:disabled {
   font-weight: 600;
   color: rgba(255, 255, 255, 0.6);
 }
+
+/* 🆘 Ruční únik z titulky, kdyby se nějaká scéna nikdy nedokreslila —
+   objeví se až po 45 s čekání (appka nenechá čtenáře trčet napořád, ale
+   nikdy taky nenabídne "číst i tak" — jen odchod domů) */
+.title-card-escape {
+  margin-top: 0.9rem;
+  padding: 0.55rem 1.1rem;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.title-card-escape:active { transform: scale(0.97); }
 
 .img-err-detail {
   display: block;

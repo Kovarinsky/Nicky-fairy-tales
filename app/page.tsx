@@ -776,7 +776,13 @@ export default function Home() {
   // Server jobs — a QUEUE: several fairy tales can generate on Vercel at once,
   // each gets its own toast row and the newest one drives the gen-cards
   type JobLogEntry = { t: number; m: string };
-  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string; restarts?: number; stuckRestarts?: number; lastError?: string; log?: JobLogEntry[]; createdAt?: number };
+  // 🎙️ voiceDone/voiceTotal: appka dřív ukázala "▶ Otevřít", jakmile byly
+  // hotové OBRÁZKY — hlas se ale namlouvá na pozadí LÍNĚ (fillMissingAudio),
+  // takže kdo klikl hned, skončil ve čtečce s dokreslováním hlasu VIDITELNĚ
+  // za sebou ("Připravuji pohádku" viselo, i když appka už dávno hlásila
+  // hotovo). "Hotovo" teď znamená OPRAVDU hotovo — obrázky i hlas zároveň —
+  // tahle dvojice sleduje postup namlouvání jako samostatný krok PO obrázcích.
+  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string; restarts?: number; stuckRestarts?: number; lastError?: string; log?: JobLogEntry[]; createdAt?: number; voiceDone?: number; voiceTotal?: number };
   const MAX_ACTIVE_JOBS = 3;
   // 📋 Otevřený deník běhu jobu (overlay) — entries se berou živě z pollů
   // (jobId → entries živě z pollů; entries → snapshot z hotové pohádky v historii)
@@ -1042,15 +1048,17 @@ export default function Home() {
   // se titleCardOpen (state) vůbec stihl nastavit na true ve stejném průchodu
   // efektů — pak po ťuknutí na titulku už nebylo co spustit („nic se nestalo").
   const titleCardOpenRef = useRef(false);
-  // 🚦 Číst appka smí začít, až jsou HOTOVÉ všechny OBRÁZKY (ne nutně i
-  // hlasy — appka má DAVNO zavedený líný hlas: namlouvá se souběžně/za
-  // čtením a stránka bez hotového hlasu ukáže "⏳ Namlouvám…" na tlačítku
-  // Přehrát, ne rozbitý stav). Vázat tohle na hlasy by appku uvěznilo na
-  // "připravuji" klidně na několik minut po tom, co job-seg na homepage už
-  // dávno hlásí "hotovo" — `fillMissingAudio` doplňuje chybějící hlasy na
-  // pozadí AŽ PO otevření pohádky, ne před ním.
-  const allImagesReady = scenes.length > 0 && scenes.every(s => s.imageUrl && !isPlaceholderImg(s.imageUrl));
-  const storyFullyReady = allImagesReady;
+  // Scéna 1 musí mít HOTOVÝ (ne placeholder) obrázek A hlas — použito JEN
+  // pro obálku titulky (ukáže se hned, jak je hotová), NE pro povolení
+  // začít číst (to čeká na CELOU pohádku, viz storyFullyReady).
+  const scene1Ready = !!(scenes[0]?.imageUrl && !isPlaceholderImg(scenes[0].imageUrl) && scenes[0]?.audioUrl);
+  // 🚦 Číst appka smí začít, až je HOTOVÁ CELÁ pohádka (všechny obrázky i
+  // hlasy) — dřív stačila jen scéna 1 a zbytek se dokresloval na pozadí ZA
+  // čtenářem, což bylo rušivé (viditelné dokreslování uprostřed čtení).
+  // "Hotovo" na serveru teď navíc OPRAVDU znamená hotovo (viz finalizeServerJob
+  // — hlas se domlouví ještě PŘED "▶ Otevřít"), takže tahle brána už nemá
+  // viset dlouho PO tom, co job-seg na homepage nahlásí hotovo.
+  const storyFullyReady = allScenesReady;
   // 📖➡️⛶ Zavření titulky = SKUTEČNÝ start čtení — appka se rovnou přepne
   // do celoobrazovkového režimu NA ŠÍŘKU, stejně jako ruční tlačítko ⛶/▶
   // (viz toggleForcedLandscape/togglePlay) — dřív to uměly JEN ony, takže po
@@ -1068,9 +1076,24 @@ export default function Home() {
         .catch(() => {});
     }
   }, []);
-  // ❗ ŽÁDNÉ automatické zavření časem ani "Číst i tak" únik — appka čeká,
-  // dokud čtenář sám neťukne, i kdyby to trvalo dlouho (na výslovné přání:
-  // "nechci žádné číst i tak, dokresli se za čtením").
+
+  // 🆘 Pojistka proti věčnému čekání: appka NIKDY nepustí čtenáře do
+  // nedokreslené pohádky ("žádné číst i tak", výslovné přání) — pokud by se
+  // ale nějaká scéna fakt nikdy nedokreslila (server narazí na tvrdý
+  // časový/rozpočtový strop, viz HARD_DEADLINE_MS v job-runner.ts),
+  // storyFullyReady by nikdy nebylo true a titulka by čtenáře uvěznila na
+  // "připravuji se" navždy. Po 45 s čekání appka místo "číst i tak" nabídne
+  // jen návrat 🏠 Domů — appka se nikdy nespustí nedokreslená, jen se dá
+  // odejít místo věčného čekání.
+  const [titleCardEscapeReady, setTitleCardEscapeReady] = useState(false);
+  useEffect(() => {
+    if (!titleCardOpen || storyFullyReady) { setTitleCardEscapeReady(false); return; }
+    const t = setTimeout(() => setTitleCardEscapeReady(true), 45_000);
+    return () => clearTimeout(t);
+  }, [titleCardOpen, storyFullyReady]);
+
+  // 🚫 ŽÁDNÉ automatické zavírání titulky ani časem, ani "číst i tak" — appka
+  // čeká na výslovné ťuknutí, i kdyby to trvalo dlouho.
 
   // Intro fanfare when reader opens — dá přednost tématu SVĚTA (Krteček,
   // Autíčka, konkrétní pohádka…) před náladou 1. scény; vlastní/žádný svět
@@ -2435,10 +2458,31 @@ export default function Home() {
     renderedMapRef.current.set(jobId, rendered);
     cacheStory(jobId, rendered).catch(() => {});
     evictOldStories(loadHistory().map(e => e.id)).catch(() => {});
-    // 🔌 Namluvit VŠECHNY stránky HNED, dokud je internet — hlas se jinak
-    // vyrábí líně až při čtení, takže pohádka otevřená offline (bez signálu)
-    // by neměla žádný zvuk. Běží na pozadí, nic neblokuje.
-    fillMissingAudio(jobId, script, rendered, undefined, st.voiceId).catch(() => {});
+    // 🩺 "▶ Otevřít" dřív naskočilo hned, jak byly hotové OBRÁZKY — hlas se
+    // ale namlouvá LÍNĚ na pozadí (fillMissingAudio), takže appka hlásila
+    // "hotovo", zatímco na pozadí ještě dobíhalo namlouvání. Kdo klikl hned,
+    // skončil ve čtečce s neviditelně dokreslovaným hlasem — appka totiž
+    // čtení nepustí dál, dokud nemá hotový obrázek I hlas KAŽDÉ scény (viz
+    // storyFullyReady) — takže "Otevřít" vypadalo hotové, ale po kliknutí
+    // viselo na "Připravuji pohádku" ještě dlouho navíc. "Hotovo" teď
+    // znamená OPRAVDU hotovo — appka hlas domlouví JEŠTĚ PŘED tím, než se
+    // tlačítko "Otevřít" vůbec objeví, ať jsou obě hlášení v souladu.
+    const missingAudioCount = script.filter((s, i) => !rendered[i]?.audioUrl && s.narration).length;
+    updateServerJob(jobId, {
+      phase: "generating",
+      title: entry.title,
+      done: rendered.filter(s => !isPlaceholderImg(s.imageUrl)).length,
+      total: script.length,
+      voiceDone: 0,
+      voiceTotal: missingAudioCount,
+    });
+    const voiceMedia = rendered.map(s => ({ imageUrl: s.imageUrl, audioUrl: s.audioUrl }));
+    await fillMissingAudio(jobId, script, voiceMedia, (voiceDone, voiceTotal) => {
+      updateServerJob(jobId, { voiceDone, voiceTotal });
+    }, st.voiceId).catch(() => {});
+    const voiced = rendered.map((s, i) => ({ ...s, audioUrl: voiceMedia[i]?.audioUrl ?? s.audioUrl }));
+    renderedMapRef.current.set(jobId, voiced);
+    cacheStory(jobId, voiced).catch(() => {});
     // Job row → „hotová ▶ Otevřít"; the finished story is no longer persisted
     // as a pending job (it lives in history + IndexedDB now)
     updateServerJob(jobId, {
@@ -4639,6 +4683,11 @@ export default function Home() {
                           {/* zdravé navázání po limitu funkce ≠ „pokus" — pokusy
                               se ukazují jen při psaní BEZ pokroku */}
                           {idx + 1}. {j.stalled ? "⚠️ " : ""}{j.phase === "writing" ? `${t.segWriting}${(j.stuckRestarts ?? 0) > 0 ? ` (${(j.restarts ?? 0) + 1}. pokus)` : (j.restarts ?? 0) > 0 ? ` (${t.segWritingResume})` : ""}`
+                            // 🎙️ Obrázky hotové (done===total), ale namlouvání
+                            // hlasu ještě běží — samostatný krok PO kreslení,
+                            // ať appka nehlásí "Otevřít" dřív, než je hlas hotový
+                            : j.phase === "generating" && j.done >= j.total && (j.voiceTotal ?? 0) > 0 && (j.voiceDone ?? 0) < (j.voiceTotal ?? 0)
+                              ? `${t.segVoicing} ${j.voiceDone ?? 0}/${j.voiceTotal}`
                             : j.phase === "generating" ? `🎨 ${j.done}/${j.total}`
                             : j.phase === "done" ? t.segOpen
                             : t.segError}
@@ -4759,22 +4808,40 @@ export default function Home() {
             {titleCardOpen && (
               <div className="title-card"
                 onClick={e => { e.stopPropagation(); if (storyFullyReady) closeTitleCard(); }}>
-                {/* 🖼️ Podklad = ilustrace SVĚTA POZADÍ appky VLASTNÍHO téhle
-                    pohádky (viz cardBg/cardBgUrl — ne živý stav homepage
-                    formuláře, aby fronta pohádek s různými světy neukázala
-                    špatný/prázdný obrázek), schválně JINÝ obrázek než pohádka
-                    samotná (na přání z konverzace: "musí to být úplně jiný
-                    obrázek, ideálně nějaké intro"). */}
-                {cardBgUrl && (
+                {/* 🖼️ Obálka = SKUTEČNÁ ilustrace scény 1 s postavami z pohádky,
+                    jakmile je hotová — appka mezitím krátce zkoušela obecné
+                    pozadí appky misto ní, ale to byl přesně ten "šedý/prázdný
+                    obal bez hrdinů", co bylo nahlášeno jako problém. Dokud
+                    scéna 1 ještě kreslí, ukáže se jako dočasná záplata VLASTNÍ
+                    svět TÉTO KONKRÉTNÍ pohádky (cardBgUrl, z historie podle
+                    jejího id — ne živý stav homepage formuláře, aby fronta
+                    pohádek s různými světy neukázala cizí/prázdný obrázek). */}
+                {scene1Ready && scenes[0]?.imageUrl ? (
+                  <div className="title-card-bg" style={{ backgroundImage: `url(${scenes[0].imageUrl})` }} />
+                ) : cardBgUrl ? (
                   <div className="title-card-bg" style={{ backgroundImage: `url(${cardBgUrl})` }} />
-                )}
+                ) : null}
                 <div className="title-card-scrim" />
                 <div className="title-card-content">
-                  <div className="title-card-emoji">📖</div>
+                  {!scene1Ready && <div className="title-card-emoji">📖</div>}
                   <div className="title-card-title">{title}</div>
                   <div className="title-card-tap">
+                    {/* 🚦 "Ťukni pro spuštění" se ukáže až pro CELOU hotovou
+                        pohádku (storyFullyReady: obrázky I hlas), ne jen pro
+                        hotovou scénu 1 — appka nikdy nespustí nedokreslenou
+                        pohádku, zbytek už se nedokresluje viditelně za čtenářem. */}
                     {storyFullyReady ? t.titleCardTap : <><span className="placeholder-spinner placeholder-spinner-sm" />{t.titleCardPreparing}</>}
                   </div>
+                  {/* 🆘 Pojistka proti věčnému čekání — appka NIKDY nenabízí
+                      "číst i tak" (výslovné přání), jen po 45 s dá možnost
+                      odejít 🏠 Domů, kdyby se nějaká scéna fakt nikdy
+                      nedokreslila. */}
+                  {!storyFullyReady && titleCardEscapeReady && (
+                    <button type="button" className="title-card-escape"
+                      onClick={e => { e.stopPropagation(); resetToForm(); }}>
+                      🏠 {t.home}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
