@@ -1,6 +1,7 @@
-export const APP_VERSION = "4.77";
+export const APP_VERSION = "4.78";
 
 // Changelog (newest first)
+// 4.78 - 🔢 VÝCHOZÍ POČET SCÉN = 10 (dřív 6) — jak ve formuláři, tak v serverovém fallbacku (kdyby počet scén v požadavku chyběl).
 // 4.77 - 🎨 VÝCHOZÍ POZADÍ/MELODIE = KOUZLO: bez vybraného tématu appka dřív defaultně ukazovala "Noc" — teď je to "Kouzlo" (fantasy), na přání. Melodie na homepage v "auto" režimu už na "Kouzlo" defaultně padala i předtím (`setBackgroundWorld` bez zadaného světa spadne na `BG_AUDIO_KEY.fantasy`), takže obraz i melodie teď spolu sedí.
 // 4.76 - 🔀 SLOUČENÍ DALŠÍ PARALELNÍ SESSION K TITULCE: appka teď opravdu VŠECHNY zdroje (i souběžná session) souhlasí, že obálka titulky = SKUTEČNÁ scéna 1 s hrdiny (ne svět pozadí, viz v4.72/v4.75 níž — přehodnoceno naposledy) a že appka nikdy nezavře titulku sama ani nenabídne obchvat. Ponechány NAVÍC vlastní věci z téhle session, které souběžná session neřešila: (1) zavření titulky teď rovnou přepne do fullscreenu NA ŠÍŘKU (dřív to uměl jen ruční ▶/⛶). (2) úvodní fanfára a dočasná záplata pozadí (dokud scéna 1 kreslí) používají VLASTNÍ téma TÉ KONKRÉTNÍ pohádky z historie, ne živý stav homepage formuláře — důležité při frontě víc pohádek s různými světy. (3) hudba/zvuky defaultně zapnuté.
 // 4.75 - 🔒 ŽÁDNÉ AUTOMATICKÉ SPUŠTĚNÍ, VŽDY FULLSCREEN (později v 4.76 doplněno o audio-gate ze souběžné session, viz výše): titulka se nezavírá sama a nenabízí "číst i tak"; zavření teď přepíná do fullscreenu na šířku; úvodní hudba/pozadí řešeny podle vlastního tématu pohádky, ne živého stavu formuláře; hudba defaultně zapnutá.

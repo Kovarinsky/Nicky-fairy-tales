@@ -280,7 +280,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         themePrompt: customTheme?.prompt ?? theme?.prompt,
         characters,
         age: Number(body.age) || 4,
-        sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), MAX_SCENES),
+        sceneCount: Math.min(Math.max(Number(body.sceneCount) || 10, 1), MAX_SCENES),
         // Povolené jazyky vyprávění (cs/en + testovací); jiné padají na cs
         language: (l => (["cs", "en", ...Object.keys(EXTRA_STORY_LANGS)].includes(l) ? l : "cs"))(String(body.language || "cs")),
         twoEndings: !!body.twoEndings,

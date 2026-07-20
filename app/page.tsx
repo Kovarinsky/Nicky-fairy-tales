@@ -273,7 +273,7 @@ export default function Home() {
   // 📸 Živá fotka přímo z foťáku — viz komentář u charCameraRef výše.
   const inspCameraRef = useRef<HTMLInputElement>(null);
   const inspPdfRef = useRef<HTMLInputElement>(null);
-  const [sceneCount, setSceneCount] = useState(6);
+  const [sceneCount, setSceneCount] = useState(10);
   // Výběr postav a nastavení se ukládá PRŮBĚŽNĚ (dřív jen při generování —
   // odškrtnuté postavy se po zavření appky vracely). Ref hlídá, ať se
   // neuloží prázdný stav dřív, než se obnoví ten uložený.

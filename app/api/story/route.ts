@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
       themePrompt: customTheme?.prompt ?? theme?.prompt,
       characters,
       age: Number(body.age) || 4,
-      sceneCount: Math.min(Math.max(Number(body.sceneCount) || 6, 1), 20),
+      sceneCount: Math.min(Math.max(Number(body.sceneCount) || 10, 1), 20),
       language,
       twoEndings: !!body.twoEndings,
       moral: body.moral ? String(body.moral).slice(0, 300) : undefined,
