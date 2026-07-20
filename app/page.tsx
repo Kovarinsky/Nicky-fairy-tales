@@ -313,7 +313,7 @@ export default function Home() {
   const [pageLeaving, setPageLeaving] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
-  const [musicOn, setMusicOn] = useState(false); // ambient music/sounds off by default
+  const [musicOn, setMusicOn] = useState(true); // hudba/zvuky zapnuté ve výchozím stavu (na výslovné přání)
   const [showCredits, setShowCredits] = useState(false);
   const goodnightCacheRef = useRef<{ key: string; url: string } | null>(null);
   const goodnightAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -375,15 +375,13 @@ export default function Home() {
   }
 
   const allScenesReady = scenes.length > 0 && scenes.every(s => s.imageUrl && s.audioUrl);
-  // bookReady: all images present (SVG fallback always set) — use for UI display and FS trigger
-  // ▶ Čtení začíná, jakmile je hotová PRVNÍ scéna — zbytek se dokresluje
-  // na pozadí (čtečka na nedokreslené stránky počká)
-  // 🔒 TVRDÉ PRAVIDLO: "hotová" scéna 1 znamená OPRAVDU hotová — skutečný
-  // (ne placeholder) obrázek A hotový hlas zároveň. Dřív stačil jen
-  // JAKÝKOLI imageUrl (i placeholder), takže appka mohla ukázat čtečku
-  // (a titulní obrazovku) dřív, než bylo co číst.
-  const bookReady = scenes.length > 0 && !!scenes[0]?.imageUrl
-    && !isPlaceholderImg(scenes[0].imageUrl) && !!scenes[0]?.audioUrl;
+  // bookReady: scéna 1 má SKUTEČNÝ (ne placeholder) obrázek — brána pro
+  // zobrazení čtečky/titulky. Hlas VĚDOMĚ nevyžaduje: appka namlouvání
+  // doplňuje líně/na pozadí (fillMissingAudio) i PO otevření pohádky — vázat
+  // na to bookReady by appku uvěznilo na "připravuji", i když job-seg na
+  // homepage už dávno hlásí hotovo (viz storyFullyReady níž, což je ta
+  // skutečná brána pro START ČTENÍ — obrázky přes celou pohádku).
+  const bookReady = scenes.length > 0 && !!scenes[0]?.imageUrl && !isPlaceholderImg(scenes[0].imageUrl);
 
   // Reader mode: explicit switch so old story stays in memory when form opens
   const [viewMode, setViewMode] = useState<"form" | "reader">("form");
@@ -1044,38 +1042,35 @@ export default function Home() {
   // se titleCardOpen (state) vůbec stihl nastavit na true ve stejném průchodu
   // efektů — pak po ťuknutí na titulku už nebylo co spustit („nic se nestalo").
   const titleCardOpenRef = useRef(false);
-  // 🚦 Číst appka smí začít, až je HOTOVÁ CELÁ pohádka (všechny obrázky i
-  // hlasy) — dřív stačila jen scéna 1 a zbytek se dokresloval na pozadí ZA
-  // čtenářem, což bylo rušivé (viditelné dokreslování uprostřed čtení).
-  // Titulka teď čeká na allScenesReady, ne jen na scénu 1.
-  const storyFullyReady = allScenesReady;
+  // 🚦 Číst appka smí začít, až jsou HOTOVÉ všechny OBRÁZKY (ne nutně i
+  // hlasy — appka má DAVNO zavedený líný hlas: namlouvá se souběžně/za
+  // čtením a stránka bez hotového hlasu ukáže "⏳ Namlouvám…" na tlačítku
+  // Přehrát, ne rozbitý stav). Vázat tohle na hlasy by appku uvěznilo na
+  // "připravuji" klidně na několik minut po tom, co job-seg na homepage už
+  // dávno hlásí "hotovo" — `fillMissingAudio` doplňuje chybějící hlasy na
+  // pozadí AŽ PO otevření pohádky, ne před ním.
+  const allImagesReady = scenes.length > 0 && scenes.every(s => s.imageUrl && !isPlaceholderImg(s.imageUrl));
+  const storyFullyReady = allImagesReady;
+  // 📖➡️⛶ Zavření titulky = SKUTEČNÝ start čtení — appka se rovnou přepne
+  // do celoobrazovkového režimu NA ŠÍŘKU, stejně jako ruční tlačítko ⛶/▶
+  // (viz toggleForcedLandscape/togglePlay) — dřív to uměly JEN ony, takže po
+  // zavření titulky (přes isAutoAdvanceRef) obraz zůstal v portrétu a
+  // "roztáhl se", než si to čtenář poopravil ručně.
   const closeTitleCard = useCallback(() => {
     titleCardOpenRef.current = false;
     setTitleCardOpen(false);
     isAutoAdvanceRef.current = true; // (znovu) natáhne spuštění namlouvání
+    if (!document.fullscreenElement) {
+      const so = (screen as Screen & { orientation?: { lock?: (o: string) => Promise<void> } }).orientation;
+      document.documentElement.requestFullscreen?.()
+        .then(() => so?.lock?.("landscape").catch(() => {}))
+        .then(() => setForcedLs(true))
+        .catch(() => {});
+    }
   }, []);
-
-  // 🆘 Pojistka proti věčnému čekání: pokud se některá scéna nikdy nedokreslí
-  // (server narazí na tvrdý časový/rozpočtový strop a scéna zůstane
-  // placeholder navěky, viz HARD_DEADLINE_MS v job-runner.ts), storyFullyReady
-  // by nikdy nebylo true a titulka by čtenáře uvěznila na "připravuji se"
-  // navždy, bez možnosti uniknout. Po 45 s čekání appka nabídne ruční
-  // "Číst i tak" — čtenář se rozhodne sám, appka ho nenechá trčet napořád.
-  const [titleCardEscapeReady, setTitleCardEscapeReady] = useState(false);
-  useEffect(() => {
-    if (!titleCardOpen || storyFullyReady) { setTitleCardEscapeReady(false); return; }
-    const t = setTimeout(() => setTitleCardEscapeReady(true), 45_000);
-    return () => clearTimeout(t);
-  }, [titleCardOpen, storyFullyReady]);
-
-  // Sama zmizí po chvíli, kdyby na ni malý čtenář zapomněl ťuknout — ale jen
-  // KDYŽ je CELÁ pohádka už opravdu hotová; jinak by appka „spustila"
-  // nedokreslenou pohádku jen proto, že vypršel čas.
-  useEffect(() => {
-    if (!titleCardOpen || !storyFullyReady) return;
-    const t = setTimeout(() => closeTitleCard(), 7000);
-    return () => clearTimeout(t);
-  }, [titleCardOpen, storyFullyReady, closeTitleCard]);
+  // ❗ ŽÁDNÉ automatické zavření časem ani "Číst i tak" únik — appka čeká,
+  // dokud čtenář sám neťukne, i kdyby to trvalo dlouho (na výslovné přání:
+  // "nechci žádné číst i tak, dokresli se za čtením").
 
   // Intro fanfare when reader opens — dá přednost tématu SVĚTA (Krteček,
   // Autíčka, konkrétní pohádka…) před náladou 1. scény; vlastní/žádný svět
@@ -1086,8 +1081,13 @@ export default function Home() {
     introFiredRef.current = true;
     titleCardOpenRef.current = true;
     setTitleCardOpen(true);
-    const themeAudioKey = (THEMES.some(t => t.id === selectedTheme) || FOLK_TALES.some(t => t.id === selectedTheme))
-      ? selectedTheme
+    // 🎬 Téma TÉTO KONKRÉTNÍ pohádky (z historie podle jejího id), ne živé
+    // selectedTheme z formuláře — jinak by fronta pohádek s různými světy
+    // hrála intro podle toho, co je AKTUÁLNĚ vybrané na homepage, ne podle
+    // světa, se kterým se pohádka doopravdy psala.
+    const openedThemeId = storyHistory.find(e => e.id === readerEntryIdRef.current)?.themeId ?? selectedTheme;
+    const themeAudioKey = (THEMES.some(t => t.id === openedThemeId) || FOLK_TALES.some(t => t.id === openedThemeId))
+      ? openedThemeId
       : undefined;
     if (musicOn) ambientRef.current?.playIntro(scenes[0]?.soundscape, themeAudioKey);
     ambientRef.current?.setScene(scenes[0]?.soundscape);
@@ -2976,6 +2976,34 @@ export default function Home() {
     }
     return () => { dead = true; };
   }, [activeBg]);
+
+  // 🎬 Titulní obrazovka MUSÍ použít VLASTNÍ téma ČTENÉ pohádky, ne živý stav
+  // formuláře (selectedTheme/activeBg) — jinak by při frontě víc pohádek s
+  // různými světy titulka otevřené STARŠÍ pohádky ukázala špatný svět, nebo
+  // úplně prázdný/šedý obrázek (nikdy nenačtený), protože mezitím uživatel na
+  // homepage vybral jiné téma pro DALŠÍ pohádku. Najde se podle id aktuálně
+  // čtené pohádky v historii (tam je uložené i její vlastní themeId).
+  const readerThemeId = storyHistory.find(e => e.id === readerEntryIdRef.current)?.themeId ?? selectedTheme;
+  const cardBg = readerThemeId
+    ? (THEME_BG[readerThemeId] ?? (customThemes.some(ct => ct.id === readerThemeId) || folkTaleById(readerThemeId) ? "fantasy" : "night"))
+    : "night";
+  const [cardBgUrl, setCardBgUrl] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    const cached = bgUrlCacheRef.current[cardBg];
+    if (cached) { setCardBgUrl(cached); return; }
+    if (!titleCardOpen) return;
+    let dead = false;
+    fetch(`/api/bg-image?scene=${cardBg}`, { signal: AbortSignal.timeout(110_000) })
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: { url?: string } | null) => {
+        if (dead || !d?.url) return;
+        bgUrlCacheRef.current[cardBg] = d.url;
+        setCardBgUrl(d.url);
+      })
+      .catch(() => {});
+    return () => { dead = true; };
+  }, [titleCardOpen, cardBg]);
+
   // Výběr světa pozadí: velké tlačítko otevře rolovací nabídku (jako 📜 pohádky)
   const [bgPickerOpen, setBgPickerOpen] = useState(false);
   // 🔍 Náhled pozadí PODRŽENÍM: po 350 ms se ukáže malá karta s ilustrací,
@@ -4724,45 +4752,29 @@ export default function Home() {
             onClick={() => { if (readerMode) setCtrlsOpen(v => !v); }}
           >
             {/* 📖 Titulní obrazovka: název + úvodní fanfára, PŘED prvním slidem —
-                scéna 1 se pod ní klidně dokresluje/čeká, ať je hned vidět po zavření.
-                Zavřít (ťuknutím i časem) jde JEN když je CELÁ pohádka fakt
-                hotová (všechny obrázky i hlasy) — jinak by appka spustila
-                nedokreslenou pohádku a dokreslování by pak bylo vidět
-                rušivě uprostřed čtení. */}
+                zbytek pohádky se pod ní klidně dokresluje/čeká. Zavřít jde JEN
+                ručním ťuknutím a JEN když jsou hotové VŠECHNY obrázky — appka
+                nikdy sama nezavře časem ani nenabídne "číst i tak": dokud není
+                hotovo, čeká, i kdyby to trvalo dlouho (na výslovné přání). */}
             {titleCardOpen && (
               <div className="title-card"
                 onClick={e => { e.stopPropagation(); if (storyFullyReady) closeTitleCard(); }}>
-                {/* 🖼️ Podklad = ilustrace SVĚTA POZADÍ appky (stejná jako na
-                    homepage, viz bgUrlCacheRef/activeBg) — SCHVÁLNĚ jiný
-                    obrázek než pohádka samotná, na přání z konverzace ("musí
-                    to být úplně jiný obrázek než v pohádce, ideálně nějaké
-                    intro"). Nikdy nefallbackuje na scénu 1, ani po jejím
-                    dokreslení — jinou (dřívější) verzi téhle úvahy viz v4.68
-                    v changelogu, tahle je záměrně jiná/finální. */}
-                {bgUrlCacheRef.current[activeBg] && (
-                  <div className="title-card-bg" style={{ backgroundImage: `url(${bgUrlCacheRef.current[activeBg]})` }} />
+                {/* 🖼️ Podklad = ilustrace SVĚTA POZADÍ appky VLASTNÍHO téhle
+                    pohádky (viz cardBg/cardBgUrl — ne živý stav homepage
+                    formuláře, aby fronta pohádek s různými světy neukázala
+                    špatný/prázdný obrázek), schválně JINÝ obrázek než pohádka
+                    samotná (na přání z konverzace: "musí to být úplně jiný
+                    obrázek, ideálně nějaké intro"). */}
+                {cardBgUrl && (
+                  <div className="title-card-bg" style={{ backgroundImage: `url(${cardBgUrl})` }} />
                 )}
                 <div className="title-card-scrim" />
                 <div className="title-card-content">
                   <div className="title-card-emoji">📖</div>
                   <div className="title-card-title">{title}</div>
                   <div className="title-card-tap">
-                    {/* 🚦 "Ťukni pro spuštění" se ukáže až pro CELOU hotovou
-                        pohádku (storyFullyReady), ne jen pro hotovou scénu 1 —
-                        appka měla dřív začínat číst dřív, než bylo vše
-                        dokreslené, a zbytek se dokresloval viditelně za
-                        čtenářem. */}
                     {storyFullyReady ? t.titleCardTap : <><span className="placeholder-spinner placeholder-spinner-sm" />{t.titleCardPreparing}</>}
                   </div>
-                  {/* 🆘 Ruční únik, kdyby se scéna nikdy nedokreslila (server
-                      narazil na svůj tvrdý strop) — appka čtenáře nenechá
-                      trčet na "připravuji se" navěky bez jakékoli možnosti. */}
-                  {!storyFullyReady && titleCardEscapeReady && (
-                    <button type="button" className="title-card-escape"
-                      onClick={e => { e.stopPropagation(); closeTitleCard(); }}>
-                      {t.titleCardReadAnyway}
-                    </button>
-                  )}
                 </div>
               </div>
             )}
