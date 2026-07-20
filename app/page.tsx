@@ -1080,14 +1080,11 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [titleCardOpen, storyFullyReady]);
 
-  // Sama zmizí po chvíli, kdyby na ni malý čtenář zapomněl ťuknout — ale jen
-  // KDYŽ je CELÁ pohádka už opravdu hotová; jinak by appka „spustila"
-  // nedokreslenou pohádku jen proto, že vypršel čas.
-  useEffect(() => {
-    if (!titleCardOpen || !storyFullyReady) return;
-    const t = setTimeout(() => closeTitleCard(), 7000);
-    return () => clearTimeout(t);
-  }, [titleCardOpen, storyFullyReady, closeTitleCard]);
+  // 🚫 ŽÁDNÉ automatické zavírání titulky — appka smí přejít na scénu 1 JEN
+  // po výslovném ťuknutí (viz "pohádka se sama spustí", výslovné zamítnutí
+  // dřívějšího 7s auto-dismiss). Titulka tedy čeká na klik navěky, jakmile
+  // je storyFullyReady — jen se změní text z "Připravuji…" na "ťukni pro
+  // spuštění" a přestane ignorovat klik (viz onClick v title-card JSX níž).
 
   // Intro fanfare when reader opens — dá přednost tématu SVĚTA (Krteček,
   // Autíčka, konkrétní pohádka…) před náladou 1. scény; vlastní/žádný svět
