@@ -2977,7 +2977,7 @@ export default function Home() {
   const autoBg = selectedTheme
     ? (THEME_BG[selectedTheme]
         ?? (customThemes.some(ct => ct.id === selectedTheme) || folkTaleById(selectedTheme) ? "fantasy" : "night"))
-    : "night";
+    : "fantasy"; // 🎨 výchozí pozadí appky = Kouzlo (bez vybraného tématu), na přání
   const activeBg = bgChoice === "auto" ? autoBg : bgChoice;
 
   // 🎨 Homepage: ambientní hudba podle SVĚTA POZADÍ — ale JEN když si ho
