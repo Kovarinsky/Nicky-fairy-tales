@@ -4280,7 +4280,7 @@ export default function Home() {
                 if (sel) return `${sel.emoji} ${uiLang === "en" && sel.nameEn ? sel.nameEn : sel.name}`;
                 const folk = folkTaleById(selectedTheme);
                 if (folk) return `${folk.emoji} ${uiLang === "en" ? folk.nameEn : folk.name}`;
-                return `🌍 ${t.presetWorldPick}`;
+                return `🌍 ${t.presetWorldPick} (${t.rollerTapHint})`;
               })()}
             </button>
             {worldOpen && (
@@ -4346,7 +4346,7 @@ export default function Home() {
               onClick={() => setCustomWorldOpen(p => !p)}>
               {(() => {
                 const ct = customThemes.find(c => c.id === selectedTheme);
-                return ct ? `🌍 ${ct.name}` : `🌍 ${t.customWorldPick}`;
+                return ct ? `🌍 ${ct.name}` : `🌍 ${t.customWorldPick} (${t.rollerTapHint})`;
               })()}
             </button>
             {customWorldOpen && (
@@ -4398,6 +4398,7 @@ export default function Home() {
                   {/* ✕ pro smazání textu je NAD polem vpravo — nepřekrývá text */}
                   {newThemeDesc.trim() !== "" && (
                     <div className="ta-toolbar">
+                      <span className="ta-clear-hint">{t.clearTextBtn}</span>
                       <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
                         onClick={e => { e.stopPropagation(); setNewThemeDesc(""); }}>✕</button>
                     </div>
@@ -4638,6 +4639,7 @@ export default function Home() {
               Oranžový ✕ NAD polem vpravo maže text (nepřekrývá ho) */}
           {topic.trim() !== "" && (
             <div className="ta-toolbar">
+              <span className="ta-clear-hint">{t.clearTextBtn}</span>
               <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
                 onClick={e => { e.stopPropagation(); setTopic(""); }}>✕</button>
             </div>
@@ -5424,6 +5426,7 @@ export default function Home() {
             <p className="app-confirm-msg">📝 {t.wishLabel}</p>
             {topic.trim() !== "" && (
               <div className="ta-toolbar">
+                <span className="ta-clear-hint">{t.clearTextBtn}</span>
                 <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
                   onClick={() => setTopic("")}>✕</button>
               </div>
@@ -5504,6 +5507,7 @@ export default function Home() {
             <p className="app-confirm-msg">✏️ {t.editTextTitle(editingPage.page + 1)}</p>
             {editingPage.text.trim() !== "" && (
               <div className="ta-toolbar">
+                <span className="ta-clear-hint">{t.clearTextBtn}</span>
                 <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
                   onClick={() => setEditingPage(p => (p ? { ...p, text: "" } : p))}>✕</button>
               </div>
@@ -5531,6 +5535,7 @@ export default function Home() {
             <p className="app-confirm-msg">🌍 {t.worldDescLabel}</p>
             {newThemeDesc.trim() !== "" && (
               <div className="ta-toolbar">
+                <span className="ta-clear-hint">{t.clearTextBtn}</span>
                 <button type="button" className="ta-clear" aria-label={t.clearTextBtn}
                   onClick={() => setNewThemeDesc("")}>✕</button>
               </div>

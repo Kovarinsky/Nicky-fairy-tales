@@ -2812,8 +2812,18 @@ button:disabled {
 
 .ta-toolbar {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 0.4rem;
   margin-bottom: 0.35rem;
+}
+
+/* Malá popiska vedle oranžového ✕ — samotná ikonka mohla vypadat jako
+   "zavřít celý editor", ve skutečnosti maže jen text v poli pod ní */
+.ta-clear-hint {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 /* Hlavní pole na vyplnění (zadání pohádky, popis světa) — tenká oranžová linka;
@@ -3057,12 +3067,35 @@ textarea.ta-accent:focus {
   width: min(680px, calc(100vw - 1.4rem));
   /* Okno sedí NAHOŘE u okraje displeje, ať pod ním zbývá místo na klávesnici */
   align-self: flex-start;
-  margin-top: max(0.6rem, env(safe-area-inset-top));
+  margin-top: max(0.4rem, env(safe-area-inset-top));
+  /* 📱⌨️ Když se otevře klávesnice, viditelná výška (100dvh) se zmenší —
+     okno i textové pole se teď podle toho SAMY zmenší (flex), místo aby
+     textarea trvala na pevných 42vh a přetekla i s tlačítky za klávesnici
+     (viz nahlášené "klávesnice vezme půl obrazovky"). Zbytek prostoru dostane
+     VÝHRADNĚ textové pole, ať se vejde co nejvíc textu. */
+  max-height: calc(100dvh - 0.8rem - env(safe-area-inset-top));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.topic-editor > .app-confirm-msg,
+.topic-editor > .ta-toolbar,
+.topic-editor > .topic-editor-btns,
+.topic-editor > .app-confirm-btns {
+  flex: 0 0 auto;
+}
+.topic-editor > .ta-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+.topic-editor > .ta-wrap textarea {
+  flex: 1 1 auto;
 }
 
 .topic-editor-ta {
   width: 100%;
-  min-height: 42vh;
+  min-height: 120px;
   resize: vertical;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.35);
