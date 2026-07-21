@@ -28,6 +28,35 @@ function applyCzechPronunciations(text: string): string {
   return out;
 }
 
+// 🗣️ Fonetické nápovědy PRO TUTO KONKRÉTNÍ pohádku — Claude je připojí na
+// konec heroDescription (stejný trik appka používá pro worldNotes), když si
+// pro příběh vymyslí jméno, které by hlas mohl přečíst špatně (např. postavy
+// jídla ve světě "Mexická kuchyně" — Tortillka, Chillička). Statický seznam
+// výše pokrývá jen FIXNÍ rodinné postavy — tohle pokrývá cokoli vymyšlené
+// PRO JEDNU KONKRÉTNÍ pohádku, aniž by appka musela protahovat nové pole
+// přes všechna volání /api/scene — heroDescription tam už beztak chodí vždy.
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractDynamicHints(heroDescription: string): Array<[RegExp, string]> {
+  const m = /Pronunciation hints\s*:\s*([^|]+)/i.exec(heroDescription);
+  if (!m) return [];
+  const pairs: Array<[RegExp, string]> = [];
+  for (const part of m[1].split(";")) {
+    const [from, to] = part.split("→").map(s => s?.trim());
+    if (from && to) pairs.push([new RegExp(escapeRegExp(from), "g"), to]);
+  }
+  return pairs;
+}
+
+function applyDynamicHints(text: string, heroDescription?: string): string {
+  if (!heroDescription) return text;
+  let out = text;
+  for (const [re, to] of extractDynamicHints(heroDescription)) out = out.replace(re, to);
+  return out;
+}
+
 function envNum(name: string, fallback: number): number {
   const n = parseFloat(process.env[name] || "");
   return Number.isFinite(n) && n >= 0 && n <= 1 ? n : fallback;
@@ -46,8 +75,8 @@ function sanitizeText(text: string): string {
 }
 
 /** Stejná úprava textu pro jiné TTS (Gemini): fonetika jmen + typografie */
-export function prepareNarrationText(text: string): string {
-  return applyCzechPronunciations(sanitizeText(text));
+export function prepareNarrationText(text: string, heroDescription?: string): string {
+  return applyDynamicHints(applyCzechPronunciations(sanitizeText(text)), heroDescription);
 }
 
 export interface VoiceTuning {
@@ -62,7 +91,7 @@ export async function getCloneTuning(voiceId: string): Promise<VoiceTuning | und
   return Array.isArray(clones) ? clones.find(c => c.id === voiceId)?.settings : undefined;
 }
 
-export async function narrateScene(scene: Scene, overrideVoiceId?: string, tuning?: VoiceTuning): Promise<Buffer> {
+export async function narrateScene(scene: Scene, overrideVoiceId?: string, tuning?: VoiceTuning, heroDescription?: string): Promise<Buffer> {
   const apiKey = sanitizeApiKey(process.env.ELEVENLABS_API_KEY);
   if (!apiKey) throw new Error("Chybi ELEVENLABS_API_KEY.");
 
@@ -82,7 +111,7 @@ export async function narrateScene(scene: Scene, overrideVoiceId?: string, tunin
         "xi-api-key": apiKey,
       },
       body: JSON.stringify({
-        text: applyCzechPronunciations(sanitizeText(scene.narration)),
+        text: applyDynamicHints(applyCzechPronunciations(sanitizeText(scene.narration)), heroDescription),
         model_id: modelId,
         output_format: "mp3_44100_128",
         // Živější přednes: nižší stability = větší intonační rozsah (citoslovce,

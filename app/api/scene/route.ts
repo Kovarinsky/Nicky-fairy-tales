@@ -29,10 +29,10 @@ export async function POST(req: NextRequest) {
     // TTS router: hlasy "gemini:<jméno>" namluví Gemini TTS (WAV), ostatní ElevenLabs
     const narrate = async (): Promise<{ buffer: Buffer; mimeType: string }> => {
       if (voiceId?.startsWith("gemini:")) {
-        return narrateWithGemini(prepareNarrationText(scene.narration), voiceId.slice(7));
+        return narrateWithGemini(prepareNarrationText(scene.narration, heroDescription), voiceId.slice(7));
       }
       const tuning = voiceTuningOverride || (voiceId ? await getCloneTuning(voiceId) : undefined);
-      return { buffer: await narrateScene(scene, voiceId, tuning), mimeType: "audio/mpeg" };
+      return { buffer: await narrateScene(scene, voiceId, tuning, heroDescription), mimeType: "audio/mpeg" };
     };
 
     if (audioOnly) {

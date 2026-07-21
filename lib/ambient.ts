@@ -10,6 +10,20 @@
 import type { Soundscape, SoundEffect } from "./types";
 export type { Soundscape, SoundEffect };
 
+// 🌙 Jemný náběh hudby mezi scénami — `setTargetAtTime` (exponenciální
+// nabíjení) roste NEJRYCHLEJI hned na začátku, takže i s dlouhým časem znělo
+// nastupující podkreso pořád jako "švihnutí". Smoothstep křivka (nulový sklon
+// na obou koncích) místo toho POMALU nabíhá, zrychlí uprostřed a plynule
+// dozní do cíle — skutečné "s náběhem", ne ostrý start.
+function smoothstepCurve(steps = 48): Float32Array {
+  const arr = new Float32Array(steps);
+  for (let i = 0; i < steps; i++) {
+    const x = i / (steps - 1);
+    arr[i] = x * x * (3 - 2 * x);
+  }
+  return arr;
+}
+
 // ── Frequency tables ──────────────────────────────────────────────────────────
 const BELLS_MAGIC  = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50]; // C5-C6 major pent
 const BELLS_NIGHT  = [220.00, 261.63, 311.13, 369.99, 440.00];          // A3-A4 minor pent
@@ -917,7 +931,7 @@ export class AmbientPlayer {
   /** Crossfade z aktuální vrstvy (pokud existuje) do už připravené `newLayer`
    *  — sdíleno mezi setScene (nálada podle scény) a enterSleepMode (přechod
    *  do usínací smyčky pro titulky), jen s jinými časy prolnutí. */
-  private crossfadeToLayer(newLayer: Layer, fadeOutSec = 0.4, fadeInSec = 0.5): void {
+  private crossfadeToLayer(newLayer: Layer, fadeOutSec = 0.4, fadeInSec = 1.6): void {
     const { ctx } = this.setup();
     const t = ctx.currentTime;
 
@@ -928,7 +942,7 @@ export class AmbientPlayer {
     }
 
     newLayer.gain.gain.setValueAtTime(0, t);
-    newLayer.gain.gain.setTargetAtTime(1, t + 0.05, fadeInSec);
+    newLayer.gain.gain.setValueCurveAtTime(smoothstepCurve(), t + 0.05, fadeInSec);
     this.layer = newLayer;
   }
 
@@ -1241,7 +1255,7 @@ export class AmbientPlayer {
     this.currentLayerKey = key;
     const { ctx, rev } = this.setup();
     const newLayer = this.buildLayerByKey(key, (c, g, r) => buildMagic(c, g, r), ctx, rev);
-    this.crossfadeToLayer(newLayer, 0.4, 0.6);
+    this.crossfadeToLayer(newLayer, 0.4, 1.4);
   }
 
   /** Switch soundscape — smooth crossfade; ignored when muted */

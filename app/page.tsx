@@ -231,15 +231,37 @@ function detectDeviceKind(): DeviceKind {
   return shortSide >= 600 ? "tablet" : "phone";
 }
 
+// 🍏 iOS Safari (mimo appku přidanou na Plochu) VŮBEC nepodporuje Fullscreen
+// API pro běžné prvky stránky (jen pro <video>) — to je omezení WebKitu, ne
+// chyba appky, a jinak než přidáním na Plochu se to z JS obejít nedá. Appka
+// to tak alespoň umí ROZPOZNAT a nabídnout jediné skutečně funkční řešení,
+// místo aby tiše "nic nedělala" bez vysvětlení.
+function isIOSDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); // iPadOS 13+ hlásí se jako Mac
+}
+function isStandaloneDisplay(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia?.("(display-mode: standalone)").matches
+    || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+}
+
 // ⛶ Fullscreen + (jen na telefonu/tabletu) zámek na šířku. Na PC appka jen
 // vyplní obrazovku fullscreenem — orientaci nemá smysl zamykat, monitor
-// žádnou "na výšku" polohu nemá.
-async function enterImmersiveLandscape(): Promise<void> {
-  if (document.fullscreenElement) return;
-  try { await document.documentElement.requestFullscreen?.(); } catch { return; }
-  if (detectDeviceKind() === "desktop") return;
+// žádnou "na výšku" polohu nemá. Vrací, jak to dopadlo, ať volající může na
+// iOS (kde requestFullscreen v běžném Safari prostě neexistuje) nabídnout
+// návod na "Přidat na Plochu" místo tichého nic-se-nestalo.
+async function enterImmersiveLandscape(): Promise<"ok" | "ios-unsupported" | "failed"> {
+  if (document.fullscreenElement) return "ok";
+  if (!document.documentElement.requestFullscreen) {
+    return isIOSDevice() && !isStandaloneDisplay() ? "ios-unsupported" : "failed";
+  }
+  try { await document.documentElement.requestFullscreen(); } catch { return "failed"; }
+  if (detectDeviceKind() === "desktop") return "ok";
   const so = (screen as Screen & { orientation?: { lock?: (o: string) => Promise<void> } }).orientation;
   try { await so?.lock?.("landscape"); } catch {}
+  return "ok";
 }
 
 // Krátká ukázková věta (test hlasu, dobrou noc) podle jazyka
@@ -1094,7 +1116,7 @@ export default function Home() {
     titleCardOpenRef.current = false;
     setTitleCardOpen(false);
     isAutoAdvanceRef.current = true; // (znovu) natáhne spuštění namlouvání
-    enterImmersiveLandscape().then(() => setForcedLs(!!document.fullscreenElement));
+    enterImmersiveLandscape().then(handleFullscreenResult);
   }, []);
 
   // 🆘 Pojistka proti věčnému čekání: appka NIKDY nepustí čtenáře do
@@ -1400,6 +1422,20 @@ export default function Home() {
   function answerConfirm(ok: boolean) {
     confirmBox?.resolve(ok);
     setConfirmBox(null);
+  }
+
+  // 🍏 Jednorázová nápověda "přidej appku na Plochu" — appka ji zobrazí
+  // POUZE PRVNÍKRÁT, kdy se fullscreen na iOS Safari (mimo appku z Plochy)
+  // opravdu nedal spustit (viz enterImmersiveLandscape výš), ať to čtenáře
+  // nerozčiluje při každém spuštění pohádky.
+  function handleFullscreenResult(status: "ok" | "ios-unsupported" | "failed") {
+    if (status !== "ios-unsupported") { setForcedLs(!!document.fullscreenElement); return; }
+    setForcedLs(false);
+    try {
+      if (localStorage.getItem("nicky-ios-fs-hint-shown")) return;
+      localStorage.setItem("nicky-ios-fs-hint-shown", "1");
+    } catch {}
+    void appAlert(t.iosFullscreenHint);
   }
 
   // Ducking: při mluveném slově se hudební podkres ztiší, v pauzách a mezi
@@ -2092,8 +2128,7 @@ export default function Home() {
     const so = (screen as Screen & { orientation?: { unlock?: () => void } }).orientation;
     const inFs = !!document.fullscreenElement;
     if (!inFs) {
-      await enterImmersiveLandscape();
-      setForcedLs(!!document.fullscreenElement);
+      handleFullscreenResult(await enterImmersiveLandscape());
     } else {
       try { so?.unlock?.(); } catch {}
       try { await document.exitFullscreen(); } catch {}
@@ -2124,7 +2159,7 @@ export default function Home() {
       // Safari mimo video, nebo desktop bez orientation.lock) appka jen
       // tiše zůstane, jak byla, bez chyby. Orientace se zamyká jen na
       // telefonu/tabletu (detectDeviceKind) — na PC nemá co zamykat.
-      enterImmersiveLandscape().then(() => setForcedLs(!!document.fullscreenElement));
+      enterImmersiveLandscape().then(handleFullscreenResult);
     }
   }
 
@@ -2970,12 +3005,14 @@ export default function Home() {
       const raw = localStorage.getItem(CUSTOM_THEMES_KEY);
       if (raw) {
         const list = JSON.parse(raw) as CustomTheme[];
-        setCustomThemes(list.map(c => ({
+        const deduped = dedupeThemesByName(list);
+        setCustomThemes(deduped.map(c => ({
           ...c,
           previewUrl: c.photos?.[0]
             ? `data:${c.photos[0].mimeType};base64,${c.photos[0].data}`
             : c.photoBase64 && c.photoMimeType ? `data:${c.photoMimeType};base64,${c.photoBase64}` : undefined,
         })));
+        if (deduped.length !== list.length) saveCustomThemes(deduped);
       }
     } catch {}
   }, []);
@@ -3159,6 +3196,13 @@ export default function Home() {
 
   // ── 🎲 Vymysli námět — Claude navrhne námět do textového pole ────────────
   const [ideaLoading, setIdeaLoading] = useState(false);
+  // 🔁 Poslední námět, co appka SAMA vygenerovala — dokud v poli zůstává
+  // BEZE ZMĚNY, další ťuknutí na 🎲 ho nesmí poslat zpátky jako "hint"
+  // (server pak jen "rozvíjel uživatelovy poznámky", což ve skutečnosti byl
+  // ten samý vygenerovaný text — proto se námět dřív pořád opakoval skoro
+  // stejný/identický). Skutečně ručně napsaný text uživatele se ale POŘÁD
+  // respektuje jako hint, protože se od téhle hodnoty liší.
+  const lastSuggestedIdeaRef = useRef("");
   // 🪄 Rozvinout — z kostry uživatele udělá detailní osnovu (postavy, místa,
   // data, kostýmy); výsledek jde do pole přání a dá se před generováním upravit
   const [expandLoading, setExpandLoading] = useState(false);
@@ -3224,7 +3268,10 @@ export default function Home() {
           // stejně "univerzální" námět bez ohledu na to, komu se čte.
           age: AGE_BANDS.find(b => b.id === agePref)?.age ?? getTargetAge([...selectedIds, ...selectedCustomIds]),
           hint: [
-            topic.trim(),
+            // 🔁 Pole obsahuje BEZE ZMĚNY námět z MINULÉHO ťuknutí na 🎲 →
+            // appka ho nesmí poslat zpátky jako hint (viz lastSuggestedIdeaRef
+            // výš), jinak server jen opakovaně "rozvíjí" ten samý text.
+            topic.trim() === lastSuggestedIdeaRef.current ? "" : topic.trim(),
             sequelOf
               ? (uiLang === "en" ? `Sequel to the tale “${sequelOf.title}”` : `Pokračování pohádky „${sequelOf.title}“`)
               : "",
@@ -3232,7 +3279,7 @@ export default function Home() {
         }),
       });
       const d = await safeJson<{ idea?: string }>(res);
-      if (res.ok && d.idea) { setTopic(d.idea); return true; }
+      if (res.ok && d.idea) { setTopic(d.idea); lastSuggestedIdeaRef.current = d.idea; return true; }
       return false;
     } catch { return false; } finally {
       setIdeaLoading(false);
@@ -3267,6 +3314,11 @@ export default function Home() {
     } catch {}
     setGpsLoading(true);
     setGpsSuccess(false); // nový pokus ruší potvrzení z toho minulého
+    // 🌍📍 GPS a ručně vybraný svět jsou VZÁJEMNĚ VÝLUČNÉ — appka dřív
+    // uměla mít oba naráz "aktivní" (vybraný svět zůstal oranžový i po
+    // úspěšné poloze), což vypadalo jako dva různé výběry současně.
+    // Poloha teď svět vždy PŘEBIJE a odznačí ho.
+    setSelectedTheme("");
     try {
       // ⏱ Volání getCurrentPosition někdy (typicky když má telefon úplně
       // vypnuté systémové služby polohy) NEZAVOLÁ ani úspěšný, ani chybový
@@ -3372,6 +3424,23 @@ export default function Home() {
     return Array.from(map.values());
   }
 
+  // 🌍✂️ Dva vlastní světy se STEJNÝM jménem (typicky vzniklé nezávisle na
+  // dvou zařízeních, unionById je nesloučí — mají jiné id) — appka je dřív
+  // ukazovala oba naráz jako samostatné dlaždice. Podle jména necháváme jen
+  // POSLEDNÍ vytvořený (id `ctheme_<timestamp>` neseslo pořadí, novější
+  // timestamp = novější svět), starší duplikát tiše zmizí.
+  function dedupeThemesByName(list: CustomTheme[]): CustomTheme[] {
+    const ordered = list
+      .map((ct, i) => {
+        const m = /^ctheme_(\d+)$/.exec(ct.id);
+        return { ct, order: m ? Number(m[1]) : i };
+      })
+      .sort((a, b) => a.order - b.order);
+    const byName = new Map<string, CustomTheme>();
+    for (const { ct } of ordered) byName.set(ct.name.trim().toLowerCase(), ct);
+    return Array.from(byName.values());
+  }
+
   function applySyncData(data: SyncPayload | null | undefined) {
     if (!data) return;
     if (data.history) {
@@ -3387,7 +3456,9 @@ export default function Home() {
       setCustomChars(merged);
     }
     if (data.customThemes) {
-      const merged = unionById(readJsonLS(CUSTOM_THEMES_KEY, [] as Array<{ id: string; name: string; prompt: string }>), data.customThemes);
+      const merged = dedupeThemesByName(
+        unionById(readJsonLS(CUSTOM_THEMES_KEY, [] as Array<{ id: string; name: string; prompt: string }>), data.customThemes) as CustomTheme[]
+      );
       localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(merged));
       setCustomThemes(merged);
     }
@@ -4215,7 +4286,7 @@ export default function Home() {
                   <p className="folk-group">🌍 {uiLang === "en" ? "Worlds" : "Světy"}</p>
                   {themes.map(th => (
                     <button type="button" key={th.id} className={`folk-item ${selectedTheme === th.id ? "folk-on" : ""}`}
-                      onClick={() => { setSelectedTheme(p => p === th.id ? "" : th.id); setWorldOpen(false); }}>
+                      onClick={() => { setSelectedTheme(p => p === th.id ? "" : th.id); setGpsSuccess(false); setWorldOpen(false); }}>
                       <span className="folk-emoji">{th.emoji}</span>
                       <span>{uiLang === "en" && th.nameEn ? th.nameEn : th.name}</span>
                     </button>
@@ -4226,7 +4297,7 @@ export default function Home() {
                     .map(ft => (
                     <button type="button" key={ft.id}
                       className={`folk-item ${selectedTheme === ft.id ? "folk-on" : ""}`}
-                      onClick={() => { setSelectedTheme(p => p === ft.id ? "" : ft.id); setWorldOpen(false); }}>
+                      onClick={() => { setSelectedTheme(p => p === ft.id ? "" : ft.id); setGpsSuccess(false); setWorldOpen(false); }}>
                       <span className="folk-emoji">{ft.emoji}</span>
                       <span>{uiLang === "en" ? ft.nameEn : ft.name}</span>
                     </button>
@@ -4237,7 +4308,7 @@ export default function Home() {
                     .map(ft => (
                     <button type="button" key={ft.id}
                       className={`folk-item ${selectedTheme === ft.id ? "folk-on" : ""}`}
-                      onClick={() => { setSelectedTheme(p => p === ft.id ? "" : ft.id); setWorldOpen(false); }}>
+                      onClick={() => { setSelectedTheme(p => p === ft.id ? "" : ft.id); setGpsSuccess(false); setWorldOpen(false); }}>
                       <span className="folk-emoji">{ft.emoji}</span>
                       <span>{uiLang === "en" ? ft.nameEn : ft.name}</span>
                     </button>
@@ -4252,7 +4323,7 @@ export default function Home() {
               {customThemes.map(ct => (
                 <div key={ct.id} className={`chip custom-chip ${selectedTheme === ct.id ? "chip-on" : ""}`}>
                   {ct.previewUrl && <img src={ct.previewUrl} alt={ct.name} className="chip-avatar" />}
-                  <span className="chip-label" onClick={() => setSelectedTheme(p => p === ct.id ? "" : ct.id)}>🌍 {ct.name}</span>
+                  <span className="chip-label" onClick={() => { setSelectedTheme(p => p === ct.id ? "" : ct.id); setGpsSuccess(false); }}>🌍 {ct.name}</span>
                   <button type="button" className="chip-edit" aria-label={t.editWorldBtn} title={t.editWorldBtn}
                     onClick={e => { e.stopPropagation(); startEditCustomTheme(ct); }}>✏️</button>
                   <button type="button" className="chip-remove" onClick={() => removeCustomTheme(ct.id)}>×</button>
@@ -4854,8 +4925,15 @@ export default function Home() {
                     scéna 1 ještě kreslí, ukáže se jako dočasná záplata VLASTNÍ
                     svět TÉTO KONKRÉTNÍ pohádky (cardBgUrl, z historie podle
                     jejího id — ne živý stav homepage formuláře, aby fronta
-                    pohádek s různými světy neukázala cizí/prázdný obrázek). */}
-                {scene1Ready && scenes[0]?.imageUrl ? (
+                    pohádek s různými světy neukázala cizí/prázdný obrázek).
+                    👀 Šipky/tečky pod titulkou zůstávají funkční (viz book-nav
+                    níž) — jakmile čtenář jimi prolistuje na jinou stránku,
+                    pozadí titulky se přepne na NÁHLED TÉ stránky, ať si může
+                    ověřit, že se pohádka správně nahrála, ještě než ťukne
+                    na spuštění. */}
+                {scenes[page]?.imageUrl && !isPlaceholderImg(scenes[page].imageUrl) ? (
+                  <div className="title-card-bg" style={{ backgroundImage: `url(${scenes[page].imageUrl})` }} />
+                ) : scene1Ready && scenes[0]?.imageUrl ? (
                   <div className="title-card-bg" style={{ backgroundImage: `url(${scenes[0].imageUrl})` }} />
                 ) : cardBgUrl ? (
                   <div className="title-card-bg" style={{ backgroundImage: `url(${cardBgUrl})` }} />
@@ -4990,12 +5068,11 @@ export default function Home() {
           </div>
 
           {/* Nav arrows + dots outside the card — no overflow clipping.
-              🚫 Dokud je nahoře titulka (title-card), listování stránkami POD
-              ní nemá k čemu — čtenář viděl pořád jen titulku a myslel si, že
-              šipky nefungují, i když stránka se pod ní ve skutečnosti měnila.
-              Celý pruh proto při otevřené titulce zhasne a nejde na něj sáhnout. */}
-          <div className={`book-nav${titleCardOpen ? " book-nav-locked" : ""}`} ref={navRef}
-            inert={titleCardOpen ? true : undefined}>
+              ✅ Funkční i při otevřené titulce — čtenář si tak může před
+              samotným spuštěním prolistovat stránky a ověřit, že se pohádka
+              správně nahrála (titulka na pozadí ukazuje NÁHLED aktuální
+              stránky, viz scenes[page] u .title-card-bg výš). */}
+          <div className="book-nav" ref={navRef}>
             {/* 🔙 Na první stránce vede šipka zpět na titulní obrazovku (jinak
                 by na první scéně nešlo nikam couvnout — je to jediná stránka
                 bez skutečné "předchozí" scény). */}
@@ -5009,15 +5086,15 @@ export default function Home() {
                   setTitleCardOpen(true);
                 }
               }}
-              disabled={titleCardOpen || (!hasPrev && pagePos !== 0)} aria-label={t.prev}>←</button>
+              disabled={!hasPrev && pagePos !== 0} aria-label={t.prev}>←</button>
             <div className="page-dots">
               {visiblePages.map((i, pos) => (
                 <button key={i} type="button"
                   className={`dot ${i === page ? "dot-active" : ""} ${scenes[i]?.audioUrl ? "dot-ready" : ""}`}
-                  onClick={() => goToPage(i)} disabled={titleCardOpen} aria-label={`Strana ${pos + 1}`} />
+                  onClick={() => goToPage(i)} aria-label={`Strana ${pos + 1}`} />
               ))}
             </div>
-            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => nextVisible !== null && goToPage(nextVisible)} disabled={titleCardOpen || !hasNext} aria-label={t.next}>→</button>
+            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => nextVisible !== null && goToPage(nextVisible)} disabled={!hasNext} aria-label={t.next}>→</button>
           </div>
 
           {/* 🔀 Návrat k rozbočce — vyzkoušet druhou variantu konce */}
