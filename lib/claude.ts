@@ -735,6 +735,35 @@ export interface TopicIdeaContext {
   userHint?: string;
   /** 📍 Aktuální místo rodiny (jméno místa nebo GPS) — námět z okolí */
   locationHint?: string;
+  /** 👶 Věk posluchače — bez toho appka námět netrefila tón/napětí podle věku */
+  age?: number;
+}
+
+// 🎲 Náhodná "jiskra" žánru/motivu — appka měla i s pokynem "buď pokaždé
+// jiný" tendenci vracet dost podobné náměty (model bez vnější náhody
+// konverguje k "nejpravděpodobnějšímu" nápadu pro daný kontext). Skutečná
+// náhoda (Math.random) z pestré palety donutí appku pokaždé začít odjinud.
+const TOPIC_SPARKS_CS = [
+  "podmořské dobrodružství", "detektivní pátrání po záhadě", "kouzelnická škola",
+  "cesta do minulosti", "setkání s neobvyklým zvířetem", "závod proti času",
+  "tajemný dopis/mapa", "ztracený poklad", "výlet do vesmíru", "kouzelný trh/jarmark",
+  "bouřka nebo živel, co je potřeba přečkat", "nová postava, co potřebuje pomoc",
+  "oslava/svátek, který se pokazí", "malé zvířátko, co se ztratilo", "kouzelný předmět s vlastní vůlí",
+  "výprava do jeskyně/podzemí", "let na kouzelném koberci/balonu", "soutěž nebo hra s pravidly",
+  "sen, který se zdá skutečný", "stopa vedoucí k překvapení",
+];
+const TOPIC_SPARKS_EN = [
+  "an underwater adventure", "a detective mystery to solve", "a school of magic",
+  "a journey into the past", "meeting an unusual animal", "a race against time",
+  "a mysterious letter or map", "a lost treasure", "a trip into space", "a magical market/fair",
+  "a storm or force of nature to weather", "a new character who needs help",
+  "a celebration that goes wrong", "a lost baby animal", "a magical object with a mind of its own",
+  "an expedition into a cave/underground", "flying on a magic carpet/balloon", "a game or contest with rules",
+  "a dream that feels real", "a clue leading to a surprise",
+];
+function randomSpark(language: "cs" | "en"): string {
+  const list = language === "en" ? TOPIC_SPARKS_EN : TOPIC_SPARKS_CS;
+  return list[Math.floor(Math.random() * list.length)];
 }
 
 export async function suggestTopicIdea(language: "cs" | "en", characterNames: string[], ctx: TopicIdeaContext = {}): Promise<string> {
@@ -757,9 +786,23 @@ export async function suggestTopicIdea(language: "cs" | "en", characterNames: st
       ? ` The family is RIGHT NOW at this real location: ${ctx.locationHint}. The idea MUST be set in this place or its close surroundings — use its real scenery (sea/mountains/forest/town), local animals, landmarks and atmosphere so the children recognize where they are.`
       : ` Rodina je PRÁVĚ TEĎ na tomto skutečném místě: ${ctx.locationHint}. Námět se MUSÍ odehrávat tady nebo v blízkém okolí — využij skutečnou krajinu (moře/hory/les/město), místní zvířata, poznávací místa a atmosféru, ať děti poznají, kde jsou.`
     : "";
+  // 👶 Věk mění tón/napětí/slovník námětu — bez toho appka nabízela stejně
+  // "dospělý" námět batoleti i staršímu školákovi.
+  const agePart = ctx.age
+    ? language === "en"
+      ? ` Pitch it for a ${ctx.age}-year-old: match the tension, vocabulary and stakes to that age (very gentle/repetitive for a toddler, real (age-appropriate) stakes and a twist for an older child).`
+      : ` Namiř to na věk ${ctx.age} let: přizpůsob napětí, slovník i sázky tomuto věku (velmi jemné a opakující se pro batole, skutečné přiměřené napětí a zvrat pro staršího školáka).`
+    : "";
+  // 🎲 Náhodná jiskra JEN když uživatel nemá vlastní zápisky — s hintem by
+  // mohla plést, "vymysli si sám" naopak potřebuje vnější náhodu (viz TOPIC_SPARKS*).
+  const sparkPart = !ctx.userHint
+    ? language === "en"
+      ? ` For inspiration (don't force it if it doesn't fit, just let it loosely spark the idea): ${randomSpark(language)}.`
+      : ` Pro inspiraci (nemusíš to použít doslova, ať tě to jen volně navnadí): ${randomSpark(language)}.`
+    : "";
   const prompt = language === "en"
-    ? `Suggest ONE playful, original bedtime-story idea (1-2 sentences, max 40 words) for small children, featuring: ${who}.${worldPart}${locationPart}${hintPart} Make it concrete and magical (a place, a problem, a twist seed). Reply with ONLY the idea text — no quotes, no intro. Vary wildly: pick an unexpected setting or magical object.`
-    : `Navrhni JEDEN hravý, originální námět na pohádku před spaním (1–2 věty, max 40 slov) pro malé děti, kde vystupují: ${who}.${worldPart}${locationPart}${hintPart} Ať je konkrétní a kouzelný (místo, problém, zárodek překvapení). Odpověz POUZE textem námětu — bez uvozovek, bez úvodu. Buď pokaždé jiný: vyber nečekané prostředí nebo kouzelný předmět.`;
+    ? `Suggest ONE playful, original bedtime-story idea (1-2 sentences, max 40 words) for small children, featuring: ${who}.${worldPart}${locationPart}${hintPart}${agePart}${sparkPart} Make it concrete and magical (a place, a problem, a twist seed). Reply with ONLY the idea text — no quotes, no intro. Vary wildly every time — never repeat a setting or object you may have suggested before.`
+    : `Navrhni JEDEN hravý, originální námět na pohádku před spaním (1–2 věty, max 40 slov) pro malé děti, kde vystupují: ${who}.${worldPart}${locationPart}${hintPart}${agePart}${sparkPart} Ať je konkrétní a kouzelný (místo, problém, zárodek překvapení). Odpověz POUZE textem námětu — bez uvozovek, bez úvodu. Buď pokaždé úplně jiný — nikdy neopakuj prostředí ani předmět, který jsi možná navrhl už dřív.`;
   const raw = await callAnthropicApi({
     model,
     max_tokens: 300,

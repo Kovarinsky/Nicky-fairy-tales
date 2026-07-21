@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
       locationHint: typeof body.locationHint === "string" && body.locationHint.trim()
         ? body.locationHint.trim().slice(0, 200)
         : undefined,
+      age: Number.isFinite(Number(body.age)) && Number(body.age) > 0 ? Number(body.age) : undefined,
     };
     // ✨ expand: rozvinout kostru uživatele do detailní osnovy (vyžaduje hint).
     // Vychází i z vloženého PDF — malé přijde base64, velké odkazem do Blobu.

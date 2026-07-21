@@ -3206,6 +3206,9 @@ export default function Home() {
           themeId: override ? undefined : selectedTheme || undefined,
           customTheme: override,
           locationHint: locationHint || undefined,
+          // 👶 Věk posluchače — ať appka trefí tón/napětí/slovník, ne pokaždé
+          // stejně "univerzální" námět bez ohledu na to, komu se čte.
+          age: AGE_BANDS.find(b => b.id === agePref)?.age ?? getTargetAge([...selectedIds, ...selectedCustomIds]),
           hint: [
             topic.trim(),
             sequelOf
@@ -4168,7 +4171,7 @@ export default function Home() {
             <label>{t.worldLabel}</label>
             {/* 🎡 Vestavěné světy jako roller v panelu s ✕ (uložené vlastní
                 světy a + Vlastní svět zůstávají jako tlačítka pod ním) */}
-            <button type="button" className={`chip chip-btn chip-full ${worldOpen || !!selectedTheme ? "chip-on" : ""}`}
+            <button type="button" className={`chip chip-btn chip-full ${selectedTheme ? "chip-world-selected" : worldOpen ? "chip-on" : ""}`}
               onClick={() => setWorldOpen(p => !p)}>
               {(() => {
                 const sel = themes.find(th => th.id === selectedTheme);
@@ -4619,12 +4622,17 @@ export default function Home() {
             : bgGen
               ? (bgBufferRef.current.length > 0 ? bgBufferRef.current : Array(total || sceneCount).fill(null))
               : (bgStatus === "idle" && scenes.length > 0 && localGen ? scenes : Array(newestJob ? (newestJob.total || sceneCount) : sceneCount).fill(null));
+          // 🧑‍🤝‍🧑 Postavy už NEJSOU povinné — pohádka může vzniknout čistě
+          // z tématu/světa/inspirace bez jediné vybrané postavy (appka si
+          // obsazení sama vymyslí, stejně jako u vymyšlených vedlejších
+          // postav). Dřív šlo tlačítko zmáčknout jen s aspoň jednou
+          // zaškrtnutou postavou.
           return (
             <div ref={progressRef}>
               <button
                 type="submit"
                 className={`btn-create${localGen ? (showShimmer ? " btn-create-shimmer" : " btn-create-loading") : ""}`}
-                disabled={btnBusy || allSelectedCount === 0 || !hasInspiration}
+                disabled={btnBusy || !hasInspiration}
                 style={localGen && !showShimmer ? { '--progress-pct': `${progressPct}%` } as React.CSSProperties : undefined}
               >
                 {localGen ? (

@@ -623,15 +623,20 @@ textarea {
   color: #fff;
 }
 
-/* 📍 Pohádka podle mé lokality — důležitá funkce, ať oproti ostatním
-   šedým tlačítkům výrazně vyčnívá (stejná oranžová jako .btn-create) */
-.chip-gps {
-  background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
-  border-color: transparent;
-  color: #fff;
-  box-shadow: 0 3px 14px rgba(249, 115, 22, 0.4);
-}
+/* 📍 Pohádka podle mé lokality — dřív natrvalo oranžová, ale to se pletlo s
+   oranžovou = "právě vybraný svět" (viz .chip-world-selected/.custom-chip.
+   chip-on níž) — oranžová teď patří VÝHRADNĚ výběru, tohle tlačítko je zpět
+   na běžném stylu jako ostatní tlačítka inspirace. */
 .chip-gps:active { transform: scale(0.98); }
+
+/* 🌍 Souhrnné tlačítko "Vybrat svět" svítí oranžově, KDYŽ je nějaký svět
+   opravdu vybraný (ne jen otevřené menu) — stejná oranžová jako u vybrané
+   dlaždice vlastního světa (.custom-chip.chip-on), ať je jasné, že oranžová
+   vždy znamená "tohle je aktivní výběr", ne "důležité tlačítko". */
+.chip-world-selected {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.32), rgba(249, 115, 22, 0.32));
+  border-color: #f59e0b;
+}
 
 /* ✓ krátké oranžové potvrzení (stejná konvence jako .panel-ok) — appka
    „nabrala" a použila výsledek (např. návrh pohádky podle GPS polohy) */
