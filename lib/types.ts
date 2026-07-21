@@ -51,13 +51,16 @@ export type Soundscape = "magic" | "forest" | "night" | "adventure" | "cozy";
  *  od soundscape, což je jen obecná nálada hrající na pozadí celé scény).
  *  Kategorie: zvířata, počasí, stroje, lidé/akce, náladové akcenty. */
 export type SoundEffect =
-  // 🌦️ počasí
+  // 🌦️ počasí/příroda
   | "waves" | "thunder" | "wind_gust" | "rain" | "snow_crunch" | "water_flow"
+  | "campfire_crackle" | "waterfall" | "cave_drip" | "leaves_crunch" | "volcano_rumble" | "desert_wind"
   // 🐾 zvířata
   | "cow" | "pig" | "chicken" | "sheep" | "horse" | "duck" | "dog" | "cat" | "frog" | "owl" | "rooster" | "bee"
   | "rabbit" | "elephant" | "bear" | "mouse" | "bird" | "squirrel"
-  // ⚙️ stroje/doprava
+  | "fox" | "wolf" | "monkey" | "seagull" | "dolphin" | "cricket"
+  // 🚀 stroje/doprava
   | "car_engine" | "train" | "boat_horn" | "clock_tick" | "doorbell" | "phone_ring"
+  | "airplane" | "bicycle_bell" | "rocket_launch" | "helicopter" | "race_car_rev" | "sailboat_flap"
   // 🙋 lidé/akce
   | "footsteps" | "applause" | "laugh" | "splash" | "glass_clink"
   // 🎻 nástroje/předměty, kterými se v ději právě zahraje/manipuluje
@@ -65,10 +68,13 @@ export type SoundEffect =
   | "xylophone" | "music_box" | "tambourine" | "harmonica" | "bell_ring"
   | "page_turn" | "key_turn" | "sword_clash" | "whistle"
   | "umbrella_open" | "camera_click" | "kettle_whistle" | "cart_wheels" | "coin_clink" | "drawer_open" | "zipper"
+  // 🎈 hry/oslavy
+  | "ball_bounce" | "balloon_pop" | "firework_burst" | "rope_skip" | "kite_flutter"
   // ✨ náladové akcenty
   | "magic_chime" | "triumphant" | "tense_sting" | "sad_tone"
   // 😊 emoční reakce postav (neverbální)
   | "giggle" | "cheer_yay" | "sigh" | "yawn" | "sneeze" | "hiccup" | "hum_content" | "surprised_oh" | "group_aww"
+  | "gasp_fear" | "determined_grunt" | "relief_exhale" | "whisper"
   // 😴 ostatní
   | "snore";
 

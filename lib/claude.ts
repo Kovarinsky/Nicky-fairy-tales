@@ -1,4 +1,4 @@
-import type { StoryRequest, StoryScript, Character, Scene } from "./types";
+import type { StoryRequest, StoryScript, Character, Scene, Soundscape, SoundEffect } from "./types";
 
 // Příběhy píše Sonnet — kvalitou pohádek srovnatelný s Opusem, ~5× levnější.
 // Starší proměnná ANTHROPIC_MODEL (na Vercelu claude-opus-4-8) se už nepoužívá;
@@ -134,15 +134,17 @@ function buildSystemPrompt(language: string): string {
       "═══ SOUND EFFECT (sfx) ═══",
       "Optional `sfx` field on a scene — a ONE-SHOT sound effect for something the NARRATION OF THAT SCENE explicitly describes happening RIGHT THEN, on top of the ambient soundscape. This covers ANY scene where a specific sound-making object or action is the center of that moment — an instrument being played, a bell rung, a book's pages turning, a key turning in a lock, swords clashing, someone whistling a tune — the categories below are examples of the PATTERN, not an exhaustive list of situations; but the `sfx` VALUE itself must always be the single closest key from this list (never invent a key that isn't listed). Only add it when the text truly calls for it — most scenes have none. Never force one just to fill the field, and never pick more than one per scene:",
       '  WEATHER/WATER: "waves" (sea/ocean lapping or crashing) · "water_flow" (a calm river, stream or fountain flowing/trickling nearby — use this, NOT "waves", for rivers like the Vltava, streams, brooks and fountains) · "thunder" (thunder/lightning striking) · "wind_gust" (a gust or steady breeze of wind — use whenever the scene mentions wind, leaves rustling in the breeze, hair/clothes blowing) · "rain" (rain falling) · "snow_crunch" (footsteps crunching in snow)',
-      '  ANIMALS (the animal itself makes its sound in THIS scene): "cow" (moo) · "pig" (oink) · "chicken" (cluck) · "sheep" (bleat) · "horse" (neigh) · "duck" (quack) · "dog" (bark) · "cat" (meow) · "frog" (croak) · "owl" (hoot) · "rooster" (crow) · "bee" (buzzing) · "rabbit" (soft hop/sniff) · "elephant" (trumpet) · "bear" (gentle friendly grumble/huff) · "mouse" (squeak) · "bird" (chirp/tweet) · "squirrel" (chatter)',
-      '  MACHINES/TRAVEL: "car_engine" (a car engine starting/running) · "train" (a train chugging/whistling) · "boat_horn" (a boat/ship horn) · "clock_tick" (a clock ticking) · "doorbell" (a doorbell or knock) · "phone_ring" (a phone ringing)',
+      '  NATURE/PLACES: "campfire_crackle" (a campfire crackling nearby) · "waterfall" (a waterfall rushing in the distance) · "cave_drip" (water dripping in a cave) · "leaves_crunch" (footsteps through fallen autumn leaves) · "volcano_rumble" (a distant volcanic rumble) · "desert_wind" (dry wind over sand)',
+      '  ANIMALS (the animal itself makes its sound in THIS scene): "cow" (moo) · "pig" (oink) · "chicken" (cluck) · "sheep" (bleat) · "horse" (neigh) · "duck" (quack) · "dog" (bark) · "cat" (meow) · "frog" (croak) · "owl" (hoot) · "rooster" (crow) · "bee" (buzzing) · "rabbit" (soft hop/sniff) · "elephant" (trumpet) · "bear" (gentle friendly grumble/huff) · "mouse" (squeak) · "bird" (chirp/tweet) · "squirrel" (chatter) · "fox" (soft yip-bark) · "wolf" (a gentle distant howl) · "monkey" (chatter/hoot) · "seagull" (cry) · "dolphin" (click/whistle) · "cricket" (chirping at night)',
+      '  MACHINES/TRAVEL: "car_engine" (a car engine starting/running) · "train" (a train chugging/whistling) · "boat_horn" (a boat/ship horn) · "clock_tick" (a clock ticking) · "doorbell" (a doorbell or knock) · "phone_ring" (a phone ringing) · "airplane" (a small plane flying overhead) · "bicycle_bell" (a bicycle bell) · "rocket_launch" (a toy-like rocket launching) · "helicopter" (rotor blades whirring) · "race_car_rev" (a race car revving) · "sailboat_flap" (a sail flapping in the wind)',
+      '  GAMES/CELEBRATIONS: "ball_bounce" (a ball bouncing) · "balloon_pop" (a balloon popping) · "firework_burst" (a single gentle festive firework) · "rope_skip" (a jump rope hitting the ground) · "kite_flutter" (a kite fluttering in the wind)',
       '  PEOPLE/ACTIONS: "footsteps" (someone walking, on a normal surface) · "applause" (clapping/cheering) · "laugh" (laughter) · "splash" (something splashing into water) · "glass_clink" (glasses/cups clinking)',
       '  INSTRUMENTS/OBJECTS (a specific instrument or object is played, rung, or handled in THIS scene): "violin" (a violin is played) · "piano" (a piano is played) · "guitar" (a guitar is played/strummed) · "flute" (a flute is played) · "drum" (a drum is beaten) · "trumpet" (a trumpet is played) · "harp" (a harp is played) · "accordion" (an accordion is played) · "xylophone" (a xylophone is played) · "music_box" (a music box plays) · "tambourine" (a tambourine is shaken) · "harmonica" (a harmonica is played) · "bell_ring" (a hand bell/chime rings once) · "page_turn" (a book page turns) · "key_turn" (a key turns in a lock) · "sword_clash" (swords clash once) · "whistle" (a character whistles a tune) · "umbrella_open" (an umbrella opens) · "camera_click" (a camera shutter clicks) · "kettle_whistle" (a kettle whistles) · "cart_wheels" (a cart/wagon creaks and rolls) · "coin_clink" (coins clink) · "drawer_open" (a drawer slides open) · "zipper" (a zipper is pulled)',
       '  MOOD ACCENTS (a musical sting, not a literal sound effect): "magic_chime" (a magical sparkle moment) · "triumphant" (a victorious/joyful high point) · "tense_sting" (a sudden scare or shock) · "sad_tone" (a sorrowful, tender beat)',
-      '  EMOTIONS (a character\'s own non-verbal reaction, in THIS scene — use to make feelings audible, not just narrated): "giggle" (soft happy giggling) · "cheer_yay" (a joyful group cheer) · "sigh" (a soft contented sigh) · "yawn" (a sleepy yawn) · "sneeze" (a gentle sneeze) · "hiccup" (cute hiccupping) · "hum_content" (contented humming) · "surprised_oh" (a soft gasp of pleasant surprise) · "group_aww" (a warm, endeared "aww")',
+      '  EMOTIONS (a character\'s own non-verbal reaction, in THIS scene — use to make feelings audible, not just narrated): "giggle" (soft happy giggling) · "cheer_yay" (a joyful group cheer) · "sigh" (a soft contented sigh) · "yawn" (a sleepy yawn) · "sneeze" (a gentle sneeze) · "hiccup" (cute hiccupping) · "hum_content" (contented humming) · "surprised_oh" (a soft gasp of pleasant surprise) · "group_aww" (a warm, endeared "aww") · "gasp_fear" (a mild fright gasp, never terrifying) · "determined_grunt" (a short effortful grunt) · "relief_exhale" (a long relieved breath) · "whisper" (a soft hushed whisper)',
       '  SLEEP: "snore" (a character audibly snoring/sleeping in THIS scene)',
       "Omit `sfx` entirely when none of these apply — do not force it, and never pick more than one per scene.",
-      "SOUND MUST MATCH THE PICTURE: whenever you DO set `sfx`, the imagePrompt for that same scene MUST visibly show that exact sound happening — the listener hears it AND sees it. An animal `sfx` needs the animal drawn mid-sound (mouth open barking/mooing/quacking, an expressive sound-making pose) — but ALWAYS gentle and FRIENDLY, never aggressive or scary: a happy open-mouth bark with a wagging tail and soft eyes, NEVER bared teeth, a snarl, or a threatening posture, even for a big dog breed. An instrument `sfx` needs a character actively playing it (bow on the violin strings, hands on the piano keys, fingers on the guitar strings), an object `sfx` needs the object shown mid-action (the bell mid-ring with motion lines, the key turning in the lock, the page mid-turn), a weather `sfx` needs that weather visibly happening in the scene (rain falling, lightning flashing, leaves blown sideways in the wind), drawn as gentle/cozy rather than dramatic, and an EMOTIONS `sfx` needs the character's face/body clearly showing that exact feeling (a wide giggling smile, a big yawn with an open mouth, arms raised mid-cheer) — never set one whose feeling isn't also visible on the character's face. Never set an `sfx` whose source is off-screen or already finished by the time of the picture.",
+      "SOUND MUST MATCH THE PICTURE: whenever you DO set `sfx`, the imagePrompt for that same scene MUST visibly show that exact sound happening — the listener hears it AND sees it. An animal `sfx` needs the animal drawn mid-sound (mouth open barking/mooing/quacking, an expressive sound-making pose) — but ALWAYS gentle and FRIENDLY, never aggressive or scary: a happy open-mouth bark with a wagging tail and soft eyes, NEVER bared teeth, a snarl, or a threatening posture, even for a big dog breed. An instrument `sfx` needs a character actively playing it (bow on the violin strings, hands on the piano keys, fingers on the guitar strings), an object or vehicle `sfx` needs the object shown mid-action (the bell mid-ring with motion lines, the key turning in the lock, the page mid-turn, the airplane visible in the sky, the ball mid-bounce), a weather or NATURE/PLACES `sfx` needs that weather or setting visibly present in the scene (rain falling, lightning flashing, leaves blown sideways in the wind, a campfire glowing, a waterfall in the background), drawn as gentle/cozy rather than dramatic, and an EMOTIONS `sfx` needs the character's face/body clearly showing that exact feeling (a wide giggling smile, a big yawn with an open mouth, arms raised mid-cheer) — never set one whose feeling isn't also visible on the character's face. Never set an `sfx` whose source is off-screen or already finished by the time of the picture.",
       "",
       "═══ OUTPUT ═══",
       "Reply with ONLY valid RFC 8259 JSON — no markdown, no code fences, no // comments, no trailing commas.",
@@ -243,15 +245,17 @@ function buildSystemPrompt(language: string): string {
     "═══ ZVUKOVÝ EFEKT (sfx) ═══",
     "Volitelné pole `sfx` u scény — JEDNORÁZOVÝ zvukový efekt navíc k ambientnímu soundscape, pro něco, co DĚJ TÉTO KONKRÉTNÍ scény výslovně popisuje PRÁVĚ TEĎ. Zahrnuje JAKOUKOLI scénu, kde je středem okamžiku konkrétní zvuk-tvořící předmět nebo akce — hraje se na nástroj, zazvoní zvonek, listuje se v knize, otočí se klíč v zámku, střetnou se meče, někdo si zapíská melodii — kategorie níže jsou příklady TOHOTO VZORU, ne vyčerpávající seznam situací; ale samotná HODNOTA `sfx` musí být vždy nejbližší klíč z tohoto seznamu (nikdy nevymýšlej klíč, který tam není). Přidej ho, jen když to text opravdu vyžaduje — většina scén ho mít nebude, nikdy ho nevynucuj a nikdy nevybírej víc než jeden na scénu:",
     '  POČASÍ/VODA: "waves" (moře naráží/šplouchá) · "water_flow" (klidná řeka, potok nebo fontánka poblíž teče/zurčí — použij TOHLE, ne "waves", pro řeky jako Vltava, potoky a fontánky) · "thunder" (hrom/blesk udeří) · "wind_gust" (poryv nebo stálý vánek větru — použij vždy, když scéna zmiňuje vítr, šumění listí ve větru, vlající vlasy/oblečení) · "rain" (padá déšť) · "snow_crunch" (kroky křupou ve sněhu)',
-    '  ZVÍŘATA (zvíře se v TÉTO scéně samo ozve): "cow" (bučení) · "pig" (chrochtání) · "chicken" (kdákání) · "sheep" (bečení) · "horse" (řehtání) · "duck" (kvákání) · "dog" (štěkání) · "cat" (mňoukání) · "frog" (kuňkání) · "owl" (houkání) · "rooster" (kokrhání) · "bee" (bzučení) · "rabbit" (tiché poskakování/čenichání) · "elephant" (troubení) · "bear" (jemné přátelské mručení/funění) · "mouse" (pískání) · "bird" (cvrlikání) · "squirrel" (rychlé cvakání)',
-    '  STROJE/DOPRAVA: "car_engine" (nastartuje/jede auto) · "train" (rachotí/houká vlak) · "boat_horn" (houkačka lodi) · "clock_tick" (tikají hodiny) · "doorbell" (zvonek/zaklepání u dveří) · "phone_ring" (zvoní telefon)',
+    '  PŘÍRODA/MÍSTA: "campfire_crackle" (praská ohníček poblíž) · "waterfall" (v dálce hučí vodopád) · "cave_drip" (v jeskyni kape voda) · "leaves_crunch" (kroky šustí napadaným podzimním listím) · "volcano_rumble" (vzdálené sopečné dunění) · "desert_wind" (suchý vítr nad pískem)',
+    '  ZVÍŘATA (zvíře se v TÉTO scéně samo ozve): "cow" (bučení) · "pig" (chrochtání) · "chicken" (kdákání) · "sheep" (bečení) · "horse" (řehtání) · "duck" (kvákání) · "dog" (štěkání) · "cat" (mňoukání) · "frog" (kuňkání) · "owl" (houkání) · "rooster" (kokrhání) · "bee" (bzučení) · "rabbit" (tiché poskakování/čenichání) · "elephant" (troubení) · "bear" (jemné přátelské mručení/funění) · "mouse" (pískání) · "bird" (cvrlikání) · "squirrel" (rychlé cvakání) · "fox" (tiché zaštěknutí) · "wolf" (jemné vzdálené vytí) · "monkey" (chichotání/houkání) · "seagull" (křik racka) · "dolphin" (cvakání/pískání) · "cricket" (cvrlikání cvrčků v noci)',
+    '  STROJE/DOPRAVA: "car_engine" (nastartuje/jede auto) · "train" (rachotí/houká vlak) · "boat_horn" (houkačka lodi) · "clock_tick" (tikají hodiny) · "doorbell" (zvonek/zaklepání u dveří) · "phone_ring" (zvoní telefon) · "airplane" (nad hlavou letí malé letadlo) · "bicycle_bell" (zvonek na kole) · "rocket_launch" (odstartuje hračkovská raketa) · "helicopter" (vrtule vrtulníku) · "race_car_rev" (řve motor závodního auta) · "sailboat_flap" (plachta plácá ve větru)',
+    '  HRY/OSLAVY: "ball_bounce" (odráží se míč) · "balloon_pop" (praskne balónek) · "firework_burst" (jeden jemný slavnostní ohňostroj) · "rope_skip" (švihadlo dopadá na zem) · "kite_flutter" (drak se třepotá ve větru)',
     '  LIDÉ/AKCE: "footsteps" (někdo jde po normálním povrchu) · "applause" (tleskání/jásot) · "laugh" (smích) · "splash" (šplouchnutí do vody) · "glass_clink" (cinknutí sklenic/hrnků)',
     '  NÁSTROJE/PŘEDMĚTY (v TÉTO scéně se hraje na konkrétní nástroj nebo se manipuluje s předmětem): "violin" (hraje se na housle) · "piano" (hraje se na klavír) · "guitar" (hraje/brnká se na kytaru) · "flute" (hraje se na flétnu) · "drum" (bubnuje se) · "trumpet" (hraje se na trumpetu) · "harp" (hraje se na harfu) · "accordion" (hraje se na tahací harmoniku) · "xylophone" (hraje se na xylofon) · "music_box" (hraje hrací skříňka) · "tambourine" (rozeznívá se tamburína) · "harmonica" (hraje se na foukací harmoniku) · "bell_ring" (jednou zazvoní ruční zvonek/zvoneček) · "page_turn" (otočí se stránka knihy) · "key_turn" (otočí se klíč v zámku) · "sword_clash" (jednou se střetnou meče) · "whistle" (postava si zapíská melodii) · "umbrella_open" (otevře se deštník) · "camera_click" (cvakne spoušť fotoaparátu) · "kettle_whistle" (píská konvička) · "cart_wheels" (vrže/jede vozík či kára) · "coin_clink" (cinknou mince) · "drawer_open" (vysune se zásuvka) · "zipper" (zapne se zip)',
     '  NÁLADOVÉ AKCENTY (hudební akcent, ne doslovný zvuk): "magic_chime" (kouzelný jiskřivý moment) · "triumphant" (vítězný/radostný vrchol) · "tense_sting" (náhlé leknutí/napětí) · "sad_tone" (smutný, dojemný moment)',
-    '  EMOCE (postava sama neverbálně reaguje v TÉTO scéně — použij, ať jsou pocity SLYŠET, ne jen popsané): "giggle" (tiché šťastné hihňání) · "cheer_yay" (radostné hurá skupinky) · "sigh" (spokojený povzdech) · "yawn" (ospalé zívnutí) · "sneeze" (jemné kýchnutí) · "hiccup" (roztomilé škytání) · "hum_content" (spokojené broukání) · "surprised_oh" (tiché nadechnutí příjemným překvapením) · "group_aww" (vřelé, dojaté "ách")',
+    '  EMOCE (postava sama neverbálně reaguje v TÉTO scéně — použij, ať jsou pocity SLYŠET, ne jen popsané): "giggle" (tiché šťastné hihňání) · "cheer_yay" (radostné hurá skupinky) · "sigh" (spokojený povzdech) · "yawn" (ospalé zívnutí) · "sneeze" (jemné kýchnutí) · "hiccup" (roztomilé škytání) · "hum_content" (spokojené broukání) · "surprised_oh" (tiché nadechnutí příjemným překvapením) · "group_aww" (vřelé, dojaté "ách") · "gasp_fear" (mírné leknutí, nikdy hrůza) · "determined_grunt" (krátké odhodlané zabručení při snaze) · "relief_exhale" (dlouhý úlevný výdech) · "whisper" (tichý šepot)',
     '  SPÁNEK: "snore" (postava slyšitelně chrápe/spí v téhle scéně)',
     "Pokud nic z toho neplatí, pole `sfx` úplně vynech — nevynucuj ho, a nikdy nevybírej víc než jeden na scénu.",
-    "ZVUK MUSÍ SEDĚT S OBRÁZKEM: kdykoli `sfx` NASTAVÍŠ, imagePrompt téže scény MUSÍ ten přesný zvuk viditelně ukazovat — posluchač ho slyší A VIDÍ. Zvíře u `sfx` potřebuje být nakreslené PŘI zvuku (otevřená tlama při štěkání/bučení/kvákání, výrazná póza) — ale VŽDY jemně a PŘÁTELSKY, nikdy agresivně nebo strašidelně: šťastné štěknutí s otevřenou tlamou, vrtícím ocasem a měkkýma očima, NIKDY vyceněné zuby, vrčení nebo výhružná póza, ani u velkého psího plemene. Nástroj potřebuje postavu AKTIVNĚ hrající (smyčec na strunách houslí, prsty na klávesách klavíru, prsty na strunách kytary), předmět potřebuje být zachycený PŘI akci (zvoneček uprostřed zvonění s pohybovými čarami, klíč otáčející se v zámku, stránka uprostřed otáčení), počasí u `sfx` potřebuje to počasí viditelně probíhat ve scéně (padající déšť, blesk, vítr čechrající listí do strany), nakreslené útulně, ne dramaticky, a EMOCE u `sfx` potřebují ten přesný pocit vidět i na tváři/postoji postavy (široký hihňavý úsměv, velké zívnutí s otevřenou pusou, ruce vzhůru při jásotu) — nikdy nenastavuj emoci, kterou postava zároveň nedává najevo v obrázku. Nikdy nenastavuj `sfx`, jehož zdroj je mimo záběr nebo už v obrázku dávno doznělý.",
+    "ZVUK MUSÍ SEDĚT S OBRÁZKEM: kdykoli `sfx` NASTAVÍŠ, imagePrompt téže scény MUSÍ ten přesný zvuk viditelně ukazovat — posluchač ho slyší A VIDÍ. Zvíře u `sfx` potřebuje být nakreslené PŘI zvuku (otevřená tlama při štěkání/bučení/kvákání, výrazná póza) — ale VŽDY jemně a PŘÁTELSKY, nikdy agresivně nebo strašidelně: šťastné štěknutí s otevřenou tlamou, vrtícím ocasem a měkkýma očima, NIKDY vyceněné zuby, vrčení nebo výhružná póza, ani u velkého psího plemene. Nástroj potřebuje postavu AKTIVNĚ hrající (smyčec na strunách houslí, prsty na klávesách klavíru, prsty na strunách kytary), předmět nebo vozidlo potřebuje být zachycené PŘI akci (zvoneček uprostřed zvonění s pohybovými čarami, klíč otáčející se v zámku, stránka uprostřed otáčení, letadlo viditelné na obloze, míč uprostřed odrazu), počasí nebo PŘÍRODA/MÍSTA u `sfx` potřebuje to počasí nebo prostředí viditelně být ve scéně přítomné (padající déšť, blesk, vítr čechrající listí do strany, zářící ohníček, vodopád v pozadí), nakreslené útulně, ne dramaticky, a EMOCE u `sfx` potřebují ten přesný pocit vidět i na tváři/postoji postavy (široký hihňavý úsměv, velké zívnutí s otevřenou pusou, ruce vzhůru při jásotu) — nikdy nenastavuj emoci, kterou postava zároveň nedává najevo v obrázku. Nikdy nenastavuj `sfx`, jehož zdroj je mimo záběr nebo už v obrázku dávno doznělý.",
     "",
     "═══ VÝSTUP ═══",
     "Odpověz POUZE validním RFC 8259 JSON — bez markdown, bez ``` obalení, bez // komentářů, bez trailing čárek.",
@@ -602,6 +606,51 @@ function parseScript(raw: string): StoryScript {
     }
   }
   return parsed;
+}
+
+// 🎚️ "Dozor" nad zvukovým designem — JEDNO doplňkové, levné textové volání
+// PO dopsání scénáře (ne jeden extra dotaz na scénu — celý scénář najednou),
+// které projde soundscape/sfx všech scén a opraví jen SKUTEČNÉ problémy
+// (sfx, co neodpovídá textu; stejný sfx opakovaný 3+ scény po sobě; nálada,
+// co nesedí s prostředím). Nikdy netvoří nový obsah, jen upraví, co Claude
+// už napsal při psaní scénáře — a nikdy nesmí generování zablokovat: chyba
+// v revizi (síť, špatný JSON) = scénář jede beze změny dál (best-effort).
+interface SoundFix { index: number; soundscape?: Soundscape; sfx?: SoundEffect | null; }
+
+async function reviewSoundDesign(scenes: Scene[], language: string): Promise<void> {
+  try {
+    const brief = scenes.map(s => ({
+      index: s.index,
+      narration: s.narration.slice(0, 260),
+      soundscape: s.soundscape,
+      sfx: s.sfx ?? null,
+    }));
+    const prompt = language === "en"
+      ? `You are a sound-design supervisor for a children's bedtime story app. Review each scene's 'soundscape' (background mood) and 'sfx' (one-shot effect) choices against its narration text — flag ONLY real problems: an sfx that doesn't match what the text describes, an sfx repeated in 3+ scenes in a row (should vary), a soundscape that clashes with the scene's setting/mood. Reply with ONLY a JSON array of corrections, one entry per scene that needs a fix, e.g. [{"index":1,"sfx":null},{"index":3,"soundscape":"cozy","sfx":"owl"}] — omit any field that's already fine, omit scenes needing no change entirely. Reply with [] if everything is already good.\nScenes:\n${JSON.stringify(brief)}`
+      : `Jsi dozor nad zvukovým designem dětské appky na pohádky před spaním. Projdi u každé scény volbu 'soundscape' (nálada na pozadí) a 'sfx' (jednorázový efekt) proti textu narace — nahlas JEN skutečné problémy: sfx, který neodpovídá tomu, co text popisuje, sfx opakovaný 3+ scény po sobě (mělo by se to střídat), soundscape, který nesedí s prostředím/náladou scény. Odpověz POUZE JSON polem oprav, jeden záznam na scénu, co potřebuje opravit, např. [{"index":1,"sfx":null},{"index":3,"soundscape":"cozy","sfx":"owl"}] — vynech pole, co je už v pořádku, vynech scény, co žádnou opravu nepotřebují. Odpověz [], pokud je vše v pořádku.\nScény:\n${JSON.stringify(brief)}`;
+
+    const raw = await callAnthropicApi({
+      model: MODEL.trim(),
+      max_tokens: 2000,
+      thinking: { type: "disabled" },
+      messages: [{ role: "user", content: prompt }],
+    });
+    const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    const start = cleaned.indexOf("[");
+    const end = cleaned.lastIndexOf("]");
+    if (start === -1 || end === -1) return;
+    const fixes = JSON.parse(cleaned.slice(start, end + 1)) as SoundFix[];
+    if (!Array.isArray(fixes)) return;
+    for (const fix of fixes) {
+      if (!fix || !Number.isFinite(fix.index)) continue;
+      const scene = scenes.find(s => s.index === fix.index);
+      if (!scene) continue;
+      if (fix.soundscape) scene.soundscape = fix.soundscape;
+      if ("sfx" in fix) scene.sfx = fix.sfx ?? undefined;
+    }
+  } catch (e) {
+    console.warn("[Claude] sound-design review selhala, scénář jede beze změny:", e instanceof Error ? e.message : e);
+  }
 }
 
 type AnthropicPart =
@@ -1060,6 +1109,12 @@ export async function generateStory(
       if (script.worldNotes && typeof script.worldNotes === "string") {
         script.heroDescription = `${script.heroDescription} | World & setting lock: ${script.worldNotes.slice(0, 700)}`;
       }
+      // 🎚️ Dozor nad zvukovým designem — best-effort, nikdy neblokuje vrácení
+      // scénáře (viz komentář u reviewSoundDesign výš).
+      await reviewSoundDesign(
+        script.choice ? [...script.scenes, ...script.choice.altScenes] : script.scenes,
+        language
+      );
       return script;
     } catch (e) {
       if (attempt === 3) throw e;
