@@ -216,6 +216,32 @@ function fmtDur(sec: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+// 📱💻 Typ zařízení — telefon/tablet/PC. Dřív appka na VŠECH zařízeních
+// stejně zkoušela zamknout orientaci na šířku po fullscreenu, i na
+// desktopu bez dotykové obrazovky, kde to nedává smysl (monitor už
+// natrvalo "na šířku" je, žádná orientace k zamykání). Rozhoduje dotykové
+// ovládání (desktop bez dotyku vs. mobil/tablet s ním) + kratší strana
+// obrazovky (telefon vs. tablet).
+type DeviceKind = "phone" | "tablet" | "desktop";
+function detectDeviceKind(): DeviceKind {
+  if (typeof window === "undefined") return "desktop";
+  const hasTouch = navigator.maxTouchPoints > 0 || "ontouchstart" in window;
+  if (!hasTouch) return "desktop";
+  const shortSide = Math.min(window.screen.width, window.screen.height);
+  return shortSide >= 600 ? "tablet" : "phone";
+}
+
+// ⛶ Fullscreen + (jen na telefonu/tabletu) zámek na šířku. Na PC appka jen
+// vyplní obrazovku fullscreenem — orientaci nemá smysl zamykat, monitor
+// žádnou "na výšku" polohu nemá.
+async function enterImmersiveLandscape(): Promise<void> {
+  if (document.fullscreenElement) return;
+  try { await document.documentElement.requestFullscreen?.(); } catch { return; }
+  if (detectDeviceKind() === "desktop") return;
+  const so = (screen as Screen & { orientation?: { lock?: (o: string) => Promise<void> } }).orientation;
+  try { await so?.lock?.("landscape"); } catch {}
+}
+
 // Krátká ukázková věta (test hlasu, dobrou noc) podle jazyka
 const SAMPLE_BY_LANG: Record<string, string> = {
   cs: "Dobrou noc, Nicolásku a Valentýnko. Sladké sny!",
@@ -1068,13 +1094,7 @@ export default function Home() {
     titleCardOpenRef.current = false;
     setTitleCardOpen(false);
     isAutoAdvanceRef.current = true; // (znovu) natáhne spuštění namlouvání
-    if (!document.fullscreenElement) {
-      const so = (screen as Screen & { orientation?: { lock?: (o: string) => Promise<void> } }).orientation;
-      document.documentElement.requestFullscreen?.()
-        .then(() => so?.lock?.("landscape").catch(() => {}))
-        .then(() => setForcedLs(true))
-        .catch(() => {});
-    }
+    enterImmersiveLandscape().then(() => setForcedLs(!!document.fullscreenElement));
   }, []);
 
   // 🆘 Pojistka proti věčnému čekání: appka NIKDY nepustí čtenáře do
@@ -2069,12 +2089,11 @@ export default function Home() {
   // — když se appka do fullscreenu dostala jinou cestou, jedno ťuknutí ho
   // rovnou opustí (dřív bylo potřeba mačkat 2×).
   async function toggleForcedLandscape() {
-    const so = (screen as Screen & { orientation?: { lock?: (o: string) => Promise<void>; unlock?: () => void } }).orientation;
+    const so = (screen as Screen & { orientation?: { unlock?: () => void } }).orientation;
     const inFs = !!document.fullscreenElement;
     if (!inFs) {
-      try { await document.documentElement.requestFullscreen?.(); } catch {}
-      try { await so?.lock?.("landscape"); } catch {}
-      setForcedLs(true);
+      await enterImmersiveLandscape();
+      setForcedLs(!!document.fullscreenElement);
     } else {
       try { so?.unlock?.(); } catch {}
       try { await document.exitFullscreen(); } catch {}
@@ -2103,14 +2122,9 @@ export default function Home() {
       // (toggleForcedLandscape) — dřív to uměl jen přehrávač POSLANÉ pohádky.
       // Best-effort — na zařízeních/prohlížečích bez podpory (typicky iOS
       // Safari mimo video, nebo desktop bez orientation.lock) appka jen
-      // tiše zůstane, jak byla, bez chyby.
-      if (!document.fullscreenElement) {
-        const so = (screen as Screen & { orientation?: { lock?: (o: string) => Promise<void> } }).orientation;
-        document.documentElement.requestFullscreen?.()
-          .then(() => so?.lock?.("landscape").catch(() => {}))
-          .then(() => setForcedLs(true))
-          .catch(() => {});
-      }
+      // tiše zůstane, jak byla, bez chyby. Orientace se zamyká jen na
+      // telefonu/tabletu (detectDeviceKind) — na PC nemá co zamykat.
+      enterImmersiveLandscape().then(() => setForcedLs(!!document.fullscreenElement));
     }
   }
 
@@ -4850,13 +4864,21 @@ export default function Home() {
                 <div className="title-card-content">
                   {!scene1Ready && <div className="title-card-emoji">📖</div>}
                   <div className="title-card-title">{title}</div>
-                  <div className="title-card-tap">
-                    {/* 🚦 "Ťukni pro spuštění" se ukáže až pro CELOU hotovou
-                        pohádku (storyFullyReady: obrázky I hlas), ne jen pro
-                        hotovou scénu 1 — appka nikdy nespustí nedokreslenou
-                        pohádku, zbytek už se nedokresluje viditelně za čtenářem. */}
-                    {storyFullyReady ? t.titleCardTap : <><span className="placeholder-spinner placeholder-spinner-sm" />{t.titleCardPreparing}</>}
-                  </div>
+                  {/* 🚦 "Ťukni pro spuštění" se ukáže až pro CELOU hotovou
+                      pohádku (storyFullyReady: obrázky I hlas), ne jen pro
+                      hotovou scénu 1 — appka nikdy nespustí nedokreslenou
+                      pohádku, zbytek už se nedokresluje viditelně za čtenářem.
+                      🟠 Dřív jen drobný tichý text — teď skutečné velké
+                      oranžové tlačítko uprostřed, ať je jasné, že se dá
+                      ťuknout (celá karta je klikatelná i tak, tohle je jen
+                      viditelná afordance). */}
+                  {storyFullyReady ? (
+                    <div className="title-card-tap title-card-tap-ready">▶ {t.titleCardTap}</div>
+                  ) : (
+                    <div className="title-card-tap">
+                      <span className="placeholder-spinner placeholder-spinner-sm" />{t.titleCardPreparing}
+                    </div>
+                  )}
                   {/* 🆘 Pojistka proti věčnému čekání — appka NIKDY nenabízí
                       "číst i tak" (výslovné přání), jen po 45 s dá možnost
                       odejít 🏠 Domů, kdyby se nějaká scéna fakt nikdy
@@ -4967,8 +4989,13 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Nav arrows + dots outside the card — no overflow clipping */}
-          <div className="book-nav" ref={navRef}>
+          {/* Nav arrows + dots outside the card — no overflow clipping.
+              🚫 Dokud je nahoře titulka (title-card), listování stránkami POD
+              ní nemá k čemu — čtenář viděl pořád jen titulku a myslel si, že
+              šipky nefungují, i když stránka se pod ní ve skutečnosti měnila.
+              Celý pruh proto při otevřené titulce zhasne a nejde na něj sáhnout. */}
+          <div className={`book-nav${titleCardOpen ? " book-nav-locked" : ""}`} ref={navRef}
+            inert={titleCardOpen ? true : undefined}>
             {/* 🔙 Na první stránce vede šipka zpět na titulní obrazovku (jinak
                 by na první scéně nešlo nikam couvnout — je to jediná stránka
                 bez skutečné "předchozí" scény). */}
@@ -4982,15 +5009,15 @@ export default function Home() {
                   setTitleCardOpen(true);
                 }
               }}
-              disabled={!hasPrev && pagePos !== 0} aria-label={t.prev}>←</button>
+              disabled={titleCardOpen || (!hasPrev && pagePos !== 0)} aria-label={t.prev}>←</button>
             <div className="page-dots">
               {visiblePages.map((i, pos) => (
                 <button key={i} type="button"
                   className={`dot ${i === page ? "dot-active" : ""} ${scenes[i]?.audioUrl ? "dot-ready" : ""}`}
-                  onClick={() => goToPage(i)} aria-label={`Strana ${pos + 1}`} />
+                  onClick={() => goToPage(i)} disabled={titleCardOpen} aria-label={`Strana ${pos + 1}`} />
               ))}
             </div>
-            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => nextVisible !== null && goToPage(nextVisible)} disabled={!hasNext} aria-label={t.next}>→</button>
+            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => nextVisible !== null && goToPage(nextVisible)} disabled={titleCardOpen || !hasNext} aria-label={t.next}>→</button>
           </div>
 
           {/* 🔀 Návrat k rozbočce — vyzkoušet druhou variantu konce */}
