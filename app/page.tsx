@@ -3210,9 +3210,17 @@ export default function Home() {
   // 🪄 Rozvinout — z kostry uživatele udělá detailní osnovu (postavy, místa,
   // data, kostýmy); výsledek jde do pole přání a dá se před generováním upravit
   const [expandLoading, setExpandLoading] = useState(false);
+  // ⏳ Tikající vteřiny + odhadovaný postup, ať je vidět, že tlačítko
+  // opravdu něco dělá (dřív jen statické "⏳ Rozvinout" bez pohybu vypadalo
+  // zaseklé) — ETA je jen orientační (typické volání trvá ~12-16 s), pruh
+  // proto stoupá jen do 92 % a tam počká, dokud odpověď opravdu nedorazí.
+  const [expandElapsedS, setExpandElapsedS] = useState(0);
+  const EXPAND_ETA_S = 14;
   async function expandIdea() {
     if (!topic.trim() || expandLoading) return;
     setExpandLoading(true);
+    setExpandElapsedS(0);
+    const tickIv = setInterval(() => setExpandElapsedS(s => s + 1), 1000);
     try {
       const names = [
         ...chars.filter(c => selectedIds.includes(c.id)).map(c => (uiLang === "en" && c.nameEn ? c.nameEn : c.name)),
@@ -3242,6 +3250,7 @@ export default function Home() {
       const d = await safeJson<{ idea?: string }>(res);
       if (res.ok && d.idea) setTopic(d.idea);
     } catch {} finally {
+      clearInterval(tickIv);
       setExpandLoading(false);
     }
   }
@@ -4643,8 +4652,14 @@ export default function Home() {
               {ideaLoading ? "⏳ " : "🎲 "}{t.ideaBtn}
             </button>
             {topic.trim() !== "" && (
-              <button type="button" className="insp-btn" onClick={expandIdea} disabled={expandLoading || ideaLoading}>
-                {expandLoading ? "⏳ " : "✨ "}{t.expandBtn}
+              <button type="button" className={`insp-btn${expandLoading ? " expand-btn-loading" : ""}`}
+                onClick={expandIdea} disabled={expandLoading || ideaLoading}
+                style={expandLoading ? ({ "--expand-progress": `${Math.min(92, Math.round((expandElapsedS / EXPAND_ETA_S) * 92))}%` } as React.CSSProperties) : undefined}>
+                <span className="expand-btn-label">
+                  {expandLoading
+                    ? <><span className="placeholder-spinner placeholder-spinner-sm" />{t.expandBtn}… {expandElapsedS}s</>
+                    : <>✨ {t.expandBtn}</>}
+                </span>
               </button>
             )}
             <button type="button" className={`insp-btn ${inspImages.length > 0 ? "chip-on" : ""}`}
@@ -5418,8 +5433,15 @@ export default function Home() {
                 onChange={e => setTopic(e.target.value)} placeholder={t.wishPlaceholder} />
             </div>
             <div className="app-confirm-btns topic-editor-btns">
-              <button type="button" className="outline-btn" disabled={!topic.trim() || expandLoading || ideaLoading}
-                onClick={expandIdea}>{expandLoading ? "⏳" : "✨"} {t.expandBtn}</button>
+              <button type="button" className={`outline-btn${expandLoading ? " expand-btn-loading" : ""}`}
+                disabled={!topic.trim() || expandLoading || ideaLoading} onClick={expandIdea}
+                style={expandLoading ? ({ "--expand-progress": `${Math.min(92, Math.round((expandElapsedS / EXPAND_ETA_S) * 92))}%` } as React.CSSProperties) : undefined}>
+                <span className="expand-btn-label">
+                  {expandLoading
+                    ? <><span className="placeholder-spinner placeholder-spinner-sm" />{t.expandBtn}… {expandElapsedS}s</>
+                    : <>✨ {t.expandBtn}</>}
+                </span>
+              </button>
               <button type="button" className="cancel-btn"
                 onClick={() => { setTopic(topicBeforeEditRef.current); setTopicEditorOpen(false); }}>
                 ✕ {t.cancel}

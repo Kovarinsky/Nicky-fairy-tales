@@ -1893,6 +1893,31 @@ button:disabled {
   text-align: center;
 }
 
+/* 🪄⏳ "Rozvinout" za běhu: animovaný pruh postupu (fialový přeliv) + tikající
+   vteřiny + rotující ikonka — dřív statické "⏳ Rozvinout" vypadalo zaseklé,
+   nebylo poznat, jestli appka ještě pracuje ani jak dlouho to asi ještě
+   potrvá. Pruh je jen ORIENTAČNÍ odhad (--expand-progress, viz JS) — stoupá
+   k ~92 % a tam počká, dokud odpověď doopravdy nedorazí. */
+.expand-btn-loading {
+  position: relative;
+  overflow: hidden;
+}
+.expand-btn-loading::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: var(--expand-progress, 0%);
+  background: rgba(124, 77, 255, 0.4);
+  transition: width 1s linear;
+}
+.expand-btn-label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
 .insp-btn:hover:not(:disabled) {
   background: rgba(124,77,255,0.20);
   border-color: var(--purple);
