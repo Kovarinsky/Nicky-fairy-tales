@@ -55,6 +55,7 @@ export type SoundEffect =
   | "waves" | "thunder" | "wind_gust" | "rain" | "snow_crunch" | "water_flow"
   // 🐾 zvířata
   | "cow" | "pig" | "chicken" | "sheep" | "horse" | "duck" | "dog" | "cat" | "frog" | "owl" | "rooster" | "bee"
+  | "rabbit" | "elephant" | "bear" | "mouse" | "bird" | "squirrel"
   // ⚙️ stroje/doprava
   | "car_engine" | "train" | "boat_horn" | "clock_tick" | "doorbell" | "phone_ring"
   // 🙋 lidé/akce
@@ -63,8 +64,11 @@ export type SoundEffect =
   | "violin" | "piano" | "guitar" | "flute" | "drum" | "trumpet" | "harp" | "accordion"
   | "xylophone" | "music_box" | "tambourine" | "harmonica" | "bell_ring"
   | "page_turn" | "key_turn" | "sword_clash" | "whistle"
+  | "umbrella_open" | "camera_click" | "kettle_whistle" | "cart_wheels" | "coin_clink" | "drawer_open" | "zipper"
   // ✨ náladové akcenty
   | "magic_chime" | "triumphant" | "tense_sting" | "sad_tone"
+  // 😊 emoční reakce postav (neverbální)
+  | "giggle" | "cheer_yay" | "sigh" | "yawn" | "sneeze" | "hiccup" | "hum_content" | "surprised_oh" | "group_aww"
   // 😴 ostatní
   | "snore";
 
