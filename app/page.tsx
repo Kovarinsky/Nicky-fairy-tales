@@ -502,10 +502,11 @@ export default function Home() {
     });
     if (voicePref === id) pickVoice("auto");
   }
-  function restoreHiddenVoices() {
-    setHiddenVoices([]);
-    try { localStorage.removeItem(HIDDEN_VOICES_KEY); } catch {}
-  }
+  // 🗑️ Odebrání vestavěného hlasu teď vyžaduje potvrzení (oranžové tlačítko
+  // pod řádkem hlasu) — dřív × hlas rovnou skryl bez zpětné vazby a appka
+  // navíc nabízela hromadné "↺ Obnovit odebrané hlasy". Na výslovné přání
+  // ↺ možnost pryč — odebrání je teď schválené, ne tiché a vratné jedním klikem.
+  const [confirmHideVoiceId, setConfirmHideVoiceId] = useState<string | null>(null);
 
   // 👶🧒👦 Věkové pásmo vyprávění: auto (podle postav) nebo ručně — řídí
   // věkový profil promptu (délka vět, slovník, napětí, hloubka)
@@ -4588,7 +4589,7 @@ export default function Home() {
               <div className="panel-title-row">
                 <p className="panel-title">🎙️ {t.voiceLabel}</p>
                 <button type="button" className="panel-close" aria-label={t.cancel}
-                  onClick={() => { stopPreview(); setVoiceOpen(false); }}>✕</button>
+                  onClick={() => { stopPreview(); setVoiceOpen(false); setConfirmHideVoiceId(null); }}>✕</button>
               </div>
               <div className="folk-list">
                 <button type="button" className={`folk-item ${voicePref === "auto" ? "folk-on" : ""}`}
@@ -4677,26 +4678,31 @@ export default function Home() {
                       onClick={e => { e.stopPropagation(); deleteDesigned(v.id); }}>×</button>
                   </div>
                 ) : (
-                  /* vestavěný hlas: × ho skryje na tomto zařízení (↺ vrátí) */
-                  <div key={v.id} role="button" tabIndex={0}
-                    className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
-                    onClick={() => { pickVoice(v.id); testVoice(v.id); }}
-                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { pickVoice(v.id); testVoice(v.id); } }}>
-                    <span className="folk-emoji">{v.emoji}</span>
-                    <span>{vName}</span>
-                    {voicePref === v.id && <span className="voice-check" aria-hidden>✓</span>}
-                    <span className="voice-play" aria-hidden>{playIcon}</span>
-                    <button type="button" className="chip-remove folk-remove" aria-label={t.voiceHide}
-                      onClick={e => { e.stopPropagation(); hideVoice(v.id); }}>×</button>
-                  </div>
+                  /* vestavěný hlas: × otevře potvrzení (oranžové tlačítko
+                     pod řádkem), teprve jeho stisk hlas na tomto zařízení
+                     skryje — dřív × skrylo rovnou bez potvrzení */
+                  [
+                    <div key={v.id} role="button" tabIndex={0}
+                      className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
+                      onClick={() => { pickVoice(v.id); testVoice(v.id); }}
+                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { pickVoice(v.id); testVoice(v.id); } }}>
+                      <span className="folk-emoji">{v.emoji}</span>
+                      <span>{vName}</span>
+                      {voicePref === v.id && <span className="voice-check" aria-hidden>✓</span>}
+                      <span className="voice-play" aria-hidden>{playIcon}</span>
+                      <button type="button" className="chip-remove folk-remove" aria-label={t.voiceHide}
+                        onClick={e => { e.stopPropagation(); setConfirmHideVoiceId(p => p === v.id ? null : v.id); }}>×</button>
+                    </div>,
+                    ...(confirmHideVoiceId === v.id ? [
+                      <button key={`confirm-${v.id}`} type="button" className="panel-ok"
+                        onClick={e => { e.stopPropagation(); hideVoice(v.id); setConfirmHideVoiceId(null); }}>
+                        {t.voiceHideConfirm}
+                      </button>,
+                    ] : []),
+                  ]
                 );})];
                 })}
               </div>
-              {hiddenVoices.length > 0 && (
-                <button type="button" className="chip chip-btn chip-full" onClick={restoreHiddenVoices}>
-                  ↺ {t.voiceRestore} ({hiddenVoices.length})
-                </button>
-              )}
               {/* hlas = i jazyk pohádky (sloučený výběr) */}
               <p className="gen-step-hint">{t.langHint}</p>
               {recState === "idle" ? (
@@ -4730,7 +4736,7 @@ export default function Home() {
               )}
               {/* 🪄 Voice Design je DOČASNĚ schovaný (na přání) — flow zůstává
                   v kódu (designGenerate/designSave), vrací se vložením JSX */}
-              <button type="button" className="panel-ok" onClick={() => { stopPreview(); setVoiceOpen(false); }}>✓ {t.okBtn}</button>
+              <button type="button" className="panel-ok" onClick={() => { stopPreview(); setVoiceOpen(false); setConfirmHideVoiceId(null); }}>✓ {t.okBtn}</button>
             </div>
           )}
         </div>
@@ -4955,8 +4961,11 @@ export default function Home() {
                         <div className="job-seg-top">
                           <span className="job-seg-label">
                             {/* zdravé navázání po limitu funkce ≠ „pokus" — pokusy
-                                se ukazují jen při psaní BEZ pokroku */}
-                            {idx + 1}. {j.stalled ? "⚠️ " : ""}{j.phase === "writing" ? `${t.segWriting}${(j.stuckRestarts ?? 0) > 0 ? ` (${(j.restarts ?? 0) + 1}. pokus)` : (j.restarts ?? 0) > 0 ? ` (${t.segWritingResume})` : ""}`
+                                se ukazují jen při psaní BEZ pokroku. Pořadové
+                                číslo jen když je pohádek ve frontě VÍC — u
+                                jediné pohádky je zbytečné a jen dělalo z
+                                "▶ Otevřít" našup nalevo místo na střed. */}
+                            {serverJobs.length > 1 ? `${idx + 1}. ` : ""}{j.stalled ? "⚠️ " : ""}{j.phase === "writing" ? `${t.segWriting}${(j.stuckRestarts ?? 0) > 0 ? ` (${(j.restarts ?? 0) + 1}. pokus)` : (j.restarts ?? 0) > 0 ? ` (${t.segWritingResume})` : ""}`
                               // 🎙️ Obrázky hotové (done===total), ale namlouvání
                               // hlasu ještě běží — samostatný krok PO kreslení,
                               // ať appka nehlásí "Otevřít" dřív, než je hlas hotový

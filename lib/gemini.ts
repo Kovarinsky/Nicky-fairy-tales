@@ -428,8 +428,11 @@ export function sceneCastList(imagePrompt: string): string | null {
   return m ? m[1].trim() : null;
 }
 
-// Sdílené stavební kameny promptů (sólo obrázek i arch scén)
-const STYLE_SUFFIX ="Hand-painted 2D storybook illustration, soft painterly brushwork in classic Disney animated-film style, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. Strictly FLAT 2D painting — NOT a 3D render, no CGI, no plastic skin, no photorealism. Correct natural anatomy: every person has EXACTLY two arms, two legs and five fingers on each hand — no extra, missing or deformed limbs; bicycles have exactly two wheels. Absolutely no text, letters, words, signs, labels, captions, subtitles, watermarks, or artist signatures of any kind anywhere in the image.";
+// Sdílené stavební kameny promptů (sólo obrázek i arch scén) — připojuje se
+// KE KAŽDÉMU volání obrázkového modelu appky bez výjimky (sólo scéna, arch,
+// ranné kreslení scény 1), takže tahle věta je jediné místo, kde je jistota,
+// že platí doslova VŠUDE, viz nahlášené "na některých slidech je jiný styl".
+const STYLE_SUFFIX ="Hand-painted 2D storybook illustration, soft painterly brushwork in classic Disney animated-film style, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. THIS ART STYLE IS FIXED FOR THE WHOLE STORY, PAGE AFTER PAGE — never drift toward a different rendering style, palette, linework or level of detail from one scene to the next, and never let brand-new characters introduced mid-story pull the picture toward a different style; THEY are drawn to match this established style, never the other way round. Strictly FLAT 2D painting — NOT a 3D render, no CGI, no plastic skin, no photorealism. Correct natural anatomy: every person has EXACTLY two arms, two legs and five fingers on each hand — no extra, missing or deformed limbs; bicycles have exactly two wheels. Absolutely no text, letters, words, signs, labels, captions, subtitles, watermarks, or artist signatures of any kind anywhere in the image.";
 
 // 📜 KONZISTENČNÍ BIBLE — kompletní, očíslovaný seznam pravidel pro KAŽDÝ
 // jednotlivý obrázek. Je součástí SERVEROVÉHO promptu (běží v `generateSceneImage`

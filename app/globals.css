@@ -3909,6 +3909,13 @@ textarea.ta-accent:focus {
   width: 100%;
 }
 
+/* Hotová pohádka nemá ✕/📋 (viz j.phase !== "done" v JSX) — v řádku tak
+   zůstává jen štítek "▶ Otevřít" samotný a space-between ho lepilo doleva
+   místo na střed tlačítka */
+.job-seg-done .job-seg-top {
+  justify-content: center;
+}
+
 .job-seg-actions {
   display: flex;
   align-items: center;
