@@ -976,25 +976,34 @@ export async function studyWorld(
   language: "cs" | "en",
   name: string,
   description: string,
-  urlTexts: string[]
+  urlTexts: string[],
+  // 📸 Fotky skutečného místa/postav/loga (až 5) — appka je teď posílá
+  // Claudovi jako OBRÁZKY (ne jen textový popis), ať si svět skutečně
+  // PROHLÉDNE, místo aby si vzhled jen domýšlel z textu — na výslovné přání
+  // "ať je svět co nejvěrnější". Bez fotek se chová přesně jako dřív.
+  photos: Array<{ data: string; mimeType: string }> = []
 ): Promise<{ prompt: string; question: string | null }> {
   const model = MODEL.trim();
   const sources = urlTexts.filter(Boolean).map((t, i) => `WEB SOURCE ${i + 1}:\n${t.slice(0, 2500)}`).join("\n\n");
   const langName = language === "en" ? "ENGLISH" : "CZECH";
-  const prompt = [
+  const promptText = [
     `You are defining a fairy-tale "world" for a children's story generator. The user wants their stories to take place in this world.`,
     `USER'S WORLD NAME: ${name || "(none)"}`,
     `USER'S DESCRIPTION: ${description.slice(0, 1500)}`,
     sources ? `FETCHED WEB CONTENT the user linked to:\n${sources}` : "",
+    photos.length
+      ? `The user also attached ${photos.length} reference photo(s) of this real place/thing/characters — look at them CAREFULLY and describe what you actually SEE (real colors, architecture/decor, layout, logos, distinguishing features, any visible people or mascots) so the guide is as FAITHFUL to the real subject as possible, not a generic guess.`
+      : "",
+    `FIDELITY MATTERS: prefer concrete, specific, VERIFIABLE details from the description/web content/photos over vague generic scene-setting — the goal is a guide that captures the REAL place/story/brand, not an approximation that could describe anything.`,
     ``,
     // ✍️ Tohle pole čte a upravuje přímo UŽIVATEL v editovatelném poli (na
     // rozdíl od heroDescription/imagePrompt, které appka nikdy neukazuje) —
     // musí být v jazyce appky, jinak čech vidí anglický text ve svém popisu.
     `Write a world guide the story generator will follow, in ${langName} (the user reads and edits this text directly — it must be in ${langName}, NOT English unless ${langName} is English). Format it like this:`,
     `1) One sentence: "Set the story in the world of X: ..." (setting, era, mood).`,
-    `2) If the world has well-known characters (from the description, web content, or your own knowledge of this fairy tale/show/book), add "CHARACTER REFERENCE:" (translate this label too) with each character's EXACT visual look (colors, clothing, size), separated by " | ".`,
+    `2) If the world has well-known characters (from the description, web content, photos, or your own knowledge of this fairy tale/show/book), add "CHARACTER REFERENCE:" (translate this label too) with each character's EXACT visual look (colors, clothing, size), separated by " | ".`,
     `3) One sentence about atmosphere/tone (gentle, adventurous...).`,
-    `Max 180 words total. Recognize the fairy tale/show/book if you know it and use your knowledge of it.`,
+    `Max 180 words total. Recognize the fairy tale/show/book/brand if you know it and use your knowledge of it.`,
     ``,
     language === "en"
       ? `If an essential detail is missing or ambiguous (which characters matter, what the world looks like), also ask ONE short clarifying question in ENGLISH — the user will answer and re-run. Otherwise question is null.`
@@ -1002,11 +1011,17 @@ export async function studyWorld(
     ``,
     `Reply with ONLY valid JSON: {"prompt":"...","question":"..." or null}`,
   ].filter(Boolean).join("\n");
+  const parts: AnthropicPart[] = [];
+  for (const ph of photos.slice(0, 5)) {
+    parts.push({ type: "image", source: { type: "base64", media_type: ph.mimeType, data: ph.data } });
+  }
+  parts.push({ type: "text", text: promptText });
+  const content: string | AnthropicPart[] = parts.length === 1 && parts[0].type === "text" ? parts[0].text : parts;
   const raw = await callAnthropicApi({
     model,
     max_tokens: 1000,
     thinking: { type: "disabled" },
-    messages: [{ role: "user", content: prompt }],
+    messages: [{ role: "user", content }],
   });
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("Claude nevrátil JSON.");

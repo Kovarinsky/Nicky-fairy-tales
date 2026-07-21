@@ -40,7 +40,15 @@ export async function POST(req: NextRequest) {
     }
     const urls = (description.match(/https?:\/\/[^\s"'<>]+/g) || []).slice(0, 2);
     const urlTexts = await Promise.all(urls.map(fetchUrlText));
-    const result = await studyWorld(language, name, description, urlTexts);
+    // 📸 Fotky skutečného místa/postav — appka je teď pošle jako obrázky, ať
+    // si Claude svět skutečně PROHLÉDNE, ne jen domýšlí z textu
+    const photos = Array.isArray(body.photos)
+      ? (body.photos as Array<{ data?: unknown; mimeType?: unknown }>)
+          .filter(p => typeof p?.data === "string" && typeof p?.mimeType === "string")
+          .slice(0, 5)
+          .map(p => ({ data: p.data as string, mimeType: p.mimeType as string }))
+      : [];
+    const result = await studyWorld(language, name, description, urlTexts, photos);
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Neznámá chyba";

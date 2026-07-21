@@ -3029,6 +3029,13 @@ export default function Home() {
   const [newThemeName, setNewThemeName] = useState("");
   const [newThemeDesc, setNewThemeDesc] = useState("");
   const [newThemePhotos, setNewThemePhotos] = useState<Array<{ data: string; mimeType: string; previewUrl: string }>>([]);
+  const worldPhotoRef = useRef<HTMLInputElement>(null);
+  // 📸 Živá fotka přímo z foťáku — viz komentář u charCameraRef výše.
+  const worldCameraRef = useRef<HTMLInputElement>(null);
+  // 🔗 Odkaz na svět — stejné tlačítko/pole jako u přání (inspUrlActive/inspUrl),
+  // ale VLASTNÍ stav: jde o odkaz k TOMUHLE světu, ne k aktuální pohádce.
+  const [newThemeUrlActive, setNewThemeUrlActive] = useState(false);
+  const [newThemeUrl, setNewThemeUrl] = useState("");
   // ✏️ Editace už uloženého vlastního světa — stejný formulář jako přidání
   // nového, jen předvyplněný a addCustomTheme() pak UPRAVÍ existující
   // záznam (stejné id) místo založení nového.
@@ -3044,11 +3051,21 @@ export default function Home() {
     setWorldQuestion(null);
     setWorldStudyError(false);
     try {
+      // 🔗 Odkaz z vlastního pole se připojí k popisu — server si z popisu
+      // sám vytáhne URL a stáhne její text (viz /api/world-study)
+      const descWithUrl = newThemeUrlActive && newThemeUrl.trim()
+        ? `${newThemeDesc}\n${newThemeUrl.trim()}`
+        : newThemeDesc;
       const res = await fetch("/api/world-study", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: AbortSignal.timeout(55_000),
-        body: JSON.stringify({ language: uiLang, name: newThemeName, description: newThemeDesc }),
+        body: JSON.stringify({
+          language: uiLang, name: newThemeName, description: descWithUrl,
+          // 📸 Fotky skutečného místa/postav — appka je posílá jako obrázky,
+          // ať si appka svět skutečně PROHLÉDNE (viz komentář ve studyWorld)
+          photos: newThemePhotos.map(ph => ({ data: ph.data, mimeType: ph.mimeType })),
+        }),
       });
       const d = await safeJson<{ prompt?: string; question?: string | null }>(res);
       if (res.ok && d.prompt) {
@@ -3971,6 +3988,11 @@ export default function Home() {
     const r = await resizeAndEncode(file, 800).catch(() => null);
     if (r) setNewCharPhotos(p => (p.length >= MAX_CHAR_PHOTOS ? p : [...p, r]));
   }
+  const MAX_WORLD_PHOTOS = 5;
+  async function handleWorldPhoto(file: File) {
+    const r = await resizeAndEncode(file, 800).catch(() => null);
+    if (r) setNewThemePhotos(p => (p.length >= MAX_WORLD_PHOTOS ? p : [...p, r]));
+  }
   // Persist custom characters — they stay until explicitly deleted (×)
   function saveCustomChars(list: CustomChar[]) {
     try {
@@ -4055,6 +4077,7 @@ export default function Home() {
       setSelectedTheme(id);
     }
     setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]);
+    setNewThemeUrlActive(false); setNewThemeUrl("");
     setEditingThemeId(null); setWorldQuestion(null); setWorldStudyError(false);
   }
   function startEditCustomTheme(ct: CustomTheme) {
@@ -4064,13 +4087,14 @@ export default function Home() {
     const photos = ct.photos?.length ? ct.photos
       : (ct.photoBase64 && ct.photoMimeType ? [{ data: ct.photoBase64, mimeType: ct.photoMimeType }] : []);
     setNewThemePhotos(photos.map(ph => ({ ...ph, previewUrl: ct.previewUrl || `data:${ph.mimeType};base64,${ph.data}` })));
+    setNewThemeUrlActive(false); setNewThemeUrl("");
     setWorldQuestion(null); setWorldStudyError(false);
     setAddingTheme(true);
   }
   function removeCustomTheme(id: string) {
     setCustomThemes(p => { const next = p.filter(c => c.id !== id); saveCustomThemes(next); return next; });
     setSelectedTheme(p => (p === id ? "" : p));
-    if (editingThemeId === id) { setEditingThemeId(null); setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]); }
+    if (editingThemeId === id) { setEditingThemeId(null); setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]); setNewThemeUrlActive(false); setNewThemeUrl(""); }
   }
   async function handleInspPdf(file: File) {
     if (file.size > 10 * 1024 * 1024) { await appAlert(t.pdfTooBig); return; }
@@ -4443,6 +4467,7 @@ export default function Home() {
                   if (addingTheme) { setAddingTheme(false); return; }
                   // Otevřít VŽDY čistý formulář — ať tu nezůstane rozjetá editace jiného světa
                   setEditingThemeId(null); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]);
+                  setNewThemeUrlActive(false); setNewThemeUrl("");
                   setWorldQuestion(null); setWorldStudyError(false); setAddingTheme(true);
                 }}>
                   {t.addWorldChip}
@@ -4473,6 +4498,49 @@ export default function Home() {
                       onClick={openWorldEditor}
                       onFocus={e => { e.target.blur(); openWorldEditor(); }} />
                   </div>
+                  {/* 📸🔗 Fotky a odkaz — stejné jako u vlastní postavy/přání, ať
+                      appka svět skutečně PROHLÉDNE (fotky jdou přímo Claudovi
+                      jako obrázky, viz studyWorld), ne jen domýšlí z textu */}
+                  <div className="insp-row">
+                    <button type="button" className={`insp-btn ${newThemePhotos.length > 0 ? "chip-on" : ""}`}
+                      onClick={() => worldPhotoRef.current?.click()} disabled={newThemePhotos.length >= MAX_WORLD_PHOTOS}>
+                      🖼️ {t.photoBtn}{newThemePhotos.length > 0 ? ` (${newThemePhotos.length})` : ""}
+                    </button>
+                    <button type="button" className="insp-btn" onClick={() => worldCameraRef.current?.click()}
+                      disabled={newThemePhotos.length >= MAX_WORLD_PHOTOS}>
+                      📸 {t.takePhoto}
+                    </button>
+                    <button type="button" className={`insp-btn ${newThemeUrlActive ? "chip-on" : ""}`}
+                      onClick={() => setNewThemeUrlActive(p => !p)}>
+                      🔗 {t.webBtn}
+                    </button>
+                  </div>
+                  <input ref={worldPhotoRef} type="file" accept="image/*" multiple style={{ display: "none" }}
+                    onChange={async e => {
+                      for (const f of Array.from(e.target.files || []).slice(0, MAX_WORLD_PHOTOS - newThemePhotos.length)) await handleWorldPhoto(f);
+                      e.target.value = "";
+                    }} />
+                  <input ref={worldCameraRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }}
+                    onChange={async e => {
+                      const f = e.target.files?.[0];
+                      if (f && newThemePhotos.length < MAX_WORLD_PHOTOS) await handleWorldPhoto(f);
+                      e.target.value = "";
+                    }} />
+                  {newThemeUrlActive && (
+                    <input type="url" value={newThemeUrl} onChange={e => setNewThemeUrl(e.target.value)}
+                      placeholder="https://…" className="url-input" />
+                  )}
+                  {newThemePhotos.length > 0 && (
+                    <div className="world-photo-grid">
+                      {newThemePhotos.map((ph, i) => (
+                        <div key={i} className="world-photo-thumb">
+                          <img src={ph.previewUrl} alt={`fotka ${i + 1}`} />
+                          <button type="button" className="chip-remove world-photo-x" aria-label="Odebrat"
+                            onClick={() => setNewThemePhotos(p => p.filter((_, j) => j !== i))}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="insp-row">
                     <button type="button" className="insp-btn" onClick={studyNewWorld}
                       disabled={worldStudyLoading || (!newThemeName.trim() && !newThemeDesc.trim())}>
@@ -4488,7 +4556,7 @@ export default function Home() {
                 </div>
                 <div className="panel-actions">
                   <button type="button" onClick={addCustomTheme} disabled={!newThemeName.trim() && !newThemeDesc.trim()}>{t.saveWorld}</button>
-                  <button type="button" className="cancel-btn" onClick={() => { setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]); setEditingThemeId(null); setWorldQuestion(null); setWorldStudyError(false); }}>✕ {t.cancel}</button>
+                  <button type="button" className="cancel-btn" onClick={() => { setAddingTheme(false); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]); setNewThemeUrlActive(false); setNewThemeUrl(""); setEditingThemeId(null); setWorldQuestion(null); setWorldStudyError(false); }}>✕ {t.cancel}</button>
                 </div>
               </div>
             )}
