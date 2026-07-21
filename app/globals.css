@@ -3407,12 +3407,18 @@ textarea.ta-accent:focus {
   line-height: 1.55;
 }
 
+/* Tlačítka mají SDÍLET šířku řady (flex: 1 1 0, min-width: 0) místo pevné
+   min-width — dřív při víc tlačítkách (🔀/⛶ navíc) na užším telefonu řada
+   byla širší než karta a poslední/první tlačítko přetékalo mimo obrazovku
+   (viz nahlášené "tlačítka jsou mimo obrazovku"). Takhle se řada VŽDY
+   vejde přesně na šířku karty, ať je tlačítek 4, 5 nebo 6. */
 .share-controls {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.7rem;
+  gap: 0.4rem;
   margin: 0.4rem 0 0.6rem;
+  width: 100%;
 }
 
 /* Tlačítka jako standardní ovládání čtečky (.ctrl-cell) — stejné sklo,
@@ -3421,7 +3427,8 @@ textarea.ta-accent:focus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 52px;
+  flex: 1 1 0;
+  min-width: 0;
   height: 48px;
   padding: 0;
   border-radius: 12px;
@@ -3440,7 +3447,7 @@ textarea.ta-accent:focus {
 }
 
 .share-play {
-  min-width: 72px;
+  flex: 1.3 1 0;
   background: linear-gradient(135deg, #7c4dff 0%, #5c35cc 100%);
   border: none;
 }
@@ -3452,9 +3459,15 @@ textarea.ta-accent:focus {
 }
 
 .share-pagenum {
+  flex: 1.1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-weight: 800;
+  font-size: 0.9rem;
   opacity: 0.85;
-  min-width: 3.5rem;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .share-footer {
