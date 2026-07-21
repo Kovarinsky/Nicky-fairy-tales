@@ -4672,47 +4672,64 @@ export default function Home() {
                         title={j.title || undefined}
                       >
                         <span className="job-seg-fill" />
-                        {j.phase !== "done" && (
-                          <button type="button" className="job-seg-x" aria-label={t.segCancel} title={t.segCancel}
-                            onClick={async e => {
-                              e.stopPropagation();
-                              // Zaseknutá / chybová: zrušit hned; zdravě běžící: 1× potvrdit
-                              if (j.phase === "error" || j.stalled || await appConfirm(t.cancelJobAsk)) {
-                                cancelServerJob(j.jobId);
-                              }
-                            }}>✕</button>
-                        )}
-                        {/* 📋 deník běhu — co se kdy stalo a jak dlouho to trvalo */}
-                        {j.phase !== "done" && (j.log?.length ?? 0) > 0 && (
-                          <button type="button" className="job-seg-x job-seg-log" aria-label={t.logTitle} title={t.logTitle}
-                            onClick={e => { e.stopPropagation(); setLogView({ jobId: j.jobId, title: j.title || "" }); }}>📋</button>
-                        )}
-                        <span className="job-seg-label">
-                          {/* zdravé navázání po limitu funkce ≠ „pokus" — pokusy
-                              se ukazují jen při psaní BEZ pokroku */}
-                          {idx + 1}. {j.stalled ? "⚠️ " : ""}{j.phase === "writing" ? `${t.segWriting}${(j.stuckRestarts ?? 0) > 0 ? ` (${(j.restarts ?? 0) + 1}. pokus)` : (j.restarts ?? 0) > 0 ? ` (${t.segWritingResume})` : ""}`
-                            // 🎙️ Obrázky hotové (done===total), ale namlouvání
-                            // hlasu ještě běží — samostatný krok PO kreslení,
-                            // ať appka nehlásí "Otevřít" dřív, než je hlas hotový
-                            : j.phase === "generating" && j.done >= j.total && (j.voiceTotal ?? 0) > 0 && (j.voiceDone ?? 0) < (j.voiceTotal ?? 0)
-                              ? `${t.segVoicing} ${j.voiceDone ?? 0}/${j.voiceTotal}`
-                            : j.phase === "generating" ? `🎨 ${j.done}/${j.total}`
-                            : j.phase === "done" ? t.segOpen
-                            : t.segError}
-                          {/* ⏱ Časomíra přípravy — tikne s jobClockTick, hodnota se
-                              vždy počítá znovu z reálného Date.now() */}
-                          {(j.phase === "writing" || j.phase === "generating") && j.createdAt && (
-                            <span className="job-seg-timer" data-tick={jobClockTick}>
-                              ⏱ {fmtDur(Math.max(0, (Date.now() - j.createdAt) / 1000))}
-                            </span>
+                        {/* Horní řádek: štítek vlevo, ✕/📋 jako samostatný
+                            shluk vpravo na KONCI (dřív na sebe navzájem
+                            naskládané v rohu — ✕ nešel spolehlivě trefit). */}
+                        <div className="job-seg-top">
+                          <span className="job-seg-label">
+                            {/* zdravé navázání po limitu funkce ≠ „pokus" — pokusy
+                                se ukazují jen při psaní BEZ pokroku */}
+                            {idx + 1}. {j.stalled ? "⚠️ " : ""}{j.phase === "writing" ? `${t.segWriting}${(j.stuckRestarts ?? 0) > 0 ? ` (${(j.restarts ?? 0) + 1}. pokus)` : (j.restarts ?? 0) > 0 ? ` (${t.segWritingResume})` : ""}`
+                              // 🎙️ Obrázky hotové (done===total), ale namlouvání
+                              // hlasu ještě běží — samostatný krok PO kreslení,
+                              // ať appka nehlásí "Otevřít" dřív, než je hlas hotový
+                              : j.phase === "generating" && j.done >= j.total && (j.voiceTotal ?? 0) > 0 && (j.voiceDone ?? 0) < (j.voiceTotal ?? 0)
+                                ? `${t.segVoicing} ${j.voiceDone ?? 0}/${j.voiceTotal}`
+                              : j.phase === "generating" ? `🎨 ${j.done}/${j.total}`
+                              : j.phase === "done" ? t.segOpen
+                              : t.segError}
+                            {/* ⏱ Časomíra přípravy — tikne s jobClockTick, hodnota se
+                                vždy počítá znovu z reálného Date.now() */}
+                            {(j.phase === "writing" || j.phase === "generating") && j.createdAt && (
+                              <span className="job-seg-timer" data-tick={jobClockTick}>
+                                ⏱ {fmtDur(Math.max(0, (Date.now() - j.createdAt) / 1000))}
+                              </span>
+                            )}
+                          </span>
+                          {j.phase !== "done" && (
+                            <div className="job-seg-actions">
+                              {/* 📋 deník běhu — co se kdy stalo a jak dlouho to trvalo */}
+                              {(j.log?.length ?? 0) > 0 && (
+                                <button type="button" className="job-seg-btn job-seg-log" aria-label={t.logTitle} title={t.logTitle}
+                                  onClick={e => { e.stopPropagation(); setLogView({ jobId: j.jobId, title: j.title || "" }); }}>📋</button>
+                              )}
+                              <button type="button" className="job-seg-btn job-seg-x" aria-label={t.segCancel} title={t.segCancel}
+                                onClick={async e => {
+                                  e.stopPropagation();
+                                  // Zaseknutá / chybová: zrušit hned; zdravě běžící: 1× potvrdit
+                                  if (j.phase === "error" || j.stalled || await appConfirm(t.cancelJobAsk)) {
+                                    cancelServerJob(j.jobId);
+                                  }
+                                }}>✕</button>
+                            </div>
                           )}
-                        </span>
-                        {/* živý stav: poslední krok z 📋 deníku — ROLUJE, ať jde
-                            přečíst i delší hlášku, ne jen useknutý začátek;
-                            key na textu = animace se restartuje s KAŽDÝM novým krokem.
-                            Dřív se ukazovalo jen při kreslení — psaní (60–200 s)
-                            vypadalo jako mrtvé, i když deník živě hlásil postup
-                            („píšu… 3900 znaků, 51s"). */}
+                        </div>
+                        {/* 🎨 Jednotlivé scény vyplňují svůj dílek POSTUPNĚ podle
+                            skutečného průběhu (ne jen jedna souhrnná lišta) —
+                            při psaní ještě není total známé, tam zůstává shimmer. */}
+                        {j.phase === "generating" && j.total > 0 && (
+                          <div className="job-seg-cells">
+                            {Array.from({ length: j.total }, (_, i) => (
+                              <span key={i} className={`job-seg-cell${i < j.done ? " job-seg-cell-done" : ""}`} />
+                            ))}
+                          </div>
+                        )}
+                        {/* živý stav: poslední krok z 📋 deníku — ROLUJE přes celou
+                            šířku dílku, ať jde přečíst i delší hlášku, ne jen
+                            useknutý začátek; key na textu = animace se restartuje
+                            s KAŽDÝM novým krokem. Dřív se ukazovalo jen při
+                            kreslení — psaní (60–200 s) vypadalo jako mrtvé, i
+                            když deník živě hlásil postup („píšu… 3900 znaků, 51s"). */}
                         {(j.phase === "generating" || j.phase === "writing") && j.log?.length ? (
                           <span className="job-live-note-clip">
                             <span className="job-live-note" key={j.log[j.log.length - 1].t}>
