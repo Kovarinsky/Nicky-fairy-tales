@@ -773,7 +773,11 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         : creditsDepleted
         ? `Vyčerpaný KREDIT Gemini (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo) — dobijte kredit v Google AI Studio (Billing) a pohádku zadejte znovu. Sám se neobnoví.`
         : `Vyčerpán denní limit kreslení Gemini (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo). Resetuje se kolem 9:00 ráno — pak pohádku zadejte znovu.`;
-      logEv(`⛔ STOP: ${spendCapped ? "měsíční rozpočtový strop" : "denní kvóta"} Gemini vyčerpaná (${Object.keys(st.sceneUrls!).length}/${total})`);
+      // 🩺 Log dřív VŽDY psal "denní kvóta" (i u vyčerpaného kreditu/rozpočtového
+      // stropu, viz isDailyQuotaError výš, která "credits are depleted" bere
+      // jako PODMNOŽINU obecné "denní kvóty") — matlo to uživatele k dojmu
+      // "samo se to ráno spraví", i když šlo o placení, ne o čas.
+      logEv(`⛔ STOP: ${spendCapped ? "měsíční rozpočtový strop" : creditsDepleted ? "vyčerpaný kredit" : "denní kvóta"} Gemini vyčerpaná (${Object.keys(st.sceneUrls!).length}/${total})`);
       await write();
       await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true);
       return;
