@@ -2415,7 +2415,7 @@ export default function Home() {
   const jobTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   // Progressive download (per job): finished scenes stream in DURING generation,
   // so the final "open" is instant and gen-cards show real thumbnails
-  const jobMediaRef = useRef<Map<string, { scenes: Map<number, { imageUrl?: string; audioUrl?: string }>; fetching: Set<number> }>>(new Map());
+  const jobMediaRef = useRef<Map<string, { scenes: Map<number, { imageUrl?: string; audioUrl?: string }>; fetching: Set<number>; audioFetching: Set<number> }>>(new Map());
   // Per-job scene buffer for the gen-card thumbnails
   const jobBuffersRef = useRef<Map<string, RenderedScene[]>>(new Map());
   // Stall watch (per job): when the server function dies on the 5-min limit, kick /continue
@@ -2474,9 +2474,14 @@ export default function Home() {
     const pre = jobMediaRef.current.get(jobId)?.scenes ?? new Map<number, { imageUrl?: string; audioUrl?: string }>();
     const media = await Promise.all(script.map(async (_, i) => {
       const cached = pre.get(i);
-      if (cached) return cached; // už staženo průběžně během generování
-      if (!urls[i]) return null;
-      return fetchSceneJson(urls[i]);
+      // 🩺 cached může mít JEN audioUrl (viz prefetchJobAudio — hlas se stahuje
+      // NEZÁVISLE na obrázku, může doběhnout dřív) — bez imageUrl v cache se
+      // MUSÍ obrázek doopravdy stáhnout, jinak by scéna dostala placeholder,
+      // i když je hotový obrázek na serveru dávno hotový (urls[i] existuje).
+      if (cached?.imageUrl) return cached;
+      if (!urls[i]) return cached ?? null;
+      const fetched = await fetchSceneJson(urls[i]);
+      return fetched ? { ...cached, ...fetched } : cached ?? null;
     }));
     // Missing image → SVG placeholder (same convention as /api/scene), so the
     // book still opens and shows the "redraw" button instead of nothing
@@ -2595,7 +2600,7 @@ export default function Home() {
   // job) and feed them into the gen-card thumbnails
   function prefetchJobScenes(jobId: string, st: { scenesScript?: Scene[]; sceneUrls?: Record<number, string> }) {
     let jm = jobMediaRef.current.get(jobId);
-    if (!jm) { jm = { scenes: new Map(), fetching: new Set() }; jobMediaRef.current.set(jobId, jm); }
+    if (!jm) { jm = { scenes: new Map(), fetching: new Set(), audioFetching: new Set() }; jobMediaRef.current.set(jobId, jm); }
     const script = st.scenesScript || [];
     const urls = st.sceneUrls || {};
     let buf = jobBuffersRef.current.get(jobId);
@@ -2611,20 +2616,70 @@ export default function Home() {
       fetchSceneJson(urls[i]).then(m => {
         jm!.fetching.delete(i);
         if (!m) return;
-        jm!.scenes.set(i, m);
+        // 🔊 SLOUČIT, ne přepsat — scene-N.json ze serveru nemá audioUrl vůbec
+        // (hlas appka nekreslí, viz job-runner.ts), takže holé .set(i, m) by
+        // smazalo audioUrl, který mezitím mohl doplnit prefetchJobAudio níž
+        jm!.scenes.set(i, { ...jm!.scenes.get(i), ...m });
         const b = jobBuffersRef.current.get(jobId);
-        if (b && b[i]) b[i] = { ...b[i], imageUrl: m.imageUrl, audioUrl: m.audioUrl };
+        if (b && b[i]) b[i] = { ...b[i], imageUrl: m.imageUrl };
         // ▶ Brzké čtení: čtečka otevřená na rozpracované pohádce dostává
         // dokreslené scény průběžně
         if (readerEntryIdRef.current === jobId) {
           setScenes(prev => {
             if (!b || prev.length !== b.length || !prev[i] || prev[i].imageUrl) return prev;
             const nx = [...prev];
-            nx[i] = { ...nx[i], imageUrl: m.imageUrl, audioUrl: m.audioUrl || nx[i].audioUrl };
+            nx[i] = { ...nx[i], imageUrl: m.imageUrl };
             return nx;
           });
         }
       }).catch(() => { jm!.fetching.delete(i); });
+    }
+  }
+
+  // 🎙️⚡ Namluvit scény BĚHEM kreslení obrázků, ne až PO něm: dřív appka
+  // hlas vůbec nezačala řešit, dokud nebyly hotové VŠECHNY obrázky (viz
+  // finalizeServerJob) — u delších pohádek (víc scén, výchozích 10) to k
+  // už tak dlouhému kreslení (až ~5 min) přidalo dalších desítky sekund až
+  // minutu navíc ČISTĚ na namlouvání, natvrdo SÉRIOVĚ za obrázky (nahlášeno
+  // jako "poslední pohádka se načítala přes 7 min"). Text scény je ale
+  // známý hned po dopsání scénáře — dávno předtím, než se dokreslí
+  // poslední obrázek — takže se namlouvání dá klidně pustit SOUBĚŽNĚ s
+  // kreslením. Až finalizeServerJob doběhne, většina/všechen hlas už bude
+  // hotová z tohohle běhu a jeho vlastní fillMissingAudio už nemá co dělat.
+  // Omezeno na `st.total` (bez líné větve B u pohádek se dvěma konci — ta
+  // se namlouvá/kreslí, jen když na ni čtenář fakt sáhne).
+  function prefetchJobAudio(jobId: string, st: { scenesScript?: Scene[]; total?: number; voiceId?: string }) {
+    const script = st.scenesScript || [];
+    if (script.length === 0) return;
+    let jm = jobMediaRef.current.get(jobId);
+    if (!jm) { jm = { scenes: new Map(), fetching: new Set(), audioFetching: new Set() }; jobMediaRef.current.set(jobId, jm); }
+    const AUDIO_CONCURRENCY = 2; // stejný strop jako fillMissingAudio
+    const limit = st.total ?? script.length;
+    for (let i = 0; i < limit; i++) {
+      if (jm.audioFetching.size >= AUDIO_CONCURRENCY) break;
+      const s = script[i];
+      if (!s?.narration) continue;
+      if (jm.scenes.get(i)?.audioUrl) continue; // už hotovo
+      if (jm.audioFetching.has(i)) continue; // už se stahuje
+      jm.audioFetching.add(i);
+      fetch("/api/scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(60_000),
+        body: JSON.stringify({
+          scene: { index: s.index, narration: s.narration, imagePrompt: s.imagePrompt || "x" },
+          audioOnly: true,
+          voiceId: st.voiceId || selectedVoiceId || undefined,
+          deviceId: deviceId(),
+        }),
+      }).then(async res => {
+        jm!.audioFetching.delete(i);
+        const d = await safeJson<{ audioUrl?: string }>(res);
+        if (!res.ok || !d.audioUrl) return;
+        jm!.scenes.set(i, { ...jm!.scenes.get(i), audioUrl: d.audioUrl });
+        const b = jobBuffersRef.current.get(jobId);
+        if (b && b[i]) b[i] = { ...b[i], audioUrl: d.audioUrl };
+      }).catch(() => { jm!.audioFetching.delete(i); });
     }
   }
 
@@ -2725,6 +2780,7 @@ export default function Home() {
           updateServerJob(jobId, { phase: "writing", restarts: st.restarts || 0, stuckRestarts: st.stuckRestarts || 0, lastError: st.lastError || undefined, log: st.log, ...createdAtPatch });
         } else if (st.phase === "generating") {
           prefetchJobScenes(jobId, st);
+          prefetchJobAudio(jobId, st);
           updateServerJob(jobId, { phase: "generating", done: st.done || 0, total: st.total || 0, title: st.title, imgError: st.imgError || undefined, log: st.log, ...createdAtPatch });
         } else if (st.phase === "done") {
           stopJobPolling(jobId);
