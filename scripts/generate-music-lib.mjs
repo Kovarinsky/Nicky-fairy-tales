@@ -214,6 +214,12 @@ const SFX = {
   owl: ["an owl hooting softly at night", 2.0, false],
   rooster: ["a rooster crowing, cock-a-doodle-doo", 2.5, false],
   bee: ["a bee buzzing past", 1.5, false],
+  rabbit: ["a rabbit sniffing and softly hopping, two gentle thumps", 1.5, false],
+  elephant: ["an elephant trumpeting once, a friendly happy sound", 2.0, false],
+  bear: ["a bear gently grumbling and huffing, soft and friendly, not scary", 2.0, false],
+  mouse: ["a small mouse squeaking twice, tiny and cute", 1.5, false],
+  bird: ["a small bird cheerfully chirping and tweeting", 2.0, false],
+  squirrel: ["a squirrel chattering quickly, a soft chittering sound", 1.5, false],
   car_engine: ["a car engine starting and idling briefly", 2.0, false],
   train: ["a steam train chugging and a distant whistle", 3.0, false],
   boat_horn: ["a deep boat horn sounding once", 2.0, false],
@@ -230,6 +236,25 @@ const SFX = {
   tense_sting: ["a short suspenseful dramatic musical sting, sudden tension", 1.0, false],
   sad_tone: ["a short sorrowful gentle musical tone, tender and sad", 1.5, false],
   snore: ["a person gently snoring twice, sleeping", 2.0, false],
+  // 🏺 další předměty/situace
+  umbrella_open: ["an umbrella opening with a soft whoosh and click", 1.5, false],
+  camera_click: ["an old camera shutter clicking once, a soft mechanical click", 1.0, false],
+  kettle_whistle: ["a kettle whistling on a stove, a cheerful steam whistle", 2.0, false],
+  cart_wheels: ["a wooden cart or wagon wheels creaking and rolling", 2.0, false],
+  coin_clink: ["a few coins clinking together, a light metallic jingle", 1.0, false],
+  drawer_open: ["a wooden drawer sliding open, a soft scrape", 1.0, false],
+  zipper: ["a zipper being pulled up, a short zip sound", 1.0, false],
+  // 😊 citoslovce/emoční reakce postav — NEmluvené, jen zvuk (viz komentář
+  // v lib/claude.ts o možné umělosti; univerzální model, ne konkrétní hlas)
+  giggle: ["children giggling softly together, happy and playful", 2.0, false],
+  cheer_yay: ["a small group of children cheering happily, 'yay'", 1.5, false],
+  sigh: ["a person letting out a soft contented sigh", 1.5, false],
+  yawn: ["a person yawning softly, sleepy", 1.5, false],
+  sneeze: ["a person sneezing once, a gentle 'achoo'", 1.0, false],
+  hiccup: ["a person hiccupping twice, cute and small", 1.5, false],
+  hum_content: ["a person humming a short happy tune, content", 2.0, false],
+  surprised_oh: ["a person gasping softly in pleasant surprise, 'oh!'", 1.0, false],
+  group_aww: ["a small group softly saying 'aww' together, warm and endeared", 1.5, false],
   // 🎻 nástroje/předměty — obecný "masterprompt" pokrývá jakýkoli konkrétní
   // nástroj/objekt, kterým se v ději právě zahraje/manipuluje (viz lib/claude.ts)
   violin: ["a short cheerful violin melody being played, a simple folk tune", 3.0, false],
