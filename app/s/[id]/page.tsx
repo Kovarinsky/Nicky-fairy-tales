@@ -9,6 +9,40 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { cacheStory } from "@/lib/scene-cache";
 
+// 📱⛶ Stejná "chytrá" fullscreen logika jako v hlavní čtečce appky (viz
+// app/page.tsx enterImmersiveLandscape) — duplikováno místo importu, aby si
+// tahle samostatná stránka (bez zbytku appky) nemusela nic sdílet. Zamyká
+// orientaci na šířku jen na telefonu/tabletu, na PC jen vyplní obrazovku.
+type DeviceKind = "phone" | "tablet" | "desktop";
+function detectDeviceKind(): DeviceKind {
+  if (typeof window === "undefined") return "desktop";
+  const hasTouch = navigator.maxTouchPoints > 0 || "ontouchstart" in window;
+  if (!hasTouch) return "desktop";
+  const shortSide = Math.min(window.screen.width, window.screen.height);
+  return shortSide >= 600 ? "tablet" : "phone";
+}
+function isIOSDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+function isStandaloneDisplay(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia?.("(display-mode: standalone)").matches
+    || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+}
+async function enterImmersiveLandscape(): Promise<"ok" | "ios-unsupported" | "failed"> {
+  if (document.fullscreenElement) return "ok";
+  if (!document.documentElement.requestFullscreen) {
+    return isIOSDevice() && !isStandaloneDisplay() ? "ios-unsupported" : "failed";
+  }
+  try { await document.documentElement.requestFullscreen(); } catch { return "failed"; }
+  if (detectDeviceKind() === "desktop") return "ok";
+  const so = (screen as Screen & { orientation?: { lock?: (o: string) => Promise<void> } }).orientation;
+  try { await so?.lock?.("landscape"); } catch {}
+  return "ok";
+}
+
 interface SharedScene { narration: string; imageUrl: string; audioUrl: string }
 interface SharedStory {
   title: string;
@@ -193,11 +227,16 @@ export default function SharedStoryPage() {
   });
 
   function enterFs() {
-    if (!document.fullscreenElement) mainRef.current?.requestFullscreen?.().catch(() => {});
+    enterImmersiveLandscape().catch(() => {});
   }
   function toggleFs() {
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    else enterFs();
+    if (document.fullscreenElement) {
+      const so = (screen as Screen & { orientation?: { unlock?: () => void } }).orientation;
+      try { so?.unlock?.(); } catch {}
+      document.exitFullscreen().catch(() => {});
+    } else {
+      enterFs();
+    }
   }
 
   useEffect(() => {
@@ -329,9 +368,12 @@ export default function SharedStoryPage() {
               <span className="share-pagenum">{pos + 1} / {visible.length}{story.choice && branch === null ? "+" : ""}</span>
               <button type="button" className="share-btn" onClick={() => go(nextIdx)} disabled={nextIdx === null} aria-label="Další">→</button>
               {fsAvail && (
+                // 📱 stejná ikona jako v hlavní čtečce (ne ⛶/🗗 — ty na řadě
+                // starších/levnějších Android telefonů nemají glyf a ukázaly
+                // se jako prázdný čtvereček, viz nahlášené "ikony nejsou vidět")
                 <button type="button" className="share-btn" onClick={toggleFs}
                   aria-label={isFs ? "Ukončit celou obrazovku" : "Celá obrazovka"}>
-                  {isFs ? "🗗" : "⛶"}
+                  <span className={isFs ? "" : "share-ico-rot"}>📱</span>
                 </button>
               )}
               <button type="button" className="share-btn share-home" aria-label="Domů — hlavní menu"

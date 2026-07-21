@@ -3367,6 +3367,33 @@ textarea.ta-accent:focus {
   text-align: center;
 }
 
+/* Základní (NE maximalizovaný) režim: karta nikdy nepřeteče výšku displeje —
+   delší text dřív zvětšoval titulkové okno na úkor viditelnosti OBRÁZKU
+   (na malém telefonu obrázek "zmizel" nahoře mimo obrazovku). Obrázek/název/
+   ovládání mají pevnou výšku (flex: 0 0 auto), titulkové okno dostane JEN
+   to, co zbyde, a přetékající text se čte swipem (viz .share-clip níž). */
+.share-main:not(.share-max) .share-card {
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.share-main:not(.share-max) .share-title,
+.share-main:not(.share-max) .share-img,
+.share-main:not(.share-max) .share-img-empty,
+.share-main:not(.share-max) .share-controls,
+.share-main:not(.share-max) .choice-cards,
+.share-main:not(.share-max) .share-footer {
+  flex: 0 0 auto;
+}
+.share-main:not(.share-max) .share-body {
+  flex: 1 1 auto;
+  min-height: 2.6rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .share-title {
   font-size: 1.25rem;
   font-weight: 900;
@@ -3398,6 +3425,15 @@ textarea.ta-accent:focus {
 
 .share-clip {
   overflow: hidden;
+}
+/* Přetékající text se v základním režimu čte SWIPEM (svislý scroll) místo
+   automatického zvětšování celého okna — viz .share-card výš */
+.share-main:not(.share-max) .share-clip {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .share-text {
@@ -3473,6 +3509,13 @@ textarea.ta-accent:focus {
 .share-footer {
   font-size: 0.78rem;
   opacity: 0.6;
+}
+
+/* Ležatý telefon = „otoč na šířku" — stejná ikona/logika jako .ico-rot v
+   hlavní čtečce */
+.share-ico-rot {
+  display: inline-block;
+  transform: rotate(90deg);
 }
 
 .share-error,
