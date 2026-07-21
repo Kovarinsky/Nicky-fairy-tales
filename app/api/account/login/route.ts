@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     return bad("Špatné jméno nebo heslo.", 401);
   }
 
-  const res = NextResponse.json({ ok: true, username, data: account.data ?? null });
+  const res = NextResponse.json({ ok: true, username, data: account.data ?? null, credits: account.credits ?? 0 });
   res.cookies.set(SESSION_COOKIE, createSessionToken(username), {
     httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 180 * 24 * 3600,
   });

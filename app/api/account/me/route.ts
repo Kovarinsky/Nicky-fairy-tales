@@ -3,12 +3,13 @@
 // rovnou ukázat jméno účtu.
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifySessionToken, SESSION_COOKIE } from "@/lib/accounts";
+import { verifySessionToken, SESSION_COOKIE, readAccount } from "@/lib/accounts";
 
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const username = verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
   if (!username) return NextResponse.json({ error: "not logged in" }, { status: 401 });
-  return NextResponse.json({ username });
+  const acc = await readAccount(username);
+  return NextResponse.json({ username, credits: acc?.credits ?? 0 });
 }

@@ -1,13 +1,5 @@
 [
   {
-    "id": "8l5r0apxY5VWrLx8u6t6",
-    "name": "Vypravěč Prémium",
-    "nameEn": "Narrator Premium",
-    "emoji": "🇨🇿",
-    "description": "Profesionální vypravěč — vyšší kvalita hlasu (ElevenLabs)",
-    "language": "cs"
-  },
-  {
     "id": "gemini:Iapetus:cs",
     "name": "Vypravěč",
     "nameEn": "Narrator",
@@ -22,14 +14,6 @@
     "emoji": "🇨🇿",
     "description": "Ženský vypravěčský hlas (Google Gemini) — vypráví česky",
     "language": "cs"
-  },
-  {
-    "id": "thfYL0Elyru2qqTtNQsE",
-    "name": "Anglický vypravěč Prémium",
-    "nameEn": "Narrator Premium",
-    "emoji": "🇬🇧",
-    "description": "English fairy tale narrator — higher voice quality (ElevenLabs)",
-    "language": "en"
   },
   {
     "id": "gemini:Iapetus:en",

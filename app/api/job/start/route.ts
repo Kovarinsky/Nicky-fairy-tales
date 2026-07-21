@@ -9,7 +9,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { blobToken } from "@/lib/blob-token";
-import { runJob, putJson } from "@/lib/job-runner";
+import { runJob, putJson, storyCreditCost } from "@/lib/job-runner";
+import { SESSION_COOKIE, verifySessionToken, readAccount } from "@/lib/accounts";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -20,6 +21,20 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json();
+    // 💳 Kreditní systém (návrh „na čisto"): jen pro přihlášené účty — anonymní/
+    // rodinné použití v prohlížeči zůstává bez omezení, dokud se nerozhodne jinak.
+    const username = verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
+    if (username) {
+      const cost = storyCreditCost(body);
+      const acc = await readAccount(username);
+      if (!acc || (acc.credits ?? 0) < cost) {
+        return NextResponse.json(
+          { error: `Nedostatek kreditů (potřeba ${cost}, máte ${acc?.credits ?? 0}). Dobijte kredit v účtu.` },
+          { status: 402 }
+        );
+      }
+      body.username = username; // ← job-runner podle něj po dokončení odečte kredit
+    }
     const id = crypto.randomUUID();
     // Úvodní zápis stavu SYNCHRONNĚ — když Blob nefunguje (plné úložiště,
     // špatný token), vrátíme chybu hned místo „zombie" jobu, který nikdy

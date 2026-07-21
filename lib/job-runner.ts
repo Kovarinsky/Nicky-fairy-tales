@@ -12,6 +12,15 @@ import { loadPortraitRefEntries, refsForText, refsForPanels } from "@/lib/portra
 import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/types";
 import { blobToken } from "@/lib/blob-token";
+import { adjustCredits } from "@/lib/accounts";
+
+// 💳 Kreditní systém (návrh „na čisto"): 1 kredit = 10 Kč = 1 pohádka.
+// Zatím jen jedna kvantifikovatelná přirážka (dva konce = dvojnásob psaní
+// i kreslení druhé poloviny) — další (delší pohádka, klonovaný hlas,
+// nastudování světa) přidáme, až budou mít vlastní pevnou cenovku.
+export function storyCreditCost(body: Record<string, unknown>): number {
+  return 1 + (body.twoEndings ? 1 : 0);
+}
 
 const ANCHOR_LABEL =
   "CONSISTENCY ANCHOR — an illustration from THIS SAME story. Copy from it EXACTLY: every character's design, clothing, hair, body size and the relative heights between characters, the art style, AND every recurring object. The car keeps the identical body type, shape, colors and details in this scene (a sedan stays a sedan — it never becomes a different car):";
@@ -59,6 +68,11 @@ export interface JobStatus {
    *  přeskočí a jdou rovnou sólo, ať se stejný neúspěch neopakuje znovu
    *  a znovu na KAŽDÉM restartu funkce. */
   sheetGaveUp?: boolean;
+  /** 💳 Přihlášený uživatel, kterému se po dokončení odečte kredit (nic pro
+   *  anonymní/rodinné použití bez účtu). */
+  username?: string;
+  /** 💳 Pojistka proti dvojímu odečtu při navázání rozděleného/restartovaného jobu */
+  creditsCharged?: boolean;
 }
 
 export async function putJson(path: string, data: unknown): Promise<string> {
@@ -121,6 +135,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           phase: "writing",
           createdAt: prev?.createdAt ?? Date.now(),
           voiceId: String(body.voiceId || prev?.voiceId || ""),
+          username: typeof body.username === "string" ? body.username : prev?.username,
           // Restart psaní (kick bez hotového scénáře) dřív MAZAL chybovou
           // hlášku — job vypadal věčně jako „Píšu…". Teď se chyba přenáší
           // a po 3. restartu BEZ POKROKU se job zastaví s viditelnou příčinou.
@@ -795,6 +810,13 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     st.phase = "done";
     st.finishedAt = Date.now(); // ⏱ pohádka kompletní
     logEv(`✅ HOTOVO — celkem ${Math.round((st.finishedAt - st.createdAt) / 1000)}s od zadání (psaní ${st.wroteAt ? Math.round((st.wroteAt - st.createdAt) / 1000) : "?"}s, řetězů ${st.chains ?? 0})`);
+    // 💳 Odečet kreditu — jen jednou (creditsCharged pojistí proti dvojímu
+    // odečtu, kdyby navázání/restart jobu proběhlo přes už dokončený stav)
+    if (st.username && !st.creditsCharged) {
+      const cost = storyCreditCost(body);
+      await adjustCredits(st.username, -cost).catch(() => {});
+      st.creditsCharged = true;
+    }
     await write();
     await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true,
       (st.finishedAt - st.createdAt) / 1000); // ⏱ trvání přípravy do panelu Spotřeba

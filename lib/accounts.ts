@@ -15,6 +15,29 @@ export interface AccountRecord {
   updatedAt?: number;
   /** Celý synchronizovaný stav appky (historie, postavy, světy, nastavení) */
   data?: unknown;
+  /** 💳 Kreditní systém (návrh „na čisto"): 1 kredit = 1 pohádka = 10 Kč.
+   *  Server-authoritative pole — NIKDY nesmí žít uvnitř `data` (ten se
+   *  bere z klienta jako důvěryhodný celek přes /api/account/sync a
+   *  jednoduše by šel přepsat na cokoliv). Mění ho jen registrace
+   *  (počáteční dar) a job-runner (odečet po dokončené pohádce). */
+  credits?: number;
+}
+
+/** Nový účet dostává na vyzkoušení tento počet kreditů zdarma. */
+export const SIGNUP_FREE_CREDITS = 2;
+
+/** Přičte (nebo odečte, se záporným `delta`) kredity na účtu; vrací nový
+ *  zůstatek, nebo null když účet neexistuje. Nechrání proti souběhu dvou
+ *  paralelních zápisů (žádná databázová transakce ve Vercel Blobu) — pro
+ *  návrh postačí, ostrá verze by potřebovala optimistický zámek/retry. */
+export async function adjustCredits(username: string, delta: number): Promise<number | null> {
+  const acc = await readAccount(username);
+  if (!acc) return null;
+  const next = Math.max(0, (acc.credits ?? 0) + delta);
+  acc.credits = next;
+  acc.updatedAt = Date.now();
+  await writeAccount(acc);
+  return next;
 }
 
 const USERNAME_RE = /^[a-z0-9_-]{3,30}$/;

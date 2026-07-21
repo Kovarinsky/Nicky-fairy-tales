@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { blobToken } from "@/lib/blob-token";
-import { normalizeUsername, hashPassword, createSessionToken, readAccount, writeAccount, SESSION_COOKIE } from "@/lib/accounts";
+import { normalizeUsername, hashPassword, createSessionToken, readAccount, writeAccount, SESSION_COOKIE, SIGNUP_FREE_CREDITS } from "@/lib/accounts";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -38,9 +38,10 @@ export async function POST(req: NextRequest) {
     createdAt: Date.now(),
     updatedAt: Date.now(),
     data: body.data ?? null,
+    credits: SIGNUP_FREE_CREDITS, // 💳 2 kredity na vyzkoušení zdarma
   });
 
-  const res = NextResponse.json({ ok: true, username });
+  const res = NextResponse.json({ ok: true, username, credits: SIGNUP_FREE_CREDITS });
   res.cookies.set(SESSION_COOKIE, createSessionToken(username), {
     httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 180 * 24 * 3600,
   });

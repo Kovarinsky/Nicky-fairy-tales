@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateSceneImage, genCounter } from "@/lib/gemini";
 import { narrateScene, prepareNarrationText, getCloneTuning } from "@/lib/elevenlabs";
-import { narrateWithGemini } from "@/lib/gemini-tts";
+import { narrateWithGemini, defaultAutoVoiceId } from "@/lib/gemini-tts";
 import { charactersByIds, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefEntries, refsForText } from "@/lib/portraits";
 import { writeUsageRecord } from "@/lib/job-runner";
@@ -15,7 +15,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const scene = body.scene as Scene;
     const heroDescription = String(body.heroDescription || "");
-    const voiceId: string | undefined = typeof body.voiceId === "string" && body.voiceId ? body.voiceId : undefined;
+    // 💰 "Automaticky" (žádný ručně vybraný hlas) teď defaultně namlouvá
+    // Gemini TTS podle jazyka pohádky (~4 Kč/pohádka), ne pevný ElevenLabs
+    // hlas z ELEVENLABS_VOICE_ID (~8 Kč/pohádka) — viz defaultAutoVoiceId.
+    const voiceId: string = (typeof body.voiceId === "string" && body.voiceId)
+      ? body.voiceId
+      : defaultAutoVoiceId(typeof body.language === "string" ? body.language : undefined);
     const audioOnly: boolean = body.audioOnly === true;
     // Nezavěšené doladění z panelu „Doladit hlas“ — zkouší se PŘED uložením
     const voiceTuningOverride = body.voiceTuning && typeof body.voiceTuning === "object"

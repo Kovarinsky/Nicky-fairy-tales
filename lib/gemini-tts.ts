@@ -4,6 +4,21 @@
 
 const TTS_MODEL = (process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts").trim();
 
+// 💰 Výchozí hlas "Automaticky" (žádný ručně vybraný voiceId) — na výslovné
+// přání appka teď defaultně namlouvá Gemini hlasem (~4 Kč/pohádka), ne
+// pevným ElevenLabs hlasem (~8 Kč/pohádka) přes ELEVENLABS_VOICE_ID.
+const DEFAULT_GEMINI_VOICE_BY_LANG: Record<string, string> = {
+  cs: "Sulafat:cs",
+  en: "Sulafat:en",
+  hr: "Sulafat:hr",
+  da: "Sulafat:da",
+  sk: "Sulafat:sk",
+};
+export function defaultAutoVoiceId(language?: string): string {
+  const lang = (language || "cs").trim();
+  return `gemini:${DEFAULT_GEMINI_VOICE_BY_LANG[lang] || DEFAULT_GEMINI_VOICE_BY_LANG.cs}`;
+}
+
 function pcmToWav(pcm: Buffer, rate = 24000): Buffer {
   const h = Buffer.alloc(44);
   h.write("RIFF", 0); h.writeUInt32LE(36 + pcm.length, 4); h.write("WAVE", 8);

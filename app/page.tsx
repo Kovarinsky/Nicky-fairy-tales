@@ -502,11 +502,8 @@ export default function Home() {
     });
     if (voicePref === id) pickVoice("auto");
   }
-  // 🗑️ Odebrání vestavěného hlasu teď vyžaduje potvrzení (oranžové tlačítko
-  // pod řádkem hlasu) — dřív × hlas rovnou skryl bez zpětné vazby a appka
-  // navíc nabízela hromadné "↺ Obnovit odebrané hlasy". Na výslovné přání
-  // ↺ možnost pryč — odebrání je teď schválené, ne tiché a vratné jedním klikem.
-  const [confirmHideVoiceId, setConfirmHideVoiceId] = useState<string | null>(null);
+  // ↺ Hromadné "Obnovit odebrané hlasy" bylo na výslovné přání odstraněno —
+  // potvrzení výběru hlasu řeší tlačítko "✓ Hotovo" hned pod seznamem.
 
   // 👶🧒👦 Věkové pásmo vyprávění: auto (podle postav) nebo ručně — řídí
   // věkový profil promptu (délka vět, slovník, napětí, hloubka)
@@ -1309,6 +1306,7 @@ export default function Home() {
               scene: { index: 0, narration: text, imagePrompt: "x" },
               audioOnly: true,
               voiceId: selectedVoiceId || undefined,
+              language: lang,
             }),
           });
           const data = await safeJson<{ audioUrl?: string }>(res);
@@ -1915,6 +1913,7 @@ export default function Home() {
           audioOnly: true,
           voiceId: selectedVoiceId || undefined,
           deviceId: deviceId(),
+          language: uiLang,
         }),
       });
       const d = await safeJson<{ audioUrl?: string; error?: string }>(res);
@@ -1979,6 +1978,7 @@ export default function Home() {
               audioOnly: true,
               voiceId: voiceIdOverride ?? (selectedVoiceId || undefined),
               deviceId: deviceId(),
+              language: uiLang,
             }),
           });
           const d = await safeJson<{ audioUrl?: string }>(res);
@@ -2675,6 +2675,7 @@ export default function Home() {
           audioOnly: true,
           voiceId: st.voiceId || selectedVoiceId || undefined,
           deviceId: deviceId(),
+          language: uiLang,
         }),
       }).then(async res => {
         jm!.audioFetching.delete(i);
@@ -2916,6 +2917,14 @@ export default function Home() {
           }
         }
         if (jobRes.status === 501) break; // blob not configured → local pipeline
+        if (jobRes.status === 402) {
+          // 💳 Nedostatek kreditů — na rozdíl od ostatních chyb NEpokračovat
+          // lokálním pipeline (ten by kreditní kontrolu prostě obešel)
+          const errBody = await jobRes.json().catch(() => ({} as { error?: string }));
+          setError(errBody?.error || "Nedostatek kreditů.");
+          setLoading(false);
+          return;
+        }
         // Důvod selhání ukázat (např. blob-write-failed = plné úložiště) —
         // generování pokračuje lokálně, ale uživatel ví, proč není fronta
         try {
@@ -3460,6 +3469,9 @@ export default function Home() {
     uiLang?: UILang;
   }
   const [account, setAccount] = useState<{ username: string } | null>(null);
+  // 💳 Kreditní systém (návrh „na čisto") — jen orientační zůstatek, žádné
+  // vynucení v UI (server sám odmítne /api/job/start, když kreditů nezbývá)
+  const [accountCredits, setAccountCredits] = useState<number | null>(null);
   const [accountChecked, setAccountChecked] = useState(false);
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
   const [accountMode, setAccountMode] = useState<"login" | "register">("login");
@@ -3474,6 +3486,7 @@ export default function Home() {
       .then(d => {
         if (!d?.username) return;
         setAccount({ username: d.username });
+        if (typeof d.credits === "number") setAccountCredits(d.credits);
         // ☁️ Doplnit z účtu i tehdy, když appka ZŮSTALA přihlášená (cookie
         // přežila), ale místní úložiště (historie pohádek) se ztratilo —
         // třeba vymazáním dat appky/prohlížeče. Dřív se sloučení dat z
@@ -3570,9 +3583,10 @@ export default function Home() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password: accountPassword, data: collectSyncData() }),
       });
-      const d = await safeJson<{ username?: string; error?: string }>(res);
+      const d = await safeJson<{ username?: string; credits?: number; error?: string }>(res);
       if (!res.ok || !d.username) { setAccountError(d.error || t.accountErrGeneric); return; }
       setAccount({ username: d.username });
+      setAccountCredits(typeof d.credits === "number" ? d.credits : null);
       setAccountPanelOpen(false);
       setAccountUsername(""); setAccountPassword("");
     } catch {
@@ -3591,10 +3605,11 @@ export default function Home() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password: accountPassword }),
       });
-      const d = await safeJson<{ username?: string; data?: SyncPayload; error?: string }>(res);
+      const d = await safeJson<{ username?: string; data?: SyncPayload; credits?: number; error?: string }>(res);
       if (!res.ok || !d.username) { setAccountError(d.error || t.accountErrGeneric); return; }
       applySyncData(d.data);
       setAccount({ username: d.username });
+      setAccountCredits(typeof d.credits === "number" ? d.credits : null);
       setAccountPanelOpen(false);
       setAccountUsername(""); setAccountPassword("");
       // Po sloučení hned pošli zpět celek, ať je účet od teď zdrojem pravdy
@@ -3611,6 +3626,7 @@ export default function Home() {
 
   async function accountLogout() {
     setAccount(null);
+    setAccountCredits(null);
     try { await fetch("/api/account/logout", { method: "POST" }); } catch {}
   }
 
@@ -4226,6 +4242,7 @@ export default function Home() {
         <button type="button" className="chip chip-btn account-chip"
           onClick={() => { setAccountPanelOpen(true); setAccountError(""); }}>
           👤 {account ? account.username : t.accountLoginChip}
+          {account && accountCredits !== null && ` · 💳 ${accountCredits}`}
         </button>
       )}
 
@@ -4589,7 +4606,7 @@ export default function Home() {
               <div className="panel-title-row">
                 <p className="panel-title">🎙️ {t.voiceLabel}</p>
                 <button type="button" className="panel-close" aria-label={t.cancel}
-                  onClick={() => { stopPreview(); setVoiceOpen(false); setConfirmHideVoiceId(null); }}>✕</button>
+                  onClick={() => { stopPreview(); setVoiceOpen(false); }}>✕</button>
               </div>
               <div className="folk-list">
                 <button type="button" className={`folk-item ${voicePref === "auto" ? "folk-on" : ""}`}
@@ -4678,28 +4695,20 @@ export default function Home() {
                       onClick={e => { e.stopPropagation(); deleteDesigned(v.id); }}>×</button>
                   </div>
                 ) : (
-                  /* vestavěný hlas: × otevře potvrzení (oranžové tlačítko
-                     pod řádkem), teprve jeho stisk hlas na tomto zařízení
-                     skryje — dřív × skrylo rovnou bez potvrzení */
-                  [
-                    <div key={v.id} role="button" tabIndex={0}
-                      className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
-                      onClick={() => { pickVoice(v.id); testVoice(v.id); }}
-                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { pickVoice(v.id); testVoice(v.id); } }}>
-                      <span className="folk-emoji">{v.emoji}</span>
-                      <span>{vName}</span>
-                      {voicePref === v.id && <span className="voice-check" aria-hidden>✓</span>}
-                      <span className="voice-play" aria-hidden>{playIcon}</span>
-                      <button type="button" className="chip-remove folk-remove" aria-label={t.voiceHide}
-                        onClick={e => { e.stopPropagation(); setConfirmHideVoiceId(p => p === v.id ? null : v.id); }}>×</button>
-                    </div>,
-                    ...(confirmHideVoiceId === v.id ? [
-                      <button key={`confirm-${v.id}`} type="button" className="panel-ok"
-                        onClick={e => { e.stopPropagation(); hideVoice(v.id); setConfirmHideVoiceId(null); }}>
-                        {t.voiceHideConfirm}
-                      </button>,
-                    ] : []),
-                  ]
+                  /* vestavěný hlas: × ho na tomto zařízení skryje. Potvrzení
+                     výběru hlasu je tlačítko "✓ Hotovo" hned pod seznamem
+                     (viz níže) — hromadné "↺ Obnovit" bylo na přání odstraněno. */
+                  <div key={v.id} role="button" tabIndex={0}
+                    className={`folk-item ${voicePref === v.id ? "folk-on" : ""}`}
+                    onClick={() => { pickVoice(v.id); testVoice(v.id); }}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { pickVoice(v.id); testVoice(v.id); } }}>
+                    <span className="folk-emoji">{v.emoji}</span>
+                    <span>{vName}</span>
+                    {voicePref === v.id && <span className="voice-check" aria-hidden>✓</span>}
+                    <span className="voice-play" aria-hidden>{playIcon}</span>
+                    <button type="button" className="chip-remove folk-remove" aria-label={t.voiceHide}
+                      onClick={e => { e.stopPropagation(); hideVoice(v.id); }}>×</button>
+                  </div>
                 );})];
                 })}
               </div>
@@ -4736,7 +4745,7 @@ export default function Home() {
               )}
               {/* 🪄 Voice Design je DOČASNĚ schovaný (na přání) — flow zůstává
                   v kódu (designGenerate/designSave), vrací se vložením JSX */}
-              <button type="button" className="panel-ok" onClick={() => { stopPreview(); setVoiceOpen(false); setConfirmHideVoiceId(null); }}>✓ {t.okBtn}</button>
+              <button type="button" className="panel-ok" onClick={() => { stopPreview(); setVoiceOpen(false); }}>✓ {t.okBtn}</button>
             </div>
           )}
         </div>
