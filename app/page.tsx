@@ -1117,7 +1117,19 @@ export default function Home() {
     setTitleCardOpen(false);
     isAutoAdvanceRef.current = true; // (znovu) natáhne spuštění namlouvání
     enterImmersiveLandscape().then(handleFullscreenResult);
-  }, []);
+    // 🎺 Úvodní fanfára hraje TEĎ, přesně když čtenář ťukne a čtení SKUTEČNĚ
+    // začíná — dřív hrála hned při vstupu do čtečky (jakmile se titulka
+    // vůbec zobrazila), klidně o řadu minut dřív, než byla pohádka hotová a
+    // než čtenář vůbec ťuknul "spustit". Než appka dokreslila, fanfára dávno
+    // dozněla — vypadalo to, jako by na začátku úvodní melodie úplně chyběla.
+    if (musicOn) {
+      const openedThemeId = storyHistory.find(e => e.id === readerEntryIdRef.current)?.themeId ?? selectedTheme;
+      const themeAudioKey = (THEMES.some(t => t.id === openedThemeId) || FOLK_TALES.some(t => t.id === openedThemeId))
+        ? openedThemeId
+        : undefined;
+      ambientRef.current?.playIntro(scenes[0]?.soundscape, themeAudioKey);
+    }
+  }, [musicOn, selectedTheme, scenes, storyHistory]);
 
   // 🆘 Pojistka proti věčnému čekání: appka NIKDY nepustí čtenáře do
   // nedokreslené pohádky ("žádné číst i tak", výslovné přání) — pokud by se
@@ -1137,26 +1149,18 @@ export default function Home() {
   // 🚫 ŽÁDNÉ automatické zavírání titulky ani časem, ani "číst i tak" — appka
   // čeká na výslovné ťuknutí, i kdyby to trvalo dlouho.
 
-  // Intro fanfare when reader opens — dá přednost tématu SVĚTA (Krteček,
-  // Autíčka, konkrétní pohádka…) před náladou 1. scény; vlastní/žádný svět
-  // (bez pevného souboru) se sám přehodí na náladu uvnitř AmbientPlayer.
+  // 📖 Titulka se otevře a tichý podkresový ambient pro scénu 1 začne hned,
+  // jakmile je čtečka otevřená — ta ÚVODNÍ FANFÁRA (jednorázový "ta-dá!"
+  // moment) ale hraje až v closeTitleCard() výš, přesně v okamžiku, kdy
+  // čtenář doopravdy ťukne a čtení začíná (viz komentář tam, proč).
   const introFiredRef = useRef(false);
   useEffect(() => {
     if (!bookReady || introFiredRef.current) return;
     introFiredRef.current = true;
     titleCardOpenRef.current = true;
     setTitleCardOpen(true);
-    // 🎬 Téma TÉTO KONKRÉTNÍ pohádky (z historie podle jejího id), ne živé
-    // selectedTheme z formuláře — jinak by fronta pohádek s různými světy
-    // hrála intro podle toho, co je AKTUÁLNĚ vybrané na homepage, ne podle
-    // světa, se kterým se pohádka doopravdy psala.
-    const openedThemeId = storyHistory.find(e => e.id === readerEntryIdRef.current)?.themeId ?? selectedTheme;
-    const themeAudioKey = (THEMES.some(t => t.id === openedThemeId) || FOLK_TALES.some(t => t.id === openedThemeId))
-      ? openedThemeId
-      : undefined;
-    if (musicOn) ambientRef.current?.playIntro(scenes[0]?.soundscape, themeAudioKey);
     ambientRef.current?.setScene(scenes[0]?.soundscape);
-  }, [bookReady, viewMode, scenes, musicOn, selectedTheme]);
+  }, [bookReady, viewMode, scenes]);
 
   // Reset intro flag when new story starts
   useEffect(() => {
@@ -1645,15 +1649,12 @@ export default function Home() {
   const nextVisible = pagePos + 1 < visiblePages.length ? visiblePages[pagePos + 1] : null;
   const prevVisible = pagePos > 0 ? visiblePages[pagePos - 1] : null;
 
-  // 🌙 Klesající usínací melodie na úplně poslední stránce (respektuje větev)
-  const outroFiredRef = useRef(false);
-  useEffect(() => {
-    if (!bookReady) { outroFiredRef.current = false; return; }
-    if (nextVisible === null && !outroFiredRef.current) {
-      outroFiredRef.current = true;
-      ambientRef.current?.playOutro();
-    }
-  }, [bookReady, nextVisible]);
+  // 🌙 Klesající usínací melodie — hraje se teď v handleAudioEnded, přesně
+  // když dozní narace POSLEDNÍ stránky (viz komentář tam). Dřív hrála hned
+  // při PŘÍCHODU na poslední stránku, tedy souběžně s vlastní narací téhle
+  // stránky (klidně desítky vteřin) — schovala se pod mluvené slovo a v
+  // okamžiku, kdy se skutečně objevily titulky, dávno dozněla ("outro na
+  // konci chybí").
 
   async function pickBranch(b: "A" | "B") {
     if (!storyChoice) return;
@@ -1738,13 +1739,15 @@ export default function Home() {
     if (!autoAdvance) return;
     const next = nextVisible;
     if (next === null) {
-      // Last scene — show rolling credits
-      setTimeout(() => setShowCredits(true), 800);
+      // 🌙 Poslední stránka: outro hraje HNED, jak dozní její vlastní narace
+      // — ne už při pouhém příchodu na stránku (viz komentář u outroFiredRef
+      // výš). Titulky/uspávací smyčka/„dobrou noc" počkají, až outro odezní
+      // (generický outro.mp3 je ~8s dlouhý), ať nehrají přes sebe.
+      ambientRef.current?.playOutro();
+      setTimeout(() => setShowCredits(true), 3200);
       return;
     }
-    // 🎼 Krátký hudební stinger na konci TÉTO scény, než appka otočí na
-    // další — poslední stránka místo toho dostane bohatší playOutro (viz
-    // efekt na nextVisible === null výše).
+    // 🎼 Krátký hudební stinger na konci TÉTO scény, než appka otočí na další
     ambientRef.current?.playSceneEnd(scenes[page]?.soundscape);
     if (scenes[next]?.imageUrl && scenes[next]?.audioUrl) {
       isAutoAdvanceRef.current = true; // allow auto-play on the next slide

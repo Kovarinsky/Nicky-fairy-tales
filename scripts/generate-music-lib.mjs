@@ -101,17 +101,22 @@ const SOUNDSCAPES = {
 };
 
 // ── 🎺 Intro/outro — jednou na celou pohádku ──────────────────────────────
+// 🎵 "flourish"/"sparkling"/"shimmering" v promptu tahá ElevenLabs Music k
+// arpeggiovanému glissandu, co zní jako cinkání, ne jako melodie — proto tu
+// každý intro prompt VÝSLOVNĚ žádá jasnou, zapamatovatelnou frázi ze 4-6
+// odlišných not (ne glissando/arpeggio) s jasným rozlišením výšky tónů,
+// končící na rozeznělém akordu (viz nahlášené "je to spíš cinkání").
 const FANFARES = {
-  intro: { prompt: "Short triumphant magical fanfare, rising sparkling orchestral flourish, joyful opening for a children's storybook, instrumental", ms: 6000 },
+  intro: { prompt: "Short cheerful magical fanfare with a clear, memorable 4-6 note rising melodic phrase (distinct separate notes, NOT a glissando or arpeggio sparkle) played on warm orchestral bells and strings, ending on a bright resolving chord, joyful opening for a children's storybook, instrumental", ms: 6500 },
   outro: { prompt: "Short gentle descending lullaby melody, warm resolving orchestral chord, sleepy and peaceful ending for a children's bedtime story, instrumental", ms: 8000 },
   // 🎺 Úvodní fanfáry LADĚNÉ podle prostředí první scény (viz AmbientPlayer.
   // playIntro) — appka zkusí intro-<scene> první, "intro" výše je jen obecný
   // záchranný fallback, kdyby konkrétní varianta chyběla/selhala.
-  "intro-magic": { prompt: "Short triumphant magical fanfare, rising sparkling orchestral flourish, joyful and wondrous opening for a children's storybook, instrumental", ms: 6000 },
-  "intro-forest": { prompt: "Short cheerful woodland fanfare, rising acoustic flourish with light woodwind and strings, fresh outdoorsy opening for a children's storybook, instrumental", ms: 6000 },
-  "intro-night": { prompt: "Short gentle dreamy opening phrase, soft rising bells and warm pad, hushed starry opening for a children's bedtime story, instrumental", ms: 6000 },
-  "intro-adventure": { prompt: "Short bold adventurous fanfare, rising brass and strings flourish, energetic and hopeful opening for a children's storybook, instrumental", ms: 6000 },
-  "intro-cozy": { prompt: "Short warm gentle opening phrase, soft rising piano and strings flourish, homely and comforting opening for a children's storybook, instrumental", ms: 6000 },
+  "intro-magic": { prompt: "Short cheerful magical fanfare with a clear, memorable 4-6 note rising melodic phrase (distinct separate notes, NOT a glissando or arpeggio sparkle) played on warm bells and strings, ending on a bright resolving chord, joyful and wondrous opening for a children's storybook, instrumental", ms: 6500 },
+  "intro-forest": { prompt: "Short cheerful woodland fanfare with a clear, memorable 4-6 note rising melodic phrase (distinct separate notes, not a glissando) played on acoustic woodwind and strings, ending on a warm resolving chord, fresh outdoorsy opening for a children's storybook, instrumental", ms: 6500 },
+  "intro-night": { prompt: "Short gentle dreamy fanfare with a clear, slow 4-6 note melodic phrase (distinct separate notes, not a glissando) played on soft bells and warm pad, ending on a hushed resolving chord, starry opening for a children's bedtime story, instrumental", ms: 6500 },
+  "intro-adventure": { prompt: "Short bold adventurous fanfare with a clear, memorable 4-6 note rising melodic phrase (distinct separate notes, not a glissando) played on brass and strings, ending on an energetic resolving chord, hopeful opening for a children's storybook, instrumental", ms: 6500 },
+  "intro-cozy": { prompt: "Short warm gentle fanfare with a clear, memorable 4-6 note melodic phrase (distinct separate notes, not a glissando) played on piano and strings, ending on a homely resolving chord, comforting opening for a children's storybook, instrumental", ms: 6500 },
 };
 
 // ── 🎨 Homepage: nálada podle SVĚTA POZADÍ appky (lib/backgrounds.ts BG_SCENES) ─
