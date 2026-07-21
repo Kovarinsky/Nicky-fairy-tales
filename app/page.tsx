@@ -4339,9 +4339,12 @@ export default function Home() {
                 if (sel) return `${sel.emoji} ${uiLang === "en" && sel.nameEn ? sel.nameEn : sel.name}`;
                 const folk = folkTaleById(selectedTheme);
                 if (folk) return `${folk.emoji} ${uiLang === "en" ? folk.nameEn : folk.name}`;
-                return `🌍 ${t.presetWorldPick} (${t.rollerTapHint})`;
+                return `🌍 ${t.presetWorldPick}`;
               })()}
             </button>
+            {/* Drobná nápověda k rozkliknutí — VŽDY vidět, i po výběru (dřív
+                zmizela hned po vybrání, ale tlačítko jde rozkliknout pořád) */}
+            <p className="gen-step-hint">{t.rollerTapHint}</p>
             {worldOpen && (
               <div className="add-char-panel">
                 <div className="panel-title-row">
@@ -4405,9 +4408,12 @@ export default function Home() {
               onClick={() => setCustomWorldOpen(p => !p)}>
               {(() => {
                 const ct = customThemes.find(c => c.id === selectedTheme);
-                return ct ? `🌍 ${ct.name}` : `🌍 ${t.customWorldPick} (${t.rollerTapHint})`;
+                return ct ? `🌍 ${ct.name}` : `🌍 ${t.customWorldPick}`;
               })()}
             </button>
+            {/* Drobná nápověda k rozkliknutí — VŽDY vidět, i po výběru (dřív
+                zmizela hned po vybrání, ale tlačítko jde rozkliknout pořád) */}
+            <p className="gen-step-hint">{t.rollerTapHint}</p>
             {customWorldOpen && (
               <div className="add-char-panel">
                 <div className="panel-title-row">
