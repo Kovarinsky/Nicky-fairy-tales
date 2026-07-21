@@ -2951,8 +2951,12 @@ export default function Home() {
   // zpětná kompatibilita se staršími světy uloženými s fotkami)
   interface CustomTheme { id: string; name: string; prompt: string; photos?: Array<{ data: string; mimeType: string }>; photoBase64?: string; photoMimeType?: string; previewUrl?: string }
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
-  // 🎡 Roller světů — světy i klasické pohádky v JEDNOM válci za tlačítkem
+  // 🎡 Roller světů — vestavěné světy i klasické pohádky v JEDNOM válci za
+  // tlačítkem (viz t.presetWorldLabel); vlastní světy mají svůj VLASTNÍ
+  // roller (customWorldOpen) — dřív byly zobrazené natvrdo jako řádek
+  // dlaždic pod tímhle výběrem, na hodně vlastních světů to bylo nepřehledné.
   const [worldOpen, setWorldOpen] = useState(false);
+  const [customWorldOpen, setCustomWorldOpen] = useState(false);
   // 🧒 Výběr postav jako roller se zaškrtávátky (vícero postav najednou)
   const [charOpen, setCharOpen] = useState(false);
   // 💡 Ponaučení pohádky — rolovací výběr; text se předá vypravěči,
@@ -4252,26 +4256,28 @@ export default function Home() {
         )}
 
         {themes.length > 0 && (
+          <>
+          {/* 🎡 Roller 1/3: PŘIPRAVENÉ POHÁDKY — vestavěné světy + klasické
+              pohádky v jednom válci. Vlastní světy mají svůj VLASTNÍ roller
+              níž (customWorldOpen) — dřív byly obojí namíchané v jednom poli
+              s natvrdo zobrazenou řadou dlaždic, na hodně vlastních světů
+              nepřehledné. */}
           <div className="field">
-            <label>{t.worldLabel}</label>
-            {/* 🎡 Vestavěné světy jako roller v panelu s ✕ (uložené vlastní
-                světy a + Vlastní svět zůstávají jako tlačítka pod ním) */}
-            <button type="button" className={`chip chip-btn chip-full ${selectedTheme ? "chip-world-selected" : worldOpen ? "chip-on" : ""}`}
+            <label>{t.presetWorldLabel}</label>
+            <button type="button" className={`chip chip-btn chip-full ${(themes.some(th => th.id === selectedTheme) || folkTaleById(selectedTheme)) ? "chip-world-selected" : worldOpen ? "chip-on" : ""}`}
               onClick={() => setWorldOpen(p => !p)}>
               {(() => {
                 const sel = themes.find(th => th.id === selectedTheme);
                 if (sel) return `${sel.emoji} ${uiLang === "en" && sel.nameEn ? sel.nameEn : sel.name}`;
                 const folk = folkTaleById(selectedTheme);
                 if (folk) return `${folk.emoji} ${uiLang === "en" ? folk.nameEn : folk.name}`;
-                const ct = customThemes.find(c => c.id === selectedTheme);
-                if (ct) return `🌍 ${ct.name}`;
-                return `🌍 ${t.worldPick}`;
+                return `🌍 ${t.presetWorldPick}`;
               })()}
             </button>
             {worldOpen && (
               <div className="add-char-panel">
                 <div className="panel-title-row">
-                  <p className="panel-title">🌍 {t.worldPick}</p>
+                  <p className="panel-title">🌍 {t.presetWorldPick}</p>
                   <button type="button" className="panel-close" aria-label={t.cancel}
                     onClick={() => setWorldOpen(false)}>✕</button>
                 </div>
@@ -4319,32 +4325,57 @@ export default function Home() {
                 <button type="button" className="panel-ok" onClick={() => setWorldOpen(false)}>✓ {t.okBtn}</button>
               </div>
             )}
-            <div className="chips">
-              {customThemes.map(ct => (
-                <div key={ct.id} className={`chip custom-chip ${selectedTheme === ct.id ? "chip-on" : ""}`}>
-                  {ct.previewUrl && <img src={ct.previewUrl} alt={ct.name} className="chip-avatar" />}
-                  <span className="chip-label" onClick={() => { setSelectedTheme(p => p === ct.id ? "" : ct.id); setGpsSuccess(false); }}>🌍 {ct.name}</span>
-                  <button type="button" className="chip-edit" aria-label={t.editWorldBtn} title={t.editWorldBtn}
-                    onClick={e => { e.stopPropagation(); startEditCustomTheme(ct); }}>✏️</button>
-                  <button type="button" className="chip-remove" onClick={() => removeCustomTheme(ct.id)}>×</button>
-                </div>
-              ))}
-              <button type="button" className={`chip chip-btn ${addingTheme ? "chip-on" : ""}`} onClick={() => {
-                if (addingTheme) { setAddingTheme(false); return; }
-                // Otevřít VŽDY čistý formulář — ať tu nezůstane rozjetá editace jiného světa
-                setEditingThemeId(null); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]);
-                setWorldQuestion(null); setWorldStudyError(false); setAddingTheme(true);
-              }}>
-                {t.addWorldChip}
-              </button>
-            </div>
-            {/* 📍 Pohádka podle mé lokality — návrh námětu z okolí; oranžová
-                natrvalo (ne jen v chip-on/chip-success stavu), ať vyčnívá
-                oproti ostatním šedým tlačítkům jako důležitá funkce */}
-            <button type="button" className={`chip chip-btn chip-full chip-gps ${gpsLoading ? "chip-on" : ""}${gpsSuccess ? " chip-success" : ""}`}
-              onClick={suggestFromLocation} disabled={gpsLoading || ideaLoading} title={t.gpsHint}>
-              {gpsSuccess ? "✓ " : gpsLoading ? "⏳ " : "📍 "}{t.gpsBtn}
+          </div>
+
+          {/* 🎡 Roller 2/3: VLASTNÍ POHÁDKOVÝ SVĚT — vlastní světy jsou teď
+              schované za tlačítkem stejně jako připravené pohádky výš; přidání
+              nového světa (+ tlačítko i formulář) je uvnitř TOHOTO panelu, ne
+              samostatně vedle. */}
+          <div className="field">
+            <label>{t.customWorldLabel}</label>
+            <button type="button" className={`chip chip-btn chip-full ${customThemes.some(c => c.id === selectedTheme) ? "chip-world-selected" : customWorldOpen ? "chip-on" : ""}`}
+              onClick={() => setCustomWorldOpen(p => !p)}>
+              {(() => {
+                const ct = customThemes.find(c => c.id === selectedTheme);
+                return ct ? `🌍 ${ct.name}` : `🌍 ${t.customWorldPick}`;
+              })()}
             </button>
+            {customWorldOpen && (
+              <div className="add-char-panel">
+                <div className="panel-title-row">
+                  <p className="panel-title">🌍 {t.customWorldLabel}</p>
+                  <button type="button" className="panel-close" aria-label={t.cancel}
+                    onClick={() => setCustomWorldOpen(false)}>✕</button>
+                </div>
+                <div className="folk-list world-roller">
+                  {customThemes.length === 0 && <p className="gen-step-hint">{t.customWorldEmpty}</p>}
+                  {customThemes.map(ct => (
+                    <div key={ct.id} role="button" tabIndex={0}
+                      className={`folk-item ${selectedTheme === ct.id ? "folk-on" : ""}`}
+                      onClick={() => { setSelectedTheme(p => p === ct.id ? "" : ct.id); setGpsSuccess(false); setCustomWorldOpen(false); }}
+                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { setSelectedTheme(p => p === ct.id ? "" : ct.id); setGpsSuccess(false); setCustomWorldOpen(false); } }}>
+                      {ct.previewUrl
+                        ? <img src={ct.previewUrl} alt={ct.name} className="chip-avatar" />
+                        : <span className="folk-emoji">🌍</span>}
+                      <span>{ct.name}</span>
+                      <button type="button" className="chip-remove folk-tune" aria-label={t.editWorldBtn} title={t.editWorldBtn}
+                        onClick={e => { e.stopPropagation(); startEditCustomTheme(ct); }}>✏️</button>
+                      <button type="button" className="chip-remove folk-remove" aria-label={t.cancel}
+                        onClick={e => { e.stopPropagation(); removeCustomTheme(ct.id); }}>×</button>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" className={`chip chip-btn chip-full ${addingTheme ? "chip-on" : ""}`} onClick={() => {
+                  if (addingTheme) { setAddingTheme(false); return; }
+                  // Otevřít VŽDY čistý formulář — ať tu nezůstane rozjetá editace jiného světa
+                  setEditingThemeId(null); setNewThemeName(""); setNewThemeDesc(""); setNewThemePhotos([]);
+                  setWorldQuestion(null); setWorldStudyError(false); setAddingTheme(true);
+                }}>
+                  {t.addWorldChip}
+                </button>
+                <button type="button" className="panel-ok" onClick={() => setCustomWorldOpen(false)}>✓ {t.okBtn}</button>
+              </div>
+            )}
             {addingTheme && (
               <div className="add-char-panel">
                 <p className="panel-title">{t.newWorldTitle}</p>
@@ -4387,6 +4418,17 @@ export default function Home() {
               </div>
             )}
           </div>
+
+          {/* 🎡 3/3: 📍 Pohádka podle mé lokality — návrh námětu z okolí;
+              oranžová natrvalo (ne jen v chip-on/chip-success stavu), ať
+              vyčnívá oproti ostatním šedým tlačítkům jako důležitá funkce */}
+          <div className="field">
+            <button type="button" className={`chip chip-btn chip-full chip-gps ${gpsLoading ? "chip-on" : ""}${gpsSuccess ? " chip-success" : ""}`}
+              onClick={suggestFromLocation} disabled={gpsLoading || ideaLoading} title={t.gpsHint}>
+              {gpsSuccess ? "✓ " : gpsLoading ? "⏳ " : "📍 "}{t.gpsBtn}
+            </button>
+          </div>
+          </>
         )}
 
         {/* 🎙️ Hlas vypravěče — automatika / knihovna hlasů / klon rodiče */}
