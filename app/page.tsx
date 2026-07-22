@@ -462,6 +462,17 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<"form" | "reader">("form");
   const readerMode = viewMode === "reader";
 
+  // 🌙 Úvodní obrazovka (Start a new story + 3 chipy) — jen jednou za návštěvu,
+  // ať appka nezakrývá rozepsaný formulář po refreshi/návratu ve stejné session
+  const [showIntro, setShowIntro] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try { return sessionStorage.getItem("nicky-intro-seen") !== "1"; } catch { return true; }
+  });
+  function dismissIntro() {
+    setShowIntro(false);
+    try { sessionStorage.setItem("nicky-intro-seen", "1"); } catch {}
+  }
+
   // UI language (CZ default; EN for Nicolas's foreign friends)
   const [uiLang, setUiLang] = useState<UILang>("cs");
   const t = UI[uiLang];
@@ -4216,6 +4227,34 @@ export default function Home() {
   return (
     <div className={readerMode ? "container reader-mode" : "container"}>
 
+      {/* 🌙 Úvodní obrazovka — velké Start tlačítko + 3 chipy (Postavy/Světy/
+          Hlas), formulář zůstává pod ní beze změny, jen ho dočasně zakrývá */}
+      {!readerMode && showIntro && (
+        <div className="intro-splash">
+          <div className="intro-splash-top">
+            <h1 className="intro-splash-title">
+              📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"}
+            </h1>
+          </div>
+          <div className="intro-splash-bottom">
+            <button type="button" className="btn-create intro-start-btn" onClick={dismissIntro}>
+              ▶ {t.introStartBtn}
+            </button>
+            <div className="intro-chip-row">
+              <button type="button" className="intro-chip" onClick={() => { dismissIntro(); setCharOpen(true); }}>
+                👤 {t.introCharsChip}
+              </button>
+              <button type="button" className="intro-chip" onClick={() => { dismissIntro(); setWorldOpen(true); }}>
+                🌳 {t.introWorldsChip}
+              </button>
+              <button type="button" className="intro-chip" onClick={() => { dismissIntro(); setVoiceOpen(true); }}>
+                🎤 {t.introVoiceChip}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {!readerMode && (
       <>
       <div className="lang-switch">
@@ -5704,8 +5743,20 @@ export default function Home() {
           <div className="app-confirm account-panel" onClick={e => e.stopPropagation()}>
             {account ? (
               <>
-                <p className="app-confirm-msg">👤 {t.accountLoggedInAs(account.username)}</p>
-                {accountCredits !== null && <p className="gen-step-hint">💳 {t.accountCreditsLabel(accountCredits)}</p>}
+                <div className="account-card">
+                  <span className="account-avatar" aria-hidden="true">👤</span>
+                  <p className="account-card-name">{account.username}</p>
+                  {accountCredits !== null && (
+                    <div className="account-credit-badge">
+                      <span className="account-credit-coin" aria-hidden="true">🪙</span>
+                      <span>{t.accountCreditsLabel(accountCredits)}</span>
+                    </div>
+                  )}
+                  <button type="button" className="account-topup-btn"
+                    onClick={() => appAlert(t.accountTopupSoon)}>
+                    ✨ {t.accountTopupBtn}
+                  </button>
+                </div>
                 <p className="gen-step-hint">{t.accountSyncHint}</p>
                 <div className="app-confirm-btns">
                   <button type="button" className="cancel-btn" onClick={() => setAccountPanelOpen(false)}>✕ {t.cancel}</button>

@@ -186,6 +186,63 @@ body {
   opacity: 0.55;
 }
 
+/* ── 🌙 Úvodní obrazovka (Start a new story + 3 chipy) ──
+   Fixní vrstva BEZ vlastního pozadí — ilustrace prosvítá skrz z .photo-bg
+   pod ní (stejný obrázek/svět jako zbytek appky), jen dočasně zakrývá
+   formulář pod sebou, dokud uživatel neťukne na Start nebo na chip. */
+.intro-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: max(2.2rem, env(safe-area-inset-top)) 1.1rem calc(2.2rem + env(safe-area-inset-bottom));
+  pointer-events: auto;
+}
+
+.intro-splash-top { text-align: center; }
+
+.intro-splash-title {
+  color: #fff;
+  font-size: clamp(1.6rem, 6vw, 2.1rem);
+  font-weight: 800;
+  text-shadow: 0 2px 18px rgba(0,0,0,0.55), 0 1px 3px rgba(0,0,0,0.6);
+  margin: 0;
+}
+
+.intro-splash-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  max-width: 460px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.intro-start-btn { margin-top: 0; }
+
+.intro-chip-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.55rem;
+}
+
+.intro-chip {
+  background: rgba(255, 255, 255, 0.14);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  border-radius: 16px;
+  padding: 0.85rem 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: center;
+  min-height: 3.1rem;
+}
+
+.intro-chip:active { background: rgba(255, 255, 255, 0.24); }
+
 /* Skrýt starý split-screen layout */
 .photo-bg-nicolas, .photo-bg-valentyna { display: none; }
 
@@ -2408,6 +2465,56 @@ button:disabled {
 .account-panel .field {
   margin-bottom: 0.6rem;
 }
+/* 💳 Karta účtu/kreditů (přihlášený stav) */
+.account-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.1rem 0.5rem 0.9rem;
+}
+.account-avatar {
+  width: 4.2rem;
+  height: 4.2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  background: linear-gradient(160deg, var(--purple-light), #fff);
+  border: 2px solid var(--gold);
+}
+.account-card-name {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+.account-credit-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(90deg, #fef3c7, #fde68a);
+  border: 1px solid var(--gold-dark);
+  border-radius: 999px;
+  padding: 0.5rem 1.1rem;
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: #7c4a03;
+}
+.account-credit-coin { font-size: 1.3rem; }
+.account-topup-btn {
+  background: none;
+  border: 1.5px solid var(--gold-dark);
+  color: var(--gold-dark);
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  font-size: 0.88rem;
+  font-family: inherit;
+  cursor: pointer;
+  margin-top: 0.1rem;
+}
+.account-topup-btn:active { background: rgba(217, 119, 6, 0.1); }
 .account-panel input[type="text"],
 .account-panel input[type="password"] {
   width: 100%;
