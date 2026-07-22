@@ -462,15 +462,14 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<"form" | "reader">("form");
   const readerMode = viewMode === "reader";
 
-  // 🌙 Úvodní obrazovka (Start a new story + 3 chipy) — jen jednou za návštěvu,
-  // ať appka nezakrývá rozepsaný formulář po refreshi/návratu ve stejné session
-  const [showIntro, setShowIntro] = useState(() => {
-    if (typeof window === "undefined") return true;
-    try { return sessionStorage.getItem("nicky-intro-seen") !== "1"; } catch { return true; }
-  });
+  // 🌙 Úvodní obrazovka (Start a new story + 3 chipy) — zatím se ukazuje při
+  // KAŽDÉM načtení appky (dokud se návrh ještě ladí/testuje); dřív se
+  // pamatovala přes sessionStorage jen na první zobrazení za kartu
+  // prohlížeče, což při opakovaném testování matlo (další reload = žádný
+  // splash, jen vršek formuláře s aktuálním pozadím appky).
+  const [showIntro, setShowIntro] = useState(true);
   function dismissIntro() {
     setShowIntro(false);
-    try { sessionStorage.setItem("nicky-intro-seen", "1"); } catch {}
   }
 
   // UI language (CZ default; EN for Nicolas's foreign friends)
