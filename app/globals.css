@@ -3825,6 +3825,34 @@ textarea.ta-accent:focus {
   .dot { width: 7px; height: 7px; }
 }
 
+/* ── 🛠️ Dev přehled (uvnitř Spotřeba, jen pro admina) ── */
+.dev-panel {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed rgba(255,255,255,0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.dev-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.dev-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.dev-table th, .dev-table td {
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+
 /* ── Usage overview (💰 Spotřeba) ── */
 .usage-body {
   padding: 0.35rem 0.9rem 0.8rem;

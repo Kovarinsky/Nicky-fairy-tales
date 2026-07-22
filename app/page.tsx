@@ -422,6 +422,33 @@ export default function Home() {
     }
   }
 
+  // 🛠️ Dev přehled účtů — schovaná sekce UVNITŘ panelu Spotřeba, viditelná
+  // jen tobě (přihlášenému účtu z NEXT_PUBLIC_ADMIN_USERNAME); ostatní
+  // uživatelé sekci vůbec neuvidí. Skutečná ochrana dat je pořád na serveru
+  // (ADMIN_PASSWORD, viz /api/admin/accounts) — username-gate je jen UI.
+  interface DevAccount {
+    username: string; email?: string; credits?: number; storiesCompleted?: number;
+    createdAt: number; updatedAt?: number;
+  }
+  const [devPw, setDevPw] = useState("");
+  const [devAccounts, setDevAccounts] = useState<DevAccount[] | null>(null);
+  const [devBusy, setDevBusy] = useState(false);
+  const [devErr, setDevErr] = useState("");
+  async function devLoad() {
+    if (!devPw) return;
+    setDevBusy(true); setDevErr("");
+    try {
+      const res = await fetch("/api/admin/accounts", { headers: { "X-Admin-Password": devPw } });
+      const d = await safeJson<{ accounts?: DevAccount[]; error?: string }>(res);
+      if (!res.ok) { setDevErr(d.error || "Chyba."); return; }
+      setDevAccounts(d.accounts || []);
+    } catch {
+      setDevErr("Nepodařilo se načíst — zkuste to znovu.");
+    } finally {
+      setDevBusy(false);
+    }
+  }
+
   const allScenesReady = scenes.length > 0 && scenes.every(s => s.imageUrl && s.audioUrl);
   // bookReady: scéna 1 má SKUTEČNÝ (ne placeholder) obrázek — brána pro
   // zobrazení čtečky/titulky. Hlas VĚDOMĚ nevyžaduje: appka namlouvání
@@ -5532,6 +5559,50 @@ export default function Home() {
                     <p>{t.usageGemini}</p>
                   )}
                 </>
+              )}
+              {!!account && account.username === process.env.NEXT_PUBLIC_ADMIN_USERNAME && (
+                <div className="dev-panel">
+                  <p className="gen-step-hint">🛠️ Dev přehled účtů</p>
+                  {!devAccounts ? (
+                    <>
+                      <div className="field">
+                        <input type="password" value={devPw} onChange={e => setDevPw(e.target.value)}
+                          placeholder="Admin heslo" onKeyDown={e => { if (e.key === "Enter") devLoad(); }} />
+                      </div>
+                      <button type="button" className="btn-span2" disabled={!devPw || devBusy} onClick={devLoad}>
+                        {devBusy ? "⏳" : "🔓"} Odemknout
+                      </button>
+                      {devErr && <p className="gen-step-hint account-err">{devErr}</p>}
+                    </>
+                  ) : (
+                    <>
+                      <p className="gen-step-hint">
+                        {devAccounts.length} účtů · {devAccounts.reduce((s, a) => s + (a.credits ?? 0), 0)} kreditů zbývá · {devAccounts.reduce((s, a) => s + (a.storiesCompleted ?? 0), 0)} pohádek dokončeno
+                      </p>
+                      <button type="button" className="history-toggle" onClick={devLoad} disabled={devBusy}>
+                        {devBusy ? "⏳" : "🔄"} Obnovit
+                      </button>
+                      <div className="dev-table-wrap">
+                        <table className="dev-table">
+                          <thead>
+                            <tr><th>Jméno</th><th>E-mail</th><th>💳</th><th>📚</th><th>Aktivita</th></tr>
+                          </thead>
+                          <tbody>
+                            {devAccounts.map(a => (
+                              <tr key={a.username}>
+                                <td>{a.username}</td>
+                                <td>{a.email || "—"}</td>
+                                <td>{a.credits ?? 0}</td>
+                                <td>{a.storiesCompleted ?? 0}</td>
+                                <td>{a.updatedAt ? new Date(a.updatedAt).toLocaleDateString("cs-CZ") : "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
             </div>
           )}
