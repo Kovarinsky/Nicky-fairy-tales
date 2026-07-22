@@ -3309,28 +3309,6 @@ export default function Home() {
     ? `🎨 ${t.bgAuto}`
     : `${bgSceneById(bgChoice)!.emoji} ${uiLang === "en" ? bgSceneById(bgChoice)!.nameEn : bgSceneById(bgChoice)!.name}`;
 
-  // 🎬 Úvodní obrazovka — při každém otevření appky jiný pohádkový motiv
-  // (vesmír, džungle, moře…), nadpis, verze a slogan; sama zmizí, ťuknutí přeskočí
-  const [intro, setIntro] = useState<{ scene: string; url: string | null; closing: boolean } | null>(null);
-  useEffect(() => {
-    const scene = BG_SCENES[Math.floor(Math.random() * BG_SCENES.length)];
-    setIntro({ scene: scene.id, url: bgUrlCacheRef.current[scene.id] ?? null, closing: false });
-    let dead = false;
-    if (!bgUrlCacheRef.current[scene.id]) {
-      fetch(`/api/bg-image?scene=${scene.id}`, { signal: AbortSignal.timeout(15_000) })
-        .then(r => (r.ok ? r.json() : null))
-        .then((d: { url?: string } | null) => {
-          if (dead || !d?.url) return;
-          bgUrlCacheRef.current[scene.id] = d.url;
-          setIntro(p => (p && p.scene === scene.id && !p.closing ? { ...p, url: d.url! } : p));
-        })
-        .catch(() => {});
-    }
-    const t1 = setTimeout(() => setIntro(p => (p ? { ...p, closing: true } : p)), 3300);
-    const t2 = setTimeout(() => setIntro(null), 4100);
-    return () => { dead = true; clearTimeout(t1); clearTimeout(t2); };
-  }, []);
-
   // 📝 Velký editor přání — ťuknutí do pole otevře okno přes displej,
   // kde je vidět celý text (dlouhé osnovy z 🪄 Rozvinout).
   // ✕ Zrušit vrátí text do podoby před otevřením editoru.
@@ -5935,17 +5913,6 @@ export default function Home() {
               <button type="button" onClick={() => setLogView(null)}>✓ OK</button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* 🎬 Úvodní obrazovka — náhodný pohádkový motiv, nadpis, verze a slogan */}
-      {intro && (
-        <div className={`intro-splash${intro.closing ? " closing" : ""}`}
-          style={intro.url ? { backgroundImage: `linear-gradient(rgba(12, 9, 38, 0.32), rgba(12, 9, 38, 0.58)), url("${intro.url}")` } : undefined}
-          onClick={() => setIntro(null)}>
-          <h1 className="intro-title">📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"}</h1>
-          <p className="intro-version">v{APP_VERSION}</p>
-          <p className="intro-tag">{t.introTag}</p>
         </div>
       )}
 
