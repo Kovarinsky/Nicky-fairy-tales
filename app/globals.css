@@ -199,8 +199,37 @@ body {
   justify-content: space-between;
   padding: max(2.2rem, env(safe-area-inset-top)) 1.1rem calc(2.2rem + env(safe-area-inset-bottom));
   pointer-events: auto;
+  background: #1a1040;
+  overflow: hidden;
 }
 
+/* Appka jinak spoléhá na ambientní .photo-bg (jen 55 % průhlednosti přes
+   tmavý gradient scény) — na téměř prázdné úvodní obrazovce to bylo
+   prakticky neviditelné. Tahle vrstva ukazuje STEJNÝ obrázek napřímo,
+   naplno, ať je vidět spolehlivě hned od prvního zobrazení appky. */
+.intro-splash-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+  z-index: 0;
+}
+
+.intro-splash-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg,
+    rgba(10, 6, 32, 0.55) 0%,
+    rgba(10, 6, 32, 0.05) 28%,
+    rgba(10, 6, 32, 0.15) 60%,
+    rgba(10, 6, 32, 0.8) 100%
+  );
+}
+
+.intro-splash-top, .intro-splash-bottom { position: relative; z-index: 2; }
 .intro-splash-top { text-align: center; }
 
 .intro-splash-title {

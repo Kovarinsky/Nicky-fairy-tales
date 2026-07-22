@@ -4231,6 +4231,9 @@ export default function Home() {
           Hlas), formulář zůstává pod ní beze změny, jen ho dočasně zakrývá */}
       {!readerMode && showIntro && (
         <div className="intro-splash">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/bg-characters.png" alt="" aria-hidden="true" className="intro-splash-img" />
+          <div className="intro-splash-scrim" aria-hidden="true" />
           <div className="intro-splash-top">
             <h1 className="intro-splash-title">
               📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"}
