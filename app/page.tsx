@@ -4232,7 +4232,8 @@ export default function Home() {
       {!readerMode && showIntro && (
         <div className="intro-splash">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/bg-characters.png" alt="" aria-hidden="true" className="intro-splash-img" />
+          <img src="/bg-intro-v2.png" alt="" aria-hidden="true" className="intro-splash-img"
+            onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
           <div className="intro-splash-scrim" aria-hidden="true" />
           <div className="intro-splash-top">
             <h1 className="intro-splash-title">

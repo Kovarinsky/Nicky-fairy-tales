@@ -39,7 +39,7 @@ body {
 }
 
 /* ── Pixelart pozadí přes celý screen ── */
-/* Nahrát soubor: public/bg-characters.png (nebo .jpg / .webp / .gif) */
+/* Nahrát soubor: public/bg-intro-v2.png (nebo .jpg / .webp / .gif) */
 .photo-bg {
   position: fixed;
   inset: 0;
