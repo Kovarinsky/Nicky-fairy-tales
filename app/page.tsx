@@ -39,6 +39,34 @@ interface HistoryEntry {
   writeSec?: number;
   /** 📋 Deník přípravy (kroky s časy a chybami) — přetrvá i po dokončení */
   log?: Array<{ t: number; m: string }>;
+  /** 🖼️ Malý náhled (skutečná scéna 1 TÉTO pohádky, ne obecná ikonka) —
+   *  zmenšeno na pár KB, ať historie zbytečně nenafoukne localStorage. */
+  coverUrl?: string;
+}
+
+/** Zmenší obrázek scény na malý čtvercový náhled pro historii (canvas,
+ *  cover-fit) — vrací null, když se to z nějakého důvodu nepovede (appka
+ *  pak jen ukáže záložní ikonku, nic se nerozbije). */
+function makeThumbnail(dataUrl: string, size = 96): Promise<string | null> {
+  return new Promise(resolve => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = size; canvas.height = size;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) { resolve(null); return; }
+          const scale = Math.max(size / img.width, size / img.height);
+          const w = img.width * scale, h = img.height * scale;
+          ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+          resolve(canvas.toDataURL("image/jpeg", 0.72));
+        } catch { resolve(null); }
+      };
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    } catch { resolve(null); }
+  });
 }
 
 const HISTORY_KEY = "nicky-story-history";
@@ -2547,6 +2575,16 @@ export default function Home() {
     };
     saveHistory(entry);
     setStoryHistory(loadHistory());
+    // 🖼️ Náhled do historie — skutečná scéna 1 TÉTO pohádky, ne obecná
+    // ikonka; nikdy neblokuje otevření pohádky (fire-and-forget)
+    const coverSrc = rendered[0]?.imageUrl;
+    if (coverSrc && coverSrc !== missingSvg) {
+      makeThumbnail(coverSrc).then(cover => {
+        if (!cover) return;
+        patchHistoryEntry(jobId, { coverUrl: cover });
+        setStoryHistory(loadHistory());
+      });
+    }
     heroDescRef.current = st.heroDescription || "";
     renderedMapRef.current.set(jobId, rendered);
     cacheStory(jobId, rendered).catch(() => {});
@@ -4367,10 +4405,10 @@ export default function Home() {
                   <button type="button" className="panel-close" aria-label={t.cancel}
                     onClick={() => setCharOpen(false)}>✕</button>
                 </div>
-                <div className="folk-list world-roller">
+                <div className="folk-list character-grid">
                   {chars.map(c => (
                     <button type="button" key={c.id}
-                      className={`folk-item ${selectedIds.includes(c.id) ? "folk-on" : ""}`}
+                      className={`folk-item character-card ${selectedIds.includes(c.id) ? "folk-on" : ""}`}
                       onClick={() => toggleChar(c.id)}>
                       <span className={`char-check ${selectedIds.includes(c.id) ? "on" : ""}`} aria-hidden="true">✓</span>
                       {c.photo && <img src={c.photo} alt={c.name} className="chip-avatar" loading="lazy" />}
@@ -4379,7 +4417,7 @@ export default function Home() {
                   ))}
                   {customChars.map(c => (
                     <div key={c.id} role="button" tabIndex={0}
-                      className={`folk-item ${selectedCustomIds.includes(c.id) ? "folk-on" : ""}`}
+                      className={`folk-item character-card ${selectedCustomIds.includes(c.id) ? "folk-on" : ""}`}
                       onClick={() => toggleCustomChar(c.id)}
                       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") toggleCustomChar(c.id); }}>
                       <span className={`char-check ${selectedCustomIds.includes(c.id) ? "on" : ""}`} aria-hidden="true">✓</span>
@@ -5473,6 +5511,9 @@ export default function Home() {
                       else if (dx > 50 && confirmDeleteIdRef.current === entry.id) { swipeHandledRef.current = true; armDelete(null); } // swipe zpět
                     }}
                     disabled={loading && bgStatus === "idle"}>
+                    {entry.coverUrl
+                      ? <img src={entry.coverUrl} alt="" className="history-cover" loading="lazy" />
+                      : <span className="history-cover history-cover-fallback" aria-hidden="true">📖</span>}
                     <div className="history-item-body">
                       <span className="history-title-clip">
                         <span className={`history-title${entry.title.length > 24 ? " title-roll" : ""}`}>{entry.title}</span>
@@ -5681,6 +5722,9 @@ export default function Home() {
 
       {showCredits && (
         <div className="credits-overlay" onClick={() => setShowCredits(false)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/bg-credits.png" alt="" aria-hidden="true" className="credits-bg-img"
+            onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
           <div className="credits-scroll">
             <div className="credits-content">
               <p className="credits-end">✨ Konec ✨</p>
@@ -5768,6 +5812,9 @@ export default function Home() {
               </>
             ) : (
               <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/bg-intro-v2.png" alt="" aria-hidden="true" className="account-panel-illustration"
+                  onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                 <p className="app-confirm-msg">👤 {accountMode === "login" ? t.accountLoginTitle : t.accountRegisterTitle}</p>
                 <p className="gen-step-hint">{accountMode === "login" ? t.accountHint : t.accountRegisterHint}</p>
                 <div className="field">
