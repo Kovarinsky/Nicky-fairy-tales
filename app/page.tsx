@@ -3605,12 +3605,13 @@ export default function Home() {
   async function accountRegister() {
     const username = accountUsername.trim();
     const email = accountEmail.trim();
-    if (!username || !EMAIL_RE.test(email)) { setAccountError(t.accountErrShortEmail); return; }
+    if (!username || accountPassword.length < 6) { setAccountError(t.accountErrShort); return; }
+    if (email && !EMAIL_RE.test(email)) { setAccountError(t.accountErrShortEmail); return; }
     setAccountBusy(true); setAccountError("");
     try {
       const res = await fetch("/api/account/register", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, email, data: collectSyncData() }),
+        body: JSON.stringify({ username, password: accountPassword, email: email || undefined, data: collectSyncData() }),
       });
       const d = await safeJson<{ username?: string; credits?: number; error?: string }>(res);
       if (!res.ok || !d.username) { setAccountError(d.error || t.accountErrGeneric); return; }
@@ -5473,37 +5474,6 @@ export default function Home() {
       )}
 
 
-      {/* ── 🩺 Zrušené/chybové běhy — deník dostupný i po zavření/zrušení ── */}
-      {!readerMode && debugJobs.length > 0 && (
-        <div className="history-box">
-          <button type="button" className="history-toggle" onClick={() => setDebugJobsOpen(p => !p)}>
-            {t.debugJobsTitle(debugJobs.length)} {debugJobsOpen ? "▲" : "▼"}
-          </button>
-          {debugJobsOpen && (
-            <>
-              <p className="gen-step-hint" style={{ margin: "0.15rem 0 0.4rem" }}>{t.debugJobsHint}</p>
-              <div className="history-list">
-                {debugJobs.map(ref => (
-                  <button type="button" key={ref.id} className="history-item debug-job-item"
-                    onClick={() => openDebugJobLog(ref)}>
-                    <div className="history-item-body">
-                      <span className="history-title-clip">
-                        <span className="history-title">{ref.title || ref.id.slice(0, 8)}</span>
-                      </span>
-                      <div className="history-badges">
-                        <span className="history-badge badge-size">{ref.phase === "error" ? t.segError : t.segWriting}</span>
-                      </div>
-                      <span className="history-date">{fmtDate(ref.endedAt)}</span>
-                    </div>
-                    <span className="debug-job-log-btn" aria-label={t.logTitle}>📋</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
       {/* ── USAGE — real spend overview — JEN PRO ADMINA (NEXT_PUBLIC_ADMIN_USERNAME):
            appka tu ukazuje skutečné dolarové náklady (Claude/ElevenLabs/Gemini),
            to nemá vidět běžný uživatel appky — celá záložka je teď schovaná,
@@ -5604,6 +5574,35 @@ export default function Home() {
                       </div>
                     </>
                   )}
+                {debugJobs.length > 0 && (
+                  <div className="dev-panel">
+                    <button type="button" className="history-toggle" onClick={() => setDebugJobsOpen(p => !p)}>
+                      {t.debugJobsTitle(debugJobs.length)} {debugJobsOpen ? "▲" : "▼"}
+                    </button>
+                    {debugJobsOpen && (
+                      <>
+                        <p className="gen-step-hint" style={{ margin: "0.15rem 0 0.4rem" }}>{t.debugJobsHint}</p>
+                        <div className="history-list">
+                          {debugJobs.map(ref => (
+                            <button type="button" key={ref.id} className="history-item debug-job-item"
+                              onClick={() => openDebugJobLog(ref)}>
+                              <div className="history-item-body">
+                                <span className="history-title-clip">
+                                  <span className="history-title">{ref.title || ref.id.slice(0, 8)}</span>
+                                </span>
+                                <div className="history-badges">
+                                  <span className="history-badge badge-size">{ref.phase === "error" ? t.segError : t.segWriting}</span>
+                                </div>
+                                <span className="history-date">{fmtDate(ref.endedAt)}</span>
+                              </div>
+                              <span className="debug-job-log-btn" aria-label={t.logTitle}>📋</span>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
                 </div>
             </div>
           )}
@@ -5721,17 +5720,17 @@ export default function Home() {
                   <input type="text" value={accountUsername} onChange={e => setAccountUsername(e.target.value)}
                     placeholder={t.accountUsernamePh} autoCapitalize="none" autoCorrect="off" autoComplete="username" />
                 </div>
-                {accountMode === "register" ? (
+                <div className="field">
+                  <input type="password" value={accountPassword} onChange={e => setAccountPassword(e.target.value)}
+                    placeholder={t.accountPasswordPh}
+                    autoComplete={accountMode === "login" ? "current-password" : "new-password"}
+                    onKeyDown={e => { if (e.key === "Enter") (accountMode === "login" ? accountLogin() : accountRegister()); }} />
+                </div>
+                {accountMode === "register" && (
                   <div className="field">
                     <input type="email" value={accountEmail} onChange={e => setAccountEmail(e.target.value)}
-                      placeholder={t.accountEmailPh} autoCapitalize="none" autoCorrect="off" autoComplete="email"
+                      placeholder={t.accountEmailOptionalPh} autoCapitalize="none" autoCorrect="off" autoComplete="email"
                       onKeyDown={e => { if (e.key === "Enter") accountRegister(); }} />
-                  </div>
-                ) : (
-                  <div className="field">
-                    <input type="password" value={accountPassword} onChange={e => setAccountPassword(e.target.value)}
-                      placeholder={t.accountPasswordPh} autoComplete="current-password"
-                      onKeyDown={e => { if (e.key === "Enter") accountLogin(); }} />
                   </div>
                 )}
                 {accountError && <p className="gen-step-hint account-err">{accountError}</p>}
