@@ -12,7 +12,7 @@ import { loadPortraitRefEntries, refsForText, refsForPanels } from "@/lib/portra
 import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/types";
 import { blobToken } from "@/lib/blob-token";
-import { adjustCredits } from "@/lib/accounts";
+import { chargeForCompletedStory } from "@/lib/accounts";
 
 // 💳 Kreditní systém (návrh „na čisto"): 1 kredit = 10 Kč = 1 pohádka.
 // Zatím jen jedna kvantifikovatelná přirážka (dva konce = dvojnásob psaní
@@ -814,7 +814,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // odečtu, kdyby navázání/restart jobu proběhlo přes už dokončený stav)
     if (st.username && !st.creditsCharged) {
       const cost = storyCreditCost(body);
-      await adjustCredits(st.username, -cost).catch(() => {});
+      await chargeForCompletedStory(st.username, cost).catch(() => {});
       st.creditsCharged = true;
     }
     await write();

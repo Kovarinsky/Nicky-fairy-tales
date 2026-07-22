@@ -21,6 +21,11 @@ export interface AccountRecord {
    *  jednoduše by šel přepsat na cokoliv). Mění ho jen registrace
    *  (počáteční dar) a job-runner (odečet po dokončené pohádce). */
   credits?: number;
+  /** ✉️ E-mail — appka na něj posílá vygenerované heslo (registrace / obnova)
+   *  a slouží jako jednoduchý tracking, kdo appku používá. */
+  email?: string;
+  /** 📊 Počet doopravdy dokončených pohádek — pro developerský přehled */
+  storiesCompleted?: number;
 }
 
 /** Nový účet dostává na vyzkoušení tento počet kreditů zdarma. */
@@ -39,6 +44,29 @@ export async function adjustCredits(username: string, delta: number): Promise<nu
   await writeAccount(acc);
   return next;
 }
+
+/** Odečet za dokončenou pohádku + zvýšení počítadla pro dev přehled —
+ *  v JEDNOM čtení/zápisu (ne dva samostatné adjustCredits+počítadlo volání). */
+export async function chargeForCompletedStory(username: string, cost: number): Promise<void> {
+  const acc = await readAccount(username);
+  if (!acc) return;
+  acc.credits = Math.max(0, (acc.credits ?? 0) - cost);
+  acc.storiesCompleted = (acc.storiesCompleted ?? 0) + 1;
+  acc.updatedAt = Date.now();
+  await writeAccount(acc);
+}
+
+// ── Heslo generované appkou (registrace / obnova hesla e-mailem) ────────
+// Bez matoucích znaků (0/O, 1/l/I) — čte se z e-mailu na telefonu, opisuje ručně
+const PASSWORD_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+export function generateTempPassword(length = 10): string {
+  const bytes = randomBytes(length);
+  let out = "";
+  for (let i = 0; i < length; i++) out += PASSWORD_ALPHABET[bytes[i] % PASSWORD_ALPHABET.length];
+  return out;
+}
+
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const USERNAME_RE = /^[a-z0-9_-]{3,30}$/;
 

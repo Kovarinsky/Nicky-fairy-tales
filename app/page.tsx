@@ -1277,12 +1277,6 @@ export default function Home() {
     };
   }, []);
 
-  // 🌙 Hudba se ztiší a přejde do usínací podkresové smyčky, jakmile se
-  // zobrazí titulky — zůstane hrát jako tichá uklidňující melodie.
-  useEffect(() => {
-    if (showCredits) ambientRef.current?.enterSleepMode();
-  }, [showCredits]);
-
   // Spoken "good night" when the credits roll at the end of the story
   useEffect(() => {
     if (!showCredits) {
@@ -1740,14 +1734,18 @@ export default function Home() {
     if (next === null) {
       // 🌙 Poslední stránka: outro hraje HNED, jak dozní její vlastní narace
       // — ne už při pouhém příchodu na stránku (viz komentář u outroFiredRef
-      // výš). Titulky/uspávací smyčka/„dobrou noc" počkají, až outro odezní
-      // (generický outro.mp3 je ~8s dlouhý), ať nehrají přes sebe.
+      // výš). Uspávací smyčka teď nastupuje SOUČASNĚ s outrem (ne až o 3.2s
+      // později při zobrazení titulků) — outro tak plynule PŘEJDE do stejné
+      // tiché usínací melodie, místo aby po něm nastalo ticho a smyčka
+      // naskočila samostatně o chvíli později.
       ambientRef.current?.playOutro();
+      ambientRef.current?.enterSleepMode();
       setTimeout(() => setShowCredits(true), 3200);
       return;
     }
-    // 🎼 Krátký hudební stinger na konci TÉTO scény, než appka otočí na další
-    ambientRef.current?.playSceneEnd(scenes[page]?.soundscape);
+    // 🔇 Generický "cinkavý" stinger po KAŽDÉ scéně byl na výslovné přání
+    // odstraněn — zvuk teď vychází jen z toho, co scéna doopravdy vypráví
+    // (scene.sfx, viz playEffect výš), ne z paušální znělky po každé stránce.
     if (scenes[next]?.imageUrl && scenes[next]?.audioUrl) {
       isAutoAdvanceRef.current = true; // allow auto-play on the next slide
       setPageLeaving(true); // gentle fade-out starts right away, swap follows after it settles
@@ -3468,6 +3466,7 @@ export default function Home() {
     hiddenVoices?: string[];
     uiLang?: UILang;
   }
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const [account, setAccount] = useState<{ username: string } | null>(null);
   // 💳 Kreditní systém (návrh „na čisto") — jen orientační zůstatek, žádné
   // vynucení v UI (server sám odmítne /api/job/start, když kreditů nezbývá)
@@ -3477,8 +3476,10 @@ export default function Home() {
   const [accountMode, setAccountMode] = useState<"login" | "register">("login");
   const [accountUsername, setAccountUsername] = useState("");
   const [accountPassword, setAccountPassword] = useState("");
+  const [accountEmail, setAccountEmail] = useState("");
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountError, setAccountError] = useState("");
+  const [accountForgotSent, setAccountForgotSent] = useState(false);
 
   useEffect(() => {
     fetch("/api/account/me")
@@ -3576,19 +3577,39 @@ export default function Home() {
 
   async function accountRegister() {
     const username = accountUsername.trim();
-    if (!username || accountPassword.length < 6) { setAccountError(t.accountErrShort); return; }
+    const email = accountEmail.trim();
+    if (!username || !EMAIL_RE.test(email)) { setAccountError(t.accountErrShortEmail); return; }
     setAccountBusy(true); setAccountError("");
     try {
       const res = await fetch("/api/account/register", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password: accountPassword, data: collectSyncData() }),
+        body: JSON.stringify({ username, email, data: collectSyncData() }),
       });
       const d = await safeJson<{ username?: string; credits?: number; error?: string }>(res);
       if (!res.ok || !d.username) { setAccountError(d.error || t.accountErrGeneric); return; }
       setAccount({ username: d.username });
       setAccountCredits(typeof d.credits === "number" ? d.credits : null);
       setAccountPanelOpen(false);
-      setAccountUsername(""); setAccountPassword("");
+      setAccountUsername(""); setAccountPassword(""); setAccountEmail("");
+    } catch {
+      setAccountError(t.accountErrGeneric);
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
+  async function accountForgotPassword() {
+    const username = accountUsername.trim();
+    if (!username) { setAccountError(t.accountErrShort); return; }
+    setAccountBusy(true); setAccountError("");
+    try {
+      const res = await fetch("/api/account/forgot-password", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username }),
+      });
+      const d = await safeJson<{ ok?: boolean; error?: string }>(res);
+      if (!res.ok) { setAccountError(d.error || t.accountErrGeneric); return; }
+      setAccountForgotSent(true);
     } catch {
       setAccountError(t.accountErrGeneric);
     } finally {
@@ -5613,6 +5634,7 @@ export default function Home() {
             {account ? (
               <>
                 <p className="app-confirm-msg">👤 {t.accountLoggedInAs(account.username)}</p>
+                {accountCredits !== null && <p className="gen-step-hint">💳 {t.accountCreditsLabel(accountCredits)}</p>}
                 <p className="gen-step-hint">{t.accountSyncHint}</p>
                 <div className="app-confirm-btns">
                   <button type="button" className="cancel-btn" onClick={() => setAccountPanelOpen(false)}>✕ {t.cancel}</button>
@@ -5622,18 +5644,26 @@ export default function Home() {
             ) : (
               <>
                 <p className="app-confirm-msg">👤 {accountMode === "login" ? t.accountLoginTitle : t.accountRegisterTitle}</p>
-                <p className="gen-step-hint">{t.accountHint}</p>
+                <p className="gen-step-hint">{accountMode === "login" ? t.accountHint : t.accountRegisterHint}</p>
                 <div className="field">
                   <input type="text" value={accountUsername} onChange={e => setAccountUsername(e.target.value)}
                     placeholder={t.accountUsernamePh} autoCapitalize="none" autoCorrect="off" autoComplete="username" />
                 </div>
-                <div className="field">
-                  <input type="password" value={accountPassword} onChange={e => setAccountPassword(e.target.value)}
-                    placeholder={t.accountPasswordPh}
-                    autoComplete={accountMode === "login" ? "current-password" : "new-password"}
-                    onKeyDown={e => { if (e.key === "Enter") (accountMode === "login" ? accountLogin() : accountRegister()); }} />
-                </div>
+                {accountMode === "register" ? (
+                  <div className="field">
+                    <input type="email" value={accountEmail} onChange={e => setAccountEmail(e.target.value)}
+                      placeholder={t.accountEmailPh} autoCapitalize="none" autoCorrect="off" autoComplete="email"
+                      onKeyDown={e => { if (e.key === "Enter") accountRegister(); }} />
+                  </div>
+                ) : (
+                  <div className="field">
+                    <input type="password" value={accountPassword} onChange={e => setAccountPassword(e.target.value)}
+                      placeholder={t.accountPasswordPh} autoComplete="current-password"
+                      onKeyDown={e => { if (e.key === "Enter") accountLogin(); }} />
+                  </div>
+                )}
                 {accountError && <p className="gen-step-hint account-err">{accountError}</p>}
+                {accountForgotSent && <p className="gen-step-hint">{t.accountForgotSent}</p>}
                 <div className="app-confirm-btns">
                   <button type="button" className="cancel-btn" onClick={() => setAccountPanelOpen(false)}>✕ {t.cancel}</button>
                   <button type="button" className="btn-span2" disabled={accountBusy}
@@ -5641,8 +5671,14 @@ export default function Home() {
                     {accountBusy ? "⏳" : accountMode === "login" ? "🔓" : "✨"} {accountMode === "login" ? t.accountLoginBtn : t.accountRegisterBtn}
                   </button>
                 </div>
+                {accountMode === "login" && (
+                  <button type="button" className="gen-step-hint account-switch-mode" disabled={accountBusy}
+                    onClick={accountForgotPassword}>
+                    {t.accountForgotBtn}
+                  </button>
+                )}
                 <button type="button" className="gen-step-hint account-switch-mode"
-                  onClick={() => { setAccountMode(m => (m === "login" ? "register" : "login")); setAccountError(""); }}>
+                  onClick={() => { setAccountMode(m => (m === "login" ? "register" : "login")); setAccountError(""); setAccountForgotSent(false); }}>
                   {accountMode === "login" ? t.accountSwitchToRegister : t.accountSwitchToLogin}
                 </button>
               </>

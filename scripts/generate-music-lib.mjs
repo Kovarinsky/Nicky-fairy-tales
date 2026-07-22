@@ -108,7 +108,11 @@ const SOUNDSCAPES = {
 // končící na rozeznělém akordu (viz nahlášené "je to spíš cinkání").
 const FANFARES = {
   intro: { prompt: "Short cheerful magical fanfare with a clear, memorable 4-6 note rising melodic phrase (distinct separate notes, NOT a glissando or arpeggio sparkle) played on warm orchestral bells and strings, ending on a bright resolving chord, joyful opening for a children's storybook, instrumental", ms: 6500 },
-  outro: { prompt: "Short gentle descending lullaby melody, warm resolving orchestral chord, sleepy and peaceful ending for a children's bedtime story, instrumental", ms: 8000 },
+  // 🌙 Hraje SOUČASNĚ s nástupem smyčkové usínací melodie (enterSleepMode,
+  // soundscape-lullaby) — outro je teď jen jemný, pomalý doznívající vstup
+  // do TÉ SAMÉ ukolébavkové nálady, ne samostatná fanfára, co po sobě
+  // nechá ticho před nástupem smyčky.
+  outro: { prompt: "Very soft, slow descending lullaby phrase, solo music box or gentle harp fading into a warm hushed pad, sleepy and tender, no strong attack, drifting gently into silence, instrumental", ms: 8000 },
   // 🎺 Úvodní fanfáry LADĚNÉ podle prostředí první scény (viz AmbientPlayer.
   // playIntro) — appka zkusí intro-<scene> první, "intro" výše je jen obecný
   // záchranný fallback, kdyby konkrétní varianta chyběla/selhala.
@@ -183,20 +187,6 @@ const THEME_INTROS = {
   folk_kufr: "Short whimsical flying-adventure fanfare, playful strings and light brass, magical and warm, instrumental",
   folk_kuzlatka: "Short cozy protective fanfare, warm strings and soft woodwind, gentle and reassuring, instrumental",
   folk_muzikanti: "Short jaunty animal-band fanfare, playful strings and brass, warm and comic, instrumental",
-};
-
-// ── 🎼 Stingery — krátká kadence na konci KAŽDÉ scény, jedna na náladu ────
-// 🤫 Přehrává se na konci KAŽDÉ scény (mezi každým otočením stránky) — musí
-// být VELMI jemné a tiché, nikdy fanfárovité/dramatické (dřív "adventure"
-// s dechovým nástrojem a "triumphant" zněním působilo rušivě, když se
-// opakuje desetkrát za pohádku). Žádný dechový nástroj, žádné "triumphant"/
-// "flourish" — jen tichý dozvuk v barvě dané nálady.
-const STINGERS = {
-  magic: "Very short gentle chime, two soft notes descending, dreamy and quiet, no sharp attack, instrumental",
-  forest: "Very short gentle acoustic phrase, soft muted chime, calm and quiet, instrumental",
-  night: "Very short soft lullaby chime, slow gentle bells, hushed and quiet, instrumental",
-  adventure: "Very short gentle resolving phrase, soft plucked strings, warm and quiet, no brass, no fanfare, instrumental",
-  cozy: "Very short warm gentle chime, soft piano, quiet and cozy, instrumental",
 };
 
 // ── 🔊 Jednorázové zvukové efekty (text, trvání v s, smyčka?) ─────────────
@@ -348,15 +338,6 @@ async function main() {
     if (shouldSkip(path)) { manifest[`intro-theme-${key}`] = statSync(path).size; console.log(`   ⏭️  ${key} (už existuje)`); continue; }
     const buf = await withRetry(() => composeMusic(prompt, 6000), `intro-theme:${key}`);
     if (buf) { writeFileSync(path, buf); manifest[`intro-theme-${key}`] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
-    else fail++;
-  }
-
-  console.log(`🎼 Stingery (${Object.keys(STINGERS).length})`);
-  for (const [key, prompt] of Object.entries(STINGERS)) {
-    const path = `${OUT_DIR}/stinger-${key}.mp3`;
-    if (shouldSkip(path)) { manifest[`stinger-${key}`] = statSync(path).size; console.log(`   ⏭️  ${key} (už existuje)`); continue; }
-    const buf = await withRetry(() => composeMusic(prompt, 3000), `stinger:${key}`);
-    if (buf) { writeFileSync(path, buf); manifest[`stinger-${key}`] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
     else fail++;
   }
 

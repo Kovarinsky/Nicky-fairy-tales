@@ -1189,47 +1189,6 @@ export class AmbientPlayer {
     bass.stop(chordT + 4.6);
   }
 
-  /** 🎼 Krátký hudební "stinger" na konci KAŽDÉ scény (kromě té úplně
-   *  poslední — tam hraje playOutro): zkusí reálnou nahrávku podle nálady
-   *  (public/music-lib/stinger-<scene>.mp3), při chybě spadne na syntézu. */
-  playSceneEnd(scene?: Soundscape): void {
-    if (!this.running) return;
-    const { ctx } = this.setup();
-    const fx = this.effectGain!;
-    this.loadBuffer(ctx, `stinger-${scene || "magic"}`).then(buf => {
-      if (buf) this.playOneShot(ctx, buf, fx, `stinger-${scene || "magic"}`);
-      else this.playSceneEndSynth(scene);
-    });
-  }
-
-  private playSceneEndSynth(scene?: Soundscape): void {
-    if (!this.running) return;
-    const { ctx } = this.setup();
-    const fx = this.effectGain!;
-    const table = scene === "night" ? BELLS_NIGHT
-      : scene === "adventure" ? BELLS_ADVENT
-      : scene === "cozy" ? BELLS_COZY
-      : BELLS_MAGIC;
-    const t0 = ctx.currentTime + 0.02;
-    // Malá "hotovo" kadence — vyšší tón, pak o kvintu níž
-    const hi = table[table.length - 1];
-    const lo = table[Math.max(0, table.length - 3)];
-    [[hi, 0], [lo, 0.16]].forEach(([freq, d]) => {
-      const t = t0 + d;
-      const osc = ctx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.14, t + 0.015);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
-      osc.connect(g);
-      g.connect(fx);
-      osc.start(t);
-      osc.stop(t + 1.0);
-    });
-  }
-
   /** 🌙 Přechod do klidového režimu pro závěrečné titulky: aktuální nálada
    *  se ztlumí a plynule vymění za samostatnou usínací podkresovou smyčku
    *  (public/music-lib/soundscape-lullaby.mp3, fallback na buildCozy) a
