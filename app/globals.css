@@ -206,26 +206,38 @@ body {
 /* Appka jinak spoléhá na ambientní .photo-bg (jen 55 % průhlednosti přes
    tmavý gradient scény) — na téměř prázdné úvodní obrazovce to bylo
    prakticky neviditelné. Tahle vrstva ukazuje STEJNÝ obrázek napřímo,
-   naplno, ať je vidět spolehlivě hned od prvního zobrazení appky. */
+   naplno, ať je vidět spolehlivě hned od prvního zobrazení appky.
+   🖼️ Obrázek zabírá jen HORNÍ ČÁST obrazovky (ne celou přes inset:0) —
+   na fullscreen verzi se děti na obrázku dostaly až úplně dolů a
+   tlačítko "Start" jim překrývalo nohy. Necháváme mu fade-out masku
+   dole, ať plynule přejde do jednobarevného pozadí, kde je pak čistý
+   prostor pro tlačítko a chipy bez překryvu. */
 .intro-splash-img {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 62%;
   width: 100%;
-  height: 100%;
   object-fit: cover;
-  object-position: center 30%;
+  object-position: center 15%;
   z-index: 0;
+  mask-image: linear-gradient(180deg, #000 0%, #000 78%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 78%, transparent 100%);
 }
 
 .intro-splash-scrim {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 62%;
   z-index: 1;
   background: linear-gradient(180deg,
-    rgba(10, 6, 32, 0.55) 0%,
-    rgba(10, 6, 32, 0.05) 28%,
-    rgba(10, 6, 32, 0.15) 60%,
-    rgba(10, 6, 32, 0.8) 100%
+    rgba(10, 6, 32, 0.5) 0%,
+    rgba(10, 6, 32, 0.05) 30%,
+    rgba(10, 6, 32, 0.1) 70%,
+    rgba(26, 16, 64, 1) 100%
   );
 }
 
