@@ -5504,8 +5504,11 @@ export default function Home() {
         </div>
       )}
 
-      {/* ── USAGE — real spend overview ── */}
-      {!readerMode && (
+      {/* ── USAGE — real spend overview — JEN PRO ADMINA (NEXT_PUBLIC_ADMIN_USERNAME):
+           appka tu ukazuje skutečné dolarové náklady (Claude/ElevenLabs/Gemini),
+           to nemá vidět běžný uživatel appky — celá záložka je teď schovaná,
+           ne jen přidaná sekce Dev přehled uvnitř ní. ── */}
+      {!readerMode && !!account && account.username === process.env.NEXT_PUBLIC_ADMIN_USERNAME && (
         <div className="history-box">
           <button type="button" className="history-toggle" onClick={toggleUsage}>
             {t.usageTitle} {usageOpen ? "▲" : "▼"}
@@ -5560,9 +5563,8 @@ export default function Home() {
                   )}
                 </>
               )}
-              {!!account && account.username === process.env.NEXT_PUBLIC_ADMIN_USERNAME && (
-                <div className="dev-panel">
-                  <p className="gen-step-hint">🛠️ Dev přehled účtů</p>
+              <div className="dev-panel">
+                <p className="gen-step-hint">🛠️ Dev přehled účtů</p>
                   {!devAccounts ? (
                     <>
                       <div className="field">
@@ -5603,7 +5605,6 @@ export default function Home() {
                     </>
                   )}
                 </div>
-              )}
             </div>
           )}
         </div>
