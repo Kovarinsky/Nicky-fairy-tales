@@ -3705,6 +3705,23 @@ export default function Home() {
     try { await fetch("/api/account/logout", { method: "POST" }); } catch {}
   }
 
+  const [accountTopupBusy, setAccountTopupBusy] = useState(false);
+  async function accountTopup() {
+    if (accountTopupBusy) return;
+    setAccountTopupBusy(true);
+    try {
+      const res = await fetch("/api/account/topup", { method: "POST" });
+      const d = await safeJson<{ credits?: number; error?: string }>(res);
+      if (!res.ok || typeof d.credits !== "number") { appAlert(d.error || t.accountErrGeneric); return; }
+      setAccountCredits(d.credits);
+      appAlert(t.accountTopupDone(d.credits));
+    } catch {
+      appAlert(t.accountErrGeneric);
+    } finally {
+      setAccountTopupBusy(false);
+    }
+  }
+
   // ☁️ Průběžný zápis na server po každé změně (s prodlevou) — appka
   // nemusí mít žádné tlačítko „Uložit", prostě to na pozadí drží v syncu
   const accountSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -5780,8 +5797,8 @@ export default function Home() {
                     </div>
                   )}
                   <button type="button" className="account-topup-btn"
-                    onClick={() => appAlert(t.accountTopupSoon)}>
-                    ✨ {t.accountTopupBtn}
+                    disabled={accountTopupBusy} onClick={accountTopup}>
+                    ✨ {accountTopupBusy ? "…" : t.accountTopupBtn}
                   </button>
                 </div>
                 <p className="gen-step-hint">{t.accountSyncHint}</p>
