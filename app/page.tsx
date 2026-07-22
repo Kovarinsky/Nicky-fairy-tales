@@ -4246,14 +4246,16 @@ export default function Home() {
           Hlas), formulář zůstává pod ní beze změny, jen ho dočasně zakrývá */}
       {!readerMode && showIntro && (
         <div className="intro-splash">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/bg-intro-v2.png" alt="" aria-hidden="true" className="intro-splash-img"
-            onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-          <div className="intro-splash-scrim" aria-hidden="true" />
-          <div className="intro-splash-top">
-            <h1 className="intro-splash-title">
-              📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"}
-            </h1>
+          <div className="intro-splash-hero">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/bg-intro-v2.png" alt="" aria-hidden="true" className="intro-splash-img"
+              onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+            <div className="intro-splash-scrim" aria-hidden="true" />
+            <div className="intro-splash-top">
+              <h1 className="intro-splash-title">
+                📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"}
+              </h1>
+            </div>
           </div>
           <div className="intro-splash-bottom">
             <button type="button" className="btn-create intro-start-btn" onClick={dismissIntro}>
