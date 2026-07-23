@@ -490,16 +490,6 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<"form" | "reader">("form");
   const readerMode = viewMode === "reader";
 
-  // 🌙 Úvodní obrazovka (Start a new story + 3 chipy) — zatím se ukazuje při
-  // KAŽDÉM načtení appky (dokud se návrh ještě ladí/testuje); dřív se
-  // pamatovala přes sessionStorage jen na první zobrazení za kartu
-  // prohlížeče, což při opakovaném testování matlo (další reload = žádný
-  // splash, jen vršek formuláře s aktuálním pozadím appky).
-  const [showIntro, setShowIntro] = useState(true);
-  function dismissIntro() {
-    setShowIntro(false);
-  }
-
   // UI language (CZ default; EN for Nicolas's foreign friends)
   const [uiLang, setUiLang] = useState<UILang>("cs");
   const t = UI[uiLang];
@@ -4258,40 +4248,6 @@ export default function Home() {
 
   return (
     <div className={readerMode ? "container reader-mode" : "container"}>
-
-      {/* 🌙 Úvodní obrazovka — velké Start tlačítko + 3 chipy (Postavy/Světy/
-          Hlas), formulář zůstává pod ní beze změny, jen ho dočasně zakrývá */}
-      {!readerMode && showIntro && (
-        <div className="intro-splash">
-          <div className="intro-splash-hero">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/bg-intro-v2.png" alt="" aria-hidden="true" className="intro-splash-img"
-              onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-            <div className="intro-splash-scrim" aria-hidden="true" />
-            <div className="intro-splash-top">
-              <h1 className="intro-splash-title">
-                📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"}
-              </h1>
-            </div>
-          </div>
-          <div className="intro-splash-bottom">
-            <button type="button" className="btn-create intro-start-btn" onClick={dismissIntro}>
-              ▶ {t.introStartBtn}
-            </button>
-            <div className="intro-chip-row">
-              <button type="button" className="intro-chip" onClick={() => { dismissIntro(); setCharOpen(true); }}>
-                👤 {t.introCharsChip}
-              </button>
-              <button type="button" className="intro-chip" onClick={() => { dismissIntro(); setWorldOpen(true); }}>
-                🌳 {t.introWorldsChip}
-              </button>
-              <button type="button" className="intro-chip" onClick={() => { dismissIntro(); setVoiceOpen(true); }}>
-                🎤 {t.introVoiceChip}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {!readerMode && (
       <>
