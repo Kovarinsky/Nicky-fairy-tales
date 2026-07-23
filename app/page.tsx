@@ -5192,8 +5192,14 @@ export default function Home() {
         </div>
       )}
 
-      {/* ── BOOK – shown when all scene images are ready (audio may be partial) ── */}
-      {bookReady && current && (
+      {/* ── BOOK – shown when all scene images are ready (audio may be partial) ──
+          Musí čekat i na readerMode, ne jen na bookReady: 🏠 Domů (resetToForm)
+          přepne viewMode zpátky na "form", ale záměrně NEMAŽE scenes/title (viz
+          "background pokračuje po Domů") — takže bookReady zůstává true a bez
+          týhle podmínky se pod formulářem znovu vykreslila titulní karta staré
+          pohádky (klidně s "Připravuji pohádku…", i když formulářový status
+          nahoře už dávno hlásil "Pohádka je připravena!" z úplně jiného běhu). */}
+      {readerMode && bookReady && current && (
         <div className={`book${ctrlsOpen ? " ctrls-open" : ""}`} ref={bookRef}>
           <h2 className="book-title">{title}</h2>
 
