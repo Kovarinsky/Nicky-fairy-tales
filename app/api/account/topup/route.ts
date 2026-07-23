@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const maxDuration = 15;
 
 /** Kolik kreditů testovací dobití přidá najednou. */
-export const TEST_TOPUP_CREDITS = 5;
+const TEST_TOPUP_CREDITS = 5;
 
 export async function POST(req: NextRequest) {
   const username = verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
