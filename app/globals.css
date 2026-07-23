@@ -2157,65 +2157,6 @@ button:disabled {
   box-shadow: 0 2px 8px rgba(244, 81, 30, 0.4);
 }
 
-/* 🧒 Postavy jako mřížka karet (2 sloupce) místo svislého rolleru — jen
-   TATO kombinace tříd, plain .folk-list/.folk-item (bg-picker, světy,
-   hlasy) zůstávají beze změny, protože sdílejí stejné základní třídy. */
-.folk-list.character-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.7rem;
-  max-height: none;
-  overflow-y: visible;
-  scroll-snap-type: none;
-  mask-image: none;
-  -webkit-mask-image: none;
-  padding: 0.9rem;
-  background: rgba(10, 8, 40, 0.3);
-}
-
-.folk-item.character-card {
-  position: relative;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  text-align: center;
-  border-radius: 16px;
-  border: 1.5px solid rgba(255, 255, 255, 0.16);
-  padding: 1rem 0.6rem 0.8rem;
-  min-height: 6.5rem;
-}
-
-.folk-item.character-card.folk-on {
-  border-color: rgba(244, 81, 30, 0.75);
-  background: rgba(244, 81, 30, 0.18);
-}
-
-.folk-item.character-card .char-check {
-  position: absolute;
-  top: 0.45rem;
-  right: 0.45rem;
-  width: 22px;
-  height: 22px;
-  min-width: 22px;
-}
-
-.folk-item.character-card .chip-avatar {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.folk-item.character-card .chip-remove {
-  position: absolute;
-  top: 0.3rem;
-  left: 0.4rem;
-  background: rgba(0,0,0,0.3);
-  width: 20px;
-  height: 20px;
-}
-
 /* ✓ malé oranžové potvrzení PŘÍMO u vybraného hlasu — fialové podbarvení
    řádku (.folk-on) samo nestačilo, nebylo jasné, který přesně je vybraný */
 .voice-check {

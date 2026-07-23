@@ -4358,10 +4358,10 @@ export default function Home() {
                   <button type="button" className="panel-close" aria-label={t.cancel}
                     onClick={() => setCharOpen(false)}>✕</button>
                 </div>
-                <div className="folk-list character-grid">
+                <div className="folk-list">
                   {chars.map(c => (
                     <button type="button" key={c.id}
-                      className={`folk-item character-card ${selectedIds.includes(c.id) ? "folk-on" : ""}`}
+                      className={`folk-item ${selectedIds.includes(c.id) ? "folk-on" : ""}`}
                       onClick={() => toggleChar(c.id)}>
                       <span className={`char-check ${selectedIds.includes(c.id) ? "on" : ""}`} aria-hidden="true">✓</span>
                       {c.photo && <img src={c.photo} alt={c.name} className="chip-avatar" loading="lazy" />}
@@ -4370,7 +4370,7 @@ export default function Home() {
                   ))}
                   {customChars.map(c => (
                     <div key={c.id} role="button" tabIndex={0}
-                      className={`folk-item character-card ${selectedCustomIds.includes(c.id) ? "folk-on" : ""}`}
+                      className={`folk-item ${selectedCustomIds.includes(c.id) ? "folk-on" : ""}`}
                       onClick={() => toggleCustomChar(c.id)}
                       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") toggleCustomChar(c.id); }}>
                       <span className={`char-check ${selectedCustomIds.includes(c.id) ? "on" : ""}`} aria-hidden="true">✓</span>
