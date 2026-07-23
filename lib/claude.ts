@@ -837,6 +837,20 @@ function randomSpark(language: "cs" | "en"): string {
   return list[Math.floor(Math.random() * list.length)];
 }
 
+// 📏 Délka/detail NÁMĚTU (ne celé pohádky) roste s věkem — batoleti stačí
+// jedna prostá věta, staršímu školákovi se hodí pár vět s víc konkrétními
+// detaily (kdo/kde/proč), ať je z čeho psát bohatší strukturovaný příběh.
+function topicLengthSpec(age: number | undefined, language: "cs" | "en"): { sentences: string; words: number } {
+  const band = age === undefined ? -1 : age <= 3 ? 0 : age <= 5 ? 1 : age <= 7 ? 2 : 3;
+  switch (band) {
+    case 0: return { sentences: language === "en" ? "ONE short sentence" : "JEDNU krátkou větu", words: 18 };
+    case 1: return { sentences: language === "en" ? "1-2 sentences" : "1–2 věty", words: 35 };
+    case 2: return { sentences: language === "en" ? "2-3 sentences" : "2–3 věty", words: 55 };
+    case 3: return { sentences: language === "en" ? "3-4 sentences" : "3–4 věty", words: 80 };
+    default: return { sentences: "1-2 sentences", words: 40 };
+  }
+}
+
 export async function suggestTopicIdea(language: "cs" | "en", characterNames: string[], ctx: TopicIdeaContext = {}): Promise<string> {
   const model = MODEL.trim();
   const who = characterNames.length ? characterNames.join(", ") : language === "en" ? "the children" : "děti";
@@ -864,6 +878,7 @@ export async function suggestTopicIdea(language: "cs" | "en", characterNames: st
       ? ` Pitch it for a ${ctx.age}-year-old: match the tension, vocabulary and stakes to that age (very gentle/repetitive for a toddler, real (age-appropriate) stakes and a twist for an older child).`
       : ` Namiř to na věk ${ctx.age} let: přizpůsob napětí, slovník i sázky tomuto věku (velmi jemné a opakující se pro batole, skutečné přiměřené napětí a zvrat pro staršího školáka).`
     : "";
+  const lenSpec = topicLengthSpec(ctx.age, language);
   // 🎲 Náhodná jiskra JEN když uživatel nemá vlastní zápisky — s hintem by
   // mohla plést, "vymysli si sám" naopak potřebuje vnější náhodu (viz TOPIC_SPARKS*).
   const sparkPart = !ctx.userHint
@@ -871,9 +886,12 @@ export async function suggestTopicIdea(language: "cs" | "en", characterNames: st
       ? ` For inspiration (don't force it if it doesn't fit, just let it loosely spark the idea): ${randomSpark(language)}.`
       : ` Pro inspiraci (nemusíš to použít doslova, ať tě to jen volně navnadí): ${randomSpark(language)}.`
     : "";
+  const avoidLostCreaturePart = language === "en"
+    ? " Avoid the overused 'a small lost/scared magical creature (a star, firefly, cloud, baby animal) that just needs guiding home' shape — reach for a genuinely different kind of premise (a mystery, a contest, a skill to learn, a misunderstanding, a building/invention project, a real obstacle) instead."
+    : " Vyhni se omletému vzorci 'malé ztracené/vystrašené kouzelné stvoření (hvězdička, světluška, obláček, mládě), co jen potřebuje doprovodit domů' — sáhni radši po opravdu jiném druhu námětu (záhada, soutěž, dovednost k naučení, nedorozumění, stavební/vynálezecký projekt, reálná překážka).";
   const prompt = language === "en"
-    ? `Suggest ONE playful, original bedtime-story idea (1-2 sentences, max 40 words) for small children, featuring: ${who}.${worldPart}${locationPart}${hintPart}${agePart}${sparkPart} Make it concrete and magical (a place, a problem, a twist seed). Reply with ONLY the idea text — no quotes, no intro. Vary wildly every time — never repeat a setting or object you may have suggested before.`
-    : `Navrhni JEDEN hravý, originální námět na pohádku před spaním (1–2 věty, max 40 slov) pro malé děti, kde vystupují: ${who}.${worldPart}${locationPart}${hintPart}${agePart}${sparkPart} Ať je konkrétní a kouzelný (místo, problém, zárodek překvapení). Odpověz POUZE textem námětu — bez uvozovek, bez úvodu. Buď pokaždé úplně jiný — nikdy neopakuj prostředí ani předmět, který jsi možná navrhl už dřív.`;
+    ? `Suggest ONE playful, original bedtime-story idea (${lenSpec.sentences}, max ${lenSpec.words} words) for small children, featuring: ${who}.${worldPart}${locationPart}${hintPart}${agePart}${sparkPart} Make it concrete and magical (a place, a problem, a twist seed)${ctx.age && ctx.age > 7 ? " — for this older age, use the extra length to add a bit more concrete detail (a specific place, a named side character, a hint of the twist), not just a longer restatement of the same one-line idea" : ""}.${avoidLostCreaturePart} Reply with ONLY the idea text — no quotes, no intro. Vary wildly every time — never repeat a setting or object you may have suggested before.`
+    : `Navrhni JEDEN hravý, originální námět na pohádku před spaním (${lenSpec.sentences}, max ${lenSpec.words} slov) pro malé děti, kde vystupují: ${who}.${worldPart}${locationPart}${hintPart}${agePart}${sparkPart} Ať je konkrétní a kouzelný (místo, problém, zárodek překvapení)${ctx.age && ctx.age > 7 ? " — u tohohle staršího věku využij tu délku navíc na víc konkrétních detailů (konkrétní místo, jmenovaná vedlejší postava, náznak zvratu), ne jen na rozvleklejší přeříkání stejné jednořádkové myšlenky" : ""}.${avoidLostCreaturePart} Odpověz POUZE textem námětu — bez uvozovek, bez úvodu. Buď pokaždé úplně jiný — nikdy neopakuj prostředí ani předmět, který jsi možná navrhl už dřív.`;
   const raw = await callAnthropicApi({
     model,
     max_tokens: 300,
