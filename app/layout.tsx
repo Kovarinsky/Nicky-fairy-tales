@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Nunito } from "next/font/google";
+import { Nunito, Alegreya } from "next/font/google";
 import "./globals.css";
 import PhotoBackground from "./PhotoBackground";
 
@@ -7,6 +7,15 @@ const nunito = Nunito({
   subsets: ["latin", "latin-ext"],
   weight: ["400", "600", "700", "800", "900"],
   display: "swap",
+});
+
+// 🎨 v5.0 redesign (Claude Design): serifový font na nadpisy, kontrast
+// k Nunito na běžný text/UI — appka dřív měla jen Nunito na vše.
+const alegreya = Alegreya({
+  subsets: ["latin", "latin-ext"],
+  weight: ["700", "800", "900"],
+  display: "swap",
+  variable: "--font-alegreya",
 });
 
 export const metadata: Metadata = {
@@ -150,7 +159,7 @@ function FairyBackground() {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="cs" className={nunito.className}>
+    <html lang="cs" className={`${nunito.className} ${alegreya.variable}`}>
       <body>
         <PhotoBackground />
         {children}
