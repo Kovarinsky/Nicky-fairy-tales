@@ -421,7 +421,7 @@ export async function verifySceneImage(
               ...(scenePrompt ? ["", "SCENE DESCRIPTION (what THIS image should show):", scenePrompt.slice(0, 700)] : []),
               "",
               "Run this checklist and report EVERY violation you find:",
-              "0) STYLE: the image MUST be a hand-painted 2D storybook ILLUSTRATION. A photograph, photorealistic render, 3D/CGI look, or stock-photo style image = FAIL immediately (this alone fails the image, regardless of content).",
+              "0) STYLE: the image must read as a painterly 2D storybook ILLUSTRATION. It is DIGITALLY produced artwork and that is CORRECT and expected — NEVER report a violation merely because it looks digital, computer-made, or 'not literally hand-painted with real brushes'. Report a violation ONLY for these three genuinely wrong looks: (a) photographic realism (real photo, real skin pores/texture, stock-photo look), (b) a 3D/CGI render (plastic-looking shaded models, Pixar-style 3D volumes), or (c) flat hard-edged vector/clipart with uniform fills and outlines. A soft, painterly, richly colored digital illustration — even a very clean or very detailed one — is exactly what this book wants: PASS it.",
               "1) IDENTIFY every visible person one by one and match each to a named character by hair, face and outfit. COUNT them: the number of visible people MUST EQUAL the number of characters named in the scene description — more OR fewer = FAIL. ANY person you cannot confidently match (extra child, stranger, background figure) = FAIL. A character named in the scene description who is MISSING = FAIL. A person who mixes features of TWO characters (one character's face with another's outfit or hairstyle — swapped/merged identities) = FAIL. EXCEPTION: when the scene description itself mentions a GROUP (a team, other players, opponents, the crowd, the audience, villagers…), unnamed background figures belonging to that group are ALLOWED — list them as 'group:<what>' in people, they don't fail the count; but none of them may look like a copy of a named hero.",
               "2) Each named character appears EXACTLY ONCE — two similar children or two similar adults = FAIL.",
               "2b) NO LOOK-ALIKES OF THE HEROES: every person who is NOT one of the characters with a reference portrait (a character invented for this story, a shopkeeper, a new friend, a background figure) must look like a CLEARLY DIFFERENT individual — different face, and a different hair color or hair style from the portrait characters. A secondary/invented person drawn with a hero's face or as a near-copy of a hero (same face and same hair) is a MAJOR violation of this rule, even if the scene legitimately calls for that person to be there. Judge this against their own description in the character sheet.",
@@ -456,7 +456,11 @@ export async function verifySceneImage(
         // kontrola pak tiše neběžela a vadné obrázky procházely neověřené.
         // (jen pro 2.5 — jiné verify modely parametr neznají a vrátily by 400)
         generationConfig: {
-          maxOutputTokens: 900,
+          // ⚠️ Strukturované nálezy (severity + expected/observed/fix u každého)
+          // jsou mnohem delší než dřívější jednořádkové "problems" — na 900
+          // tokenech se odpověď u 5–6 nálezů UTRHLA v půlce JSONu a kontrola
+          // pak spadla na "verify UNAVAILABLE" (obrázek přijat neověřený).
+          maxOutputTokens: 2000,
           responseMimeType: "application/json",
           // 🎯 temperature 0: bez toho běžel grader na defaultu (~1.0) a tentýž
           // obrázek dostával při opakování různé verdikty — u brány, která
