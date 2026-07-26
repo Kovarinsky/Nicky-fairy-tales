@@ -352,13 +352,24 @@ function normalizeSeverity(f: QaFinding): QaFinding {
       return { ...f, severity: step <= 1 ? "MINOR" : "MAJOR" };
     }
   }
-  // Pravidlo 7 — měřítko: odchylka poměru hlav do tolerance = MINOR
-  if (f.rule === 7 && typeof f.deviationPct === "number") {
-    return { ...f, severity: Math.abs(f.deviationPct) <= HEAD_RATIO_TOLERANCE_PCT ? "MINOR" : "MAJOR" };
-  }
-  // Pravidlo 7 bez čísla: grader odchylku nezměřil, jen „vypadá to větší" —
-  // na takový dojem se neplatí překreslení (dřív nejčastější falešný poplach)
-  if (f.rule === 7 && f.deviationPct === undefined && /slight|mild|little|trochu|mírn/i.test(f.problem)) {
+  // Pravidlo 7 — měřítko. Na překreslení kvůli velikosti postavy se platí JEN
+  // když je pro to skutečný důvod, protože odhad poměru hlav od vision modelu
+  // má reálné chybové pásmo (naměřeno ±3–5 %) a bez výškového listu porovnává
+  // proti kánonu, který si musí domyslet z textu. Testem doloženo: grader
+  // napíše „head size is SLIGHTLY larger" a k tomu vydá číslo nad tolerancí —
+  // a appka za ten „mírný" rozdíl zaplatí přemalování (které se navíc
+  // v jednom ze dvou případů vůbec nepovedlo).
+  if (f.rule === 7) {
+    const hedged = /slight|mild|marginal|a bit|somewhat|trochu|mírn|nepatrn/i.test(f.problem);
+    // Skutečné rozbití proporcí: dítě nakreslené jako teenager/dospělý
+    const ageBreak = /adult|teenager|teenage|grown[- ]?up|dospěl|puberť/i.test(f.problem);
+    if (ageBreak) return { ...f, severity: "MAJOR" };
+    if (hedged) return { ...f, severity: "MINOR" };
+    if (typeof f.deviationPct === "number") {
+      return { ...f, severity: Math.abs(f.deviationPct) <= HEAD_RATIO_TOLERANCE_PCT ? "MINOR" : "MAJOR" };
+    }
+    // Bez čísla a bez kategoriálního rozbití je to jen dojem — netolerovat
+    // znamená platit za nezměřený pocit
     return { ...f, severity: "MINOR" };
   }
   return f;
