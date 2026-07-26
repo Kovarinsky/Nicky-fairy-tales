@@ -542,6 +542,20 @@ export async function verifySceneImage(
           fix: "remove the unidentified extra person from the image",
         });
       }
+      // 🩺 ZJIŠTĚNO reálným testem: grader občas místo "vypiš JEN porušení"
+      // pochopí úkol jako "okomentuj VŠECHNA pravidla" a vrátí nález ke
+      // KAŽDÉMU z ~14 pravidel — i těm, co evidentně PROŠLA (text zní "is
+      // correct and expected", "appears exactly once"…), ale se špatně
+      // přiřazenou závažností MAJOR. Appka by pak zaplatila překreslení za
+      // obrázek, který byl ve skutečnosti v pořádku (stejný obrázek podruhé
+      // dostal ok:true). Podezřele vysoký počet nálezů => bereme to jako
+      // selhání kontroly a zkusíme to znovu, ne že bychom to rovnou platili.
+      const SUSPICIOUS_FINDINGS_COUNT = 8;
+      if (findings.length >= SUSPICIOUS_FINDINGS_COUNT && attempt < 2) {
+        console.warn(`[Gemini QA] verify attempt ${attempt}/2: podezřele ${findings.length} nálezů najednou (pravděpodobně "okomentovala všechna pravidla" místo jen chyb) → zkouším znovu`);
+        await new Promise(r => setTimeout(r, 2000));
+        continue;
+      }
       const actionable = findings.filter(f => f.severity !== "MINOR");
       const action = decideAction(findings);
       const minorNote = findings.length > actionable.length
