@@ -1075,9 +1075,13 @@ export async function generateSceneSheet(
   // druhém) — u archu se 3+ vadnými panely to samo o sobě přidávalo desítky
   // sekund navíc PŘED tím, než se uložil byť jediný obrázek (appka reportovala
   // „obrázky se načítají dlouho potom co se pohádka načte"). Teď běží
-  // paralelně a KAŽDÝ panel se přes onPanelReady uloží hned, jak je hotový —
-  // ne až po tom nejpomalejším z celého archu.
-  await Promise.all(Array.from({ length: n }, async (_, i) => {
+  // souběžně a KAŽDÝ panel se přes onPanelReady uloží hned, jak je hotový —
+  // ne až po tom nejpomalejším z celého archu. ALE po stejných dávkách po 4
+  // jako verifikace výš — reálný test (v4.99.20→21) ukázal, že VŠECH až 6
+  // editSceneImage+verifySceneImage najednou umí vyčerpat rate-limit
+  // kontrolního modelu úplně stejně jako kdysi 9 souběžných verify (0/6
+  // panelů prošlo, log plný „QA verdict missing JSON").
+  const doPanel = async (i: number) => {
     const v = verdicts[i];
     let result: ImageResult | null = null;
     // 🖌️ Panel s drobnou vadou se NEZAHAZUJE do sóla (to je nejdražší cesta —
@@ -1108,7 +1112,10 @@ export async function generateSceneSheet(
     }
     out[i] = result;
     await onPanelReady?.(i, result);
-  }));
+  };
+  for (let i = 0; i < n; i += 4) {
+    await Promise.all(Array.from({ length: Math.min(4, n - i) }, (_, j) => doPanel(i + j)));
+  }
   console.log(`[Gemini sheet] hotovo: ${out.filter(Boolean).length}/${n} panelů prošlo (zbytek sólo)`);
   return { results: out, report: reasons.filter(Boolean).slice(0, 4).join(" | ") };
 }
