@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@700;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#1a1033;font-family:'Nunito',system-ui,sans-serif}
+a{color:#fcd34d;text-decoration:none}a:hover{color:#fde68a}
+input{font-family:'Nunito',sans-serif}
+input::placeholder,textarea::placeholder{color:rgba(253,243,215,.5)}
+@keyframes omDone{0%{transform:scale(1)}22%{transform:scale(.95)}55%{transform:scale(1.045)}100%{transform:scale(1)}}
+@keyframes omPulse{0%,72%,100%{transform:scale(1)}82%{transform:scale(1.14)}90%{transform:scale(.97)}}
+@keyframes omGlow{0%{box-shadow:0 5px 16px rgba(70,30,130,.45)}45%{box-shadow:0 0 0 10px rgba(253,224,138,.28),0 6px 22px rgba(253,224,138,.5)}100%{box-shadow:0 5px 16px rgba(70,30,130,.45)}}
+</style>
+</helmet>
+<div data-screen-label="Výběr pohádky" style="position:relative;width:390px;height:844px;margin:0 auto;overflow:hidden;background:#241447;color:#fdf3d7;user-select:none">
+  <div style="{{ bgStyle }}"></div>
+  <div style="position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(16,8,36,.6) 0%,rgba(16,8,36,.25) 14%,rgba(16,8,36,.15) 30%,rgba(16,8,36,.55) 60%,rgba(14,7,32,.82) 100%)"></div>
+  <header style="position:relative;padding:58px 20px 6px;text-align:center">
+    <a href="{{ backHref }}" onClick="{{ onBack }}" style="position:absolute;left:20px;top:52px;display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(8px);font-size:20px;color:#fdf3d7">‹</a>
+    <h1 style="margin:0;padding:0 60px;font-family:'Alegreya',Georgia,serif;font-size:30px;font-weight:800;color:#fdf3d7;text-shadow:0 0 22px rgba(253,224,138,.5),0 0 48px rgba(253,224,138,.28),0 3px 8px rgba(20,8,40,.65)">Výběr pohádky</h1>
+    <div style="margin-top:7px;font-size:12px;font-weight:800;letter-spacing:.09em;color:rgba(253,224,138,.95);text-shadow:0 2px 8px rgba(20,8,40,.9)">{{ stepLabel }}</div>
+  </header>
+  <div style="position:absolute;top:132px;bottom:104px;left:0;right:0;overflow:auto;padding:8px 16px 12px;box-sizing:border-box">
+  <main style="position:relative;display:flex;flex-direction:column;gap:12px">
+    <sc-if value="{{ s1 }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-direction:column;gap:9px">
+      <section style="padding:11px 16px 12px;border-radius:24px;background:rgba(30,16,58,.65);border:1.5px solid rgba(253,224,138,.4);backdrop-filter:blur(12px);display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.09em;color:rgba(253,224,138,.8)">PŘIPRAVENÉ POHÁDKY</div>
+        <div style="display:flex;gap:10px;align-items:stretch;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(253,224,138,.55) rgba(255,255,255,.06);margin:0 -16px;padding:2px 16px 6px">
+          <sc-for list="{{ readyRoller }}" as="w" hint-placeholder-count="4">
+            <button onClick="{{ w.onTap }}" style="{{ w.style }}">
+              <sc-if value="{{ w.plus }}" hint-placeholder-val="{{ false }}">
+                <span style="animation:omPulse 2.6s ease-in-out infinite;position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:linear-gradient(180deg,#fbbf24,#f97316);border:1.5px solid rgba(255,255,255,.9);box-shadow:0 2px 8px rgba(8,3,20,.6);display:flex;align-items:center;justify-content:center;color:#fffaf0;font-size:17px;font-weight:900;line-height:1;padding-bottom:2px">+</span>
+              </sc-if>
+              <span style="font-size:26px;line-height:1">{{ w.emoji }}</span>
+              <span style="font-size:11px;font-weight:800;line-height:1.2;text-align:center;text-wrap:balance">{{ w.name }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </section>
+      <section style="padding:11px 16px 12px;border-radius:24px;background:rgba(30,16,58,.65);border:1.5px solid rgba(253,224,138,.4);backdrop-filter:blur(12px);display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.09em;color:rgba(253,224,138,.8)">VLASTNÍ POHÁDKY</div>
+        <div style="display:flex;gap:10px;align-items:stretch;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(253,224,138,.55) rgba(255,255,255,.06);margin:0 -16px;padding:2px 16px 6px">
+          <sc-for list="{{ ownRoller }}" as="w" hint-placeholder-count="4">
+            <button onClick="{{ w.onTap }}" style="{{ w.style }}">
+              <sc-if value="{{ w.plus }}" hint-placeholder-val="{{ false }}">
+                <span style="animation:omPulse 2.6s ease-in-out infinite;position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:linear-gradient(180deg,#fbbf24,#f97316);border:1.5px solid rgba(255,255,255,.9);box-shadow:0 2px 8px rgba(8,3,20,.6);display:flex;align-items:center;justify-content:center;color:#fffaf0;font-size:17px;font-weight:900;line-height:1;padding-bottom:2px">+</span>
+              </sc-if>
+              <span style="font-size:26px;line-height:1">{{ w.emoji }}</span>
+              <span style="font-size:11px;font-weight:800;line-height:1.2;text-align:center;text-wrap:balance">{{ w.name }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </section>
+      <section style="padding:11px 16px 12px;border-radius:24px;background:rgba(30,16,58,.65);border:1.5px solid rgba(253,224,138,.4);backdrop-filter:blur(12px);display:flex;flex-direction:column;gap:7px">
+        <button onClick="{{ onLocal }}" style="{{ localStyle }}">
+          <span style="{{ discStyle }}">{{ ico.poloha }}</span>
+          <span style="font-size:13px;font-weight:800">Pohádka podle mé polohy</span>
+          
+        </button>
+        <div style="font-size:11px;font-weight:700;color:rgba(253,243,215,.6);text-wrap:pretty">{{ localHint }}</div>
+      </section>
+      <div style="display:flex;justify-content:center;margin-top:-4px"><img src="assets/kniha-svetla.png" alt="" style="width:96px;height:auto;filter:drop-shadow(0 0 22px rgba(253,224,138,.45))"></div>
+    </div>
+    </sc-if>
+    <sc-if value="{{ sCat }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <input value="{{ q }}" onChange="{{ onQ }}" placeholder="Hledat pohádku…" style="border:1px solid rgba(253,224,138,.4);border-radius:999px;padding:11px 18px;font-size:14px;font-weight:700;color:#fdf3d7;background:rgba(30,16,58,.7);outline:none;font-family:'Nunito',sans-serif">
+      <div style="display:flex;gap:6px;padding:4px;border-radius:999px;background:rgba(20,10,44,.55);border:1px solid rgba(253,224,138,.16)">
+        <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="3">
+          <button onClick="{{ tb.onTap }}" style="{{ tb.style }}">{{ tb.name }}</button>
+        </sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:11px">
+        <sc-for list="{{ catList }}" as="c" hint-placeholder-count="9">
+          <button onClick="{{ c.onTap }}" style="{{ c.style }}">
+            <span style="font-size:10.5px;font-weight:800;line-height:1.15;text-align:center;text-wrap:balance">{{ c.name }}</span>
+          </button>
+        </sc-for>
+      </div>
+      <div style="font-size:11px;font-weight:800;letter-spacing:.09em;color:rgba(253,224,138,.8);text-align:center;padding:2px 0 6px">{{ catCount }}</div>
+    </div>
+    </sc-if>
+    <sc-if value="{{ s2 }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button onClick="{{ onBackToWorld }}" style="display:flex;align-items:center;gap:11px;padding:9px 14px;border-radius:20px;border:1.5px solid rgba(253,224,138,.35);background:rgba(30,16,58,.6);backdrop-filter:blur(12px);cursor:pointer;text-align:left;font-family:'Nunito',sans-serif">
+        <span style="{{ worldThumb }}"></span>
+        <span style="display:flex;flex-direction:column;gap:1px;flex:1">
+          <span style="font-size:10px;font-weight:800;letter-spacing:.09em;color:rgba(253,224,138,.75)">SVĚT POHÁDKY</span>
+          <span style="font-size:14px;font-weight:800;color:#fdf3d7">{{ worldName }}</span>
+        </span>
+        <span style="font-size:18px;color:rgba(253,224,138,.7)">›</span>
+      </button>
+      <section style="padding:11px 16px 12px;border-radius:24px;background:rgba(30,16,58,.65);border:1.5px solid rgba(253,224,138,.4);backdrop-filter:blur(12px);display:flex;flex-direction:column;gap:7px">
+        <div style="font-size:13px;font-weight:800;letter-spacing:.03em;color:rgba(253,243,215,.85)">Motiv pohádky</div>
+        <textarea value="{{ motiv }}" onChange="{{ onMotiv }}" placeholder="O čem by pohádka měla být… ✏️" rows="2" style="border:1px solid rgba(253,224,138,.35);border-radius:16px;padding:12px 16px;font-size:15px;font-weight:700;color:#fdf3d7;background:rgba(30,16,58,.5);outline:none;resize:none;font-family:'Nunito',sans-serif;cursor:pointer"></textarea>
+        <div style="display:flex;gap:8px">
+          <button onClick="{{ onNamet }}" style="{{ secBtnStyle }}" style-active="transform:scale(.96)">
+            <span style="{{ discStyle }}">{{ ico.namet }}</span>
+            <span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Vymysli námět</span>
+          </button>
+          <button style="{{ secBtnStyle }}" style-active="transform:scale(.96)">
+            <span style="{{ discStyle }}">{{ ico.rozvin }}</span>
+            <span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Rozvinout</span>
+          </button>
+        </div>
+      </section>
+      <section style="padding:11px 16px 12px;border-radius:24px;background:rgba(30,16,58,.65);border:1.5px solid rgba(253,224,138,.4);backdrop-filter:blur(12px)">
+        <div style="font-size:13px;font-weight:800;letter-spacing:.03em;color:rgba(253,243,215,.85);margin-bottom:6px">Kdo v pohádce vystupuje</div>
+        <div style="display:flex;gap:16px;align-items:flex-start;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(253,224,138,.55) rgba(255,255,255,.06);margin:0 -16px;padding:3px 16px 6px">
+          <sc-for list="{{ avatars }}" as="av" hint-placeholder-count="0">
+            <button onClick="{{ av.onTap }}" aria-label="{{ av.name }}" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;border:none;background:none;cursor:pointer;flex-shrink:0;scroll-snap-align:center">
+              <span style="position:relative;display:block">
+                <span style="{{ av.style }}"></span>
+                <sc-if value="{{ av.sel }}" hint-placeholder-val="{{ false }}">
+                  <span style="{{ badgeSel }}">✓</span>
+                </sc-if>
+              </span>
+              <span style="font-size:11px;font-weight:800;color:rgba(253,243,215,.9);max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ av.name }}</span>
+            </button>
+          </sc-for>
+          <button onClick="{{ onNew }}" aria-label="Vlastní postava" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;border:none;background:none;cursor:pointer;flex-shrink:0;scroll-snap-align:center">
+            <span style="{{ discAddStyle }}"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 6v12M6 12h12"></path></svg></span>
+            <span style="font-size:11px;font-weight:800;color:rgba(253,243,215,.7)">Přidat</span>
+          </button>
+        </div>
+      </section>
+      <button onClick="{{ onOpenVoices }}" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 16px;border-radius:24px;background:rgba(30,16,58,.65);border:1.5px solid rgba(253,224,138,.4);backdrop-filter:blur(12px);cursor:pointer;font-family:'Nunito',sans-serif;color:#fdf3d7" style-active="transform:scale(.99)">
+        {{ voiceAvatar }}
+        <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:11px;font-weight:800;letter-spacing:.09em;color:rgba(253,224,138,.8)">VYPRÁVÍ</span>
+          <span style="font-size:15px;font-weight:800">{{ voiceName }}</span>
+          <span style="font-size:11px;font-weight:700;color:rgba(253,243,215,.6)">{{ voiceSub }}</span>
+        </span>
+        <span style="flex:none;font-size:22px;color:rgba(253,224,138,.7)">›</span>
+      </button>
+      <section style="padding:10px 16px 11px;border-radius:24px;background:rgba(30,16,58,.65);border:1.5px solid rgba(253,224,138,.4);backdrop-filter:blur(12px)">
+        <div style="font-size:13px;font-weight:800;letter-spacing:.03em;color:rgba(253,243,215,.85);margin-bottom:4px">Délka pohádky</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="range" min="2" max="18" value="{{ len }}" onChange="{{ onLen }}" style="flex:1;height:20px;margin:0;accent-color:{{ accColor }};cursor:pointer">
+          <span style="flex:none;font-size:13px;font-weight:800;color:rgba(253,243,215,.9)">{{ len }} scén</span>
+        </div>
+      </section>
+    </div>
+    </sc-if>
+    <sc-if value="{{ sVoice }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <section style="padding:10px 18px 8px;border-radius:24px;background:rgba(30,16,58,.65);border:1.5px solid rgba(253,224,138,.4);backdrop-filter:blur(12px);display:flex;flex-direction:column;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;justify-content:center;gap:14px">
+          {{ wavesLeft }}
+          <span style="{{ heroStyle }}"></span>
+          {{ wavesRight }}
+        </div>
+        <div style="font-family:'Alegreya',Georgia,serif;font-size:21px;font-weight:800;color:#fdf3d7">{{ voiceName }}</div>
+        <div style="font-size:11.5px;font-weight:700;color:rgba(253,243,215,.65)">{{ voiceSub }}</div>
+        <button aria-label="Přehrát ukázku" style="{{ discBigStyle }}">{{ ico.play }}</button>
+        <div style="font-size:11.5px;font-weight:800;color:rgba(253,224,138,.9)">Přehrát ukázku <span style="color:rgba(253,243,215,.55)">(brzy)</span></div>
+      </section>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:13px;font-weight:800;color:rgba(253,243,215,.85)">Vypravěči</div>
+        <div style="display:flex;gap:16px">
+          <sc-for list="{{ voiceCards }}" as="v" hint-placeholder-count="3">
+            <button onClick="{{ v.onTap }}" aria-label="{{ v.name }}" style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:0;border:none;background:none;cursor:pointer">
+              <span style="{{ v.style }}"></span>
+              <span style="font-size:11.5px;font-weight:800;color:#fdf3d7">{{ v.name }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-size:13px;font-weight:800;color:rgba(253,243,215,.85)">Premium hlasy</div>
+          <span style="display:flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:{{ accBg }};color:#fff;font-size:9.5px;font-weight:800;letter-spacing:.09em">★ PREMIUM</span>
+        </div>
+        <div style="display:flex;gap:12px">
+          <sc-for list="{{ premium }}" as="p" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:5px;width:64px">
+              <span style="position:relative;display:block">
+                <span style="{{ p.style }}"></span>
+                <span style="{{ badgeLock }}">🔒</span>
+              </span>
+              <span style="font-size:10px;font-weight:800;line-height:1.15;text-align:center;color:rgba(253,243,215,.75)">{{ p.name }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="font-size:11.5px;font-weight:700;color:rgba(253,243,215,.6);text-wrap:pretty">Klon hlasu mámy či táty a další hlasy odemknete v Premium.</div>
+      </div>
+      <button onClick="{{ onVoicePick }}" style="{{ ctaStyleFlat }}" style-active="transform:scale(.97)"><span style="{{ discStyle }}">{{ ico.play }}</span><span>Vybrat tento hlas</span></button>
+    </div>
+    </sc-if>
+  </main>
+  </div>
+  <div style="position:absolute;left:0;right:0;bottom:0;padding:14px 16px 26px;box-sizing:border-box;background:linear-gradient(180deg,rgba(14,7,32,0),rgba(14,7,32,.78) 42%,rgba(12,5,28,.92))">
+    <sc-if value="{{ showCta }}" hint-placeholder-val="{{ false }}">
+      <button style="{{ ctaStyle }}" style-active="transform:translateY(1px) scale(.98)">
+        <span style="{{ discStyle }}">{{ ico.play }}</span>
+        <span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Vytvořit pohádku</span>
+      </button>
+    </sc-if>
+    <sc-if value="{{ notLast }}" hint-placeholder-val="{{ true }}">
+      <button onClick="{{ onNext }}" style="{{ ctaStyle }}" style-active="transform:translateY(1px) scale(.98)">
+        <span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Pokračovat</span>
+      </button>
+    </sc-if>
+  </div>
+  <sc-if value="{{ navrhyOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:rgba(12,5,28,.82);backdrop-filter:blur(6px);display:flex;flex-direction:column;justify-content:center;gap:12px;padding:26px 20px;border-radius:38px;box-sizing:border-box">
+      <div style="font-family:'Alegreya',Georgia,serif;font-size:24px;font-weight:800;color:#fdf3d7;text-align:center">Návrhy ikon</div>
+      <div style="font-size:12px;font-weight:700;color:rgba(253,243,215,.7);text-align:center;margin-bottom:2px">Vyber sadu, kterou appka použije na všech tlačítkách</div>
+      <sc-for list="{{ navrhy }}" as="n" hint-placeholder-count="3">
+        <div onClick="{{ n.onPick }}" style="{{ n.style }}">
+          <div style="font-size:12px;font-weight:800;letter-spacing:.06em">{{ n.name }}</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="{{ discStyle }}">{{ n.ico.namet }}</span>
+            <span style="{{ discStyle }}">{{ n.ico.rozvin }}</span>
+            <span style="{{ discStyle }}">{{ n.ico.poloha }}</span>
+            <span style="{{ discStyle }}">{{ n.ico.play }}</span>
+            <span style="{{ discStyle }}">{{ n.ico.foto }}</span>
+            <span style="{{ discStyle }}">{{ n.ico.kamera }}</span>
+          </div>
+        </div>
+      </sc-for>
+      <button onClick="{{ onNavrhyClose }}" style="margin-top:4px;height:46px;border:1px solid rgba(253,224,138,.35);border-radius:999px;background:rgba(30,16,58,.6);color:#fdf3d7;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer">Zavřít</button>
+    </div>
+  </sc-if>
+  <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:72;display:flex;flex-direction:column">
+      <div style="{{ ovBgStyle }}"></div>
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(16,8,36,.72),rgba(16,8,36,.42) 32%,rgba(16,8,36,.55) 70%,rgba(14,7,32,.93))"></div>
+      <div style="position:relative;display:flex;flex-direction:column;height:100%;box-sizing:border-box;padding:50px 20px 26px;gap:14px">
+        <div style="display:flex;align-items:center;gap:12px;flex:none">
+          <button onClick="{{ onCloseSheet }}" aria-label="Zpět" style="flex:none;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(6px);color:#fdf3d7;font-size:22px;font-weight:800;cursor:pointer">‹</button>
+          <sc-if value="{{ sheetHasImg }}" hint-placeholder-val="{{ false }}">
+            <span style="{{ sheetAvatarStyle }}"></span>
+          </sc-if>
+          <sc-if value="{{ sheetIsNew }}" hint-placeholder-val="{{ false }}">
+            <span style="flex:none;width:48px;height:48px;border-radius:50%;background:url(assets/postavy/nova-postava.png) center/cover;border:2px solid rgba(253,224,138,.6);box-shadow:0 0 16px rgba(253,224,138,.35);box-sizing:border-box"></span>
+          </sc-if>
+          <div style="flex:1;min-width:0">
+            <div style="font-family:'Alegreya',Georgia,serif;font-size:24px;font-weight:800;color:#fdf3d7;text-shadow:0 2px 10px rgba(20,8,40,.7)">{{ sheetTitle }}</div>
+            <div style="font-size:13px;font-weight:700;color:rgba(253,243,215,.7)">{{ sheetSubtitle }}</div>
+          </div>
+          <sc-if value="{{ sheetHasImg }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ onSheetToggleSel }}" style="{{ sheetSelBtnStyle }}">{{ sheetSelLabel }}</button>
+          </sc-if>
+        </div>
+        <div style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px">
+          <section style="display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:26px;background:rgba(30,16,58,.6);border:1.5px solid rgba(253,224,138,.28);backdrop-filter:blur(12px);box-shadow:0 8px 28px rgba(8,3,20,.4)">
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-size:11.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.85)">JMÉNO *</span>
+              <input value="{{ sheetName }}" onChange="{{ onSheetName }}" placeholder="Kubík, Pohádková víla, Dráček…" style="height:48px;border:1.5px solid rgba(253,224,138,.4);border-radius:16px;padding:0 15px;font-size:15px;font-weight:700;color:#fdf3d7;background:rgba(16,8,36,.55);backdrop-filter:blur(6px);outline:none;font-family:'Nunito',sans-serif;box-sizing:border-box">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-size:11.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.85)">POPIS (NEPOVINNÉ)</span>
+              <textarea value="{{ sheetDesc }}" onChange="{{ onSheetDesc }}" rows="4" placeholder="Malý hnědý medvídek s červenou mašlí…" style="border:1.5px solid rgba(253,224,138,.4);border-radius:16px;padding:12px 15px;font-size:15px;line-height:1.5;font-weight:700;color:#fdf3d7;background:rgba(16,8,36,.55);backdrop-filter:blur(6px);outline:none;resize:none;font-family:'Nunito',sans-serif;box-sizing:border-box"></textarea>
+            </label>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:9px;padding:14px;border-radius:26px;background:rgba(30,16,58,.6);border:1.5px solid rgba(253,224,138,.28);backdrop-filter:blur(12px);box-shadow:0 8px 28px rgba(8,3,20,.4)">
+            <span style="font-size:11.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.85)">FOTKA POSTAVY (NEPOVINNÉ)</span>
+            <div style="display:flex;gap:9px">
+              <button style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="{{ discStyle }}">{{ ico.foto }}</span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Nahrát fotku ({{ sheetPhotos }}/5)</span></button>
+              <button style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="{{ discStyle }}">{{ ico.kamera }}</span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Vyfotit</span></button>
+            </div>
+          </section>
+        </div>
+        <div style="flex:none;display:flex;align-items:center;gap:10px">
+          <button onClick="{{ onCloseSheet }}" style="{{ ctaStyleFlat }}" style-active="transform:scale(.97)"><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">{{ sheetPrimaryLabel }}</span></button>
+          <button onClick="{{ onCloseSheet }}" style="flex:none;height:62px;padding:0 20px;border:1.5px solid rgba(253,224,138,.35);border-radius:999px;background:rgba(16,8,36,.5);color:#fdf3d7;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer">Zrušit</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ edescOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:72;display:flex;flex-direction:column">
+      <div style="{{ ovBgStyle }}"></div>
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(20,8,40,.6),rgba(20,8,40,.82))"></div>
+      <div style="position:relative;display:flex;flex-direction:column;height:100%;box-sizing:border-box;padding:54px 20px 30px;gap:16px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button onClick="{{ onEdescClose }}" aria-label="Zpět" style="flex:none;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,.14);color:#fdf3d7;font-size:20px;cursor:pointer">‹</button>
+          <div style="font-family:'Alegreya',Georgia,serif;font-size:25px;font-weight:800;color:#fdf3d7;text-shadow:0 2px 10px rgba(20,8,40,.7)">Popis postavy</div>
+        </div>
+        <textarea value="{{ sheetDesc }}" onChange="{{ onSheetDesc }}" autoFocus="{{ true }}" placeholder="Jak postava vypadá, jakou má povahu, co má ráda… ✏️" style="flex:1;min-height:0;border:1px solid rgba(253,224,138,.35);border-radius:16px;padding:14px 16px;font-size:16px;font-weight:600;color:#fdf3d7;background:rgba(20,10,44,.55);outline:none;resize:none;font-family:'Nunito',sans-serif"></textarea>
+        <button onClick="{{ onEdescClose }}" style="{{ ctaDoneStyle }}" style-active="transform:scale(.97)"><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Hotovo</span></button>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ worldSheetOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:72;display:flex;flex-direction:column">
+      <div style="{{ ovBgStyle }}"></div>
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(16,8,36,.72),rgba(16,8,36,.42) 32%,rgba(16,8,36,.55) 70%,rgba(14,7,32,.93))"></div>
+      <div style="position:relative;display:flex;flex-direction:column;height:100%;box-sizing:border-box;padding:50px 20px 26px;gap:14px">
+        <div style="display:flex;align-items:center;gap:12px;flex:none">
+          <button onClick="{{ onCloseWorld }}" aria-label="Zpět" style="flex:none;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(6px);color:#fdf3d7;font-size:22px;font-weight:800;cursor:pointer">‹</button>
+          <div style="font-family:'Alegreya',Georgia,serif;font-size:24px;font-weight:800;color:#fdf3d7;text-shadow:0 2px 10px rgba(20,8,40,.7)">Vytvořit vlastní pohádku</div>
+        </div>
+        <div style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px">
+          <section style="display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:26px;background:rgba(30,16,58,.6);border:1.5px solid rgba(253,224,138,.28);backdrop-filter:blur(12px);box-shadow:0 8px 28px rgba(8,3,20,.4)">
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:11.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.85)">NÁZEV SVĚTA</span>
+            <input value="{{ wName }}" onChange="{{ onWName }}" placeholder="Pojmenuj svůj svět…" style="height:48px;border:1.5px solid rgba(253,224,138,.4);border-radius:16px;padding:0 15px;font-size:15px;font-weight:700;color:#fdf3d7;background:rgba(16,8,36,.55);backdrop-filter:blur(6px);outline:none;font-family:'Nunito',sans-serif;box-sizing:border-box">
+          </label>
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:11.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.85)">POPIS SVĚTA</span>
+            <textarea value="{{ wDesc }}" onChange="{{ onWDesc }}" onClick="{{ onWdescOpen }}" rows="4" placeholder="Jak svět vypadá, kdo v něm žije, co se v něm děje…" style="border:1.5px solid rgba(253,224,138,.4);border-radius:16px;padding:12px 15px;font-size:15px;line-height:1.5;font-weight:700;color:#fdf3d7;background:rgba(16,8,36,.55);backdrop-filter:blur(6px);outline:none;resize:none;font-family:'Nunito',sans-serif;cursor:pointer;box-sizing:border-box"></textarea>
+          </label>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:26px;background:rgba(30,16,58,.6);border:1.5px solid rgba(253,224,138,.28);backdrop-filter:blur(12px);box-shadow:0 8px 28px rgba(8,3,20,.4)">
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:11.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.85)">{{ wPhotoLabel }}</span>
+            <div style="display:flex;gap:9px">
+              <button onClick="{{ onWPhotoAdd }}" style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="{{ discStyle }}">{{ ico.foto }}</span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Nahrát fotku</span></button>
+              <button onClick="{{ onWPhotoAdd }}" style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="{{ discStyle }}">{{ ico.kamera }}</span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Vyfotit</span></button>
+            </div>
+            <sc-if value="{{ wHasPhotos }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px">
+                <sc-for list="{{ wPhotos }}" as="ph" hint-placeholder-count="3">
+                  <div style="{{ ph.style }}">
+                    <button onClick="{{ ph.onDel }}" aria-label="Smazat fotku" style="position:absolute;right:-4px;top:-4px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(14,7,32,.85);color:#fdf3d7;font-size:12px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.5)">×</button>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ wNoPhotos }}" hint-placeholder-val="{{ true }}">
+              <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px">
+                <sc-for list="{{ wSlots }}" as="sl" hint-placeholder-count="5">
+                  <div style="aspect-ratio:1;border-radius:12px;border:1.5px dashed rgba(253,224,138,.28);background:rgba(16,8,36,.35);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:rgba(253,224,138,.4)">{{ sl.n }}</div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+          <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(253,224,138,.28),transparent)"></div>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <div style="display:flex;gap:8px;justify-content:center">
+              <button onClick="{{ onWLinkToggle }}" style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="{{ discStyle }}">{{ icoOdkaz }}</span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Odkaz</span></button>
+              <button onClick="{{ onWStudy }}" style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="{{ discStyle }}">{{ icoLupa }}</span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Prostudovat</span></button>
+            </div>
+            <sc-if value="{{ wLinkOn }}" hint-placeholder-val="{{ false }}">
+              <input value="{{ wLink }}" onChange="{{ onWLink }}" placeholder="https://…" style="height:44px;border:1.5px solid rgba(253,224,138,.35);border-radius:14px;padding:0 15px;font-size:14px;font-weight:700;color:#fdf3d7;background:rgba(16,8,36,.55);outline:none;font-family:'Nunito',sans-serif;box-sizing:border-box">
+            </sc-if>
+          </div>
+
+          <sc-if value="{{ wStudied }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid rgba(253,224,138,.3);border-radius:16px;padding:12px 14px;background:rgba(16,8,36,.5);font-size:13px;line-height:1.5;font-weight:700;color:rgba(253,243,215,.85);text-wrap:pretty">{{ wStudyNote }}</div>
+          </sc-if>
+          </section>
+        </div>
+        <div style="flex:none;display:flex;align-items:center;gap:10px">
+          <button onClick="{{ onSaveWorld }}" style="{{ ctaStyleFlat }}" style-active="transform:scale(.97)"><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Uložit svět</span></button>
+          <button onClick="{{ onCloseWorld }}" style="flex:none;height:62px;padding:0 20px;border:1.5px solid rgba(253,224,138,.35);border-radius:999px;background:rgba(16,8,36,.5);color:#fdf3d7;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer">Zrušit</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ wdescOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:82;display:flex;flex-direction:column">
+      <div style="{{ ovBgStyle }}"></div>
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(16,8,36,.6),rgba(16,8,36,.2) 28%,rgba(16,8,36,.3) 68%,rgba(14,7,32,.9))"></div>
+      <div style="position:relative;display:flex;flex-direction:column;height:100%;box-sizing:border-box;padding:54px 20px 30px;gap:16px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button onClick="{{ onWdescClose }}" aria-label="Zpět" style="flex:none;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(6px);color:#fdf3d7;font-size:22px;font-weight:800;cursor:pointer">‹</button>
+          <div style="font-family:'Alegreya',Georgia,serif;font-size:25px;font-weight:800;color:#fdf3d7;text-shadow:0 2px 10px rgba(20,8,40,.7)">Popis světa</div>
+        </div>
+        <textarea value="{{ wDesc }}" onChange="{{ onWDesc }}" autoFocus="{{ true }}" placeholder="Jak svět vypadá, kdo v něm žije, jaká tam platí pravidla… ✏️" style="flex:1;min-height:0;border:1.5px solid rgba(253,224,138,.4);border-radius:22px;padding:18px;font-size:17px;line-height:1.55;font-weight:700;color:#fdf3d7;background:rgba(16,8,36,.55);backdrop-filter:blur(8px);outline:none;resize:none;font-family:'Nunito',sans-serif;box-sizing:border-box"></textarea>
+        <div style="display:flex;gap:10px">
+          <button onClick="{{ onWNamet }}" style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="flex:none;width:28px;height:28px;border-radius:50%;background:url(assets/btn-ico-kostka.png) center/cover;box-shadow:0 1px 3px rgba(120,40,0,.25)"></span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Vymysli svět</span></button>
+          <button style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="flex:none;width:28px;height:28px;border-radius:50%;background:url(assets/btn-ico-jiskry.png) center/cover;box-shadow:0 1px 3px rgba(120,40,0,.25)"></span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Rozvinout</span></button>
+        </div>
+        <button onClick="{{ onWdescClose }}" style="{{ ctaDoneStyle }}" style-active="transform:scale(.97)"><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Hotovo</span></button>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ pSheetOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:72;display:flex;flex-direction:column">
+      <div style="{{ ovBgStyle }}"></div>
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(16,8,36,.72),rgba(16,8,36,.42) 32%,rgba(16,8,36,.55) 70%,rgba(14,7,32,.93))"></div>
+      <div style="position:relative;display:flex;flex-direction:column;height:100%;box-sizing:border-box;padding:50px 20px 26px;gap:14px">
+        <div style="display:flex;align-items:center;gap:12px;flex:none">
+          <button onClick="{{ pClose }}" aria-label="Zpět" style="flex:none;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(6px);color:#fdf3d7;font-size:22px;font-weight:800;cursor:pointer">‹</button>
+          <span style="flex:none;width:48px;height:48px;border-radius:14px;background:url(assets/svety/vlastni-pohadka.jpg) center/cover;border:2px solid #fcd34d"></span>
+          <div style="flex:1;min-width:0">
+            <div style="font-family:'Alegreya',Georgia,serif;font-size:24px;font-weight:800;color:#fdf3d7;text-shadow:0 2px 10px rgba(20,8,40,.7)">Vlastní pohádka</div>
+            <div style="font-size:13px;font-weight:700;color:rgba(253,243,215,.7)">Nastav si příběh úplně po svém</div>
+          </div>
+        </div>
+        <div style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px">
+          <section style="display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:26px;background:rgba(30,16,58,.6);border:1.5px solid rgba(253,224,138,.28);backdrop-filter:blur(12px);box-shadow:0 8px 28px rgba(8,3,20,.4)">
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-size:11.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.85)">NÁZEV POHÁDKY</span>
+              <input value="{{ pName }}" onChange="{{ onPName }}" placeholder="Např. Kouzelná noc v lese" style="height:48px;border:1.5px solid rgba(253,224,138,.4);border-radius:16px;padding:0 15px;font-size:15px;font-weight:700;color:#fdf3d7;background:rgba(16,8,36,.55);backdrop-filter:blur(6px);outline:none;font-family:'Nunito',sans-serif;box-sizing:border-box">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-size:11.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.85)">O ČEM TO BUDE</span>
+              <textarea value="{{ pDesc }}" onChange="{{ onPDesc }}" onClick="{{ onPdescOpen }}" rows="4" placeholder="Zápletka, prostředí, kdo v ní vystupuje…" style="border:1.5px solid rgba(253,224,138,.4);border-radius:16px;padding:12px 15px;font-size:15px;line-height:1.5;font-weight:700;color:#fdf3d7;background:rgba(16,8,36,.55);backdrop-filter:blur(6px);outline:none;resize:none;font-family:'Nunito',sans-serif;cursor:pointer;box-sizing:border-box"></textarea>
+            </label>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:26px;background:rgba(30,16,58,.6);border:1.5px solid rgba(253,224,138,.28);backdrop-filter:blur(12px);box-shadow:0 8px 28px rgba(8,3,20,.4)">
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="font-size:11.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.85)">ŽÁNR</span>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <sc-for list="{{ pZanry }}" as="z" hint-placeholder-count="5">
+                  <button onClick="{{ z.onTap }}" style="{{ z.style }}">{{ z.name }}</button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="font-size:11.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.85)">ATMOSFÉRA</span>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <sc-for list="{{ pAtmo }}" as="a" hint-placeholder-count="5">
+                  <button onClick="{{ a.onTap }}" style="{{ a.style }}">{{ a.name }}</button>
+                </sc-for>
+              </div>
+            </div>
+          </section>
+        </div>
+        <div style="flex:none;display:flex;align-items:center;gap:10px">
+          <button onClick="{{ pSave }}" style="{{ ctaStyleFlat }}" style-active="transform:scale(.97)"><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Použít pohádku</span></button>
+          <button onClick="{{ pClose }}" style="flex:none;height:62px;padding:0 20px;border:1.5px solid rgba(253,224,138,.35);border-radius:999px;background:rgba(16,8,36,.5);color:#fdf3d7;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer">Zrušit</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ pdescOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:80;display:flex;flex-direction:column">
+      <div style="{{ ovBgStyle }}"></div>
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(16,8,36,.6),rgba(16,8,36,.2) 28%,rgba(16,8,36,.3) 68%,rgba(14,7,32,.9))"></div>
+      <div style="position:relative;display:flex;flex-direction:column;height:100%;box-sizing:border-box;padding:54px 20px 30px;gap:16px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button onClick="{{ onPdescClose }}" aria-label="Zpět" style="flex:none;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(6px);color:#fdf3d7;font-size:22px;font-weight:800;cursor:pointer">‹</button>
+          <div style="font-family:'Alegreya',Georgia,serif;font-size:25px;font-weight:800;color:#fdf3d7;text-shadow:0 2px 10px rgba(20,8,40,.7)">O čem to bude</div>
+        </div>
+        <textarea value="{{ pDesc }}" onChange="{{ onPDesc }}" autoFocus="{{ true }}" placeholder="Zápletka, prostředí, kdo v ní vystupuje, čím to skončí… ✏️" style="flex:1;min-height:0;border:1.5px solid rgba(253,224,138,.4);border-radius:22px;padding:18px;font-size:17px;line-height:1.55;font-weight:700;color:#fdf3d7;background:rgba(16,8,36,.55);backdrop-filter:blur(8px);outline:none;resize:none;font-family:'Nunito',sans-serif;box-sizing:border-box"></textarea>
+        <div style="display:flex;gap:10px">
+          <button onClick="{{ onNametP }}" style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="flex:none;width:28px;height:28px;border-radius:50%;background:url(assets/btn-ico-kostka.png) center/cover;box-shadow:0 1px 3px rgba(120,40,0,.25)"></span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Vymysli námět</span></button>
+          <button style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="flex:none;width:28px;height:28px;border-radius:50%;background:url(assets/btn-ico-jiskry.png) center/cover;box-shadow:0 1px 3px rgba(120,40,0,.25)"></span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Rozvinout</span></button>
+        </div>
+        <button onClick="{{ onPdescClose }}" style="{{ ctaDoneStyle }}" style-active="transform:scale(.97)"><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Hotovo</span></button>
+      </div>
+    </div>
+  </sc-if>
+    <sc-if value="{{ motivOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:70;display:flex;flex-direction:column">
+      <div style="{{ ovBgStyle }}"></div>
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(16,8,36,.6),rgba(16,8,36,.2) 28%,rgba(16,8,36,.3) 68%,rgba(14,7,32,.9))"></div>
+      <div style="position:relative;display:flex;flex-direction:column;height:100%;box-sizing:border-box;padding:54px 20px 30px;gap:16px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button onClick="{{ onMotivClose }}" aria-label="Zpět" style="flex:none;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(6px);color:#fdf3d7;font-size:22px;font-weight:800;cursor:pointer">‹</button>
+          <div style="font-family:'Alegreya',Georgia,serif;font-size:25px;font-weight:800;color:#fdf3d7;text-shadow:0 2px 10px rgba(20,8,40,.7)">Motiv pohádky</div>
+        </div>
+        <textarea value="{{ motiv }}" onChange="{{ onMotiv }}" autoFocus="{{ true }}" placeholder="O čem by pohádka měla být? Popiš svět, postavy, dobrodružství… ✏️" style="flex:1;min-height:0;border:1.5px solid rgba(253,224,138,.4);border-radius:22px;padding:18px;font-size:17px;line-height:1.55;font-weight:700;color:#fdf3d7;background:rgba(16,8,36,.55);backdrop-filter:blur(8px);outline:none;resize:none;font-family:'Nunito',sans-serif;box-sizing:border-box"></textarea>
+        <div style="display:flex;gap:10px">
+          <button onClick="{{ onNamet }}" style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="flex:none;width:28px;height:28px;border-radius:50%;background:url(assets/btn-ico-kostka.png) center/cover;box-shadow:0 1px 3px rgba(120,40,0,.25)"></span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Vymysli námět</span></button>
+          <button style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="flex:none;width:28px;height:28px;border-radius:50%;background:url(assets/btn-ico-jiskry.png) center/cover;box-shadow:0 1px 3px rgba(120,40,0,.25)"></span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Rozvinout</span></button>
+        </div>
+        <button onClick="{{ onMotivClose }}" style="{{ ctaDoneStyle }}" style-active="transform:scale(.97)"><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Hotovo</span></button>
+      </div>
+    </div>
+  </sc-if>
+      <sc-if value="{{ detailOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:0;right:0;top:0;bottom:0;z-index:40;overflow:hidden;background:#0c051c">
+          <div style="position:absolute;inset:0;background:url({{ detailImg }}) center center/cover no-repeat;filter:blur(26px) brightness(.7);transform:scale(1.15)"></div>
+          <div style="position:absolute;inset:0;background:url({{ detailImg }}) center 40%/cover no-repeat"></div>
+          <div style="position:absolute;left:0;right:0;top:34%;bottom:0;background:linear-gradient(180deg,rgba(12,5,28,0),rgba(12,5,28,.55) 40%,rgba(12,5,28,.9) 78%)"></div>
+          <div style="position:absolute;top:20px;left:18px;display:flex;align-items:center;gap:10px">
+            <button onClick="{{ onDetailClose }}" aria-label="Zpět" style="flex:none;width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(253,224,138,.45);background:rgba(18,8,40,.72);backdrop-filter:blur(6px);color:#fdf3d7;font-size:18px;font-weight:800;cursor:pointer">‹</button>
+            <div style="font-size:11px;font-weight:800;letter-spacing:.1em;color:#fdf3d7;text-shadow:0 2px 8px rgba(6,2,16,.9)">{{ detailGrp }}</div>
+          </div>
+          <button onClick="{{ onDetailPrev }}" aria-label="Předchozí pohádka" style="position:absolute;left:12px;top:50%;margin-top:-70px;width:40px;height:40px;border-radius:50%;border:1px solid rgba(253,224,138,.35);background:rgba(18,8,40,.55);backdrop-filter:blur(8px);color:#fdf3d7;font-size:20px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center" style-active="transform:scale(.92)">‹</button>
+          <button onClick="{{ onDetailNext }}" aria-label="Další pohádka" style="position:absolute;right:12px;top:50%;margin-top:-70px;width:40px;height:40px;border-radius:50%;border:1px solid rgba(253,224,138,.35);background:rgba(18,8,40,.55);backdrop-filter:blur(8px);color:#fdf3d7;font-size:20px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center" style-active="transform:scale(.92)">›</button>
+          <div style="position:absolute;left:16px;right:16px;bottom:20px;display:flex;flex-direction:column;gap:12px">
+            <div style="padding:16px 18px 18px;border-radius:26px;border:1px solid rgba(253,224,138,.18);background:rgba(30,16,58,.6);backdrop-filter:blur(12px);box-shadow:0 8px 28px rgba(8,3,20,.4);display:flex;flex-direction:column;gap:8px">
+              <h2 style="margin:0;text-align:center;font-family:'Alegreya',Georgia,serif;font-size:27px;font-weight:800;color:#fdf3d7;text-wrap:balance">{{ detailName }}</h2>
+              <p style="margin:0;text-align:center;font-size:14px;line-height:1.6;font-weight:700;color:rgba(253,243,215,.88);text-wrap:pretty">{{ detailDesc }}</p>
+            </div>
+            <button onClick="{{ onDetailPick }}" style="{{ ctaDoneStyle }}" style-active="transform:scale(.97)"><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Vybrat tuto pohádku</span></button>
+          </div>
+        </div>
+      </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844},&quot;nahledKrok&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;1 – Svět&quot;,&quot;options&quot;:[&quot;1 – Svět&quot;,&quot;2 – Pohádka&quot;,&quot;Výběr hlasu&quot;,&quot;Katalog pohádek&quot;,&quot;Vlastní pohádka&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Rozvržení&quot;},&quot;pozadi&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Zrození (kouzelná kniha)&quot;,&quot;options&quot;:[&quot;Zrození (kouzelná kniha)&quot;,&quot;Na kládě&quot;,&quot;Na dece pod stromem&quot;,&quot;V dutině stromu&quot;,&quot;Na kládě (postavy dole)&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Vzhled&quot;},&quot;svetlost&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Zlatý soumrak&quot;,&quot;options&quot;:[&quot;Bez filtru&quot;,&quot;Zlatý soumrak&quot;,&quot;Hluboká noc&quot;,&quot;Fialový samet&quot;,&quot;Mléčná pohádka&quot;,&quot;Smaragdový les&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Vzhled&quot;},&quot;tlacitka&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Oranžová lesklá&quot;,&quot;options&quot;:[&quot;Oranžová lesklá&quot;,&quot;Švestková&quot;,&quot;Ohnivá&quot;,&quot;Noční obloha&quot;,&quot;Akvarel&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Vzhled&quot;},&quot;ikonySada&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Konstelace&quot;,&quot;options&quot;:[&quot;Čisté&quot;,&quot;Kontrastní&quot;,&quot;Obrázkové&quot;,&quot;3D&quot;,&quot;Pečetě&quot;,&quot;Konstelace&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Ikony&quot;}}">
+class Component extends DCLogic {
+  state = { len: null, sel: { nicolasek: true, valentynka: true, james: false, bella: false }, sheet: null, edit: {},
+    motiv: '', worlds: ['Spasitel', 'JK Advisory', 'Mexická kuchyně', 'Tic Tac Toe'], world: 'c:0',
+    wname: '', wdesc: '', motivOpen: false, psheet: false, pname: '', pdesc: '', pzanr: 'Dobrodružná', patmo: 'Kouzelná', pdescOpen: false, edescOpen: false };
+  meta = {
+    nicolasek: { name: 'Nicolásek', sub: 'Kluk, 6 let · hlavní hrdina', desc: 'Blond vlasy s ofinou, hnědé oči, béžová kšiltovka. Zvídavý a odvážný.' },
+    valentynka: { name: 'Valentýnka', sub: 'Holčička, 2 roky · sestřička', desc: 'Blond vlásky s culíkem, hnědé oči, buclaté tvářičky. Všude chce být s bráškou.' },
+    james: { name: 'James', sub: 'Kluk, 6 let · kamarád', desc: 'Krátké tmavě hnědé vlasy, modrošedé oči. Nejlepší kamarád Nicoláska.' },
+    bella: { name: 'Bella', sub: 'Holka, 10 let · kamarádka', desc: 'Dlouhé hnědé vlasy. Jamesova starší sestra, ráda všechny hlídá.' },
+  };
+  bars(side) {
+    const hs = side === 'l' ? [14, 22, 30, 20] : [20, 30, 22, 14];
+    return React.createElement('span', { style: { display: 'flex', alignItems: 'center', gap: '3px' } },
+      hs.map((h, i) => React.createElement('span', { key: i, style: { display: 'block', width: '4px', height: h + 'px', borderRadius: '99px', background: 'rgba(253,224,138,.85)' } })));
+  }
+  glyph(html, size, filled, sw) {
+    return React.createElement('svg', { width: size, height: size, viewBox: '0 0 24 24',
+      fill: filled ? 'currentColor' : 'none', stroke: filled ? 'none' : 'currentColor',
+      strokeWidth: sw || 2.1, strokeLinecap: 'round', strokeLinejoin: 'round',
+      dangerouslySetInnerHTML: { __html: html } });
+  }
+  extraIcon(setName, which) {
+    const P = {
+      odkaz: { line: '<path d="M9.5 14.5l5-5"/><path d="M12.5 7.5l1.6-1.6a3.6 3.6 0 0 1 5 5L17.5 12.5"/><path d="M11.5 16.5l-1.6 1.6a3.6 3.6 0 0 1-5-5L6.5 11.5"/>',
+        fill: '<path d="M14.1 5.9a3.6 3.6 0 0 1 5 5l-2 2-1.7-1.7 2-2a1.2 1.2 0 0 0-1.7-1.7l-2 2-1.7-1.7zM9.9 18.1a3.6 3.6 0 0 1-5-5l2-2 1.7 1.7-2 2a1.2 1.2 0 0 0 1.7 1.7l2-2 1.7 1.7zM8.9 15.1l6.2-6.2 1.2 1.2-6.2 6.2z"/>' },
+      lupa: { line: '<circle cx="11" cy="11" r="6.2"/><path d="M15.6 15.6L20 20"/>',
+        fill: '<path d="M11 4.2a6.8 6.8 0 1 0 4.1 12.2l3.9 3.9 1.7-1.7-3.9-3.9A6.8 6.8 0 0 0 11 4.2Zm0 2.4a4.4 4.4 0 1 1 0 8.8 4.4 4.4 0 0 1 0-8.8Z"/>' }
+    }[which];
+    if (setName === 'Pečetě') return this.glyph('<circle cx="12" cy="12" r="10.4" stroke="currentColor" stroke-width="1.6" fill="none"/>' + P.fill, 17, true);
+    if (setName === 'Konstelace') return this.glyph(P.line + '<circle cx="5.6" cy="18.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="18.4" cy="5.6" r="1.1" fill="currentColor" stroke="none"/>', 16, false, 1.4);
+    if (setName === '3D') return React.createElement('img', { src: which === 'odkaz' ? 'assets/ico/3d-odkaz.png' : 'assets/ico/3d-lupa.png', alt: '', style: { width: '22px', height: '22px', objectFit: 'contain' } });
+    if (setName === 'Obrázkové') return this.glyph(P.fill, 16, true);
+    if (setName === 'Kontrastní') return this.glyph(P.line, 14, false, 3.2);
+    return this.glyph(P.line, 16, false, 1.7);
+  }
+  outlineSet(sw, size) {
+    const g = (h, s) => this.glyph(h, s || size, false, sw);
+    return {
+      namet: g('<path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.6.6 1 1.2 1 2V16h6v-.5c0-.8.4-1.4 1-2A6 6 0 0 0 12 3Z"/>'),
+      rozvin: g('<path d="M5 19L15 9"/><path d="M15.5 3.4l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/><path d="M19.8 10.6l.55 1.4 1.4.55-1.4.55-.55 1.4-.55-1.4-1.4-.55 1.4-.55z" fill="currentColor" stroke="none"/><path d="M7.2 6.6l.42 1.05 1.05.42-1.05.42-.42 1.05-.42-1.05-1.05-.42 1.05-.42z" fill="currentColor" stroke="none"/><path d="M11.4 17.6l.36.9.9.36-.9.36-.36.9-.36-.9-.9-.36.9-.36z" fill="currentColor" stroke="none"/>', size + 2),
+      poloha: g('<path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/>', size - 1),
+      play: g('<path d="M8 5.5v13l11-6.5z"/>'),
+      foto: g('<rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="8.5" cy="10" r="1.6"/><path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5"/>'),
+      kamera: g('<path d="M3 8.5h4l1.6-2h6.8l1.6 2H21v10H3z"/><circle cx="12" cy="13" r="3.2"/>')
+    };
+  }
+  imgSet(pref) {
+    const im = (n, sz) => React.createElement('img', { src: 'assets/ico/' + pref + '-' + n + '.png', width: sz || 22, height: sz || 22, alt: '', style: { display: 'block' } });
+    return { namet: im('namet'), rozvin: im('rozvin'), poloha: im('poloha'), play: im('play'), foto: im('foto'), kamera: im('kamera'),
+      disc: { color: '#3b1a5c', background: pref === '3d' ? 'radial-gradient(circle at 50% 30%,#f6e7c9,#e6cfa6)' : 'linear-gradient(160deg,#fff8ea,#f0dcbb)', border: '2px solid rgba(255,255,255,.95)', boxShadow: '0 2px 6px rgba(120,40,0,.25)' } };
+  }
+  iconSet(name) {
+    const g = (h, sz, f, sw) => this.glyph(h, sz || 15, f, sw);
+    const sets = {
+      'Čisté': this.outlineSet(1.6, 17),
+      'Kontrastní': Object.assign(this.outlineSet(3.4, 15), {
+        disc: { background: 'linear-gradient(160deg,#2a1550,#150a30)', border: '2px solid rgba(253,243,215,.92)', color: '#fdf3d7', boxShadow: '0 2px 7px rgba(12,5,28,.55)' } }),
+      'Obrázkové': this.imgSet('img'),
+      '3D': this.imgSet('3d'),
+      'Pečetě': {
+        namet: g('<circle cx="12" cy="12" r="10.4" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M10.4 17.2h3.2v.9a1.1 1.1 0 0 1-1.1 1.1h-1a1.1 1.1 0 0 1-1.1-1.1z"/><path d="M12 4.6a5.1 5.1 0 0 0-3.1 9.2c.4.3.6.8.6 1.2v.5h5v-.5c0-.4.2-.9.6-1.2A5.1 5.1 0 0 0 12 4.6Z"/>', 18, true),
+        rozvin: g('<circle cx="12" cy="12" r="10.4" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M7 16.6l6.6-6.6 1.1 1.1L8.1 17.7z"/><path d="M15.4 5.4l.75 1.9 1.9.75-1.9.75-.75 1.9-.75-1.9-1.9-.75 1.9-.75z"/><path d="M19.8 10.6l.55 1.4 1.4.55-1.4.55-.55 1.4-.55-1.4-1.4-.55 1.4-.55z" fill="currentColor" stroke="none"/><path d="M7.2 6.6l.42 1.05 1.05.42-1.05.42-.42 1.05-.42-1.05-1.05-.42 1.05-.42z" fill="currentColor" stroke="none"/><path d="M11.4 17.6l.36.9.9.36-.9.36-.36.9-.36-.9-.9-.36.9-.36z" fill="currentColor" stroke="none"/>', 18, true),
+        poloha: g('<circle cx="12" cy="12" r="10.4" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M12 19.4c0 0 5.2-5 5.2-8.4a5.2 5.2 0 1 0-10.4 0c0 3.4 5.2 8.4 5.2 8.4Zm0-6.6a1.95 1.95 0 1 1 0-3.9 1.95 1.95 0 0 1 0 3.9Z"/>', 18, true),
+        play: g('<circle cx="12" cy="12" r="10.4" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M9.6 7.6v8.8l7.2-4.4z"/>', 18, true),
+        foto: g('<circle cx="12" cy="12" r="10.4" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M6.4 8.2h11.2a1 1 0 0 1 1 1v5.6a1 1 0 0 1-1 1H6.4a1 1 0 0 1-1-1V9.2a1 1 0 0 1 1-1Zm.7 6.6h9.8l-3.2-3.8-2.1 2.2-1.4-1.4zM9 11a1.2 1.2 0 1 0 0-2.4A1.2 1.2 0 0 0 9 11Z"/>', 18, true),
+        kamera: g('<circle cx="12" cy="12" r="10.4" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M9.8 7.4h4.4l1 1.4h2.4a1 1 0 0 1 1 1v5.8a1 1 0 0 1-1 1H6.4a1 1 0 0 1-1-1V9.8a1 1 0 0 1 1-1h2.4zM12 15.6a2.9 2.9 0 1 0 0-5.8 2.9 2.9 0 0 0 0 5.8Z"/>', 18, true),
+        disc: { background: 'radial-gradient(circle at 38% 26%,#6d3f9c,#3a1a63)', border: '2px solid rgba(253,224,138,.9)', color: '#fcd34d', boxShadow: '0 2px 8px rgba(20,8,40,.55),inset 0 2px 7px rgba(253,224,138,.25)' } },
+      'Konstelace': {
+        namet: g('<path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.6.6 1 1.2 1 2V16h6v-.5c0-.8.4-1.4 1-2A6 6 0 0 0 12 3Z"/><circle cx="12" cy="3" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.3" fill="currentColor" stroke="none"/>', 17, false, 1.4),
+        rozvin: g('<path d="M5 19L15 9"/><path d="M15.6 4.2l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="currentColor" stroke="none"/><circle cx="5" cy="19" r="1.5" fill="currentColor" stroke="none"/><circle cx="20.4" cy="12.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="7.4" cy="6.6" r="0.9" fill="currentColor" stroke="none"/><path d="M19.8 10.6l.55 1.4 1.4.55-1.4.55-.55 1.4-.55-1.4-1.4-.55 1.4-.55z" fill="currentColor" stroke="none"/><path d="M7.2 6.6l.42 1.05 1.05.42-1.05.42-.42 1.05-.42-1.05-1.05-.42 1.05-.42z" fill="currentColor" stroke="none"/><path d="M11.4 17.6l.36.9.9.36-.9.36-.36.9-.36-.9-.9-.36.9-.36z" fill="currentColor" stroke="none"/>', 18, false, 1.4),
+        poloha: g('<path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="21" r="1.2" fill="currentColor" stroke="none"/><circle cx="5" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="19" cy="10" r="1" fill="currentColor" stroke="none"/>', 16, false, 1.4),
+        play: g('<path d="M8 5.5v13l11-6.5z"/><circle cx="8" cy="5.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="8" cy="18.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/>', 17, false, 1.4),
+        foto: g('<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5"/><circle cx="8.5" cy="9.6" r="1.5" fill="currentColor" stroke="none"/><circle cx="3" cy="5" r="1.1" fill="currentColor" stroke="none"/><circle cx="21" cy="19" r="1.1" fill="currentColor" stroke="none"/>', 17, false, 1.4),
+        kamera: g('<path d="M3 8.5h4l1.6-2h6.8l1.6 2H21v10H3z"/><circle cx="12" cy="13" r="2.6" fill="currentColor" stroke="none"/><circle cx="3" cy="8.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.1" fill="currentColor" stroke="none"/>', 17, false, 1.4),
+        disc: { background: 'radial-gradient(circle at 50% 30%,#4c2d72,#1d0f3c)', border: '2px solid rgba(253,224,138,.8)', color: '#fde68a',
+          boxShadow: '0 0 12px rgba(253,224,138,.5),0 2px 7px rgba(20,8,40,.5),inset 0 2px 8px rgba(253,224,138,.18)' } }
+    };
+    return sets[name] || sets['Konstelace'];
+  }
+  setNames() {
+    return ['Čisté', 'Kontrastní', 'Obrázkové', '3D', 'Pečetě', 'Konstelace'];
+  }
+  bgFilter() {
+    return ({
+      'Zlatý soumrak': 'brightness(1.08) saturate(1.35) sepia(.18) hue-rotate(-14deg) contrast(1.04)',
+      'Hluboká noc': 'brightness(.42) saturate(.9) contrast(1.12) hue-rotate(6deg)',
+      'Fialový samet': 'brightness(.78) saturate(1.6) hue-rotate(28deg) contrast(1.06)',
+      'Mléčná pohádka': 'brightness(1.25) saturate(.62) contrast(.9)',
+      'Smaragdový les': 'brightness(.8) saturate(1.45) hue-rotate(-58deg) contrast(1.05)'
+    })[this.props.svetlost] ?? 'brightness(1.08) saturate(1.35) sepia(.18) hue-rotate(-14deg) contrast(1.04)';
+  }
+  renderVals() {
+    const bgFilter = this.bgFilter();
+    const urlStep = +((typeof location !== 'undefined' && (location.search.match(/krok=(\d)/) || [])[1]) || 0);
+    const step = this.state.step ?? (urlStep || +(String(this.props.nahledKrok || '1').match(/\d/) || [1])[0]);
+    const voiceOpen = this.state.voiceOpen ?? (this.props.nahledKrok === 'Výběr hlasu');
+    const catOpen = this.state.catOpen ?? (this.props.nahledKrok === 'Katalog pohádek');
+    const tab = this.state.tab ?? 'Vše';
+    const q = (this.state.q ?? '').trim().toLowerCase();
+    const CAT = [
+      ['Oblíbené','Dinosauři','m-dinosauri'],['Oblíbené','Vesmír','m-vesmir'],['Oblíbené','Autíčka','m-auticka'],
+      ['Oblíbené','Podmořský svět','m-podmorsky'],['Oblíbené','Historie','m-historie'],['Oblíbené','Zvířátka','m-zviratka'],
+      ['Oblíbené','Stroje','m-stroje'],['Oblíbené','Piráti','m-pirati'],['Oblíbené','Džungle','m-dzungle'],['Oblíbené','Kouzelná zima','m-zima'],
+      ['České','Karkulka','c-karkulka'],['České','Perníková chaloupka','c-pernikova'],['České','Popelka','c-popelka'],
+      ['České','Šípková Růženka','c-ruzenka'],['České','Sněhurka','c-snehurka'],['České','Zlatovláska','c-zlatovlaska'],
+      ['České','Dlouhý, Široký a Bystrozraký','c-dlouhy'],['České','Tři zlaté vlasy děda Vševěda','c-trivlasy'],['České','Smolíček','c-smolicek'],
+      ['České','Budulínek','c-budulinek'],['České','Koblížek','c-koblizek'],['České','Veliká řepa','c-repa'],
+      ['České','Hrnečku vař!','c-hrnecek'],['České','Dvanáct měsíčků','c-dvanact'],['České','Čert a Káča','c-certkaca'],
+      ['České','Otesánek','c-otesanek'],['České','Sůl nad zlato','c-sul'],['České','Hloupý Honza','c-honza'],
+      ['České','Paleček','c-palecek'],['České','Obušku z pytle ven!','c-obusek'],['České','Zvířátka a Petrovští','c-zviratka'],
+      ['České','Kocour v botách','c-kocour'],['České','Vlk a sedm kůzlátek','c-kuzlatka'],['České','Brémští muzikanti','c-bremsti'],
+      ['Andersen','Sněhová královna','a-snehkralovna'],['Andersen','Ošklivé káčátko','a-kacatko'],['Andersen','Císařovy nové šaty','a-saty'],
+      ['Andersen','Princezna na hrášku','a-hrasek'],['Andersen','Malá mořská víla','a-morskavila'],['Andersen','Malenka','a-malenka'],
+      ['Andersen','Cínový vojáček','a-vojacek'],['Andersen','Divoké labutě','a-labute'],['Andersen','Slavík','a-slavik'],
+      ['Andersen','Létající kufr','a-kufr']
+    ].map(([g, n, f]) => ({ grp: g, name: n, img: 'assets/katalog/' + f + '.jpg', id: f }));
+    const DESC = {
+      'm-dinosauri':'Cesta do pravěku mezi obří ještěry — kdo se schová před tyranosaurem a kdo najde vylíhnuté mládě?',
+      'm-vesmir':'Raketou mezi planety, kolem komet a spát v beztíži. Co se skrývá za posledním prstencem?',
+      'm-auticka':'Ve městě, kde autíčka mluví, se chystá velký závod. Vyhraje ten nejrychlejší, nebo nejhodnější?',
+      'm-podmorsky':'Pod hladinou svítí korálové město. Kamarádi z rybího hejna hledají ztracenou perlu.',
+      'm-historie':'Rytíři, hradní kuchyně a tajná chodba pod věží — dobrodružství v dávných dobách.',
+      'm-zviratka':'Na statku i v lese: veselá zvířátka, která si pomáhají, když přijde bouřka.',
+      'm-stroje':'Bagry, jeřáby a vlaky staví nový most. Podaří se to do západu slunce?',
+      'm-pirati':'Plachty vzhůru! Mapa vede k ostrovu, kde truhla ukrývá něco cennějšího než zlato.',
+      'm-dzungle':'Liány, papoušci a tajemné šplouchání v řece. Kdo je ten stín mezi kapradinami?',
+      'm-zima':'Zamrzlé jezero, ledové květy a zimní víla, která vrací zapomenutá sáňkovací kouzla.',
+      'c-karkulka':'Karkulka nese babičce koláče a v lese potká vlka. Naštěstí je nedaleko myslivec.',
+      'c-pernikova':'Dvě děti najdou v lese chaloupku z perníku — a s ní i ježibabu, kterou nakonec přelstí.',
+      'c-popelka':'Popelka má tři oříšky, dobré srdce a jeden střevíček, který se ztratí na plese.',
+      'c-ruzenka':'Zlá věštba uspí celý hrad na sto let. Probudí ho odvaha a jeden zapomenutý úkol.',
+      'c-snehurka':'Sněhurka najde útulek u sedmi mužíků, když jí královna zlé srdce nedopřeje klid.',
+      'c-zlatovlaska':'Jiřík rozumí zvířatům a to mu pomůže poznat pravou Zlatovlásku ze dvanácti sester.',
+      'c-dlouhy':'Tři neobyčejní pomocníci — jeden se natáhne, druhý se nafoukne, třetí vidí až za obzor.',
+      'c-trivlasy':'Cesta za dědem Vševědem, tři zlaté vlasy a tři otázky, na které musí být odpověď.',
+      'c-smolicek':'Smolíček zůstane sám v chaloupce a jezinky ho lákají ven. Pomůže jelen se zlatými parohy.',
+      'c-budulinek':'Budulínek si otevře lišce, i když neměl. Dědeček a babička ho ale najdou.',
+      'c-koblizek':'Koblížek uteče z pece a putuje světem — dokud nenarazí na chytrou lišku.',
+      'c-repa':'Řepa je tak velká, že ji nikdo nevytáhne sám. Až když přiloží ruku i myška, povolí.',
+      'c-hrnecek':'Kouzelný hrneček vaří kaši. Kdo zapomene zaklínadlo, zaplaví jí celou vesnici.',
+      'c-dvanact':'Dívka hledá v mrazu jahody a u ohně potká dvanáct měsíčků, kteří umí přehodit ročního času.',
+      'c-certkaca':'Káča se drží čerta tak pevně, že se jí chce zbavit i samotné peklo.',
+      'c-otesanek':'Panáček z pařezu má nekonečný hlad — a hospodáři to dá co proto.',
+      'c-sul':'Princezna řekne, že sůl je nad zlato, a musí to králi teprve dokázat.',
+      'c-honza':'Hloupý Honza vypadá nešikovně, ale právě jeho dobré srdce najde největší štěstí.',
+      'c-palecek':'Malý jako paleček, ale odvahy má za tři — a projde i uchem od jehly.',
+      'c-obusek':'Z pytle vyskočí obušek a naučí lakomce, že poctivost je nejlepší kouzlo.',
+      'c-zviratka':'Kohout, kočka, pes a další zvířátka najdou chaloupku a vyženou z ní loupežníky.',
+      'c-kocour':'Chytrý kocour v botách udělá ze svého pána panovníka — bez jediného kouzla.',
+      'c-kuzlatka':'Vlk se vydává za mámu kozu, ale nejmenší kůzlátko ho prozradí.',
+      'c-bremsti':'Osel, pes, kočka a kohout chtějí do Brém, a po cestě přelstí loupežníky.',
+      'a-snehkralovna':'Střípek zrcadla zamrazí chlapci srdce. Kamarádka za ním jde až do ledového zámku.',
+      'a-kacatko':'Káčátko, kterému se všichni smějí, se jednoho jara podívá do vody a spatří labuť.',
+      'a-saty':'Císař se pyšní šaty, které nikdo nevidí — dokud to jedno dítě neřekne nahlas.',
+      'a-hrasek':'Pravou princeznu prozradí jediný hrášek pod dvaceti matracemi.',
+      'a-morskavila':'Malá víla vymění hlas za nohy, aby mohla chodit po pevnině za tím, koho má ráda.',
+      'a-malenka':'Dívenka velká jako palec putuje na listu lilie a nakonec doletí ke květinovým lidem.',
+      'a-vojacek':'Cínový vojáček s jednou nohou se nikdy nevzdá — ani v odpadní stružce, ani v rybě.',
+      'a-labute':'Jedenáct bratrů se změní v labutě a jen mlčenlivá sestra jim může utkat záchranu.',
+      'a-slavik':'Živý slavík zpívá tak krásně, že přehluší i zlatého mechanického ptáčka.',
+      'a-kufr':'Kouzelný kufr letí, kam si přeješ — a vypráví pohádku, když se v něm sedí.'
+    };
+    const VOICES = [
+      { name: 'Žena', sub: 'Klidný ženský hlas · Google Gemini TTS', img: 'assets/hlasy/vypravecka.png' },
+      { name: 'Muž', sub: 'Teplý mužský hlas · Google Gemini TTS', img: 'assets/hlasy/vypravec.png' },
+      { name: 'Dítě', sub: 'Hravý dětský hlas · Google Gemini TTS', img: 'assets/hlasy/vesely.png' }
+    ];
+    const vMeta = VOICES.find(v => v.name === (this.state.voice ?? 'Žena')) || VOICES[0];
+    const accSets = { 'Švestková': { bg: 'linear-gradient(135deg,#8b5cf6,#5b21b6)', sh: '0 4px 16px rgba(70,30,130,.45)', fg: '#fdf3d7' }, 'Ohnivá': { bg: 'linear-gradient(135deg,#fb7185,#c2410c)', sh: '0 4px 16px rgba(150,50,20,.45)', fg: '#fff7ed' }, 'Noční obloha': { bg: 'radial-gradient(circle at 50% 15%,#4a2a63,#241447)', sh: '0 4px 16px rgba(20,8,40,.5)', fg: '#fcd34d' }, 'Akvarel': { bg: 'linear-gradient(135deg,#f6ead2,#e8c9a0)', sh: '0 4px 16px rgba(20,8,40,.35)', fg: '#7a4a12' } };
+    const acc = accSets[this.props.tlacitka] ?? { bg: 'linear-gradient(90deg,#f59e0b,#f97316)', sh: '0 4px 16px rgba(245,158,11,.35)', fg: '#fff' };
+    const pill = (on) => ({ height: '46px', border: on ? 'none' : '1.5px solid rgba(253,224,138,.3)', borderRadius: '999px',
+      background: on ? acc.bg : 'rgba(30,16,58,.5)',
+      boxShadow: on ? acc.sh : 'none',
+      color: on ? acc.fg : '#fdf3d7', fontFamily: "'Nunito',sans-serif",
+      fontSize: '15px', fontWeight: 800, cursor: 'pointer' });
+    const chip = (on) => ({ height: '38px', padding: '0 14px', borderRadius: '999px', cursor: 'pointer',
+      border: on ? 'none' : '1px solid rgba(253,224,138,.3)',
+      background: on ? acc.bg : 'rgba(30,16,58,.5)',
+      boxShadow: on ? acc.sh : 'none',
+      color: on ? acc.fg : '#fdf3d7',
+      fontFamily: "'Nunito',sans-serif", fontSize: '13px', fontWeight: 800 });
+    const names = { nicolasek: 'Nicolásek', valentynka: 'Valentýnka', james: 'James', bella: 'Bella' };
+    const sk = this.state.sheet, isNew = sk === 'new', m = sk && !isNew ? this.meta[sk] : null;
+    const ed = this.state.edit;
+    const ctaSets = { 'Švestková': { background: 'linear-gradient(135deg,#8b5cf6,#5b21b6)', color: '#fdf3d7', boxShadow: '0 5px 16px rgba(70,30,130,.45)' }, 'Ohnivá': { background: 'linear-gradient(135deg,#fb7185,#c2410c)', color: '#fff7ed', boxShadow: '0 5px 16px rgba(150,50,20,.45)' }, 'Noční obloha': { background: 'radial-gradient(circle at 50% 15%,#4a2a63,#241447)', color: '#fcd34d', boxShadow: '0 5px 16px rgba(20,8,40,.5)' }, 'Akvarel': { background: 'linear-gradient(135deg,#f6ead2,#e8c9a0)', color: '#7a4a12', boxShadow: '0 5px 16px rgba(20,8,40,.35)' } };
+    const discSets = { 'Švestková': { bg: 'linear-gradient(160deg,#a78bfa,#5b21b6)', gl: '#fdf3d7' }, 'Ohnivá': { bg: 'linear-gradient(160deg,#fda4af,#c2410c)', gl: '#fff7ed' }, 'Noční obloha': { bg: 'radial-gradient(circle at 50% 28%,#5c3c7a,#2a164d)', gl: '#fde68a' }, 'Akvarel': { bg: 'linear-gradient(160deg,#fff6e6,#e0bd8f)', gl: '#7a4a12' } };
+    const dsc = discSets[this.props.tlacitka] ?? { bg: 'linear-gradient(160deg,#fbbf5a,#f97316)', gl: '#fff' };
+    const icoSet = this.iconSet(this.state.sada ?? this.props.ikonySada ?? 'Konstelace');
+    const icoDisc = icoSet.disc || {};
+    const discStyle = Object.assign({ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none', width: '27px', height: '27px', borderRadius: '50%', background: dsc.bg, border: '2px solid rgba(255,255,255,.95)', boxShadow: '0 2px 6px rgba(120,40,0,.28),inset 0 2px 5px rgba(255,255,255,.45)', color: dsc.gl }, icoDisc);
+    const discAddStyle = { display: 'flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', borderRadius: '50%', background: dsc.bg, border: '2.5px solid rgba(255,255,255,.95)', boxShadow: '0 4px 10px rgba(20,8,40,.4),inset 0 2px 6px rgba(255,255,255,.45)', color: dsc.gl };
+    return {
+      rozvinoutIkona: { 'Svitek': 'assets/btn-ico-svitek.png', 'Šipky': 'assets/btn-ico-sipky.png', 'Hůlka': 'assets/btn-ico-hulka.png' }[this.props.rozvinoutIkona] ?? 'assets/btn-ico-hulka.png',
+      discStyle,
+      smallDiscStyle: Object.assign({}, discStyle, { width: '26px', height: '26px', minWidth: '26px' }),
+      glyphDiscStyle: Object.assign({}, discStyle, { background: 'linear-gradient(160deg,#fff8e6,#f6dfae)', border: '2px solid rgba(255,255,255,.95)', color: '#3b1a5c' }),
+      discAddStyle,
+      discBigStyle: Object.assign({}, discStyle, { width: '54px', height: '54px', minWidth: '54px', cursor: 'pointer' }),
+      s1: step === 1 && !voiceOpen && !catOpen,
+      s2: step === 2 && !voiceOpen && !catOpen,
+      sVoice: voiceOpen && !catOpen,
+      sCat: catOpen,
+      notLast: !voiceOpen && !catOpen && step === 1,
+      showCta: !voiceOpen && !catOpen && step === 2,
+      stepLabel: catOpen ? ('VŠECHNY POHÁDKY · ' + CAT.length) : (voiceOpen ? 'VÝBĚR HLASU' : (step === 1 ? 'KROK 1 ZE 2 · SVĚT' : 'KROK 2 ZE 2 · POHÁDKA')),
+      backHref: (step === 1 && !voiceOpen && !catOpen) ? '1%20Home.dc.html' : '#',
+      onBack: (e) => { if (catOpen) { e.preventDefault(); this.setState({ catOpen: false }); } else if (voiceOpen) { e.preventDefault(); this.setState({ voiceOpen: false }); } else if (step > 1) { e.preventDefault(); this.setState({ step: 1 }); } },
+      onBackToWorld: () => this.setState({ step: 1 }),
+      worldName: (() => { const w = String(this.state.world || '');
+        const base = w.startsWith('k:') ? ((CAT.find(c => c.id === w.slice(2)) || {}).name || 'Nevybráno')
+          : (w.startsWith('c:') ? (this.state.mine || [])[+w.slice(2)] || 'Vlastní pohádka' : 'Nevybráno');
+        return this.state.local ? base + ' + moje poloha' : base; })(),
+      worldThumb: (() => { const w = String(this.state.world || '');
+        const MY = { 'Spasitel': 'assets/svety/spasitel.jpg?v=5', 'JK Advisory': 'assets/svety/jk-advisory.jpg?v=2', 'Mexická kuchyně': 'assets/svety/mexicka-kuchyne.jpg', 'Tic Tac Toe': 'assets/svety/tic-tac-toe.jpg' };
+        const img = w.startsWith('k:') ? ((CAT.find(c => c.id === w.slice(2)) || {}).img || null)
+          : (w === 'own' ? 'assets/svety/nova-pohadka.jpg'
+          : (w.startsWith('c:') ? (MY[(this.state.mine || this.state.worlds || [])[+w.slice(2)]] || 'assets/svety/nova-pohadka.jpg') : null));
+        return { width: '40px', height: '40px', borderRadius: '13px', flex: '0 0 auto',
+          border: '1.5px solid rgba(253,224,138,.4)',
+          background: img ? 'url(' + img + ') center/cover no-repeat' : 'rgba(253,224,138,.14)' }; })(),
+      q: this.state.q ?? '',
+      onQ: (e) => this.setState({ q: e.target.value }),
+      tabs: [['Vše', 'Vše'], ['České', 'Klasické'], ['Andersen', 'Andersen'], ['Oblíbené', 'Světy']].map(([k, lbl]) => ({ name: lbl,
+        style: Object.assign({ flex: '1 1 0', minWidth: 0, height: '36px', padding: '0 6px', borderRadius: '999px', cursor: 'pointer',
+          fontFamily: "'Nunito',sans-serif", whiteSpace: 'nowrap', letterSpacing: '.01em',
+          fontSize: '11.5px', fontWeight: 800 }, tab === k
+          ? { border: 'none', background: acc.bg, color: acc.fg, boxShadow: '0 3px 10px rgba(8,3,20,.45)' }
+          : { border: '1.5px solid rgba(253,224,138,.3)', background: 'rgba(30,16,58,.6)', color: '#fdf3d7' }),
+        onTap: () => this.setState({ tab: k }) })),
+      catList: CAT.filter(c => q ? c.name.toLowerCase().includes(q) : (tab === 'Vše' || c.grp === tab)).map(c => ({ name: c.name,
+        style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'center', minHeight: '104px', padding: '7px 5px',
+          borderRadius: '18px', cursor: 'pointer', boxSizing: 'border-box', fontFamily: "'Nunito',sans-serif", color: '#fff',
+          textShadow: '0 1px 4px rgba(10,4,24,.95)',
+          background: 'linear-gradient(180deg,rgba(16,8,36,0) 40%,rgba(16,8,36,.84)),url(' + c.img + ') center center/cover no-repeat',
+          backgroundColor: '#150a30',
+          border: this.state.world === 'k:' + c.id ? '2.5px solid #f97316' : 'none',
+          boxShadow: this.state.world === 'k:' + c.id ? '0 0 0 3px rgba(249,115,22,.3), 0 6px 18px rgba(249,115,22,.4)' : '0 6px 14px rgba(8,3,20,.55)' },
+        onTap: () => this.setState({ detail: c.id }) })),
+      detailOpen: !!this.state.detail,
+      detailName: (CAT.find(c => c.id === this.state.detail) || {}).name || '',
+      detailImg: this.state.detail ? 'assets/katalog/big/' + this.state.detail + '.jpg' : '',
+      detailDesc: DESC[this.state.detail] || 'Pohádka na dobrou noc pro Nicoláska a Valentýnku.',
+      detailGrp: { 'Oblíbené': 'SVĚT POHÁDKY', 'České': 'KLASICKÁ POHÁDKA', 'Andersen': 'ANDERSEN' }[((CAT.find(c => c.id === this.state.detail) || {}).grp)] || '',
+      onDetailClose: () => this.setState({ detail: null }),
+      onDetailPrev: () => { const l = CAT.filter(c => q ? c.name.toLowerCase().includes(q) : (tab === 'Vše' || c.grp === tab)); const i = l.findIndex(c => c.id === this.state.detail); if (i >= 0) this.setState({ detail: l[(i - 1 + l.length) % l.length].id }); },
+      onDetailNext: () => { const l = CAT.filter(c => q ? c.name.toLowerCase().includes(q) : (tab === 'Vše' || c.grp === tab)); const i = l.findIndex(c => c.id === this.state.detail); if (i >= 0) this.setState({ detail: l[(i + 1) % l.length].id }); },
+      onDetailPick: () => { this.setState(s => ({ fx: (s.fx || 0) + 1 })); setTimeout(() => this.setState({ world: 'k:' + this.state.detail, detail: null, catOpen: false, fx: 0 }), 380); },
+      catCount: (() => { const n = CAT.filter(c => q ? c.name.toLowerCase().includes(q) : (tab === 'Vše' || c.grp === tab)).length; return n + (n === 1 ? ' POHÁDKA' : (n < 5 ? ' POHÁDKY' : ' POHÁDEK')); })(),
+      onOpenCat: () => this.setState({ catOpen: true }),
+      onNext: () => this.setState({ step: 2 }),
+      onOpenVoices: () => this.setState({ voiceOpen: true }),
+      wDescQuick: this.state.wdescQuick ?? '',
+      onWDescQuick: (e) => this.setState({ wdescQuick: e.target.value }),
+      localHint: (this.state.localAdd ?? false)
+        ? 'Pohádka se propojí s vaším okolím i s vybraným světem výše.'
+        : 'Můžete zapnout i společně s vybraným světem — děj se pak odehraje ve vašem okolí.',
+      voiceName: vMeta.name, voiceSub: vMeta.sub,
+      voiceAvatar: React.createElement('img', { src: vMeta.img, alt: '', style: { display: 'block', flex: 'none', width: '52px', height: '52px', borderRadius: '50%', border: '2px solid rgba(253,224,138,.75)', objectFit: 'cover' } }),
+      voiceCards: VOICES.map(v => ({ name: v.name, on: v.name === vMeta.name,
+        style: { display: 'block', width: '46px', height: '46px', borderRadius: '50%', cursor: 'pointer', padding: 0,
+          backgroundImage: 'url(' + v.img + ')', backgroundSize: 'cover', backgroundPosition: 'center',
+          border: v.name === vMeta.name ? '3px solid #fcd34d' : '3px solid rgba(255,255,255,.35)',
+          boxShadow: v.name === vMeta.name ? '0 0 16px rgba(253,224,138,.45)' : '0 3px 8px rgba(20,8,40,.4)' },
+        onTap: () => this.setState({ voice: v.name }) })),
+      heroStyle: { display: 'block', flex: 'none', width: '64px', height: '64px', borderRadius: '50%',
+        backgroundImage: 'url(' + vMeta.img + ')', backgroundSize: 'cover', backgroundPosition: 'center',
+        border: '3px solid #fcd34d', boxShadow: '0 0 28px rgba(253,224,138,.4)' },
+      wavesLeft: this.bars('l'), wavesRight: this.bars('r'),
+      premium: [['filmova','Klon máma'],['filmovy','Klon táta'],['dobrodruzny','Hollywoodský herec'],['dobrodruzna','Hollywoodská herečka']].map(([k, n]) => ({ name: n,
+        style: { display: 'block', width: '42px', height: '42px', borderRadius: '50%',
+          backgroundImage: 'url(assets/hlasy/' + k + '.png)', backgroundSize: 'cover', backgroundPosition: 'center',
+          border: '3px solid rgba(255,255,255,.25)', filter: 'grayscale(.5) brightness(.75)', boxShadow: '0 3px 8px rgba(20,8,40,.4)' } })),
+      icoPlay: icoSet.play,
+      icoOdkaz: this.extraIcon(this.state.sada ?? this.props.ikonySada ?? 'Konstelace', 'odkaz'),
+      icoLupa: this.extraIcon(this.state.sada ?? this.props.ikonySada ?? 'Konstelace', 'lupa'),
+      onVoicePick: () => this.setState({ voiceOpen: false }),
+      ico: icoSet,
+      badgeSel: { position: 'absolute', right: '-2px', top: '-2px', width: '20px', height: '20px', borderRadius: '50%',
+        background: acc.bg, color: acc.fg, fontSize: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' },
+      badgeLock: { position: 'absolute', right: '-2px', bottom: '-2px', width: '18px', height: '18px', borderRadius: '50%',
+        background: acc.bg, color: acc.fg, fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid rgba(255,255,255,.9)' },
+      accBg: acc.bg,
+      accColor: (acc.bg.match(/#[0-9a-f]{6}/gi) || ['#f59e0b'])[0],
+      navrhyOpen: (() => {
+        const on = !!this.props.srovnatSady;
+        if (on && !this._lastSrov) this._off = false;
+        this._lastSrov = on;
+        return this.state.navrhy ?? (on && !this._off);
+      })(),
+      onNavrhy: () => this.setState({ navrhy: true }),
+      onNavrhyClose: () => this.setState({ navrhy: undefined, }, () => { this._off = true; this.forceUpdate(); }),
+      navrhy: this.setNames().map((n) => {
+        const s = this.iconSet(n);
+        const on = (this.state.sada ?? this.props.ikonySada ?? 'Konstelace') === n;
+        return { name: n, ico: s, on,
+          onPick: () => this.setState({ sada: n, navrhy: undefined, }, () => { this._off = true; this.forceUpdate(); }),
+          style: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '13px 15px', borderRadius: '20px', cursor: 'pointer',
+            fontFamily: "'Nunito',sans-serif", color: '#fdf3d7', textAlign: 'left',
+            border: on ? '2px solid rgba(253,224,138,.95)' : '1.5px solid rgba(253,224,138,.28)',
+            background: on ? 'rgba(253,224,138,.14)' : 'rgba(30,16,58,.55)' } };
+      }),
+      secBtnStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', flex: '1 1 0', minWidth: 0, height: '40px', padding: '0 10px', border: '1.5px solid rgba(255,255,255,.9)', borderRadius: '999px', background: acc.bg, boxShadow: acc.sh, color: acc.fg, fontFamily: "'Nunito',sans-serif", fontSize: '13px', fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer', transition: 'transform .12s ease' },
+      ctaDoneStyle: Object.assign({}, { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', width: '100%', height: '62px', borderRadius: '999px', border: '1.5px solid rgba(255,255,255,.9)', color: acc.fg, background: acc.bg, boxShadow: acc.sh, fontFamily: "'Nunito',sans-serif", fontSize: '17px', fontWeight: 800, cursor: 'pointer' }, this.state.fx ? { animation: 'omDone .42s ease, omGlow .42s ease' } : {}),
+      ctaStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', width: '100%', height: '62px', borderRadius: '999px', border: '1.5px solid rgba(255,255,255,.9)', color: '#fff', fontFamily: "'Nunito',sans-serif", fontSize: '20px', fontWeight: 800, letterSpacing: '.02em', whiteSpace: 'nowrap', cursor: 'pointer', transition: 'transform .12s ease', ...(ctaSets[this.props.tlacitka] ?? { background: 'linear-gradient(90deg,#f59e0b 0%,#f97316 100%)', boxShadow: '0 4px 24px rgba(245,158,11,.35),inset 0 1px 0 rgba(255,255,255,.35)' }), marginTop: '4px' },
+      wNoPhotos: !(this.state.wPhotos || []).length,
+      wSlots: [1, 2, 3, 4, 5].map(n => ({ n: n })),
+      ctaStyleFlat: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', width: '100%', height: '62px', borderRadius: '999px', border: '1.5px solid rgba(255,255,255,.9)', color: '#fff', fontFamily: "'Nunito',sans-serif", fontSize: '20px', fontWeight: 800, letterSpacing: '.02em', whiteSpace: 'nowrap', cursor: 'pointer', transition: 'transform .12s ease', ...(ctaSets[this.props.tlacitka] ?? { background: 'linear-gradient(90deg,#f59e0b 0%,#f97316 100%)', boxShadow: '0 4px 24px rgba(245,158,11,.35),inset 0 1px 0 rgba(255,255,255,.35)' }) },
+      sheetOpen: !!sk,
+      sheetIsNew: isNew,
+      sheetHasImg: !!m,
+      sheetTitle: isNew ? 'Nová postava' : (m ? m.name : ''),
+      sheetSubtitle: isNew ? 'Vlastní postava do pohádek' : (m ? m.sub : ''),
+      sheetAvatarStyle: m ? { width: '64px', height: '64px', borderRadius: '50%', display: 'block', backgroundImage: 'url(assets/postavy/avatar-' + sk + '.png)', backgroundSize: 'cover', backgroundPosition: 'center', border: '3px solid #fcd34d' } : {},
+      sheetSelBtnStyle: { height: '34px', padding: '0 14px', borderRadius: '999px', cursor: 'pointer', fontFamily: "'Nunito',sans-serif", fontSize: '13px', fontWeight: 800,
+        border: this.state.sel[sk] ? 'none' : '1px solid rgba(253,224,138,.4)',
+        background: this.state.sel[sk] ? acc.bg : 'rgba(30,16,58,.5)', color: this.state.sel[sk] ? acc.fg : '#fff' },
+      sheetSelLabel: this.state.sel[sk] ? '✓ V pohádce' : 'Přidat do pohádky',
+      sheetName: ed.name ?? (m ? m.name : ''),
+      sheetDesc: ed.desc ?? (m ? m.desc : ''),
+      sheetPhotos: isNew ? 0 : 2,
+      sheetPrimaryLabel: isNew ? 'Přidat postavu' : 'Uložit',
+      onSheetName: (e) => this.setState(s => ({ edit: { ...s.edit, name: e.target.value } })),
+      onSheetDesc: (e) => { const t = e.target; const over = t.scrollHeight > t.clientHeight + 4; this.setState(s => ({ edit: { ...s.edit, desc: t.value }, ...(over ? { edescOpen: true } : {}) })); },
+      edescOpen: this.state.edescOpen,
+      onEdescClose: () => { this.setState(s => ({ fx: (s.fx || 0) + 1 })); setTimeout(() => this.setState({ edescOpen: false, fx: 0 }), 380); },
+      onSheetToggleSel: () => this.setState(s => ({ sel: { ...s.sel, [sk]: !s.sel[sk] } })),
+      onCloseSheet: () => this.setState({ sheet: null, edit: {}, edescOpen: false }),
+      onNew: () => this.setState({ sheet: 'new', edit: {} }),
+      bgStyle: { position: 'absolute', inset: 0, width: '390px', height: '844px', backgroundSize: 'cover', backgroundPosition: 'center',
+        backgroundImage: 'url(' + (({ 'Zrození (kouzelná kniha)': 'assets/bg-zrozeni.jpg', 'Na kládě': 'assets/bg-log.jpg', 'Na dece pod stromem': 'assets/bg-blanket.jpg', 'V dutině stromu': 'assets/bg-tree.jpg', 'Na kládě (postavy dole)': 'assets/bg-log-v6.jpg' })[this.props.pozadi] ?? 'assets/bg-zrozeni.jpg') + ')', filter: bgFilter },
+      ovBgStyle: { position: 'absolute', inset: 0, background: 'url(assets/bg-motiv.jpg) center/cover', filter: bgFilter },
+      len: this.state.len ?? 10,
+      onLen: (e) => this.setState({ len: +e.target.value }),
+      motiv: this.state.motiv,
+      motivOpen: this.state.motivOpen,
+      onMotivOpen: () => this.setState({ motivOpen: true }),
+      onMotivClose: () => { this.setState(s => ({ fx: (s.fx || 0) + 1 })); setTimeout(() => this.setState({ motivOpen: false, fx: 0 }), 380); },
+      pSheetOpen: this.state.psheet,
+      sheetPrimStyle: { flex: 1, height: '52px', border: 'none', borderRadius: '999px', background: acc.bg, boxShadow: acc.sh, color: acc.fg, fontFamily: "'Nunito',sans-serif", fontSize: '16px', fontWeight: 800, cursor: 'pointer', transition: 'transform .12s ease' },
+      pName: this.state.pname, pDesc: this.state.pdesc,
+      onPName: (e) => this.setState({ pname: e.target.value }),
+      onPDesc: (e) => { const t = e.target; const over = t.scrollHeight > t.clientHeight + 4; this.setState({ pdesc: t.value, ...(over ? { pdescOpen: true } : {}) }); },
+      pClose: () => this.setState({ psheet: false }),
+      pSave: () => this.setState({ psheet: false, world: 'own' }),
+      pdescOpen: this.state.pdescOpen,
+      onPdescOpen: () => this.setState({ pdescOpen: true }),
+      onPdescClose: () => { this.setState(s => ({ fx: (s.fx || 0) + 1 })); setTimeout(() => this.setState({ pdescOpen: false, fx: 0 }), 380); },
+      onNametP: () => this.setState({ pdesc: 'Nicolásek a Valentýnka objeví v zahradě tajná dvířka do světa, kde všechno mluví — kytky, kamínky i vtír. Společně pomohou ztracenému ježkovi najít cestu domů.' }),
+      pZanry: ['Dobrodružná', 'Uspávací', 'Vzdělávací', 'Veselá', 'Napínavá'].map(z => ({ name: z, style: chip(this.state.pzanr === z), onTap: () => this.setState({ pzanr: z }) })),
+      pAtmo: ['Kouzelná', 'Klidná', 'Veselá', 'Hravá', 'Tajemná'].map(a => ({ name: a, style: chip(this.state.patmo === a), onTap: () => this.setState({ patmo: a }) })),
+      onMotiv: (e) => { const t = e.target; const over = t.scrollHeight > t.clientHeight + 4; this.setState({ motiv: t.value, ...(over ? { motivOpen: true } : {}) }); },
+      onNamet: () => this.setState({ motiv: 'Nicolásek a Valentýnka najdou v korunách stromů ztracenou hvězdičku, která se bojí tmy — a musí jí pomoct najít cestu zpátky na oblohu.' }),
+      myWorlds: this.state.worlds.map((n, i) => ({ name: n, style: chip(this.state.world === 'c:' + i), onTap: () => this.setState({ world: 'c:' + i }) })),
+      readyWorlds: ['🌲 Kouzelný les', '🚀 Vesmírná loď', '⛰ Krakonošovy hory', '🌊 Podmořský svět'].map((n, i) => ({ name: n, style: chip(this.state.world === 'r:' + i), onTap: () => this.setState({ world: 'r:' + i }) })),
+      onLocal: () => this.setState({ world: 'local' }),
+      ...(() => {
+        const card = (on, opts = {}) => {
+          const s = { flex: 'none', scrollSnapAlign: 'center', width: '88px', minHeight: '92px', padding: '8px 6px', borderRadius: '16px', cursor: 'pointer',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '7px', boxSizing: 'border-box',
+            fontFamily: "'Nunito',sans-serif", color: on ? acc.fg : '#fdf3d7',
+            border: on ? '2px solid rgba(255,255,255,.95)' : (opts.dashed ? '2px dashed rgba(253,224,138,.5)' : '1.5px solid rgba(253,224,138,.3)'),
+            background: on ? acc.bg : 'rgba(30,16,58,.5)',
+            boxShadow: on ? acc.sh : 'none' };
+          if (opts.img) Object.assign(s, {
+            justifyContent: 'flex-end', padding: '8px 6px', color: '#fff', textShadow: '0 1px 4px rgba(10,4,24,.9)',
+            border: on ? '2.5px solid #f97316' : 'none',
+            background: 'linear-gradient(180deg,rgba(16,8,36,0) 44%,rgba(16,8,36,.8)),url(' + opts.img + ') ' + (opts.imgFit || 'center 42%/cover') + ' no-repeat',
+            backgroundColor: opts.imgBg || '#150a30',
+            boxShadow: on ? '0 0 0 3px rgba(249,115,22,.3), 0 6px 18px rgba(249,115,22,.45)' : '0 6px 14px rgba(8,3,20,.55)' });
+          return s;
+        };
+        const myImg = { 'Spasitel': 'assets/svety/spasitel.jpg?v=5', 'JK Advisory': 'assets/svety/jk-advisory.jpg?v=2', 'Mexická kuchyně': 'assets/svety/mexicka-kuchyne.jpg', 'Tic Tac Toe': 'assets/svety/tictactoe.jpg' };
+        const myFit = { 'JK Advisory': { imgFit: 'center center/62% auto', imgBg: '#0d0722' } };
+        const RECENT = ['c-karkulka','m-dinosauri','a-snehkralovna','c-popelka','m-auticka','c-pernikova','m-vesmir','a-morskavila'];
+        const pickId = String(this.state.world || '').startsWith('k:') ? String(this.state.world).slice(2) : null;
+        const order = (pickId && !RECENT.includes(pickId)) ? [pickId].concat(RECENT) : RECENT;
+        const ready = [{ emoji: '', name: 'Všechny', plus: true, style: Object.assign(card(false, { img: 'assets/katalog/vsechny.jpg' }), { position: 'relative' }), onTap: () => this.setState({ catOpen: true }) }]
+          .concat(order.map(f => { const it = CAT.find(c => c.id === f) || { name: f, img: 'assets/katalog/' + f + '.jpg' };
+            return { emoji: '', name: it.name, style: card(this.state.world === 'k:' + f, { img: it.img }), onTap: () => this.setState({ world: 'k:' + f }) }; }));
+        const own = this.state.worlds.map((n, i) => { const img = myImg[n];
+          return { emoji: img ? '' : '🌍', name: n, style: card(this.state.world === 'c:' + i, Object.assign({ img }, myFit[n] || {})), onTap: () => this.setState({ world: 'c:' + i }) }; });
+        own.push({ emoji: '', name: '＋ Vlastní pohádka', style: card(this.state.world === 'own', { img: 'assets/svety/nova-pohadka.jpg', size: '112%', pos: '50% 40%' }), onTap: () => this.setState({ world: 'own', wsheet: true, wname: '', wdesc: '' }) });
+        const localOn = this.state.localAdd ?? false;
+        return { readyRoller: ready, ownRoller: own, localOn };
+      })(),
+      ownStyle: pill(this.state.world === 'own'),
+      localStyle: (() => { const on = this.state.localAdd ?? false; const t = this.props.tlacitka; const imgMap = { 'Noční obloha': 'assets/btn-poloha-pill-noc.jpg', 'Akvarel': 'assets/btn-poloha-pill-akvarel.jpg' }; const img = imgMap[t]; const dark = t === 'Akvarel'; return { position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '9px', height: '52px', width: '100%', borderRadius: '999px', cursor: 'pointer', boxSizing: 'border-box', fontFamily: "'Nunito',sans-serif", fontSize: '15px', fontWeight: 800, color: dark ? '#5a3a00' : (img ? '#fff' : acc.fg), background: img ? 'url(' + img + ') center/cover' : acc.bg, border: on ? '2.5px solid #f97316' : '1.5px solid rgba(255,255,255,.35)', boxShadow: on ? '0 0 0 4px rgba(249,115,22,.35), 0 6px 20px rgba(249,115,22,.4)' : '0 3px 12px rgba(20,8,40,.4)', textShadow: dark ? '0 1px 2px rgba(255,255,255,.45)' : '0 1px 3px rgba(20,8,40,.7)', transition: 'box-shadow .15s ease, border-color .15s ease' }; })(),
+      onOwn: () => this.setState({ world: 'own' }),
+      onLocal: () => this.setState({ localAdd: !(this.state.localAdd ?? false) }),
+      onWorldNew: () => this.setState({ wsheet: true, wname: '', wdesc: '' }),
+      worldSheetOpen: this.state.wsheet === undefined ? (this.props.nahledKrok === 'Vlastní pohádka') : this.state.wsheet,
+      wName: this.state.wname,
+      wDesc: this.state.wdesc,
+      onWName: (e) => this.setState({ wname: e.target.value }),
+      onWDesc: (e) => { const t = e.target; const over = t.scrollHeight > t.clientHeight + 4; this.setState({ wdesc: t.value, ...(over ? { wdescOpen: true } : {}) }); },
+      onCloseWorld: () => this.setState({ wsheet: false, wdescOpen: false }),
+      wdescOpen: this.state.wdescOpen ?? false,
+      onWdescOpen: () => this.setState({ wdescOpen: true }),
+      onWdescClose: () => { this.setState(s => ({ fx: (s.fx || 0) + 1 })); setTimeout(() => this.setState({ wdescOpen: false, fx: 0 }), 380); },
+      onWNamet: () => this.setState({ wdesc: 'Kouzelná zahrada za babiččiným domem, kde rostliny mluví, ploty jsou z perníku a večer se rozsvítí lucerničky, které vodí děti k tajným dvířkám.' }),
+      wPhotoLabel: 'FOTKY (' + (this.state.wphotos || []).length + ' / 5)',
+      wHasPhotos: (this.state.wphotos || []).length > 0,
+      wPhotos: (this.state.wphotos || []).map((src, i) => ({
+        style: { position: 'relative', aspectRatio: '1', borderRadius: '12px', background: 'url(' + src + ') center/cover', border: '1.5px solid rgba(253,224,138,.45)' },
+        onDel: () => this.setState(s => ({ wphotos: (s.wphotos || []).filter((_, j) => j !== i) })) })),
+      onWPhotoAdd: () => this.setState(s => {
+        const pool = ['assets/katalog/m-dinosauri.jpg', 'assets/katalog/m-vesmir.jpg', 'assets/katalog/m-auticka.jpg', 'assets/katalog/m-podmorsky.jpg', 'assets/katalog/m-dzungle.jpg'];
+        const cur = s.wphotos || [];
+        return cur.length >= 5 ? {} : { wphotos: [...cur, pool[cur.length % pool.length]] }; }),
+      wLinkOn: this.state.wlinkOn ?? false,
+      wLinkLabel: 'Odkaz na inspiraci',
+      wLink: this.state.wlink ?? '',
+      onWLink: (e) => this.setState({ wlink: e.target.value }),
+      onWLinkToggle: () => this.setState(s => ({ wlinkOn: !(s.wlinkOn ?? false) })),
+      wLinkBtnStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '0 11px 0 5px', height: '34px', border: '1.5px solid rgba(255,255,255,.9)', borderRadius: '999px', background: acc.bg, boxShadow: acc.sh, color: acc.fg, fontFamily: "'Nunito',sans-serif", fontSize: '12px', fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer', transition: 'transform .12s ease' },
+      wStudyStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '0 11px 0 5px', height: '34px', border: '1.5px solid rgba(255,255,255,.9)', borderRadius: '999px', background: acc.bg, boxShadow: acc.sh, color: acc.fg, fontFamily: "'Nunito',sans-serif", fontSize: '12px', fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer', transition: 'transform .12s ease' },
+      wStudied: this.state.wstudied ?? false,
+      wStudyNote: 'Doplnila jsem: v tvém světě je vždycky podvečer, mluvící kytky mají jména a lucerničky se rozsvěcují, když je někdo smutný. Chceš to tak?',
+      onWStudy: () => this.setState({ wstudied: true }),
+      onSaveWorld: () => this.setState(s => {
+        const name = s.wname.trim();
+        if (!name) return { wsheet: false };
+        return { worlds: [...s.worlds, name], world: 'c:' + s.worlds.length, wsheet: false };
+      }),
+      avatars: Object.keys(names).map(k => {
+        const adj = { nicolasek: { size: '118%', pos: '50% 40%' }, valentynka: { size: '113%', pos: '50% 46%' }, james: { size: '112%', pos: '50% 44%' }, bella: { size: '113%', pos: '50% 42%' } }[k] || { size: '118%', pos: 'center' };
+        return {
+        name: names[k], img: 'assets/postavy/avatar-' + k + '.png', sel: this.state.sel[k],
+        style: { width: '56px', height: '56px', borderRadius: '50%', display: 'block',
+          backgroundImage: 'url(assets/postavy/avatar-' + k + '.png)', backgroundSize: adj.size, backgroundPosition: adj.pos, backgroundRepeat: 'no-repeat',
+          border: this.state.sel[k] ? '3px solid #fcd34d' : '3px solid rgba(255,255,255,.4)' },
+        onTap: () => this.setState({ sheet: k, edit: {} }),
+      }; }),
+    };
+  }
+}
+</script>
+</body>
+</html>

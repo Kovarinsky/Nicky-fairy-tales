@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@700;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="image-slot.js"></script>
+<style>body{margin:0;background:#1a1033;font-family:'Nunito',system-ui,sans-serif}a{color:#fcd34d;text-decoration:none}a:hover{color:#fde68a}</style>
+</helmet>
+<div data-screen-label="Výběr světa" style="position:relative;width:390px;height:844px;margin:0 auto;overflow:hidden;background:#241447;color:#fdf3d7;user-select:none">
+  <div style="{{ bgStyle }}"></div>
+  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(20,8,40,.55),rgba(20,8,40,.25) 30%,rgba(20,8,40,.6))"></div>
+  <header style="position:relative;display:flex;align-items:center;gap:12px;padding:58px 20px 8px">
+    <a href="1%20Home.dc.html" style="display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.16);font-size:20px;color:#fdf3d7">‹</a>
+    <h1 style="margin:0;font-family:'Alegreya',Georgia,serif;font-size:26px;font-weight:800;text-shadow:0 0 16px rgba(253,224,138,.45)">Výběr světa</h1>
+  </header>
+  <main style="position:relative;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px">
+    <button onClick="{{ onPrev }}" aria-label="Předchozí" style="{{ discNavStyle }}" style-active="transform:scale(.94)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button>
+    <div style="position:relative;width:280px;height:470px;border-radius:28px;overflow:hidden;background:{{ worldBg }};box-shadow:0 12px 40px rgba(10,4,24,.55);border:1.5px solid rgba(253,224,138,.45)">
+      <div style="position:absolute;inset:0">{{ worldSlot }}</div>
+      <div style="position:absolute;left:0;right:0;bottom:0;padding:46px 16px 18px;background:linear-gradient(180deg,rgba(16,8,36,0),rgba(16,8,36,.8));text-align:center;pointer-events:none">
+        <div style="font-family:'Alegreya',Georgia,serif;font-size:26px;font-weight:800;color:#fdf3d7;text-shadow:0 0 14px rgba(253,224,138,.5)">{{ worldName }}</div>
+        <div style="font-size:12px;font-weight:700;color:rgba(253,243,215,.75);margin-top:2px">{{ worldNote }}</div>
+      </div>
+    </div>
+    <button onClick="{{ onNext }}" aria-label="Další" style="{{ discNavStyle }}" style-active="transform:scale(.94)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg></button>
+  </main>
+  <div style="position:relative;display:flex;justify-content:center;gap:7px;padding:8px 0">
+    <sc-for list="{{ dots }}" as="d" hint-placeholder-count="10">
+      <button onClick="{{ d.onTap }}" aria-label="{{ d.label }}" style="{{ d.style }}"></button>
+    </sc-for>
+  </div>
+  <footer style="position:absolute;left:0;right:0;bottom:0;padding:0 20px 34px">
+    <button style="width:100%;height:60px;border:none;border-radius:999px;background:linear-gradient(90deg,#f59e0b 0%,#f97316 100%);box-shadow:0 4px 24px rgba(245,158,11,.35);color:#fff;font-family:'Nunito',sans-serif;font-size:19px;font-weight:800;cursor:pointer;transition:transform .12s ease" style-active="transform:scale(.97)">Vybrat tento svět</button>
+  </footer>
+  <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ onCloseSheet }}" style="position:absolute;inset:0;background:rgba(12,5,28,.45);backdrop-filter:blur(6px)"></div>
+    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:306px;max-height:660px;overflow:auto;scrollbar-width:none;border-radius:26px;background:url({{ fSrc }}) center/cover no-repeat;box-shadow:0 16px 48px rgba(10,4,24,.65);padding:30px 26px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px;color:{{ fText }}">
+      <div style="font-family:'Alegreya',Georgia,serif;font-size:23px;font-weight:800;text-align:center;color:{{ fHead }}">Vlastní svět</div>
+      <label style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-size:11px;font-weight:800;letter-spacing:.07em;color:{{ fLabel }}">NÁZEV SVĚTA *</span>
+        <input value="{{ wName }}" onChange="{{ onWName }}" placeholder="např. Babiččina chalupa, Vesmírná školka…" style="height:44px;border:1.5px solid {{ fBorder }};border-radius:14px;padding:0 14px;font-size:15px;font-weight:700;color:{{ fText }};background:{{ fFieldBg }};outline:none;font-family:'Nunito',sans-serif">
+      </label>
+      <label style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-size:11px;font-weight:800;letter-spacing:.07em;color:{{ fLabel }}">POPIS SVĚTA (JAK MÁ VYPADAT A FUNGOVAT)</span>
+        <textarea value="{{ wDesc }}" onChange="{{ onWDesc }}" placeholder="např. kouzelná zahrada za babiččiným domem, kde rostliny mluví a večer svítí lucerničky… Můžete vložit i internetový odkaz." rows="3" style="border:1.5px solid {{ fBorder }};border-radius:14px;padding:10px 14px;font-size:14px;font-weight:600;color:{{ fText }};background:{{ fFieldBg }};outline:none;resize:none;font-family:'Nunito',sans-serif"></textarea>
+      </label>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:11px;font-weight:800;letter-spacing:.07em;color:{{ fLabel }}">OBRÁZEK SVĚTA (NEPOVINNÉ)</span>
+        <div style="position:relative;height:100px;border-radius:16px;overflow:hidden;border:1.5px dashed {{ fBorder }};background:{{ fFieldBg }}">
+          <image-slot id="vlastni-svet-foto" shape="rect" placeholder="Přetáhněte fotku nebo ilustraci světa"></image-slot>
+        </div>
+        <div style="display:flex;gap:7px">
+          <button style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;height:40px;border:1.5px solid {{ fBorder }};border-radius:999px;background:{{ fFieldBg }};color:{{ fBtnText }};font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;padding:0 4px"><span style="flex:none;width:22px;height:22px;border-radius:50%;background:url(assets/btn-ico-obrazek.png) center/cover"></span>Foto</button>
+          <button style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;height:40px;border:1.5px solid {{ fBorder }};border-radius:999px;background:{{ fFieldBg }};color:{{ fBtnText }};font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;padding:0 4px"><span style="flex:none;width:22px;height:22px;border-radius:50%;background:url(assets/btn-ico-foto.png) center/cover"></span>Vyfotit</button>
+          <button style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;height:40px;border:1.5px solid {{ fBorder }};border-radius:999px;background:{{ fFieldBg }};color:{{ fBtnText }};font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;padding:0 4px"><span style="flex:none;width:22px;height:22px;border-radius:50%;background:url(assets/btn-ico-odkaz.png) center/cover"></span>Odkaz</button>
+        </div>
+      </div>
+      <button onClick="{{ onStudy }}" style="height:42px;align-self:flex-start;padding:0 16px;border:1.5px solid {{ fBorder }};border-radius:999px;background:{{ fFieldBg }};color:{{ fBtnText }};font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer">🔮 Nastuduj svět</button>
+      <sc-if value="{{ studied }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:11px 14px;border-radius:14px;background:rgba(245,158,11,.16);border:1.5px solid {{ fBorder }};font-size:13px;font-weight:700;color:{{ fNote }};line-height:1.45">✨ Svět nastudován — z popisu a fotky jsme si zapamatovali prostředí, postavy a atmosféru.</div>
+      </sc-if>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:2px">
+        <button onClick="{{ onSaveWorld }}" style="{{ ctaStyle }}" style-active="transform:scale(.97)"><span style="{{ discStyle }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"></path></svg></span>Uložit svět</button>
+        <button onClick="{{ onCloseSheet }}" style="height:44px;border:1.5px solid {{ fBorder }};border-radius:999px;background:{{ fFieldBg }};color:{{ fBtnText }};font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;cursor:pointer">✕ Zrušit</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844},&quot;pozadi&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;V dutině stromu&quot;,&quot;options&quot;:[&quot;Na kládě&quot;,&quot;Na dece pod stromem&quot;,&quot;V dutině stromu&quot;,&quot;Na kládě (postavy dole)&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Vzhled&quot;},&quot;svetlost&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Zlatý soumrak&quot;,&quot;options&quot;:[&quot;Zlatý soumrak&quot;,&quot;Hluboká noc&quot;,&quot;Fialový samet&quot;,&quot;Mléčná pohádka&quot;,&quot;Smaragdový les&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Vzhled&quot;},&quot;tlacitka&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Oranžová lesklá&quot;,&quot;options&quot;:[&quot;Oranžová lesklá&quot;,&quot;Zlatý medailon&quot;,&quot;Noční obloha&quot;,&quot;Akvarel&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Vzhled&quot;},&quot;formular&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Čistý&quot;,&quot;options&quot;:[&quot;Původní&quot;,&quot;Čistý&quot;,&quot;Látka&quot;,&quot;Akvarel&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Vzhled&quot;},&quot;uvodniSvet&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Krteček&quot;,&quot;options&quot;:[&quot;Krteček&quot;,&quot;Tlapková patrola&quot;,&quot;Krkonošské pohádky&quot;,&quot;Mickey Mouse&quot;,&quot;Dinosauři&quot;,&quot;Vesmír&quot;,&quot;Pokémon&quot;,&quot;Sonic&quot;,&quot;Autíčka&quot;,&quot;Vlastní svět&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Výchozí hodnoty&quot;}}">
+class Component extends DCLogic {
+  state = { idx: null, sheet: false, wname: '', wdesc: '', studied: false };
+  worlds = [
+    { key: 'krtecek', name: 'Krteček', bg: 'linear-gradient(160deg,#3e7d3a,#1e4d2b)' },
+    { key: 'tlapkova', name: 'Tlapková patrola', bg: 'linear-gradient(160deg,#2f6fd0,#1b3d7a)' },
+    { key: 'krkonose', name: 'Krkonošské pohádky', bg: 'linear-gradient(160deg,#4f7d8c,#233d52)' },
+    { key: 'mickey', name: 'Mickey Mouse', bg: 'linear-gradient(160deg,#c73a3a,#5a1414)' },
+    { key: 'dinosauri', name: 'Dinosauři', bg: 'linear-gradient(160deg,#7a8c3a,#3d4a1e)' },
+    { key: 'vesmir', name: 'Vesmír', bg: 'linear-gradient(160deg,#2a2a72,#0d0d2b)' },
+    { key: 'pokemon', name: 'Pokémon', bg: 'linear-gradient(160deg,#e8b33a,#a15c12)' },
+    { key: 'sonic', name: 'Sonic', bg: 'linear-gradient(160deg,#2451c7,#101d5a)' },
+    { key: 'auticka', name: 'Autíčka', bg: 'linear-gradient(160deg,#d04a2f,#6e1a0e)' },
+    { key: 'vlastni', name: 'Vlastní svět', bg: 'linear-gradient(160deg,#5a4a7a,#2e2245)', custom: true },
+  ];
+  renderVals() {
+    const n = this.worlds.length;
+    const propIdx = Math.max(0, this.worlds.findIndex(x => x.name === this.props.uvodniSvet));
+    const i = this.state.idx ?? propIdx, w = this.worlds[i];
+    const ctaSets = { 'Zlatý medailon': { background: 'linear-gradient(135deg,#fcd34d,#d99a1b)', color: '#5a3a00', boxShadow: '0 5px 16px rgba(120,80,10,.4)' }, 'Noční obloha': { background: 'radial-gradient(circle at 50% 15%,#4a2a63,#241447)', color: '#fcd34d', boxShadow: '0 5px 16px rgba(20,8,40,.5)' }, 'Akvarel': { background: 'linear-gradient(135deg,#f6ead2,#e8c9a0)', color: '#7a4a12', boxShadow: '0 5px 16px rgba(20,8,40,.35)' } };
+    const ctaStyle = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', height: '52px', borderRadius: '999px', border: 'none', color: '#fff', fontFamily: "'Nunito',sans-serif", fontSize: '16px', fontWeight: 800, cursor: 'pointer', transition: 'transform .12s ease', ...(ctaSets[this.props.tlacitka] ?? { background: 'linear-gradient(90deg,#f59e0b,#f97316)', boxShadow: '0 4px 18px rgba(180,100,20,.45)' }) };
+    const slot = w.custom
+      ? React.createElement('a', { href: '#', onClick: (e) => { e.preventDefault(); this.setState({ sheet: true }); }, style: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: '74px', background: 'url(assets/svety/vlastni.jpg) center/cover no-repeat', color: '#fff', textAlign: 'center', textDecoration: 'none' } },
+          React.createElement('div', { key: 't', style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 16px', borderRadius: '999px', background: 'rgba(16,8,36,.62)', backdropFilter: 'blur(6px)', border: '1.5px solid rgba(253,224,138,.5)', fontSize: '14px', fontWeight: 800 } }, '＋ Vytvořit vlastní svět'))
+      : React.createElement('image-slot', { id: 'world-' + w.key, shape: 'rect', src: 'assets/svety/' + w.key + '.jpg', placeholder: 'Ilustrace světa „' + w.name + '" — přetáhněte obrázek' });
+    const discSets = { 'Zlatý medailon': { bg: 'linear-gradient(160deg,#fde68a,#d99a1b)', gl: '#5a3a00' }, 'Noční obloha': { bg: 'radial-gradient(circle at 50% 28%,#5c3c7a,#2a164d)', gl: '#fde68a' }, 'Akvarel': { bg: 'linear-gradient(160deg,#fff6e6,#e0bd8f)', gl: '#7a4a12' } };
+    const dsc = discSets[this.props.tlacitka] ?? { bg: 'linear-gradient(160deg,#fbbf5a,#f97316)', gl: '#fff' };
+    const discStyle = { display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none', width: '30px', height: '30px', borderRadius: '50%', background: dsc.bg, border: '2px solid rgba(255,255,255,.95)', boxShadow: '0 2px 6px rgba(120,40,0,.28),inset 0 2px 5px rgba(255,255,255,.45)', color: dsc.gl };
+    return {
+      ctaStyle,
+      discStyle,
+      discNavStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none', width: '48px', height: '48px', borderRadius: '50%', background: dsc.bg, border: '2.5px solid rgba(255,255,255,.95)', boxShadow: '0 4px 10px rgba(20,8,40,.45),inset 0 2px 6px rgba(255,255,255,.45)', color: dsc.gl, padding: 0, cursor: 'pointer' },
+      worldBg: w.bg,
+      worldNote: '',
+      worldSlot: slot,
+      bgStyle: { position: 'absolute', inset: '-20px', width: '430px', height: '884px', backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(7px) ' + (({'Zlatý soumrak':'brightness(1.08) saturate(1.35) sepia(.18) hue-rotate(-14deg) contrast(1.04)','Hluboká noc':'brightness(.42) saturate(.9) contrast(1.12) hue-rotate(6deg)','Fialový samet':'brightness(.78) saturate(1.6) hue-rotate(28deg) contrast(1.06)','Mléčná pohádka':'brightness(1.25) saturate(.62) contrast(.9)','Smaragdový les':'brightness(.8) saturate(1.45) hue-rotate(-58deg) contrast(1.05)'})[this.props.svetlost] ?? 'brightness(1.08) saturate(1.35) sepia(.18) hue-rotate(-14deg) contrast(1.04)'),
+        backgroundImage: 'url(' + (({ 'Na kládě': 'assets/bg-log.jpg', 'Na dece pod stromem': 'assets/bg-blanket.jpg', 'V dutině stromu': 'assets/bg-tree.jpg', 'Na kládě (postavy dole)': 'assets/bg-log-v6.jpg' })[this.props.pozadi] ?? 'assets/bg-tree.jpg') + ')' },
+      ...(() => {
+        const t = this.props.formular ?? 'Původní';
+        const src = { 'Původní': 'assets/ui-pergamen.jpg', 'Čistý': 'assets/ui-form-cisty.jpg', 'Látka': 'assets/ui-form-latka.jpg', 'Akvarel': 'assets/ui-form-akvarel.jpg' }[t] || 'assets/ui-pergamen.jpg';
+        return t === 'Tmavý'
+          ? { fSrc: src, fText: '#fdf3d7', fHead: '#fde68a', fLabel: 'rgba(253,224,138,.85)', fBorder: 'rgba(253,224,138,.4)', fFieldBg: 'rgba(30,16,58,.55)', fBtnText: '#fde68a', fNote: '#fde68a' }
+          : { fSrc: src, fText: '#4a2c12', fHead: '#7a4712', fLabel: 'rgba(122,71,18,.85)', fBorder: 'rgba(180,120,40,.55)', fFieldBg: 'rgba(255,250,235,.8)', fBtnText: '#6b3d10', fNote: '#8a541a' };
+      })(),
+      sheetOpen: this.state.sheet,
+      wName: this.state.wname,
+      wDesc: this.state.wdesc,
+      studied: this.state.studied,
+      onWName: (e) => this.setState({ wname: e.target.value }),
+      onWDesc: (e) => this.setState({ wdesc: e.target.value }),
+      onStudy: () => this.setState({ studied: true }),
+      onCloseSheet: () => this.setState({ sheet: false }),
+      onSaveWorld: () => this.setState(s => {
+        const name = s.wname.trim();
+        if (name) this.worlds[this.worlds.length - 1] = { ...this.worlds[this.worlds.length - 1], name };
+        return { sheet: false };
+      }),
+      onPrev: () => this.setState({ idx: (i - 1 + n) % n }),
+      onNext: () => this.setState({ idx: (i + 1) % n }),
+      dots: this.worlds.map((x, j) => ({
+        label: x.name,
+        onTap: () => this.setState({ idx: j }),
+        style: { width: j === i ? '20px' : '8px', height: '8px', borderRadius: '4px', border: 'none', padding: 0, cursor: 'pointer',
+          background: j === i ? 'linear-gradient(90deg,#fcd34d,#f59e0b)' : 'rgba(255,255,255,.35)', transition: 'all .2s ease' },
+      })),
+    };
+  }
+}
+</script>
+</body>
+</html>
