@@ -8,7 +8,7 @@ import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, peekEarlyScene, enforceCanonicalAppearance, inventedCharacterNames, type StoryExtras } from "@/lib/claude";
 import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, isCreditsDepletedError, isSpendCapError, sceneCastList } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
-import { loadPortraitRefEntries, refsForText, refsForPanels, getGroupScaleSheet } from "@/lib/portraits";
+import { loadPortraitRefEntries, refsForText, refsForPanels, getFamilyScaleSheet, familyScaleSheetApplies } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/types";
 import { blobToken } from "@/lib/blob-token";
@@ -252,10 +252,11 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   // až po dopsání — u studeného startu ~3–5 s navíc)
   const refIds: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
   const refEntriesPromise = loadPortraitRefEntries(charactersByIds(refIds)).catch(() => [] as Awaited<ReturnType<typeof loadPortraitRefEntries>>);
-  // 📏 Výškový list obsazení — jeden obrázek, který drží poměry velikostí
-  // postav (textové pravidlo „sahá jí k uším" model změřit neumí). Načítá se
-  // taky souběžně s psaním; null = pojede se jako dřív, bez výškové kotvy.
-  const scaleSheetPromise = getGroupScaleSheet(charactersByIds(refIds)).catch(() => null);
+  // 📏 Celorodinný výškový list — jeden STATICKÝ obrázek (jmény+cm), který
+  // drží poměry velikostí postav (textové pravidlo „sahá jí k uším" model
+  // změřit neumí). Připojuje se jen když je v pohádce 2+ postav, které appka
+  // zná s přesným cm. Načítá se souběžně s psaním; null = bez výškové kotvy.
+  const scaleSheetPromise = familyScaleSheetApplies(refIds) ? getFamilyScaleSheet().catch(() => null) : Promise.resolve(null);
 
   try {
     logEv(`▶ běh funkce start${(st.chains ?? 0) > 0 ? ` (řetěz ${st.chains})` : ""}${st.scenesScript?.length ? ` — scénář hotový, ${Object.keys(st.sceneUrls || {}).length}/${st.total ?? "?"} scén nakresleno` : (st.restarts ?? 0) > 0 ? ` — psaní pokus ${(st.restarts ?? 0) + 1}` : ""}`);
@@ -695,6 +696,13 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         // míchané obsazení). Obojí jde stáhnout envem, kdyby kvalita klesla.
         const maxPanelPeople = Number(process.env.IMAGE_SHEET_MAX_PANEL_PEOPLE || 3);
         const maxSheetPeople = Number(process.env.IMAGE_SHEET_MAX_PEOPLE || 4);
+        // ⚡ Skutečný počet panelů v JEDNOM archu — dřív šel až na maxCells (9 v
+        // 3×3 mřížce). Čím víc panelů v jednom volání, tím víc verifikačních
+        // dávek (po 4) a tím déle trvá, než je hotový byť POSLEDNÍ panel toho
+        // archu (nahlášeno: „obrázky se načítají dlouho potom co se pohádka
+        // načte"). 6 defaultně = max 2 verifikační dávky místo 3, arch pořád
+        // stojí stejnou paušální cenu (prázdné buňky = jen klidná scenérie).
+        const maxGroupPanels = Math.min(maxCells, Number(process.env.IMAGE_SHEET_MAX_REAL_PANELS || 6));
         // Řadit podle obsazení, při shodě podle indexu scény — sousední scény
         // se tak drží pohromadě, což bývá i stejné prostředí (jeden arch =
         // jedno místo = model drží kulisu konzistentně sám od sebe)
@@ -705,7 +713,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         let curPeople = new Set<string>();
         for (const i of pendGrouped) {
           const merged = new Set([...curPeople, ...castOf(i)]);
-          if (cur.length > 0 && (merged.size > maxSheetPeople || cur.length >= maxCells)) {
+          if (cur.length > 0 && (merged.size > maxSheetPeople || cur.length >= maxGroupPanels)) {
             groups.push(cur); cur = []; curPeople = new Set();
           }
           for (const p of castOf(i)) curPeople.add(p);

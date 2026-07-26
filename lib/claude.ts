@@ -1235,15 +1235,19 @@ export function peekEarlyScene(partial: string): { heroDescription: string; scen
 // věta PŘEPÍŠE, co si Claude napsal sám — jde i do vizuální kontroly
 // obrázku, takže i případnou chybu modelu při kreslení appka pozná a
 // nechá scénu předělat.
-// Dospělí i Nicolásek mají SKUTEČNÉ cm (reálná fakta rodiny); zbytek dětí
-// nemá přesné cm, jen ověřený vztah k jinému dítěti (mění se, jen když
-// rodina naměří nové skutečné číslo — neodhaduj/nedopočítávej sám).
+// SKUTEČNÁ cm celé rodiny (reálná fakta, ne odhad) — doplněno o James/Bella/
+// Valentýnku podle celorodinného výškového listu od CD (dřív appka znala jen
+// jejich RELATIVNÍ vztah k jinému dítěti, ne přesné číslo). Mění se, jen když
+// rodina naměří nové skutečné číslo — neodhaduj/nedopočítávej sám.
 const CANONICAL_HEIGHT_CM: Record<string, number> = {
+  valentyna: 85,
   nicolas: 111,
+  james: 115,
+  bella: 135,
+  jana: 175,
+  eva: 180,
+  jakob: 183,
   jan: 185,
-  jana: 172,
-  eva: 173,
-  jakob: 182,
 };
 
 function canonicalHeightsEntry(characters: Character[]): string | null {
@@ -1254,20 +1258,18 @@ function canonicalHeightsEntry(characters: Character[]): string | null {
   };
   const bits: string[] = [];
 
-  // Nicolásek: přesná výška; o něco menší než James (dřív mylně "stejně vysocí")
-  if (ids.has("nicolas")) {
-    bits.push(`${name("nicolas")} is 111 cm tall`);
-    if (ids.has("james")) {
-      bits.push(`${name("james")} is a little taller than ${name("nicolas")} — the top of ${name("nicolas")}'s head reaches only to ${name("james")}'s ears`);
-    }
+  // Všechny děti mají teď přesné cm (viz CANONICAL_HEIGHT_CM) — relační popis
+  // ("sahá jí k uším") zůstává PŘIDÁN vedle čísla, protože model geometrii
+  // z pouhého cm nezměří, ale slovní vztah k jinému tělu ano.
+  for (const id of ["valentyna", "nicolas", "james", "bella"] as const) {
+    if (ids.has(id)) bits.push(`${name(id)} is ${CANONICAL_HEIGHT_CM[id]} cm tall`);
   }
-
-  // Valentýnka: nejmenší dítě, po uši Nicoláska (opraveno z dřívějšího "po bradu")
+  if (ids.has("nicolas") && ids.has("james")) {
+    bits.push(`${name("james")} is a little taller than ${name("nicolas")} — the top of ${name("nicolas")}'s head reaches only to ${name("james")}'s ears`);
+  }
   if (ids.has("valentyna") && ids.has("nicolas")) {
     bits.push(`${name("valentyna")} is the smallest — the top of her head reaches only to ${name("nicolas")}'s ears`);
   }
-
-  // Bella: o půl hlavy vyšší než James a Nicolásek (beze změny)
   if (ids.has("bella")) {
     const anchors = ["james", "nicolas"].filter(id => ids.has(id)).map(name);
     if (anchors.length) bits.push(`${name("bella")} is about half a head taller than ${anchors.join(" and ")}`);

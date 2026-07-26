@@ -12,7 +12,7 @@
 import { put, head } from "@vercel/blob";
 import { blobToken } from "./blob-token";
 import { generateBackgroundImage, verifySceneImage } from "./gemini";
-import { loadReferenceImages, type ReferenceImage } from "./characters";
+import { loadReferenceImages, loadCharacters, type ReferenceImage } from "./characters";
 import type { Character } from "./types";
 
 // v3: portréty procházejí KONTROLOU (dřív jediná cesta bez QA — vadný portrét
@@ -26,6 +26,14 @@ const PORTRAIT_STYLE =
   "Strictly FLAT 2D painting — NOT a 3D render, no CGI, no photorealism. " +
   "Correct natural anatomy: exactly two arms, two legs, five fingers on each hand. " +
   "Absolutely no text, letters, words, watermarks or signatures anywhere in the image.";
+
+// Stejný styl, ale BEZ zákazu textu — výhradně pro celorodinný výškový list
+// níž, kde jsou jméno+cm popisky ŽÁDOUCÍ (je to soukromá reference appky,
+// nikdy stránka, kterou vidí čtenář).
+const REFERENCE_SHEET_STYLE =
+  "Hand-painted 2D storybook illustration, soft painterly brushwork in classic Disney animated-film style, warm lighting, rich saturated colors. " +
+  "Strictly FLAT 2D painting — NOT a 3D render, no CGI, no photorealism. " +
+  "Correct natural anatomy: exactly two arms, two legs, five fingers on each hand.";
 
 function portraitPrompt(c: Character): string {
   return [
@@ -143,64 +151,78 @@ export async function loadPortraitRefs(characters: Character[]): Promise<Referen
   return refs;
 }
 
-// ── 📏 Výškový list: poměr velikostí postav JAKO OBRÁZEK ────────────────────
-// Textové pravidlo („temeno jí sahá k jeho uším") model při kreslení nijak
-// nezměří — je to relační geometrie, na kterou v promptu nemá nástroj, takže
-// poměr vycházel pokaždé trochu jinak. Změřeno na reálných bězích: s tímto
-// jedním obrázkem jako referencí spadl rozptyl měřítka mezi dvěma běhy téže
-// scény z ~3,5 % na 0 %. Kreslí se JEDNOU na sestavu postav a cachuje se.
-const SCALE_SHEET_VERSION = 1;
-/** Nad 4 postavy je řada přeplácaná a model si s ní přestává poradit. */
-const SCALE_SHEET_MAX_CHARS = 4;
+// ── 📏 CELORODINNÝ výškový list — JEDEN statický obrázek s popiskami jmen
+// a cm pro celou pevnou rodinnou kartotéku. Textové pravidlo („temeno jí
+// sahá k jeho uším") model při kreslení nijak nezměří — je to relační
+// geometrie, na kterou v promptu nemá nástroj. Dřív appka kreslila zvlášť
+// jeden obrázek PRO KAŽDOU jinou podskupinu postav vybraných do konkrétní
+// pohádky (cache key vázaný na výběr obsazení) — teď je to JEDEN natrvalo
+// vygenerovaný obrázek pro celou rodinu, vždy stejný cache-hit.
+// Skutečná cm jsou z CANONICAL_HEIGHT_CM (lib/claude.ts, reálná rodinná
+// fakta) — viditelný text je tu VÝJIMEČNĚ žádoucí (na rozdíl od pohádkových
+// stránek, kde appka text vždy zakazuje): jde o SOUKROMOU referenci appky,
+// nikdy stránku, kterou vidí čtenář, a jméno+cm napsané přímo u postavy nechá
+// jak kreslicí, tak kontrolní model přesně přiřadit barvu vlasů ke jménu —
+// cílí na nahlášenou záměnu „jednou Vája, potom Nicolásek".
+const FAMILY_SCALE_VERSION = 1;
+// Duplikát CANONICAL_HEIGHT_CM z claude.ts (import by vytáhl celý claude.ts
+// do knihovny portrétů) — mění se JEN spolu s tamní tabulkou, viz komentář tam.
+const FAMILY_HEIGHT_CM: Record<string, number> = {
+  valentyna: 85, nicolas: 111, james: 115, bella: 135,
+  jana: 175, eva: 180, jakob: 183, jan: 185,
+};
 
-function scaleSheetLabel(names: string[]): string {
+function familyScaleLabel(): string {
   return (
-    `CANONICAL SCALE SHEET (${names.join(" + ")}) — this shows the EXACT body sizes and height ` +
-    `relationships between these characters. Reproduce that SAME size relationship in the scene, ` +
-    `even when their poses differ (kneeling, sitting, crouching): their underlying body scale never changes.`
+    "CANONICAL FAMILY HEIGHT REFERENCE SHEET — shows the EXACT height (cm) and hair/face/outfit of every named family member, sorted shortest to tallest, with their name and height printed under each one. " +
+    "Use it ONLY to match the height/body-scale RATIO between whichever of these characters actually appear together in this scene — match each visible character's OWN printed cm value to their OWN name, never swap two characters' colors or sizes with each other. " +
+    "IGNORE any person in this reference who is NOT named in this scene's cast — they are shown here only for the height comparison, they are not present in the scene."
   );
 }
 
-/** Malovaná „řada postav" ukazující kanonické poměry výšek; null když se
- *  nepovede nebo nemá smysl (méně než 2 postavy / bez Blob úložiště). */
-export async function getGroupScaleSheet(characters: Character[]): Promise<ReferenceImage | null> {
-  const cast = characters.slice(0, SCALE_SHEET_MAX_CHARS);
-  if (cast.length < 2) return null; // poměr výšek se dvěma a víc postavami
-  const key = `scale-${cast.map(c => c.id).sort().join("-")}-v${SCALE_SHEET_VERSION}`;
+/** Má smysl list vůbec připojovat? Jen když příběh má 2+ postavy, které
+ *  appka doopravdy zná s přesným cm (custom/vymyšlené postavy list neumí
+ *  pomoct — na obrázku by byli lidé, co ve scéně vůbec nejsou). */
+export function familyScaleSheetApplies(characterIds: string[]): boolean {
+  return characterIds.filter(id => FAMILY_HEIGHT_CM[id] !== undefined).length >= 2;
+}
+
+/** Malovaný celorodinný výškový list se jmény a cm; null když se nepovede
+ *  nebo chybí Blob úložiště. Kreslí se JEDNOU CELKOVĚ (ne na pohádku/postavu)
+ *  a natrvalo se cachuje — bump FAMILY_SCALE_VERSION při změně cm/vzhledu. */
+export async function getFamilyScaleSheet(): Promise<ReferenceImage | null> {
+  const key = `family-scale-v${FAMILY_SCALE_VERSION}`;
   const cached = memCache.get(key);
   if (cached) return cached;
   const token = blobToken();
   if (!token) return null;
   const pathName = `portraits/${key}.img`;
-  const names = cast.map(c => c.name);
 
   try {
     const h = await head(pathName, { token });
     const r = await fetch(h.url, { cache: "force-cache" });
     if (r.ok) {
       const buf = Buffer.from(await r.arrayBuffer());
-      const ref: ReferenceImage = {
-        data: buf.toString("base64"),
-        mimeType: h.contentType || "image/webp",
-        label: scaleSheetLabel(names),
-      };
+      const ref: ReferenceImage = { data: buf.toString("base64"), mimeType: h.contentType || "image/webp", label: familyScaleLabel() };
       memCache.set(key, ref);
       return ref;
     }
   } catch {}
 
   try {
-    console.log(`[portraits] drawing scale sheet for ${cast.map(c => c.id).join("+")}…`);
+    const cast = loadCharacters()
+      .filter(c => FAMILY_HEIGHT_CM[c.id] !== undefined)
+      .sort((a, b) => FAMILY_HEIGHT_CM[a.id] - FAMILY_HEIGHT_CM[b.id]);
+    if (cast.length < 2) return null;
+    console.log(`[portraits] drawing FAMILY scale sheet (${cast.map(c => c.id).join("+")})…`);
     const prompt = [
-      `CHARACTER HEIGHT REFERENCE SHEET: ${names.join(", ")} standing side by side in one row.`,
+      `CHARACTER HEIGHT REFERENCE SHEET: ${cast.map(c => c.name).join(", ")} standing side by side in one row, shortest to tallest from left to right.`,
       `Exact appearances (copy faithfully): ${cast.map(c => c.description).join(" | ")}.`,
-      `Every character FULL BODY head to toe, standing straight and relaxed facing the viewer,`,
-      `all feet on the SAME flat ground line, evenly spaced, plain soft warm-cream background, even flat lighting, no props, no scenery.`,
-      `CRITICAL: draw their relative heights exactly as the descriptions state, clearly and measurably —`,
-      `this image becomes the canonical scale reference for every illustration in the book.`,
-      `Exactly ${cast.length} characters in the image — nobody else.`,
-      PORTRAIT_STYLE,
-      `No measurement marks, rulers, grid lines or labels of any kind.`,
+      `Every character FULL BODY head to toe, standing straight and relaxed facing the viewer, all feet on the SAME flat ground line, evenly spaced, plain soft warm-cream background, even flat lighting, no props, no scenery.`,
+      `Their real heights are EXACTLY: ${cast.map(c => `${c.name} ${FAMILY_HEIGHT_CM[c.id]}cm`).join(", ")} — draw every body scaled precisely to these proportions relative to each other; this is the single most important requirement of this image.`,
+      `Directly BELOW each character, print their name in capital letters and their height in parentheses as two short lines of clean plain text (e.g. "NICOLÁSEK" then "(111CM)") — this is the ONE exception in this whole book's art style where readable text is wanted, because this specific image is a private reference sheet for the illustrator, never a page shown to a reader.`,
+      `Exactly ${cast.length} people in the image — nobody else.`,
+      REFERENCE_SHEET_STYLE,
     ].join(" ");
     const photoRefs = loadReferenceImages(cast);
     const img = await generateBackgroundImage(prompt, photoRefs);
@@ -212,15 +234,11 @@ export async function getGroupScaleSheet(characters: Character[]): Promise<Refer
       allowOverwrite: true,
       cacheControlMaxAge: 31536000,
     });
-    const ref: ReferenceImage = {
-      data: img.buffer.toString("base64"),
-      mimeType: img.mimeType,
-      label: scaleSheetLabel(names),
-    };
+    const ref: ReferenceImage = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: familyScaleLabel() };
     memCache.set(key, ref);
     return ref;
   } catch (e) {
-    console.warn(`[portraits] scale sheet failed: ${e instanceof Error ? e.message : e}`);
+    console.warn(`[portraits] family scale sheet failed: ${e instanceof Error ? e.message : e}`);
     return null; // scény pojedou jako dřív, jen bez výškové kotvy
   }
 }
