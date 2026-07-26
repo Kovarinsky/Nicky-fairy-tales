@@ -271,6 +271,14 @@ export interface QaFinding {
   fix?: string;
   /** Lze to spravit editací detailu, nebo je potřeba celý obrázek znovu? */
   fixable?: boolean;
+  /** Co MĚLO být (podle kanonické karty) — u barev slouží k určení rodiny. */
+  expected?: string;
+  /** Co je NAKRESLENO. */
+  observed?: string;
+  /** Čeho se nález týká („eye color", „hair", „head size"). */
+  attribute?: string;
+  /** U měřítka: naměřená odchylka poměru velikosti hlav v procentech. */
+  deviationPct?: number;
 }
 
 export interface QaVerdict {
@@ -298,6 +306,63 @@ const REDRAW_ONLY_RULES = new Set([0, 7, 11, 12, 13]);
 // zamítalo prokazatelně správné obrázky. 15 % je nejtěsnější hodnota, která
 // spolehlivě propustí správné a zachytí skutečný rozjezd proporcí.
 const HEAD_RATIO_TOLERANCE_PCT = 15;
+
+// 🎨 Rodiny barev — POŘADÍ je významné: sousední položky jsou v malované
+// ilustraci prakticky nerozlišitelné (a mění je i samotné osvětlení), skok
+// o dvě a víc rodin je skutečná chyba. Rozhodování o závažnosti barev drží
+// KÓD, ne grader: v testu tentýž nález („hnědé vs. oříškové oči") dostal na
+// jedné scéně MINOR a na jiné MAJOR, což znamenalo placené přemalování
+// za rozdíl, který se v knize nepozná.
+const EYE_FAMILIES = [
+  ["blue", "modr"], ["grey", "gray", "šed", "sed"], ["green", "zelen"],
+  ["hazel", "amber", "oříšk", "orisk", "jantar"], ["brown", "hněd", "hned"],
+  ["dark brown", "black", "čern", "cern"],
+];
+const HAIR_FAMILIES = [
+  ["platinum", "blond", "golden", "flaxen", "plavé", "plave"],
+  ["ginger", "red", "auburn", "zrzav", "kaštan", "kastan", "ryšav"],
+  ["brown", "brunette", "hněd", "hned"],
+  ["black", "raven", "čern", "cern"],
+];
+
+/** Do které rodiny barva patří (−1 = nerozpoznáno). */
+function familyIndex(families: string[][], text: string): number {
+  const low = text.toLowerCase();
+  let best = -1, bestPos = Infinity;
+  families.forEach((fam, idx) => {
+    for (const word of fam) {
+      const p = low.indexOf(word);
+      if (p >= 0 && p < bestPos) { bestPos = p; best = idx; }
+    }
+  });
+  return best;
+}
+
+/** Přepočítá závažnost nálezu podle měřitelných pravidel — grader jen
+ *  POZORUJE (co má být / co je nakresleno / o kolik procent), o závažnosti
+ *  rozhoduje tenhle kód, aby stejný nález nedopadal pokaždé jinak. */
+function normalizeSeverity(f: QaFinding): QaFinding {
+  // Pravidlo 3 — barvy: rozdíl uvnitř rodiny nebo o JEDEN krok = MINOR
+  if (f.rule === 3 && f.expected && f.observed) {
+    const families = /hair|vlas/i.test(`${f.problem} ${f.attribute || ""}`) ? HAIR_FAMILIES : EYE_FAMILIES;
+    const a = familyIndex(families, f.expected);
+    const b = familyIndex(families, f.observed);
+    if (a >= 0 && b >= 0) {
+      const step = Math.abs(a - b);
+      return { ...f, severity: step <= 1 ? "MINOR" : "MAJOR" };
+    }
+  }
+  // Pravidlo 7 — měřítko: odchylka poměru hlav do tolerance = MINOR
+  if (f.rule === 7 && typeof f.deviationPct === "number") {
+    return { ...f, severity: Math.abs(f.deviationPct) <= HEAD_RATIO_TOLERANCE_PCT ? "MINOR" : "MAJOR" };
+  }
+  // Pravidlo 7 bez čísla: grader odchylku nezměřil, jen „vypadá to větší" —
+  // na takový dojem se neplatí překreslení (dřív nejčastější falešný poplach)
+  if (f.rule === 7 && f.deviationPct === undefined && /slight|mild|little|trochu|mírn/i.test(f.problem)) {
+    return { ...f, severity: "MINOR" };
+  }
+  return f;
+}
 
 /** Z nálezů určí akci: MAJOR na needitovatelném pravidle → REDRAW,
  *  jinak jakýkoli MAJOR/MODERATE → EDIT, samotné MINOR → ACCEPT. */
@@ -359,7 +424,10 @@ export async function verifySceneImage(
               "· MODERATE = clearly wrong but repairable by touching ONE detail without redrawing the picture: a missing signature accessory, one garment in the wrong color family, stray text/watermark, a duplicated prop.",
               "· MINOR = painterly variation a parent would never notice or complain about: shade differences inside a color family, adjacent eye families, lighting-driven skin warmth, hair length off by one step, body-scale ratio inside the stated tolerance, tiny background details.",
               "Be honest and CALIBRATED: do not inflate a MINOR into a MAJOR to look thorough, and do not downgrade a genuine MAJOR to seem lenient. Most good illustrations legitimately have zero or only MINOR findings.",
-              'Reply with ONLY JSON. ALWAYS include a "people" audit — list every visible person as "<who you matched them to or UNKNOWN>". Clean image: {"people":["Nicolas","Valentýna"],"findings":[]}. Otherwise list each finding: {"people":[...],"findings":[{"rule":<number>,"severity":"MINOR"|"MODERATE"|"MAJOR","problem":"<short English reason, max 15 words>","fix":"<a single imperative instruction that would repair ONLY this detail, e.g. \'change Valentýna\'s eye color to brown\'>","fixable":<true if repairing this one detail in place would fix it, false if the whole picture must be drawn again>}]}. Any UNKNOWN in people is a MAJOR finding on rule 1.',
+              "REPORT MEASUREMENTS, NOT JUST OPINIONS — for these two rules always fill in the extra fields, they decide whether a repair is even needed:",
+              "· rule 3 (colors): set \"attribute\" (e.g. \"eye color\", \"hair color\"), \"expected\" (the color word from the character sheet) and \"observed\" (the color word you actually see).",
+              `· rule 7 (scale): set "deviationPct" — by how many percent the girl-to-boy (or child-to-adult) HEAD-SIZE ratio in this image differs from the canonical ratio. Estimate the head heights and compute it; a value within ±${HEAD_RATIO_TOLERANCE_PCT} is fine. If you genuinely cannot measure it, omit the field and say so in "problem".`,
+              'Reply with ONLY JSON. ALWAYS include a "people" audit — list every visible person as "<who you matched them to or UNKNOWN>". Clean image: {"people":["Nicolas","Valentýna"],"findings":[]}. Otherwise list each finding: {"people":[...],"findings":[{"rule":<number>,"severity":"MINOR"|"MODERATE"|"MAJOR","problem":"<short English reason, max 15 words>","attribute":"<what it concerns, for rules 3 and 7>","expected":"<canonical value, for rule 3>","observed":"<what is drawn, for rule 3>","deviationPct":<number, for rule 7>,"fix":"<a single imperative instruction that would repair ONLY this detail, e.g. \'change Valentýna\'s eye color to brown\'>","fixable":<true if repairing this one detail in place would fix it, false if the whole picture must be drawn again>}]}. Any UNKNOWN in people is a MAJOR finding on rule 1.',
             ].join("\n") },
           ],
         }],
@@ -383,18 +451,25 @@ export async function verifySceneImage(
       if (!m) throw new Error("QA verdict missing JSON");
       const v = JSON.parse(m[0]) as {
         ok?: boolean; rules?: number[]; problems?: string; people?: string[];
-        findings?: Array<{ rule?: number; severity?: string; problem?: string; fix?: string; fixable?: boolean }>;
+        findings?: Array<{
+          rule?: number; severity?: string; problem?: string; fix?: string; fixable?: boolean;
+          expected?: string; observed?: string; attribute?: string; deviationPct?: number;
+        }>;
       };
       const findings: QaFinding[] = [];
       for (const f of Array.isArray(v.findings) ? v.findings : []) {
         const sev = String(f.severity || "MAJOR").toUpperCase();
-        findings.push({
+        findings.push(normalizeSeverity({
           rule: Number.isFinite(Number(f.rule)) ? Number(f.rule) : -1,
           severity: sev === "MINOR" || sev === "MODERATE" ? sev : "MAJOR",
           problem: String(f.problem || "").slice(0, 160),
           fix: f.fix ? String(f.fix).slice(0, 200) : undefined,
           fixable: typeof f.fixable === "boolean" ? f.fixable : undefined,
-        });
+          expected: f.expected ? String(f.expected).slice(0, 60) : undefined,
+          observed: f.observed ? String(f.observed).slice(0, 60) : undefined,
+          attribute: f.attribute ? String(f.attribute).slice(0, 60) : undefined,
+          deviationPct: Number.isFinite(Number(f.deviationPct)) ? Number(f.deviationPct) : undefined,
+        }));
       }
       // 🛟 Kompatibilita se starším formátem verdiktu ({ok:false, rules:[…]}) —
       // kdyby grader (jiný model / starší chování) závažnosti nevrátil,
