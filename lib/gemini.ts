@@ -368,16 +368,27 @@ function normalizeSeverity(f: QaFinding): QaFinding {
   // a appka za ten „mírný" rozdíl zaplatí přemalování (které se navíc
   // v jednom ze dvou případů vůbec nepovedlo).
   if (f.rule === 7) {
-    const hedged = /slight|mild|marginal|a bit|somewhat|trochu|mírn|nepatrn/i.test(f.problem);
-    // Skutečné rozbití proporcí: dítě nakreslené jako teenager/dospělý
-    const ageBreak = /adult|teenager|teenage|grown[- ]?up|dospěl|puberť/i.test(f.problem);
+    const dev = typeof f.deviationPct === "number" ? Math.abs(f.deviationPct) : undefined;
+    // Skutečné rozbití proporcí: dítě nakreslené jako teenager/dospělý,
+    // nebo naopak školák s batolecími proporcemi
+    const ageBreak = /adult|teenager|teenage|grown[- ]?up|toddler|infant|baby|dospěl|puberť|batol/i.test(f.problem);
     if (ageBreak) return { ...f, severity: "MAJOR" };
-    if (hedged) return { ...f, severity: "MINOR" };
-    if (typeof f.deviationPct === "number") {
-      return { ...f, severity: Math.abs(f.deviationPct) <= HEAD_RATIO_TOLERANCE_PCT ? "MINOR" : "MAJOR" };
+    // Naměřená odchylka rozhoduje — a rozhoduje i PROTI zdrobňujícím slovům:
+    // nahlášeno reálným případem, kdy Valentýnka místo k uším sahala
+    // Nicoláskovi k pasu (poměr výšek 0,77 → 0,45, tj. −42 %), což žádné
+    // „mírně" není, i kdyby to tak kontrola nazvala.
+    if (dev !== undefined) {
+      return { ...f, severity: dev <= HEAD_RATIO_TOLERANCE_PCT ? "MINOR" : "MAJOR" };
     }
-    // Bez čísla a bez kategoriálního rozbití je to jen dojem — netolerovat
-    // znamená platit za nezměřený pocit
+    // Bez čísla: zdrobňující formulace = jen dojem, na ten se neplatí
+    if (/slight|mild|marginal|a bit|somewhat|trochu|mírn|nepatrn/i.test(f.problem)) {
+      return { ...f, severity: "MINOR" };
+    }
+    // Bez čísla, ale bez zdrobnění a s výrazným slovníkem („much smaller",
+    // „only reaches his waist") — to je popis skutečného rozjezdu proporcí
+    if (/much |far |way |half |only reaches|instead of|dvakrát|polovin/i.test(f.problem)) {
+      return { ...f, severity: "MAJOR" };
+    }
     return { ...f, severity: "MINOR" };
   }
   return f;
@@ -429,7 +440,11 @@ export async function verifySceneImage(
               "4) Hair LENGTH and STYLE match the sheet (short stays short, long stays long; beard per sheet).",
               "5) CLOTHING: each character wears THEIR OWN outfit (or their 'Story outfits:'/'Team kits:' variant for this scene). A signature outfit on the WRONG person (e.g. a different child wearing Nicolas's white T-shirt with red stripes) = FAIL. The SAME signature garment on TWO different people (two lilac hoodies, two striped polos) = FAIL. An adult's signature outfit worn by a child (or vice versa) = FAIL. If the sheet has a 'Team kits:' entry and this scene shows that group activity happening, everyone taking part MUST wear their group's stated uniform, NOT default/casual clothes — someone in everyday clothes during the activity = FAIL; members of the SAME group must all match each other's uniform, a rival/opposing group must be in their clearly different stated uniform.",
               "6) Dressing level is UNIFORM for the scene: no winter coat next to a T-shirt; indoors without jackets/hats; never summer clothes in snow.",
-              `7) BODY SCALE — MEASURE IT POSE-INVARIANTLY, do not eyeball it. NEVER judge scale by how high one character's head reaches on another's body ("her head reaches his ears"): that changes completely when someone kneels, sits, crouches, leans or stands further back, and such a difference is NOT an error. Instead compare HEAD SIZES: for each character estimate head height (top of the skull down to the chin, EXCLUDING hair volume above the skull and excluding bows/hats), then compare the ratio between characters with the ratio implied by the canonical sheet and the reference portraits. A deviation up to ±${HEAD_RATIO_TOLERANCE_PCT}% in that ratio is MINOR (accept it). A larger deviation is MAJOR. Independently of the ratio: a character described as a small child but drawn with adult-like proportions (head roughly one seventh of body height or smaller, teenage/adult body shape) is MAJOR. If the scene description explicitly states a DIFFERENT size relationship for this scene (a deliberate story-driven transformation), judge against THAT and do not fail for matching it.`,
+              `7) BODY SCALE AND HEIGHT — measure it, do not eyeball it. Run ALL THREE checks:`,
+              `   (a) HEAD-COUNT (body proportions / apparent age): estimate how many head-heights tall each character is. A small toddler is about 4-5 heads, a school-age child about 5-6, a grown-up about 7-7.5. If a character's head-count is off their canonical age bracket by more than roughly one head — a school-age child drawn with toddler proportions, or a child drawn with an adult's 7-head build — that is MAJOR.`,
+              `   (b) TOTAL HEIGHT RATIO — but ONLY when two characters are in COMPARABLE poses (both standing upright, or both sitting) and at a similar distance from the camera. Then compare the ratio of their full head-to-toe heights against the canonical sheet and reference portraits. A deviation over ±${HEAD_RATIO_TOLERANCE_PCT}% is MAJOR: a child who should reach an adult's chest but only reaches their hip, or a toddler who should reach her brother's ears but only reaches his waist, is a serious error even though both are "children".`,
+              `   (c) WHEN POSES ARE NOT COMPARABLE (one kneels, sits, crouches, leans, or stands much further back) SKIP check (b) entirely and never report a violation from it — apparent height legitimately changes with pose. Judge only (a) and the HEAD-SIZE ratio (head height top-of-skull to chin, excluding hair volume and bows) against the canonical ratio, same ±${HEAD_RATIO_TOLERANCE_PCT}% band.`,
+              `   Report the numeric deviation in "deviationPct" for whichever check you actually used, and name that check in "attribute" (e.g. "total height ratio", "head size ratio", "head-count"). If the scene description explicitly states a DIFFERENT size relationship for this scene (a deliberate story-driven transformation), judge against THAT and do not fail for matching it.`,
               "8) ANATOMY: exactly two arms, two legs, five fingers per hand, natural faces; bicycles have two wheels.",
               "9) KEY OBJECTS identical to their sheet entry — the same vehicle/boat/toy type and colors as stated. Each key object appears EXACTLY ONCE — two copies of the same boat/lighthouse/vehicle in one image = FAIL (unless the scene explicitly says otherwise).",
               "10) NO text, letters, watermarks or signatures anywhere in the image. EXCEPTION: a scoreboard may show ONLY the score as plain digits (e.g. '2:1') — but team/country abbreviations or any other letters ON the scoreboard (or anywhere else) still FAIL.",

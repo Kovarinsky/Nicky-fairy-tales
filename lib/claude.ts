@@ -1286,7 +1286,16 @@ function canonicalHeightsEntry(characters: Character[]): string | null {
 }
 
 export function enforceCanonicalAppearance(hero: string, req: StoryRequest, extras: StoryExtras = {}): string {
-  const parts = hero.split("|").map(s => s.trim()).filter(Boolean);
+  // 🩺 Vypravěč má sekce oddělovat " | ", ale občas použije NOVÝ ŘÁDEK —
+  // dělení jen podle "|" pak nechalo záznam „Heights:" zapečený uvnitř jiné
+  // části, takže se nenašel, NEsloučil se s kanonickými výškami a appka do
+  // zámku vzhledu přidala DRUHÝ, neúplný záznam o výškách. Model tak dostal
+  // dvě různé instrukce o tom, co má přesně držet — a právě velikosti postav
+  // pak mezi scénami plavaly (nahlášeno: Valentýnka jednou po uši, jinde po
+  // pás). Před dělením proto nový řádek před známou sekcí normalizujeme na "|".
+  const SECTIONS = "heights|key objects|story outfits|team kits|world & setting lock|world and setting lock|pronunciation hints";
+  const normalized = hero.replace(new RegExp(`\\s*\\n+\\s*(?=(?:${SECTIONS})\\s*:)`, "gi"), " | ");
+  const parts = normalized.split("|").map(s => s.trim()).filter(Boolean);
   // Jména kanonických postav (cs + en varianta + jméno z popisu)
   const canonNames = new Set<string>();
   for (const c of req.characters) {
