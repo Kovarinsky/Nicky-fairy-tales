@@ -8,7 +8,7 @@ import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, peekEarlyScene, enforceCanonicalAppearance, inventedCharacterNames, type StoryExtras } from "@/lib/claude";
 import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, isCreditsDepletedError, isSpendCapError, sceneCastList } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
-import { loadPortraitRefEntries, refsForText, refsForPanels } from "@/lib/portraits";
+import { loadPortraitRefEntries, refsForText, refsForPanels, getGroupScaleSheet } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/types";
 import { blobToken } from "@/lib/blob-token";
@@ -252,6 +252,10 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   // až po dopsání — u studeného startu ~3–5 s navíc)
   const refIds: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
   const refEntriesPromise = loadPortraitRefEntries(charactersByIds(refIds)).catch(() => [] as Awaited<ReturnType<typeof loadPortraitRefEntries>>);
+  // 📏 Výškový list obsazení — jeden obrázek, který drží poměry velikostí
+  // postav (textové pravidlo „sahá jí k uším" model změřit neumí). Načítá se
+  // taky souběžně s psaním; null = pojede se jako dřív, bez výškové kotvy.
+  const scaleSheetPromise = getGroupScaleSheet(charactersByIds(refIds)).catch(() => null);
 
   try {
     logEv(`▶ běh funkce start${(st.chains ?? 0) > 0 ? ` (řetěz ${st.chains})` : ""}${st.scenesScript?.length ? ` — scénář hotový, ${Object.keys(st.sceneUrls || {}).length}/${st.total ?? "?"} scén nakresleno` : (st.restarts ?? 0) > 0 ? ` — psaní pokus ${(st.restarts ?? 0) + 1}` : ""}`);
@@ -389,6 +393,10 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           for (const ci of (Array.isArray(body.customCharacterImages) ? (body.customCharacterImages as Array<{ data?: string; mimeType?: string }>) : [])) {
             if (ci?.data && ci?.mimeType) early.push({ data: ci.data, mimeType: ci.mimeType, name: "a custom story character" });
           }
+          // 📏 Scéna 1 je KOTVA pro celý zbytek pohádky — poměry výšek v ní
+          // musí sedět především, jinak se chyba replikuje do všech scén
+          const sheet0 = await scaleSheetPromise;
+          if (sheet0 && early.length >= 2) early.push(sheet0);
           const img = await generateSceneImage(peek.scene, hero, early, sceneDeadline());
           earlyImg = img;
           logEv("⚡ scéna 1 dokreslena během psaní");
@@ -484,6 +492,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // scéna/arch dostane jen portréty postav, které v ní vystupují — 9 portrétů
     // na každou scénu vedlo k míchání identit
     const refEntries = await refEntriesPromise; // načtené souběžně s psaním
+    const scaleSheet = await scaleSheetPromise;  // 📏 kanonické poměry výšek (může být null)
     const customRefs: ReferenceImage[] = [];
     const customImages = Array.isArray(body.customCharacterImages)
       ? (body.customCharacterImages as Array<{ data?: string; mimeType?: string }>)
@@ -514,11 +523,14 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       const isLetter = (ch: string) => /[a-záčďéěíňóřšťúůýž]/i.test(ch);
       return !isLetter(low[i - 1] || " ") && !isLetter(low[i + k.length] || " ");
     };
-    const refsFor = (txt: string): ReferenceImage[] => [
-      ...refsForText(refEntries, txt),
-      ...customRefs,
-      ...inventedNames.filter(n => inventedRefs.has(n) && nameHit(txt, n)).map(n => inventedRefs.get(n)!),
-    ];
+    const refsFor = (txt: string): ReferenceImage[] => {
+      const own = refsForText(refEntries, txt);
+      const invented = inventedNames.filter(n => inventedRefs.has(n) && nameHit(txt, n)).map(n => inventedRefs.get(n)!);
+      // 📏 Výškový list přiložit JEN když ve scéně stojí 2+ postavy vedle sebe
+      // (u sólo scény nemá poměr výšek co držet a jen by ubíral pozornost)
+      const withScale = scaleSheet && own.length + customRefs.length + invented.length >= 2 ? [scaleSheet] : [];
+      return [...own, ...customRefs, ...invented, ...withScale];
+    };
 
     let anchor: ReferenceImage | null = null;
     // Navázání: kotva konzistence = už hotová scéna 1 z minulého běhu
@@ -656,7 +668,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       + (Array.isArray(body.customCharacters) ? (body.customCharacters as unknown[]).length : 0);
     const sheetMode = (process.env.IMAGE_SHEET_MODE || "3x3").toLowerCase();
     if (st.sheetGaveUp) logEv("🗂️ archová fáze už dřív vzdala (žádný nový panel) → rovnou sólo");
-    else if (castSize >= 3) logEv(`🧪 ${castSize} postav v pohádce — archy zkusí jen scény s ≤2 lidmi v panelu, zbytek sólo`);
+    else if (castSize >= 3) logEv(`🧪 ${castSize} postav v pohádce — archy grupují scény podle překryvu obsazení, zbytek sólo`);
     if (sheetMode !== "off" && !quotaExhausted && !st.sheetGaveUp && st.sceneUrls![0]) {
       const maxCells = sheetMode === "2x2" ? 4 : 9;
       // ⚡ Archy jedné vlny běží PARALELNĚ (15 stránek = archy 9+5 najednou —
@@ -672,17 +684,31 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         // (pořadí panelů v archu na příběhu nezáleží, výřezy se ukládají
         // zpátky podle PŮVODNÍHO indexu scény, ne podle pozice v archu).
         const castKey = (i: number) => (sceneCastList(scenesScript[i].imagePrompt) || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean).sort().join(",");
+        const castOf = (i: number) => castKey(i).split(",").filter(Boolean);
         const castPeople = (key: string) => key ? key.split(",").filter(Boolean).length : 0;
-        // ≥3 lidí v JEDNOM panelu → vždy sólo, bez ohledu na castSize celé pohádky
-        const pendGrouped = pend.filter(i => castPeople(castKey(i)) <= 2)
-          .sort((a, b) => castKey(a).localeCompare(castKey(b)));
+        // 🗂️ UVOLNĚNÉ seskupování: dřív se do archu dostaly jen scény s ≤2 lidmi
+        // A ZÁROVEŇ naprosto shodným obsazením — u běžné pohádky (kde se cast
+        // scénu od scény mění) to znamenalo, že se archy skoro nechytly a vše
+        // se kreslilo drahým sólem. Teď se grupuje podle PŘEKRYVU obsazení:
+        // panel smí mít až MAX_PANEL_PEOPLE lidí a celý arch až MAX_SHEET_PEOPLE
+        // různých osob (per-panel popisky referencí `refsForPanels` umí i
+        // míchané obsazení). Obojí jde stáhnout envem, kdyby kvalita klesla.
+        const maxPanelPeople = Number(process.env.IMAGE_SHEET_MAX_PANEL_PEOPLE || 3);
+        const maxSheetPeople = Number(process.env.IMAGE_SHEET_MAX_PEOPLE || 4);
+        // Řadit podle obsazení, při shodě podle indexu scény — sousední scény
+        // se tak drží pohromadě, což bývá i stejné prostředí (jeden arch =
+        // jedno místo = model drží kulisu konzistentně sám od sebe)
+        const pendGrouped = pend.filter(i => castPeople(castKey(i)) <= maxPanelPeople)
+          .sort((a, b) => castKey(a).localeCompare(castKey(b)) || a - b);
         const groups: number[][] = [];
         let cur: number[] = [];
-        let curKey: string | null = null;
+        let curPeople = new Set<string>();
         for (const i of pendGrouped) {
-          const k = castKey(i);
-          if (curKey !== null && (k !== curKey || cur.length >= maxCells)) { groups.push(cur); cur = []; }
-          curKey = k;
+          const merged = new Set([...curPeople, ...castOf(i)]);
+          if (cur.length > 0 && (merged.size > maxSheetPeople || cur.length >= maxCells)) {
+            groups.push(cur); cur = []; curPeople = new Set();
+          }
+          for (const p of castOf(i)) curPeople.add(p);
           cur.push(i);
         }
         if (cur.length) groups.push(cur);
@@ -706,6 +732,9 @@ export async function runJob(id: string, body: Record<string, unknown>) {
             // vymýšlel obličeje (nevěděl, který portrét patří ke kterému panelu)
             const panelTexts = group.map(i => `${scenesScript[i].imagePrompt} ${scenesScript[i].narration}`);
             const groupRefs = [...refsForPanels(refEntries, panelTexts), ...customRefs];
+            // 📏 Arch kreslí víc scén najednou → poměry výšek se v něm musí
+            // držet napříč panely; výškový list je tu proto vždy (když existuje)
+            if (scaleSheet) groupRefs.push(scaleSheet);
             const refs = anchor ? [...groupRefs, anchor] : groupRefs;
             const { results, report } = await generateSceneSheet(group.map(i => scenesScript[i]), heroDescription, refs, prevRoundReports);
             if (report) roundReports.push(report);

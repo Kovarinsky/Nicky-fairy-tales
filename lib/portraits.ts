@@ -143,6 +143,88 @@ export async function loadPortraitRefs(characters: Character[]): Promise<Referen
   return refs;
 }
 
+// ── 📏 Výškový list: poměr velikostí postav JAKO OBRÁZEK ────────────────────
+// Textové pravidlo („temeno jí sahá k jeho uším") model při kreslení nijak
+// nezměří — je to relační geometrie, na kterou v promptu nemá nástroj, takže
+// poměr vycházel pokaždé trochu jinak. Změřeno na reálných bězích: s tímto
+// jedním obrázkem jako referencí spadl rozptyl měřítka mezi dvěma běhy téže
+// scény z ~3,5 % na 0 %. Kreslí se JEDNOU na sestavu postav a cachuje se.
+const SCALE_SHEET_VERSION = 1;
+/** Nad 4 postavy je řada přeplácaná a model si s ní přestává poradit. */
+const SCALE_SHEET_MAX_CHARS = 4;
+
+function scaleSheetLabel(names: string[]): string {
+  return (
+    `CANONICAL SCALE SHEET (${names.join(" + ")}) — this shows the EXACT body sizes and height ` +
+    `relationships between these characters. Reproduce that SAME size relationship in the scene, ` +
+    `even when their poses differ (kneeling, sitting, crouching): their underlying body scale never changes.`
+  );
+}
+
+/** Malovaná „řada postav" ukazující kanonické poměry výšek; null když se
+ *  nepovede nebo nemá smysl (méně než 2 postavy / bez Blob úložiště). */
+export async function getGroupScaleSheet(characters: Character[]): Promise<ReferenceImage | null> {
+  const cast = characters.slice(0, SCALE_SHEET_MAX_CHARS);
+  if (cast.length < 2) return null; // poměr výšek se dvěma a víc postavami
+  const key = `scale-${cast.map(c => c.id).sort().join("-")}-v${SCALE_SHEET_VERSION}`;
+  const cached = memCache.get(key);
+  if (cached) return cached;
+  const token = blobToken();
+  if (!token) return null;
+  const pathName = `portraits/${key}.img`;
+  const names = cast.map(c => c.name);
+
+  try {
+    const h = await head(pathName, { token });
+    const r = await fetch(h.url, { cache: "force-cache" });
+    if (r.ok) {
+      const buf = Buffer.from(await r.arrayBuffer());
+      const ref: ReferenceImage = {
+        data: buf.toString("base64"),
+        mimeType: h.contentType || "image/webp",
+        label: scaleSheetLabel(names),
+      };
+      memCache.set(key, ref);
+      return ref;
+    }
+  } catch {}
+
+  try {
+    console.log(`[portraits] drawing scale sheet for ${cast.map(c => c.id).join("+")}…`);
+    const prompt = [
+      `CHARACTER HEIGHT REFERENCE SHEET: ${names.join(", ")} standing side by side in one row.`,
+      `Exact appearances (copy faithfully): ${cast.map(c => c.description).join(" | ")}.`,
+      `Every character FULL BODY head to toe, standing straight and relaxed facing the viewer,`,
+      `all feet on the SAME flat ground line, evenly spaced, plain soft warm-cream background, even flat lighting, no props, no scenery.`,
+      `CRITICAL: draw their relative heights exactly as the descriptions state, clearly and measurably —`,
+      `this image becomes the canonical scale reference for every illustration in the book.`,
+      `Exactly ${cast.length} characters in the image — nobody else.`,
+      PORTRAIT_STYLE,
+      `No measurement marks, rulers, grid lines or labels of any kind.`,
+    ].join(" ");
+    const photoRefs = loadReferenceImages(cast);
+    const img = await generateBackgroundImage(prompt, photoRefs);
+    await put(pathName, img.buffer, {
+      access: "public",
+      contentType: img.mimeType,
+      token,
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      cacheControlMaxAge: 31536000,
+    });
+    const ref: ReferenceImage = {
+      data: img.buffer.toString("base64"),
+      mimeType: img.mimeType,
+      label: scaleSheetLabel(names),
+    };
+    memCache.set(key, ref);
+    return ref;
+  } catch (e) {
+    console.warn(`[portraits] scale sheet failed: ${e instanceof Error ? e.message : e}`);
+    return null; // scény pojedou jako dřív, jen bez výškové kotvy
+  }
+}
+
 // ── Cílené reference: scéna dostane JEN portréty postav, které v ní vystupují ──
 // Při velkém obsazení (9 postav) dostával model 9 portrétů na každou scénu
 // a míchal identity (Janova polokošile na cizím dítěti…). Filtruje se podle

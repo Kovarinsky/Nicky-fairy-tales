@@ -258,11 +258,63 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
 // deadline: když čas na TENTO běh dochází, kontrola se rovnou vzdá (žádné
 // další čekání/pokusy) — dřív mohla sama o sobě natáhnout jednu scénu o
 // stovky sekund a připravit ji tak o šanci na bezpečné předání štafety.
+/** Závažnost jednoho nálezu vizuální kontroly. */
+export type QaSeverity = "MINOR" | "MODERATE" | "MAJOR";
+/** Co s obrázkem udělat: přijmout / cíleně doeditovat / překreslit celý. */
+export type QaAction = "ACCEPT" | "EDIT" | "REDRAW";
+
+export interface QaFinding {
+  rule: number;
+  severity: QaSeverity;
+  problem: string;
+  /** Cílená instrukce pro editaci ("change her eye color to brown"). */
+  fix?: string;
+  /** Lze to spravit editací detailu, nebo je potřeba celý obrázek znovu? */
+  fixable?: boolean;
+}
+
+export interface QaVerdict {
+  /** Nic, co by se mělo řešit (žádný MODERATE/MAJOR nález). */
+  ok: boolean;
+  action: QaAction;
+  /** Souhrn pro log (zachováno kvůli starším voláním). */
+  problems: string;
+  /** Počet nálezů, na které se reaguje — porovnávací metrika „nejlepší pokus". */
+  badRules: number;
+  findings: QaFinding[];
+  /** Spojené instrukce pro editaci vadných detailů. */
+  fixInstruction: string;
+}
+
+// 🚧 Pravidla, u kterých je EDITACE nespolehlivá → vždy překreslit celý obrázek:
+// styl (0), tělesné měřítko (7), rámování/ořez (11), prostředí (12) a hlavně
+// podoba dítěte podle referenční fotky (13) — obličej skutečného dítěte se
+// nikdy „nedoedituje k podobě", to je cesta ke znetvoření.
+const REDRAW_ONLY_RULES = new Set([0, 7, 11, 12, 13]);
+
+// 📏 Tolerance měřítka postav (poměr velikosti hlav vůči kánonu).
+// Naměřeno na reálných bězích: dobrý obrázek s kanonickou referencí se od
+// kánonu liší ~9 %, samotný šum měření graderu je ±3–5 % — pásmo 10 % by tedy
+// zamítalo prokazatelně správné obrázky. 15 % je nejtěsnější hodnota, která
+// spolehlivě propustí správné a zachytí skutečný rozjezd proporcí.
+const HEAD_RATIO_TOLERANCE_PCT = 15;
+
+/** Z nálezů určí akci: MAJOR na needitovatelném pravidle → REDRAW,
+ *  jinak jakýkoli MAJOR/MODERATE → EDIT, samotné MINOR → ACCEPT. */
+function decideAction(findings: QaFinding[]): QaAction {
+  const actionable = findings.filter(f => f.severity !== "MINOR");
+  if (actionable.length === 0) return "ACCEPT";
+  const needsRedraw = actionable.some(f =>
+    (f.severity === "MAJOR" && REDRAW_ONLY_RULES.has(f.rule)) || f.fixable === false
+  );
+  return needsRedraw ? "REDRAW" : "EDIT";
+}
+
 export async function verifySceneImage(
   apiKey: string, img: ImageResult, heroDescription: string, scenePrompt = "",
   refs: ReferenceImage[] = [], // 🕵️ kanonické portréty — inspektor porovnává TVÁŘE, ne jen text
   deadline?: number
-): Promise<{ ok: boolean; problems: string; badRules: number } | null> {
+): Promise<QaVerdict | null> {
   // Referenční portréty jdou inspektorovi PŘED kontrolovaný obrázek — dřív
   // soudil jen podle textu a „Bella jako černoška" mu nemohla padnout do oka
   const refParts = refs.slice(0, 8).flatMap((r, i) => [
@@ -288,11 +340,11 @@ export async function verifySceneImage(
               "0) STYLE: the image MUST be a hand-painted 2D storybook ILLUSTRATION. A photograph, photorealistic render, 3D/CGI look, or stock-photo style image = FAIL immediately (this alone fails the image, regardless of content).",
               "1) IDENTIFY every visible person one by one and match each to a named character by hair, face and outfit. COUNT them: the number of visible people MUST EQUAL the number of characters named in the scene description — more OR fewer = FAIL. ANY person you cannot confidently match (extra child, stranger, background figure) = FAIL. A character named in the scene description who is MISSING = FAIL. A person who mixes features of TWO characters (one character's face with another's outfit or hairstyle — swapped/merged identities) = FAIL. EXCEPTION: when the scene description itself mentions a GROUP (a team, other players, opponents, the crowd, the audience, villagers…), unnamed background figures belonging to that group are ALLOWED — list them as 'group:<what>' in people, they don't fail the count; but none of them may look like a copy of a named hero.",
               "2) Each named character appears EXACTLY ONCE — two similar children or two similar adults = FAIL.",
-              "3) HAIR COLOR of EVERY person matches their sheet entry (blond stays blond, brown stays brown, dark stays dark) — check person by person. SKIN TONE/ethnicity must also match (a character described with fair light skin drawn as a different ethnicity/race, or vice versa, = FAIL) — but ALLOW natural lighting variation: a slightly warmer, sun-kissed, tanned or shadowed rendering of the SAME underlying skin tone (e.g. bright outdoor/beach/summer light) is NOT a violation. Only flag a clear ethnicity/race change, not a shade difference plausibly caused by lighting. For a named ANIMAL, the SPECIES/BREED and coat color/pattern must match its sheet entry exactly — a different dog breed than described (wrong ear shape, wrong build, wrong coat pattern) = FAIL.",
+              "3) HAIR / EYE / SKIN COLOR — judge by COLOR FAMILIES, not by shade. Hair families: {platinum, golden, dark blond} · {ginger, auburn} · {light, medium, dark brown} · {black}. Eye families in order: {blue} {grey} {green} {hazel/amber} {brown} {dark brown/black}. A different shade INSIDE the same family, or a jump to an ADJACENT eye family (brown↔hazel, blue↔grey, green↔hazel), is MINOR — painterly lighting causes it and it is NOT worth redrawing. A jump BETWEEN hair families (blond→brown, brown→black) or an eye jump of TWO OR MORE families (brown→blue) is MAJOR. IMPORTANT — DO NOT GUESS: if a face is small in the frame (roughly less than one tenth of the image height) the iris is only a few pixels wide; then you MUST report eye color as not assessable and NEVER as a violation. SKIN TONE/ethnicity must match, but ALLOW natural lighting variation: a warmer, sun-kissed, tanned or shadowed rendering of the SAME underlying tone is NOT a violation (MINOR at most) — only a clear ethnicity/race change is MAJOR. For a named ANIMAL, a different SPECIES/BREED or a clearly different coat color/pattern than its sheet entry is MAJOR.",
               "4) Hair LENGTH and STYLE match the sheet (short stays short, long stays long; beard per sheet).",
               "5) CLOTHING: each character wears THEIR OWN outfit (or their 'Story outfits:'/'Team kits:' variant for this scene). A signature outfit on the WRONG person (e.g. a different child wearing Nicolas's white T-shirt with red stripes) = FAIL. The SAME signature garment on TWO different people (two lilac hoodies, two striped polos) = FAIL. An adult's signature outfit worn by a child (or vice versa) = FAIL. If the sheet has a 'Team kits:' entry and this scene shows that group activity happening, everyone taking part MUST wear their group's stated uniform, NOT default/casual clothes — someone in everyday clothes during the activity = FAIL; members of the SAME group must all match each other's uniform, a rival/opposing group must be in their clearly different stated uniform.",
               "6) Dressing level is UNIFORM for the scene: no winter coat next to a T-shirt; indoors without jackets/hats; never summer clothes in snow.",
-              "7) BODY PROPORTIONS: children child-sized, adults adult-sized, relative heights per the 'Heights:' entry — UNLESS the scene description above explicitly states a DIFFERENT height/size relationship for this scene (a deliberate story-driven transformation like a growth spurt or magical size change); when it does, judge against THAT instead and do not fail for matching it.",
+              `7) BODY SCALE — MEASURE IT POSE-INVARIANTLY, do not eyeball it. NEVER judge scale by how high one character's head reaches on another's body ("her head reaches his ears"): that changes completely when someone kneels, sits, crouches, leans or stands further back, and such a difference is NOT an error. Instead compare HEAD SIZES: for each character estimate head height (top of the skull down to the chin, EXCLUDING hair volume above the skull and excluding bows/hats), then compare the ratio between characters with the ratio implied by the canonical sheet and the reference portraits. A deviation up to ±${HEAD_RATIO_TOLERANCE_PCT}% in that ratio is MINOR (accept it). A larger deviation is MAJOR. Independently of the ratio: a character described as a small child but drawn with adult-like proportions (head roughly one seventh of body height or smaller, teenage/adult body shape) is MAJOR. If the scene description explicitly states a DIFFERENT size relationship for this scene (a deliberate story-driven transformation), judge against THAT and do not fail for matching it.`,
               "8) ANATOMY: exactly two arms, two legs, five fingers per hand, natural faces; bicycles have two wheels.",
               "9) KEY OBJECTS identical to their sheet entry — the same vehicle/boat/toy type and colors as stated. Each key object appears EXACTLY ONCE — two copies of the same boat/lighthouse/vehicle in one image = FAIL (unless the scene explicitly says otherwise).",
               "10) NO text, letters, watermarks or signatures anywhere in the image. EXCEPTION: a scoreboard may show ONLY the score as plain digits (e.g. '2:1') — but team/country abbreviations or any other letters ON the scoreboard (or anywhere else) still FAIL.",
@@ -301,8 +353,13 @@ export async function verifySceneImage(
               ...(refParts.length ? [
                 "13) IDENTITY MATCH TO REFERENCES: compare EVERY visible named character against their REFERENCE image above — it must clearly be the SAME person: same face, same underlying SKIN TONE/ethnicity, same hair color and style, same apparent AGE and BODY SIZE (a small child in the reference must stay a small child — drawn as a teenager or adult = FAIL; an adult must stay an adult), same signature outfit. A character who looks like a DIFFERENT person than their reference (different ethnicity, different age, different face) = FAIL. Do NOT fail for lighting-only differences (sun-tanned, warmer/cooler color grading, shadows, golden-hour light) when the person is otherwise clearly the same individual — judge the underlying tone, not the lighting. EXCEPTION: if the scene description explicitly states this character is now a different height/size (a deliberate story-driven transformation), a body-size difference from the reference is CORRECT, not a fail — still check face/hair/ethnicity/outfit match.",
               ] : []),
-              "Minor painterly variation is fine — but violations of the rules above are NEVER minor.",
-              'Reply with ONLY JSON. ALWAYS include a "people" audit — list every visible person as "<who you matched them to or UNKNOWN>". Passing image: {"people":["Nicolas","Valentýna"],"ok":true}. Failing image: {"people":[...],"ok":false,"rules":[<numbers of violated rules>],"problems":"<max 60 words: per violated rule a short English reason>"}. Any UNKNOWN in people means rule 1 failed.',
+              "",
+              "CLASSIFY EVERY FINDING BY SEVERITY — this is as important as finding it:",
+              "· MAJOR = breaks the illusion for a child or reader: wrong/missing/extra named person, merged or swapped identities, a character who is not the person in their reference photo, colors jumping between families, broken art style, broken anatomy, body scale outside the stated tolerance, key content cut off by the frame, wrong setting.",
+              "· MODERATE = clearly wrong but repairable by touching ONE detail without redrawing the picture: a missing signature accessory, one garment in the wrong color family, stray text/watermark, a duplicated prop.",
+              "· MINOR = painterly variation a parent would never notice or complain about: shade differences inside a color family, adjacent eye families, lighting-driven skin warmth, hair length off by one step, body-scale ratio inside the stated tolerance, tiny background details.",
+              "Be honest and CALIBRATED: do not inflate a MINOR into a MAJOR to look thorough, and do not downgrade a genuine MAJOR to seem lenient. Most good illustrations legitimately have zero or only MINOR findings.",
+              'Reply with ONLY JSON. ALWAYS include a "people" audit — list every visible person as "<who you matched them to or UNKNOWN>". Clean image: {"people":["Nicolas","Valentýna"],"findings":[]}. Otherwise list each finding: {"people":[...],"findings":[{"rule":<number>,"severity":"MINOR"|"MODERATE"|"MAJOR","problem":"<short English reason, max 15 words>","fix":"<a single imperative instruction that would repair ONLY this detail, e.g. \'change Valentýna\'s eye color to brown\'>","fixable":<true if repairing this one detail in place would fix it, false if the whole picture must be drawn again>}]}. Any UNKNOWN in people is a MAJOR finding on rule 1.',
             ].join("\n") },
           ],
         }],
@@ -311,8 +368,12 @@ export async function verifySceneImage(
         // kontrola pak tiše neběžela a vadné obrázky procházely neověřené.
         // (jen pro 2.5 — jiné verify modely parametr neznají a vrátily by 400)
         generationConfig: {
-          maxOutputTokens: 700,
+          maxOutputTokens: 900,
           responseMimeType: "application/json",
+          // 🎯 temperature 0: bez toho běžel grader na defaultu (~1.0) a tentýž
+          // obrázek dostával při opakování různé verdikty — u brány, která
+          // rozhoduje o placeném překreslení, je rozptyl přímo drahý
+          temperature: 0,
           ...(VERIFY_MODEL.includes("2.5") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
         },
       }, GEMINI_VERIFY_TIMEOUT_MS);
@@ -320,18 +381,58 @@ export async function verifySceneImage(
       const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
       const m = text.match(/\{[\s\S]*\}/);
       if (!m) throw new Error("QA verdict missing JSON");
-      const v = JSON.parse(m[0]) as { ok?: boolean; rules?: number[]; problems?: string; people?: string[] };
-      let ok = v.ok !== false;
-      let problems = String(v.problems || "").slice(0, 400);
-      // Pojistka: inspektor vyjmenoval osobu, kterou nepřiřadil k žádné
-      // postavě (UNKNOWN) — cizí člověk v obraze, i kdyby dal ok:true
-      // (osoby smí být řetězce i objekty {name: …} — kontrola přes JSON)
-      if (ok && Array.isArray(v.people) && /unknown|stranger/i.test(JSON.stringify(v.people))) {
-        ok = false;
-        problems = "rule 1: an unmatched person (stranger/extra figure) is present";
+      const v = JSON.parse(m[0]) as {
+        ok?: boolean; rules?: number[]; problems?: string; people?: string[];
+        findings?: Array<{ rule?: number; severity?: string; problem?: string; fix?: string; fixable?: boolean }>;
+      };
+      const findings: QaFinding[] = [];
+      for (const f of Array.isArray(v.findings) ? v.findings : []) {
+        const sev = String(f.severity || "MAJOR").toUpperCase();
+        findings.push({
+          rule: Number.isFinite(Number(f.rule)) ? Number(f.rule) : -1,
+          severity: sev === "MINOR" || sev === "MODERATE" ? sev : "MAJOR",
+          problem: String(f.problem || "").slice(0, 160),
+          fix: f.fix ? String(f.fix).slice(0, 200) : undefined,
+          fixable: typeof f.fixable === "boolean" ? f.fixable : undefined,
+        });
       }
-      const badRules = ok ? 0 : Math.max(1, Array.isArray(v.rules) ? v.rules.length : 1);
-      return { ok, problems, badRules };
+      // 🛟 Kompatibilita se starším formátem verdiktu ({ok:false, rules:[…]}) —
+      // kdyby grader (jiný model / starší chování) závažnosti nevrátil,
+      // ber to jako dřív: každé porušení je MAJOR.
+      if (findings.length === 0 && v.ok === false) {
+        const rules = Array.isArray(v.rules) && v.rules.length ? v.rules : [-1];
+        for (const r of rules) {
+          findings.push({
+            rule: Number.isFinite(Number(r)) ? Number(r) : -1,
+            severity: "MAJOR",
+            problem: String(v.problems || "unspecified violation").slice(0, 160),
+          });
+        }
+      }
+      // Pojistka: inspektor vyjmenoval osobu, kterou nepřiřadil k žádné
+      // postavě (UNKNOWN) — cizí člověk v obraze, i kdyby nález nezapsal
+      // (osoby smí být řetězce i objekty {name: …} — kontrola přes JSON)
+      if (Array.isArray(v.people) && /unknown|stranger/i.test(JSON.stringify(v.people))
+          && !findings.some(f => f.rule === 1)) {
+        findings.push({
+          rule: 1, severity: "MAJOR",
+          problem: "an unmatched person (stranger/extra figure) is present",
+          fix: "remove the unidentified extra person from the image",
+        });
+      }
+      const actionable = findings.filter(f => f.severity !== "MINOR");
+      const action = decideAction(findings);
+      const minorNote = findings.length > actionable.length
+        ? ` [tolerováno: ${findings.filter(f => f.severity === "MINOR").map(f => `r${f.rule} ${f.problem}`).join("; ").slice(0, 200)}]`
+        : "";
+      return {
+        ok: actionable.length === 0,
+        action,
+        problems: (actionable.map(f => `r${f.rule}(${f.severity}) ${f.problem}`).join("; ") + minorNote).slice(0, 500),
+        badRules: actionable.length,
+        findings,
+        fixInstruction: actionable.map(f => f.fix || f.problem).filter(Boolean).join("; ").slice(0, 500),
+      };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.warn(`[Gemini QA] verify attempt ${attempt}/2 failed: ${msg}`);
@@ -391,6 +492,48 @@ export async function describeStoryCast(
   return { heroDescription, worldNotes: String(v.worldNotes || "").trim() };
 }
 
+// ── 🖌️ Cílená EDITACE vadného detailu (místo překreslení celé scény) ──────
+// Vadný obrázek se pošle ZPĚT modelu s instrukcí „změň POUZE tohle, zbytek
+// nech beze změny". Stojí to stejně jako generace, ale:
+//   - uspěje výrazně častěji než čerstvé překreslení (u kterého se dřív
+//     měřilo, že 3 ze 7 oprav nespravily nic — čistá ztráta),
+//   - zachová všechno, co už na obrázku bylo dobré (kompozice, světlo, pózy),
+//     takže se oprava barvy očí neprojeví jako úplně jiná scéna.
+// Pro needitovatelné vady (styl, měřítko, ořez, podoba dítěte) se NEPOUŽÍVÁ —
+// viz REDRAW_ONLY_RULES.
+async function editSceneImage(
+  apiKey: string, model: string, base: ImageResult, fixInstruction: string,
+  refImages: ReferenceImage[] = [], aspect: string | null = "16:9"
+): Promise<ImageResult> {
+  const parts: Array<Record<string, unknown>> = [];
+  for (const ref of refImages.slice(0, 6)) {
+    parts.push({ text: ref.label || `Canonical reference of ${ref.name || "a story character"}:` });
+    parts.push({ inlineData: { data: ref.data, mimeType: ref.mimeType } });
+  }
+  parts.push({ text: "IMAGE TO EDIT — return this SAME illustration with only the requested change applied:" });
+  parts.push({ inlineData: { data: base.buffer.toString("base64"), mimeType: base.mimeType } });
+  parts.push({ text: [
+    `Edit the image above. Apply EXACTLY this change and NOTHING else: ${fixInstruction}`,
+    "Keep everything else pixel-for-pixel as close to the original as you can: the same composition, camera angle, poses, facial expressions, background, lighting, colors and painting style. Do NOT re-imagine the scene, do NOT move the characters, do NOT change the time of day.",
+    "Output the full edited illustration in the same hand-painted 2D storybook style — flat 2D painting, never a 3D render, and no text, letters or watermarks anywhere.",
+  ].join(" ") });
+
+  const generationConfig: Record<string, unknown> = { responseModalities: ["IMAGE", "TEXT"] };
+  if (aspect) generationConfig.imageConfig = { aspectRatio: aspect };
+  const raw = await geminiPost(apiKey, model, { contents: [{ role: "user", parts }], generationConfig }, GEMINI_IMAGE_TIMEOUT_MS);
+  const data = JSON.parse(raw) as { candidates?: GeminiCandidate[]; promptFeedback?: { blockReason?: string } };
+  if (data.promptFeedback?.blockReason) throw new Error(`Gemini BLOCKED: ${data.promptFeedback.blockReason}`);
+  for (const cand of data.candidates || []) {
+    for (const part of cand.content?.parts || []) {
+      if (part.inlineData?.data) {
+        genCounter.img1k += 1; // 💰 editace je placená generace jako každá jiná
+        return { buffer: Buffer.from(part.inlineData.data, "base64"), mimeType: part.inlineData.mimeType || "image/png" };
+      }
+    }
+  }
+  throw new Error("NO_IMAGE: editace nevrátila obrázek");
+}
+
 // Pozadí aplikace — ilustrovaná scenérie ve stejném stylu jako pohádky,
 // na výšku (telefon). Volitelně s referenčními fotkami postav (Nicolásek
 // a Valentýnka bývají součástí každého světa). Prompt je bezpečný a pevně
@@ -432,7 +575,11 @@ export function sceneCastList(imagePrompt: string): string | null {
 // KE KAŽDÉMU volání obrázkového modelu appky bez výjimky (sólo scéna, arch,
 // ranné kreslení scény 1), takže tahle věta je jediné místo, kde je jistota,
 // že platí doslova VŠUDE, viz nahlášené "na některých slidech je jiný styl".
-const STYLE_SUFFIX ="Hand-painted 2D storybook illustration, soft painterly brushwork in classic Disney animated-film style, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. THIS ART STYLE IS FIXED FOR THE WHOLE STORY, PAGE AFTER PAGE — never drift toward a different rendering style, palette, linework or level of detail from one scene to the next, and never let brand-new characters introduced mid-story pull the picture toward a different style; THEY are drawn to match this established style, never the other way round. Strictly FLAT 2D painting — NOT a 3D render, no CGI, no plastic skin, no photorealism. Correct natural anatomy: every person has EXACTLY two arms, two legs and five fingers on each hand — no extra, missing or deformed limbs; bicycles have exactly two wheels. Absolutely no text, letters, words, signs, labels, captions, subtitles, watermarks, or artist signatures of any kind anywhere in the image.";
+// 🎥 ZÁMEK ZÁBĚRU: měřením se ukázalo, že tělesné proporce postav model drží
+// v toleranci — co ale mezi scénami skákalo (a působilo jako „postava je jinak
+// velká"), byla VZDÁLENOST KAMERY: jednou děti přes půl obrázku, jinde malé
+// v krajině. Jednotný záběr je proto součástí stylu, ne volba scény.
+const STYLE_SUFFIX ="Hand-painted 2D storybook illustration, soft painterly brushwork in classic Disney animated-film style, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. CONSISTENT CAMERA: frame every scene as a comfortable medium-wide shot at a child's eye level, with the named characters occupying roughly one third of the image height, their whole bodies visible, and enough of the surroundings to show where they are. Keep this same shot distance and eye level in every scene of the book — never cut to an extreme close-up of faces and never shrink the characters into tiny distant figures in a landscape. THIS ART STYLE IS FIXED FOR THE WHOLE STORY, PAGE AFTER PAGE — never drift toward a different rendering style, palette, linework or level of detail from one scene to the next, and never let brand-new characters introduced mid-story pull the picture toward a different style; THEY are drawn to match this established style, never the other way round. Strictly FLAT 2D painting — NOT a 3D render, no CGI, no plastic skin, no photorealism. Correct natural anatomy: every person has EXACTLY two arms, two legs and five fingers on each hand — no extra, missing or deformed limbs; bicycles have exactly two wheels. Absolutely no text, letters, words, signs, labels, captions, subtitles, watermarks, or artist signatures of any kind anywhere in the image.";
 
 // 📜 KONZISTENČNÍ BIBLE — kompletní, očíslovaný seznam pravidel pro KAŽDÝ
 // jednotlivý obrázek. Je součástí SERVEROVÉHO promptu (běží v `generateSceneImage`
@@ -524,25 +671,38 @@ export async function generateSceneImage(
             console.warn(`[Gemini QA] scene ${scene.index}: REJECTED [${v0.badRules} rules] (${v0.problems}) but DEADLINE passed → accepted as-is, no redraw`);
           } else if (v0 && !v0.ok) {
             let best = { img, badRules: v0.badRules, problems: v0.problems };
-            // 1 kolo (jen cílená korekce s výčtem porušených pravidel) — cena
-            // vs. kvalita: méně kol = nižší náklad na scénách, které mají
-            // problém, ale víc nedokonalých obrázků projde bez další opravy
+            // 🎯 Jedno opravné kolo — ale podle ZÁVAŽNOSTI: drobné vady
+            // (barva očí, chybějící mašle) se cíleně DOEDITUJÍ na hotovém
+            // obrázku, jen skutečné rozbití (styl, měřítko, ořez, cizí
+            // podoba) si vyžádá celé nové překreslení. Dřív se za plnou cenu
+            // překreslovalo VŠECHNO včetně kosmetiky — 7 z 10 scén, z toho
+            // 3 opravy nespravily nic.
+            const useEdit = v0.action === "EDIT" && !!v0.fixInstruction;
             for (let fix = 1; fix <= 1 && best.badRules > 0 && !(deadline !== undefined && Date.now() > deadline); fix++) {
-              console.warn(`[Gemini QA] scene ${scene.index}: REJECTED [${best.badRules} rules] (${best.problems}) → correction`);
+              console.warn(`[Gemini QA] scene ${scene.index}: ${v0.action} [${best.badRules}] (${best.problems}) → ${useEdit ? "targeted edit" : "full redraw"}`);
               try {
-                const prompt2 = `${safePrompt} ⚠ CORRECTION: the previous attempt violated these rules: ${best.problems}. Fix EXACTLY these issues — follow the APPEARANCE LOCK precisely, draw ONLY the named characters, each EXACTLY ONCE, with their own hair colors and outfits.`;
-                const img2 = await callGeminiImage(apiKey, m, prompt2, withAspect ? "16:9" : null, refImages);
+                const img2 = useEdit
+                  ? await editSceneImage(apiKey, m, best.img, v0.fixInstruction, refImages, withAspect ? "16:9" : null)
+                  : await callGeminiImage(
+                      apiKey, m,
+                      `${safePrompt} ⚠ CORRECTION: the previous attempt violated these rules: ${best.problems}. Fix EXACTLY these issues — follow the APPEARANCE LOCK precisely, draw ONLY the named characters, each EXACTLY ONCE, with their own hair colors and outfits.`,
+                      withAspect ? "16:9" : null, refImages
+                    );
                 const v2 = await verifySceneImage(apiKey, img2, heroDescription, scene.imagePrompt, refImages, deadline);
                 if (v2 && (v2.ok || v2.badRules < best.badRules)) {
                   best = { img: img2, badRules: v2.ok ? 0 : v2.badRules, problems: v2.problems };
                 }
               } catch (e2) {
-                console.warn(`[Gemini QA] scene ${scene.index}: redraw failed (${e2 instanceof Error ? e2.message : e2})`);
+                console.warn(`[Gemini QA] scene ${scene.index}: ${useEdit ? "edit" : "redraw"} failed (${e2 instanceof Error ? e2.message : e2})`);
               }
             }
             img = best.img;
-            if (best.badRules > 0) console.warn(`[Gemini QA] scene ${scene.index}: still imperfect after redraw [${best.badRules} rules] (${best.problems})`);
-            else console.log(`[Gemini QA] scene ${scene.index}: fixed after redraw ✓`);
+            if (best.badRules > 0) console.warn(`[Gemini QA] scene ${scene.index}: still imperfect [${best.badRules}] (${best.problems})`);
+            else console.log(`[Gemini QA] scene ${scene.index}: fixed ✓`);
+          } else if (v0 && v0.ok && v0.findings.length > 0) {
+            // Prošlo, ale s tolerovanými drobnostmi — zalogovat, ať je vidět,
+            // co všechno tolerance propouští (podklad pro ladění pásem)
+            console.log(`[Gemini QA] scene ${scene.index}: OK s tolerancí — ${v0.problems}`);
           }
         }
         return await compressImage(img);
@@ -773,7 +933,7 @@ export async function generateSceneSheet(
   // Jedenáctero na každý výřez zvlášť — paralelně po 4 (všech 9 naráz
   // umělo vyčerpat rate-limit kontrolního modelu → kontrola selhala
   // a NEOVĚŘENÝ panel dřív proklouzl bez prohlídky)
-  const verdicts: Array<{ ok: boolean; problems: string; badRules: number } | null> = new Array(n).fill(null);
+  const verdicts: Array<QaVerdict | null> = new Array(n).fill(null);
   for (let i = 0; i < n; i += 4) {
     const chunk = await Promise.all(
       Array.from({ length: Math.min(4, n - i) }, (_, j) =>
@@ -786,6 +946,22 @@ export async function generateSceneSheet(
   const reasons: string[] = [];
   for (let i = 0; i < n; i++) {
     const v = verdicts[i];
+    // 🖌️ Panel s drobnou vadou se NEZAHAZUJE do sóla (to je nejdražší cesta —
+    // arch je flat-price, sólo stojí plnou cenu za každou scénu): zkusí se
+    // cílená editace přímo na výřezu. Sólo zůstává jen pro skutečné rozbití.
+    if (v && !v.ok && v.action === "EDIT" && v.fixInstruction) {
+      try {
+        const fixed = await editSceneImage(apiKey, model, slices[i], v.fixInstruction, refImages, null);
+        const v2 = await verifySceneImage(apiKey, fixed, heroDescription, scenes[i].imagePrompt, refImages);
+        if (v2 && v2.ok) {
+          console.log(`[Gemini sheet] panel ${i + 1}: drobná vada doeditována ✓`);
+          out.push(await compressImage(fixed));
+          continue;
+        }
+      } catch (e) {
+        console.warn(`[Gemini sheet] panel ${i + 1}: editace selhala (${e instanceof Error ? e.message : e}) → sólo`);
+      }
+    }
     if (!v || !v.ok) {
       // ZPŘÍSNĚNO: neověřitelný panel (kontrola 3× selhala) se NEpřijímá —
       // jde na sólo dokreslení s vlastní QA, stejně jako zamítnutý
@@ -793,6 +969,7 @@ export async function generateSceneSheet(
       console.warn(`[Gemini sheet] panel ${i + 1} ${v ? `zamítnut (${v.problems.slice(0, 160)})` : "NEOVĚŘEN (kontrola selhala)"} → sólo`);
       out.push(null);
     } else {
+      if (v.findings.length > 0) console.log(`[Gemini sheet] panel ${i + 1}: OK s tolerancí — ${v.problems}`);
       out.push(await compressImage(slices[i]));
     }
   }
