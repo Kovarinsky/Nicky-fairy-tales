@@ -39,6 +39,13 @@ function portraitPrompt(c: Character): string {
   return [
     `CHARACTER REFERENCE SHEET: a full-body standing portrait of ${c.name}.`,
     `Exact appearance (copy faithfully from the reference photos and this description): ${c.description}.`,
+    // 🩺 Bez tohohle appka opakovaně malovala Archieho s běžnou "maskou" kolem
+    // očí typickou pro jeho plemeno, i když popis i referenční fotka výslovně
+    // říkají opak — model dává přednost typickému/generickému vzhledu před
+    // explicitní negací v textu. Scénové kreslení tuhle ochranu už mělo
+    // (pravidlo 9 v buildAppearanceLock, gemini.ts), prvotní malování portrétu
+    // ne — to je přesně krok, který selhával.
+    `If the description above explicitly states a feature is ABSENT or DIFFERENT from what would be typical (e.g. "NO dark mask", "NO stripe", a specific marking shape instead of the usual one for this breed/type), that is a DELIBERATE correction — draw it EXACTLY as stated even if it contradicts what is typical or generic for this kind of animal/person. Do not default to a stereotypical look when the description explicitly rules it out.`,
     `Standing straight facing the viewer, friendly relaxed pose with arms by the sides, the WHOLE body visible from head to toe.`,
     `Plain soft warm-cream studio background with a gentle ground shadow. Exactly ONE character in the image — nobody and nothing else.`,
     PORTRAIT_STYLE,
