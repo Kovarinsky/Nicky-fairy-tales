@@ -736,22 +736,27 @@ export async function runJob(id: string, body: Record<string, unknown>) {
             // držet napříč panely; výškový list je tu proto vždy (když existuje)
             if (scaleSheet) groupRefs.push(scaleSheet);
             const refs = anchor ? [...groupRefs, anchor] : groupRefs;
-            const { results, report } = await generateSceneSheet(group.map(i => scenesScript[i]), heroDescription, refs, prevRoundReports);
+            // ⚡ Panely se ukládají HNED, jak je každý jednotlivě hotový (ne až
+            // po nejpomalejším z celého archu) — appka dřív čekala na CELOU
+            // skupinu 3-9 scén najednou, než ukázala byť jednu (nahlášeno:
+            // „obrázky se načítají dlouho potom co se pohádka načte").
+            const { results, report } = await generateSceneSheet(
+              group.map(i => scenesScript[i]), heroDescription, refs, prevRoundReports,
+              async (k, img) => {
+                if (!img) return;
+                const i = group[k];
+                const url = await putJson(`jobs/${id}/scene-${i}.json`, {
+                  index: scenesScript[i].index,
+                  imageUrl: `data:${img.mimeType};base64,${img.buffer.toString("base64")}`,
+                });
+                st.sceneUrls![i] = url;
+                st.done = Object.keys(st.sceneUrls!).length;
+                await write();
+              }
+            );
             if (report) roundReports.push(report);
             const passed = results.filter(Boolean).length;
             logEv(`🗂️ arch (${group.length} scén) hotový za ${secsSince(tSheet)}s (prošlo ${passed}/${group.length})${report ? ` — ${report.slice(0, 200)}` : ""}`);
-            // panely se ukládají paralelně (sériově to stálo ~2–4 s na arch)
-            await Promise.all(group.map(async (i, k) => {
-              const img = results[k];
-              if (!img) return;
-              const url = await putJson(`jobs/${id}/scene-${i}.json`, {
-                index: scenesScript[i].index,
-                imageUrl: `data:${img.mimeType};base64,${img.buffer.toString("base64")}`,
-              });
-              st.sceneUrls![i] = url;
-            }));
-            st.done = Object.keys(st.sceneUrls!).length;
-            await write();
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             logEv(`🗂️ arch CHYBA po ${secsSince(tSheet)}s: ${msg.slice(0, 140)} → sólo dokreslení`);

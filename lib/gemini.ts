@@ -350,14 +350,22 @@ function normalizeSeverity(f: QaFinding): QaFinding {
   if (/look-?alike|looks like (a |the )?(hero|copy)|near-?copy|same face|copy of|identical to (the )?(hero|reference)/i.test(f.problem)) {
     return { ...f, severity: "MAJOR" };
   }
-  // Pravidlo 3 — barvy: rozdíl uvnitř rodiny nebo o JEDEN krok = MINOR
+  // Pravidlo 3 — barvy. VLASY jsou identitní znak (dva sourozenci s různou,
+  // byť "sousední" barvou vlasů — blond vs. zrzavá/kaštanová — jsou pro
+  // rodiče viditelně PROHOZENÍ, ne malířská odchylka): tolerovat se smí jen
+  // stejná rodina (step 0), žádný mezirodinný skok. OČI naopak mají reálné
+  // pásmo nejistoty (drobná duhovka, osvětlení) → tam zůstává soused = MINOR.
+  // Reálný nahlášený případ: „jednou Vája, potom Nicolásek" — appka s
+  // toleranci step<=1 tenhle skutečný swap classifikovala jako MINOR.
   if (f.rule === 3 && f.expected && f.observed) {
-    const families = /hair|vlas/i.test(`${f.problem} ${f.attribute || ""}`) ? HAIR_FAMILIES : EYE_FAMILIES;
+    const isHair = /hair|vlas/i.test(`${f.problem} ${f.attribute || ""}`);
+    const families = isHair ? HAIR_FAMILIES : EYE_FAMILIES;
     const a = familyIndex(families, f.expected);
     const b = familyIndex(families, f.observed);
     if (a >= 0 && b >= 0) {
       const step = Math.abs(a - b);
-      return { ...f, severity: step <= 1 ? "MINOR" : "MAJOR" };
+      const tolerance = isHair ? 0 : 1;
+      return { ...f, severity: step <= tolerance ? "MINOR" : "MAJOR" };
     }
   }
   // Pravidlo 7 — měřítko. Na překreslení kvůli velikosti postavy se platí JEN
@@ -974,7 +982,11 @@ export async function generateSceneSheet(
   scenes: Scene[],
   heroDescription: string,
   refImages: ReferenceImage[] = [],
-  correction = "" // výtky z minulé vlny — arch se kreslí S KOREKCÍ, ne naslepo znovu
+  correction = "", // výtky z minulé vlny — arch se kreslí S KOREKCÍ, ne naslepo znovu
+  // ⚡ Volitelný callback: zavolá se, JAKMILE je hotový KAŽDÝ jednotlivý panel
+  // (po vlastní editaci/QA), místo čekání na celý arch — volající tak může
+  // uložit a zobrazit scénu hned, ne až po nejpomalejším panelu z 6-9.
+  onPanelReady?: (i: number, result: ImageResult | null) => void | Promise<void>
 ): Promise<{ results: Array<ImageResult | null>; report: string }> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
@@ -1057,37 +1069,46 @@ export async function generateSceneSheet(
     );
     chunk.forEach((v, j) => { verdicts[i + j] = v; });
   }
-  const out: Array<ImageResult | null> = [];
-  const reasons: string[] = [];
-  for (let i = 0; i < n; i++) {
+  const out: Array<ImageResult | null> = new Array(n).fill(null);
+  const reasons: string[] = new Array(n).fill("");
+  // ⚡ Oprava panelů běžela dřív SEKVENČNĚ (jeden editSceneImage+reverify po
+  // druhém) — u archu se 3+ vadnými panely to samo o sobě přidávalo desítky
+  // sekund navíc PŘED tím, než se uložil byť jediný obrázek (appka reportovala
+  // „obrázky se načítají dlouho potom co se pohádka načte"). Teď běží
+  // paralelně a KAŽDÝ panel se přes onPanelReady uloží hned, jak je hotový —
+  // ne až po tom nejpomalejším z celého archu.
+  await Promise.all(Array.from({ length: n }, async (_, i) => {
     const v = verdicts[i];
+    let result: ImageResult | null = null;
     // 🖌️ Panel s drobnou vadou se NEZAHAZUJE do sóla (to je nejdražší cesta —
     // arch je flat-price, sólo stojí plnou cenu za každou scénu): zkusí se
     // cílená editace přímo na výřezu. Sólo zůstává jen pro skutečné rozbití.
     if (v && !v.ok && v.action === "EDIT" && v.fixInstruction) {
       try {
-        const fixed = await editSceneImage(apiKey, model, slices[i], v.fixInstruction, refImages, null);
+        const fixed = await editSceneImage(apiKey, model, slices![i], v.fixInstruction, refImages, null);
         const v2 = await verifySceneImage(apiKey, fixed, heroDescription, scenes[i].imagePrompt, refImages);
         if (v2 && v2.ok) {
           console.log(`[Gemini sheet] panel ${i + 1}: drobná vada doeditována ✓`);
-          out.push(await compressImage(fixed));
-          continue;
+          result = await compressImage(fixed);
         }
       } catch (e) {
         console.warn(`[Gemini sheet] panel ${i + 1}: editace selhala (${e instanceof Error ? e.message : e}) → sólo`);
       }
     }
-    if (!v || !v.ok) {
-      // ZPŘÍSNĚNO: neověřitelný panel (kontrola 3× selhala) se NEpřijímá —
-      // jde na sólo dokreslení s vlastní QA, stejně jako zamítnutý
-      reasons.push(`p${i + 1}: ${v ? v.problems.slice(0, 70) : "NEOVĚŘEN (kontrola nedostupná)"}`);
-      console.warn(`[Gemini sheet] panel ${i + 1} ${v ? `zamítnut (${v.problems.slice(0, 160)})` : "NEOVĚŘEN (kontrola selhala)"} → sólo`);
-      out.push(null);
-    } else {
-      if (v.findings.length > 0) console.log(`[Gemini sheet] panel ${i + 1}: OK s tolerancí — ${v.problems}`);
-      out.push(await compressImage(slices[i]));
+    if (!result) {
+      if (!v || !v.ok) {
+        // ZPŘÍSNĚNO: neověřitelný panel (kontrola 3× selhala) se NEpřijímá —
+        // jde na sólo dokreslení s vlastní QA, stejně jako zamítnutý
+        reasons[i] = `p${i + 1}: ${v ? v.problems.slice(0, 70) : "NEOVĚŘEN (kontrola nedostupná)"}`;
+        console.warn(`[Gemini sheet] panel ${i + 1} ${v ? `zamítnut (${v.problems.slice(0, 160)})` : "NEOVĚŘEN (kontrola selhala)"} → sólo`);
+      } else {
+        if (v.findings.length > 0) console.log(`[Gemini sheet] panel ${i + 1}: OK s tolerancí — ${v.problems}`);
+        result = await compressImage(slices![i]);
+      }
     }
-  }
+    out[i] = result;
+    await onPanelReady?.(i, result);
+  }));
   console.log(`[Gemini sheet] hotovo: ${out.filter(Boolean).length}/${n} panelů prošlo (zbytek sólo)`);
-  return { results: out, report: reasons.slice(0, 4).join(" | ") };
+  return { results: out, report: reasons.filter(Boolean).slice(0, 4).join(" | ") };
 }
