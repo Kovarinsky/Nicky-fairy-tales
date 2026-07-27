@@ -1,0 +1,31 @@
+Extracted verbatim from: project/2 Vyber pohady.dc.html (lines 711-737)
+Screen: 4. Vyber pohadky - katalog/vyhledavani -- JS logic defining real tab labels + grid text
+Confirms displayed tabs: Vse / Klasicke / Andersen / Svety (internal keys: Vse/Ceske/Andersen/Oblibene)
+---
+      tabs: [['Vše', 'Vše'], ['České', 'Klasické'], ['Andersen', 'Andersen'], ['Oblíbené', 'Světy']].map(([k, lbl]) => ({ name: lbl,
+        style: Object.assign({ flex: '1 1 0', minWidth: 0, height: '36px', padding: '0 6px', borderRadius: '999px', cursor: 'pointer',
+          fontFamily: "'Nunito',sans-serif", whiteSpace: 'nowrap', letterSpacing: '.01em',
+          fontSize: '11.5px', fontWeight: 800 }, tab === k
+          ? { border: 'none', background: acc.bg, color: acc.fg, boxShadow: '0 3px 10px rgba(8,3,20,.45)' }
+          : { border: '1.5px solid rgba(253,224,138,.3)', background: 'rgba(30,16,58,.6)', color: '#fdf3d7' }),
+        onTap: () => this.setState({ tab: k }) })),
+      catList: CAT.filter(c => q ? c.name.toLowerCase().includes(q) : (tab === 'Vše' || c.grp === tab)).map(c => ({ name: c.name,
+        style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'center', minHeight: '104px', padding: '7px 5px',
+          borderRadius: '18px', cursor: 'pointer', boxSizing: 'border-box', fontFamily: "'Nunito',sans-serif", color: '#fff',
+          textShadow: '0 1px 4px rgba(10,4,24,.95)',
+          background: 'linear-gradient(180deg,rgba(16,8,36,0) 40%,rgba(16,8,36,.84)),url(' + c.img + ') center center/cover no-repeat',
+          backgroundColor: '#150a30',
+          border: this.state.world === 'k:' + c.id ? '2.5px solid #f97316' : 'none',
+          boxShadow: this.state.world === 'k:' + c.id ? '0 0 0 3px rgba(249,115,22,.3), 0 6px 18px rgba(249,115,22,.4)' : '0 6px 14px rgba(8,3,20,.55)' },
+        onTap: () => this.setState({ detail: c.id }) })),
+      detailOpen: !!this.state.detail,
+      detailName: (CAT.find(c => c.id === this.state.detail) || {}).name || '',
+      detailImg: this.state.detail ? 'assets/katalog/big/' + this.state.detail + '.jpg' : '',
+      detailDesc: DESC[this.state.detail] || 'Pohádka na dobrou noc pro Nicoláska a Valentýnku.',
+      detailGrp: { 'Oblíbené': 'SVĚT POHÁDKY', 'České': 'KLASICKÁ POHÁDKA', 'Andersen': 'ANDERSEN' }[((CAT.find(c => c.id === this.state.detail) || {}).grp)] || '',
+      onDetailClose: () => this.setState({ detail: null }),
+      onDetailPrev: () => { const l = CAT.filter(c => q ? c.name.toLowerCase().includes(q) : (tab === 'Vše' || c.grp === tab)); const i = l.findIndex(c => c.id === this.state.detail); if (i >= 0) this.setState({ detail: l[(i - 1 + l.length) % l.length].id }); },
+      onDetailNext: () => { const l = CAT.filter(c => q ? c.name.toLowerCase().includes(q) : (tab === 'Vše' || c.grp === tab)); const i = l.findIndex(c => c.id === this.state.detail); if (i >= 0) this.setState({ detail: l[(i + 1) % l.length].id }); },
+      onDetailPick: () => { this.setState(s => ({ fx: (s.fx || 0) + 1 })); setTimeout(() => this.setState({ world: 'k:' + this.state.detail, detail: null, catOpen: false, fx: 0 }), 380); },
+      catCount: (() => { const n = CAT.filter(c => q ? c.name.toLowerCase().includes(q) : (tab === 'Vše' || c.grp === tab)).length; return n + (n === 1 ? ' POHÁDKA' : (n < 5 ? ' POHÁDKY' : ' POHÁDEK')); })(),
+      onOpenCat: () => this.setState({ catOpen: true }),

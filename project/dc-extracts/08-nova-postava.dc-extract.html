@@ -1,0 +1,53 @@
+<!--
+  Extracted verbatim from: project/2 Vyber pohady.dc.html (lines 234-280)
+  Screen: 8. Nova postava
+  Note: sheetOpen: jmeno, popis (nepovinne), fotka postavy (nepovinne).
+  Source: newest CD/Canva handoff zip, 2026-07-27 export. Not a React component -- raw .dc canvas markup/JS.
+-->
+  <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:72;display:flex;flex-direction:column">
+      <div style="{{ ovBgStyle }}"></div>
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(16,8,36,.72),rgba(16,8,36,.42) 32%,rgba(16,8,36,.55) 70%,rgba(14,7,32,.93))"></div>
+      <div style="position:relative;display:flex;flex-direction:column;height:100%;box-sizing:border-box;padding:50px 20px 26px;gap:14px">
+        <div style="display:flex;align-items:center;gap:12px;flex:none">
+          <button onClick="{{ onCloseSheet }}" aria-label="Zpět" style="flex:none;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(6px);color:#fdf3d7;font-size:22px;font-weight:800;cursor:pointer">‹</button>
+          <sc-if value="{{ sheetHasImg }}" hint-placeholder-val="{{ false }}">
+            <span style="{{ sheetAvatarStyle }}"></span>
+          </sc-if>
+          <sc-if value="{{ sheetIsNew }}" hint-placeholder-val="{{ false }}">
+            <span style="flex:none;width:48px;height:48px;border-radius:50%;background:url(assets/postavy/nova-postava.png) center/cover;border:2px solid rgba(253,224,138,.6);box-shadow:0 0 16px rgba(253,224,138,.35);box-sizing:border-box"></span>
+          </sc-if>
+          <div style="flex:1;min-width:0">
+            <div style="font-family:'Alegreya',Georgia,serif;font-size:24px;font-weight:800;color:#fdf3d7;text-shadow:0 2px 10px rgba(20,8,40,.7)">{{ sheetTitle }}</div>
+            <div style="font-size:13px;font-weight:700;color:rgba(253,243,215,.7)">{{ sheetSubtitle }}</div>
+          </div>
+          <sc-if value="{{ sheetHasImg }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ onSheetToggleSel }}" style="{{ sheetSelBtnStyle }}">{{ sheetSelLabel }}</button>
+          </sc-if>
+        </div>
+        <div style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px">
+          <section style="display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:26px;background:rgba(30,16,58,.6);border:1.5px solid rgba(253,224,138,.28);backdrop-filter:blur(12px);box-shadow:0 8px 28px rgba(8,3,20,.4)">
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-size:11.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.85)">JMÉNO *</span>
+              <input value="{{ sheetName }}" onChange="{{ onSheetName }}" placeholder="Kubík, Pohádková víla, Dráček…" style="height:48px;border:1.5px solid rgba(253,224,138,.4);border-radius:16px;padding:0 15px;font-size:15px;font-weight:700;color:#fdf3d7;background:rgba(16,8,36,.55);backdrop-filter:blur(6px);outline:none;font-family:'Nunito',sans-serif;box-sizing:border-box">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-size:11.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.85)">POPIS (NEPOVINNÉ)</span>
+              <textarea value="{{ sheetDesc }}" onChange="{{ onSheetDesc }}" rows="4" placeholder="Malý hnědý medvídek s červenou mašlí…" style="border:1.5px solid rgba(253,224,138,.4);border-radius:16px;padding:12px 15px;font-size:15px;line-height:1.5;font-weight:700;color:#fdf3d7;background:rgba(16,8,36,.55);backdrop-filter:blur(6px);outline:none;resize:none;font-family:'Nunito',sans-serif;box-sizing:border-box"></textarea>
+            </label>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:9px;padding:14px;border-radius:26px;background:rgba(30,16,58,.6);border:1.5px solid rgba(253,224,138,.28);backdrop-filter:blur(12px);box-shadow:0 8px 28px rgba(8,3,20,.4)">
+            <span style="font-size:11.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.85)">FOTKA POSTAVY (NEPOVINNÉ)</span>
+            <div style="display:flex;gap:9px">
+              <button style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="{{ discStyle }}">{{ ico.foto }}</span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Nahrát fotku ({{ sheetPhotos }}/5)</span></button>
+              <button style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="{{ discStyle }}">{{ ico.kamera }}</span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Vyfotit</span></button>
+            </div>
+          </section>
+        </div>
+        <div style="flex:none;display:flex;align-items:center;gap:10px">
+          <button onClick="{{ onCloseSheet }}" style="{{ ctaStyleFlat }}" style-active="transform:scale(.97)"><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">{{ sheetPrimaryLabel }}</span></button>
+          <button onClick="{{ onCloseSheet }}" style="flex:none;height:62px;padding:0 20px;border:1.5px solid rgba(253,224,138,.35);border-radius:999px;background:rgba(16,8,36,.5);color:#fdf3d7;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer">Zrušit</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>

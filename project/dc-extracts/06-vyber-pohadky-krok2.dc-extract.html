@@ -1,0 +1,68 @@
+<!--
+  Extracted verbatim from: project/2 Vyber pohady.dc.html (lines 92-153)
+  Screen: 6. Vyber pohadky - krok 2/2 (Pohadka)
+  Note: Step-2 main view (motiv/postavy/vypravec/delka entry points).
+  Source: newest CD/Canva handoff zip, 2026-07-27 export. Not a React component -- raw .dc canvas markup/JS.
+-->
+    <sc-if value="{{ s2 }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button onClick="{{ onBackToWorld }}" style="display:flex;align-items:center;gap:11px;padding:9px 14px;border-radius:20px;border:1.5px solid rgba(253,224,138,.35);background:rgba(30,16,58,.6);backdrop-filter:blur(12px);cursor:pointer;text-align:left;font-family:'Nunito',sans-serif">
+        <span style="{{ worldThumb }}"></span>
+        <span style="display:flex;flex-direction:column;gap:1px;flex:1">
+          <span style="font-size:10px;font-weight:800;letter-spacing:.09em;color:rgba(253,224,138,.75)">SVĚT POHÁDKY</span>
+          <span style="font-size:14px;font-weight:800;color:#fdf3d7">{{ worldName }}</span>
+        </span>
+        <span style="font-size:18px;color:rgba(253,224,138,.7)">›</span>
+      </button>
+      <section style="padding:11px 16px 12px;border-radius:24px;background:rgba(30,16,58,.65);border:1.5px solid rgba(253,224,138,.4);backdrop-filter:blur(12px);display:flex;flex-direction:column;gap:7px">
+        <div style="font-size:13px;font-weight:800;letter-spacing:.03em;color:rgba(253,243,215,.85)">Motiv pohádky</div>
+        <textarea value="{{ motiv }}" onChange="{{ onMotiv }}" placeholder="O čem by pohádka měla být… ✏️" rows="2" style="border:1px solid rgba(253,224,138,.35);border-radius:16px;padding:12px 16px;font-size:15px;font-weight:700;color:#fdf3d7;background:rgba(30,16,58,.5);outline:none;resize:none;font-family:'Nunito',sans-serif;cursor:pointer"></textarea>
+        <div style="display:flex;gap:8px">
+          <button onClick="{{ onNamet }}" style="{{ secBtnStyle }}" style-active="transform:scale(.96)">
+            <span style="{{ discStyle }}">{{ ico.namet }}</span>
+            <span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Vymysli námět</span>
+          </button>
+          <button style="{{ secBtnStyle }}" style-active="transform:scale(.96)">
+            <span style="{{ discStyle }}">{{ ico.rozvin }}</span>
+            <span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Rozvinout</span>
+          </button>
+        </div>
+      </section>
+      <section style="padding:11px 16px 12px;border-radius:24px;background:rgba(30,16,58,.65);border:1.5px solid rgba(253,224,138,.4);backdrop-filter:blur(12px)">
+        <div style="font-size:13px;font-weight:800;letter-spacing:.03em;color:rgba(253,243,215,.85);margin-bottom:6px">Kdo v pohádce vystupuje</div>
+        <div style="display:flex;gap:16px;align-items:flex-start;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(253,224,138,.55) rgba(255,255,255,.06);margin:0 -16px;padding:3px 16px 6px">
+          <sc-for list="{{ avatars }}" as="av" hint-placeholder-count="0">
+            <button onClick="{{ av.onTap }}" aria-label="{{ av.name }}" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;border:none;background:none;cursor:pointer;flex-shrink:0;scroll-snap-align:center">
+              <span style="position:relative;display:block">
+                <span style="{{ av.style }}"></span>
+                <sc-if value="{{ av.sel }}" hint-placeholder-val="{{ false }}">
+                  <span style="{{ badgeSel }}">✓</span>
+                </sc-if>
+              </span>
+              <span style="font-size:11px;font-weight:800;color:rgba(253,243,215,.9);max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ av.name }}</span>
+            </button>
+          </sc-for>
+          <button onClick="{{ onNew }}" aria-label="Vlastní postava" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;border:none;background:none;cursor:pointer;flex-shrink:0;scroll-snap-align:center">
+            <span style="{{ discAddStyle }}"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 6v12M6 12h12"></path></svg></span>
+            <span style="font-size:11px;font-weight:800;color:rgba(253,243,215,.7)">Přidat</span>
+          </button>
+        </div>
+      </section>
+      <button onClick="{{ onOpenVoices }}" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 16px;border-radius:24px;background:rgba(30,16,58,.65);border:1.5px solid rgba(253,224,138,.4);backdrop-filter:blur(12px);cursor:pointer;font-family:'Nunito',sans-serif;color:#fdf3d7" style-active="transform:scale(.99)">
+        {{ voiceAvatar }}
+        <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:11px;font-weight:800;letter-spacing:.09em;color:rgba(253,224,138,.8)">VYPRÁVÍ</span>
+          <span style="font-size:15px;font-weight:800">{{ voiceName }}</span>
+          <span style="font-size:11px;font-weight:700;color:rgba(253,243,215,.6)">{{ voiceSub }}</span>
+        </span>
+        <span style="flex:none;font-size:22px;color:rgba(253,224,138,.7)">›</span>
+      </button>
+      <section style="padding:10px 16px 11px;border-radius:24px;background:rgba(30,16,58,.65);border:1.5px solid rgba(253,224,138,.4);backdrop-filter:blur(12px)">
+        <div style="font-size:13px;font-weight:800;letter-spacing:.03em;color:rgba(253,243,215,.85);margin-bottom:4px">Délka pohádky</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="range" min="2" max="18" value="{{ len }}" onChange="{{ onLen }}" style="flex:1;height:20px;margin:0;accent-color:{{ accColor }};cursor:pointer">
+          <span style="flex:none;font-size:13px;font-weight:800;color:rgba(253,243,215,.9)">{{ len }} scén</span>
+        </div>
+      </section>
+    </div>
+    </sc-if>

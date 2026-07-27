@@ -1,0 +1,24 @@
+<!--
+  Extracted verbatim from: project/2 Vyber pohady.dc.html (lines 74-91)
+  Screen: 4. Vyber pohadky - katalog/vyhledavani
+  Note: Template (search input + Vse/Klasicke/Andersen/Svety tabs + grid). Real tab/grid text values are in the JS logic block, see companion .txt file.
+  Source: newest CD/Canva handoff zip, 2026-07-27 export. Not a React component -- raw .dc canvas markup/JS.
+-->
+    <sc-if value="{{ sCat }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <input value="{{ q }}" onChange="{{ onQ }}" placeholder="Hledat pohádku…" style="border:1px solid rgba(253,224,138,.4);border-radius:999px;padding:11px 18px;font-size:14px;font-weight:700;color:#fdf3d7;background:rgba(30,16,58,.7);outline:none;font-family:'Nunito',sans-serif">
+      <div style="display:flex;gap:6px;padding:4px;border-radius:999px;background:rgba(20,10,44,.55);border:1px solid rgba(253,224,138,.16)">
+        <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="3">
+          <button onClick="{{ tb.onTap }}" style="{{ tb.style }}">{{ tb.name }}</button>
+        </sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:11px">
+        <sc-for list="{{ catList }}" as="c" hint-placeholder-count="9">
+          <button onClick="{{ c.onTap }}" style="{{ c.style }}">
+            <span style="font-size:10.5px;font-weight:800;line-height:1.15;text-align:center;text-wrap:balance">{{ c.name }}</span>
+          </button>
+        </sc-for>
+      </div>
+      <div style="font-size:11px;font-weight:800;letter-spacing:.09em;color:rgba(253,224,138,.8);text-align:center;padding:2px 0 6px">{{ catCount }}</div>
+    </div>
+    </sc-if>

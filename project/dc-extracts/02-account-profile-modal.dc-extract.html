@@ -1,0 +1,91 @@
+<!--
+  Extracted verbatim from: project/1 Home.dc.html (lines 73-157)
+  Screen: 2. Account/profil modal
+  Note: Includes login form (loginOpen, 73-99) + account panel (accOpen, 100-157): credits, e-mail, password, logout.
+  Source: newest CD/Canva handoff zip, 2026-07-27 export. Not a React component -- raw .dc canvas markup/JS.
+-->
+  <sc-if value="{{ loginOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;background:rgba(12,5,28,.94);backdrop-filter:blur(10px);border-radius:38px;overflow:hidden">
+      <div style="padding:52px 26px 0;display:flex;align-items:center;gap:12px">
+        <button onClick="{{ onLoginClose }}" aria-label="Zavřít" style="border:none;background:rgba(30,16,58,.75);border-radius:999px;width:34px;height:34px;cursor:pointer;color:#fdf3d7;font-size:17px;font-family:'Nunito',sans-serif" style-active="transform:scale(.94)">‹</button>
+        <span style="font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;letter-spacing:.1em;color:rgba(253,224,138,.85)">{{ loginTitle }}</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:14px;padding:22px 26px 26px">
+        <h2 style="margin:0;font-family:'Alegreya',Georgia,serif;font-size:28px;font-weight:700;color:#fdf3d7">{{ loginHead }}</h2>
+        <label style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.8)">JMÉNO</span>
+          <input value="{{ lgName }}" onChange="{{ onLgName }}" placeholder="např. jan" style="border:1.5px solid rgba(253,224,138,.4);border-radius:16px;padding:13px 16px;font-size:15px;font-weight:700;color:#fdf3d7;background:rgba(30,16,58,.7);outline:none;font-family:'Nunito',sans-serif">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.8)">HESLO</span>
+          <input value="{{ lgPass }}" onChange="{{ onLgPass }}" type="password" placeholder="••••••••" style="border:1.5px solid rgba(253,224,138,.4);border-radius:16px;padding:13px 16px;font-size:15px;font-weight:700;color:#fdf3d7;background:rgba(30,16,58,.7);outline:none;font-family:'Nunito',sans-serif">
+        </label>
+        <sc-if value="{{ isRegister }}" hint-placeholder-val="{{ false }}">
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.8)">E-MAIL</span>
+            <input value="{{ lgMail }}" onChange="{{ onLgMail }}" placeholder="jan@email.cz" style="border:1.5px solid rgba(253,224,138,.4);border-radius:16px;padding:13px 16px;font-size:15px;font-weight:700;color:#fdf3d7;background:rgba(30,16,58,.7);outline:none;font-family:'Nunito',sans-serif">
+          </label>
+        </sc-if>
+        <button onClick="{{ onLoginSubmit }}" style="{{ ctaStyle }}" style-active="transform:scale(.97)">{{ loginCta }}</button>
+        <button onClick="{{ onLoginToggle }}" style="align-self:center;border:none;background:transparent;cursor:pointer;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:rgba(253,224,138,.85);text-decoration:underline;padding:4px">{{ loginSwitch }}</button>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ accOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ onAccClose }}" style="position:absolute;inset:0;z-index:44;background:rgba(8,3,20,.6)"></div>
+    <button onClick="{{ onAccClose }}" aria-label="Zavřít" style="position:absolute;z-index:46;top:54px;right:16px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid rgba(253,224,138,.4);background:rgba(24,12,48,.95);backdrop-filter:blur(8px);color:rgba(253,224,138,.85);cursor:pointer;box-shadow:0 6px 18px rgba(6,2,18,.5)" style-active="transform:scale(.92)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </button>
+    <div style="position:absolute;z-index:45;top:96px;right:14px;left:14px;display:flex;flex-direction:column;gap:14px;padding:18px;border-radius:28px;background:rgba(24,12,48,.97);border:1px solid rgba(253,224,138,.32);box-shadow:0 16px 44px rgba(6,2,18,.7);backdrop-filter:blur(12px)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="{{ avatarBigStyle }}">{{ initial }}</span>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-family:'Alegreya',Georgia,serif;font-size:23px;font-weight:700;color:#fdf3d7;line-height:1">{{ accName }}</span>
+          <span style="font-family:'Nunito',sans-serif;font-size:11.5px;font-weight:700;color:rgba(253,243,215,.6)">Přihlášen</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:20px;background:rgba(253,224,138,.1);border:1px solid rgba(253,224,138,.28)">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span style="{{ coinStyle }}">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="9"></circle></svg>
+          </span>
+          <div style="display:flex;flex-direction:column">
+            <span style="font-family:'Nunito',sans-serif;font-size:10.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.8)">KREDITY</span>
+            <span style="font-family:'Alegreya',Georgia,serif;font-size:22px;font-weight:700;color:#fdf3d7;line-height:1.1">{{ credits }}</span>
+          </div>
+        </div>
+        <button onClick="{{ onTopUp }}" style="{{ smallCtaStyle }}" style-active="transform:scale(.96)">Dobít kredit</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ accRows }}" as="r" hint-placeholder-count="2">
+          <button onClick="{{ r.onTap }}" style="{{ r.style }}">
+            <span style="display:flex;flex-direction:column;gap:1px;text-align:left">
+              <span style="font-family:'Nunito',sans-serif;font-size:10.5px;font-weight:800;letter-spacing:.08em;color:rgba(253,224,138,.75)">{{ r.label }}</span>
+              <span style="font-family:'Nunito',sans-serif;font-size:13.5px;font-weight:800;color:#fdf3d7">{{ r.value }}</span>
+            </span>
+            <span style="font-family:'Nunito',sans-serif;font-size:16px;font-weight:800;color:rgba(253,224,138,.7)">›</span>
+          </button>
+        </sc-for>
+      </div>
+      <sc-if value="{{ mailEdit }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;gap:8px">
+          <input value="{{ accMailDraft }}" onChange="{{ onAccMailDraft }}" placeholder="jan@email.cz" style="flex:1;border:1.5px solid rgba(253,224,138,.4);border-radius:14px;padding:11px 14px;font-size:14px;font-weight:700;color:#fdf3d7;background:rgba(30,16,58,.7);outline:none;font-family:'Nunito',sans-serif">
+          <button onClick="{{ onAccMailSave }}" style="{{ smallCtaStyle }}" style-active="transform:scale(.96)">Uložit</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{ passEdit }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <input type="password" placeholder="Stávající heslo" style="border:1.5px solid rgba(253,224,138,.4);border-radius:14px;padding:11px 14px;font-size:14px;font-weight:700;color:#fdf3d7;background:rgba(30,16,58,.7);outline:none;font-family:'Nunito',sans-serif">
+          <input type="password" placeholder="Nové heslo" style="border:1.5px solid rgba(253,224,138,.4);border-radius:14px;padding:11px 14px;font-size:14px;font-weight:700;color:#fdf3d7;background:rgba(30,16,58,.7);outline:none;font-family:'Nunito',sans-serif">
+          <button onClick="{{ onPassSave }}" style="{{ smallCtaStyle }}" style-active="transform:scale(.96)">Změnit heslo</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{ accNote }}" hint-placeholder-val="{{ false }}">
+        <span style="font-family:'Nunito',sans-serif;font-size:11.5px;font-weight:700;color:rgba(253,224,138,.8);text-wrap:pretty">{{ accNote }}</span>
+      </sc-if>
+      <button onClick="{{ onLogout }}" style="display:flex;align-items:center;justify-content:center;gap:8px;height:44px;border-radius:999px;border:1.5px solid rgba(248,113,113,.5);background:rgba(80,20,30,.35);cursor:pointer;font-family:'Nunito',sans-serif;font-size:13.5px;font-weight:800;color:#fca5a5;margin-top:2px" style-active="transform:scale(.97)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5H6a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h9"></path><path d="M18 8l3 4-3 4M21 12h-9"></path></svg>
+        <span>Odhlásit se</span>
+      </button>
+    </div>
+  </sc-if>

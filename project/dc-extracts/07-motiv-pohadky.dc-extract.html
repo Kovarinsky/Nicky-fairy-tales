@@ -1,0 +1,24 @@
+<!--
+  Extracted verbatim from: project/2 Vyber pohady.dc.html (lines 448-465)
+  Screen: 7. Motiv pohadky (velky editor textu)
+  Note: Standalone motivOpen overlay -- distinct from pdescOpen in 06b, titled exactly 'Motiv pohadky'.
+  Source: newest CD/Canva handoff zip, 2026-07-27 export. Not a React component -- raw .dc canvas markup/JS.
+-->
+    <sc-if value="{{ motivOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:70;display:flex;flex-direction:column">
+      <div style="{{ ovBgStyle }}"></div>
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(16,8,36,.6),rgba(16,8,36,.2) 28%,rgba(16,8,36,.3) 68%,rgba(14,7,32,.9))"></div>
+      <div style="position:relative;display:flex;flex-direction:column;height:100%;box-sizing:border-box;padding:54px 20px 30px;gap:16px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button onClick="{{ onMotivClose }}" aria-label="Zpět" style="flex:none;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(6px);color:#fdf3d7;font-size:22px;font-weight:800;cursor:pointer">‹</button>
+          <div style="font-family:'Alegreya',Georgia,serif;font-size:25px;font-weight:800;color:#fdf3d7;text-shadow:0 2px 10px rgba(20,8,40,.7)">Motiv pohádky</div>
+        </div>
+        <textarea value="{{ motiv }}" onChange="{{ onMotiv }}" autoFocus="{{ true }}" placeholder="O čem by pohádka měla být? Popiš svět, postavy, dobrodružství… ✏️" style="flex:1;min-height:0;border:1.5px solid rgba(253,224,138,.4);border-radius:22px;padding:18px;font-size:17px;line-height:1.55;font-weight:700;color:#fdf3d7;background:rgba(16,8,36,.55);backdrop-filter:blur(8px);outline:none;resize:none;font-family:'Nunito',sans-serif;box-sizing:border-box"></textarea>
+        <div style="display:flex;gap:10px">
+          <button onClick="{{ onNamet }}" style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="flex:none;width:28px;height:28px;border-radius:50%;background:url(assets/btn-ico-kostka.png) center/cover;box-shadow:0 1px 3px rgba(120,40,0,.25)"></span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Vymysli námět</span></button>
+          <button style="{{ secBtnStyle }}" style-active="transform:scale(.96)"><span style="flex:none;width:28px;height:28px;border-radius:50%;background:url(assets/btn-ico-jiskry.png) center/cover;box-shadow:0 1px 3px rgba(120,40,0,.25)"></span><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Rozvinout</span></button>
+        </div>
+        <button onClick="{{ onMotivClose }}" style="{{ ctaDoneStyle }}" style-active="transform:scale(.97)"><span style="text-shadow:0 1px 2px rgba(120,40,0,.35)">Hotovo</span></button>
+      </div>
+    </div>
+  </sc-if>
