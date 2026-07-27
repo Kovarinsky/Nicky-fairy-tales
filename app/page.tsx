@@ -9,6 +9,7 @@ import { UI, UI_LANG_KEY, type UILang } from "@/lib/i18n";
 import { BG_SCENES, bgSceneById, THEME_BG } from "@/lib/backgrounds";
 import { FOLK_TALES, folkTaleById } from "@/lib/folk-tales";
 import HomeScreen from "./HomeScreen";
+import WorldsScreen, { type WorldItem } from "./WorldsScreen";
 import { THEMES } from "@/lib/themes";
 import { upload as uploadToBlob } from "@vercel/blob/client";
 
@@ -3096,6 +3097,45 @@ export default function Home() {
   // dlaždic pod tímhle výběrem, na hodně vlastních světů to bylo nepřehledné.
   const [worldOpen, setWorldOpen] = useState(false);
   const [customWorldOpen, setCustomWorldOpen] = useState(false);
+  // 🎨 v5.0 redesign: samostatná obrazovka "Světy" z navigace na Home screenu
+  // (WorldsScreen.tsx) — podle struktury z Claude Design je to RYCHLÉ
+  // procházení vestavěných + vlastních světů, ODDĚLENÉ od staršího panelu
+  // uvnitř formuláře (ten navíc obsahuje i klasické/Andersenovy pohádky,
+  // které v CD patří do jiné obrazovky — katalogu ve StorySelectionScreen,
+  // zatím nezapojeného). Proto VLASTNÍ stav, ne sdílený s worldOpen.
+  const [worldsScreenOpen, setWorldsScreenOpen] = useState(false);
+  // 🎨 v5.0 WorldsScreen — samostatné handlery na customThemes (STEJNÁ data
+  // jako starší formulářový panel), ale nezávislé na jeho draft-stavu
+  // (newThemeName/newThemeDesc…), aby se dvě oddělené obrazovky nepletly.
+  function createCustomWorldFromScreen(data: { name: string; description: string }) {
+    const id = `ctheme_${Date.now()}`;
+    setCustomThemes(p => {
+      const next = [...p, { id, name: data.name, prompt: data.description || data.name }];
+      saveCustomThemes(next);
+      return next;
+    });
+    setSelectedTheme(id);
+  }
+  function editCustomWorldFromScreen(data: { id: string; name: string; description: string }) {
+    setCustomThemes(p => {
+      const next = p.map(ct => ct.id !== data.id ? ct : { ...ct, name: data.name, prompt: data.description || data.name });
+      saveCustomThemes(next);
+      return next;
+    });
+  }
+  async function studyWorldFromScreen(description: string): Promise<string> {
+    try {
+      const res = await fetch("/api/world-study", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(55_000),
+        body: JSON.stringify({ language: uiLang, name: uiLang === "en" ? "My world" : "Můj svět", description, photos: [] }),
+      });
+      const d = await safeJson<{ prompt?: string; question?: string | null }>(res);
+      if (res.ok && d.prompt) return d.question ? `${d.prompt}\n\n❓ ${d.question}` : d.prompt;
+    } catch {}
+    return description; // selhání -> appka nechá popis beze změny
+  }
   // 🧒 Výběr postav jako roller se zaškrtávátky (vícero postav najednou)
   const [charOpen, setCharOpen] = useState(false);
   // 💡 Ponaučení pohádky — rolovací výběr; text se předá vypravěči,
@@ -4261,10 +4301,28 @@ export default function Home() {
         onNav={key => {
           setShowIntro(false);
           if (key === "postavy") setCharOpen(true);
-          else if (key === "svety") setWorldOpen(true);
+          else if (key === "svety") setWorldsScreenOpen(true);
           else if (key === "hlas") setVoiceOpen(true);
           else if (key === "pozadi") setBgPickerOpen(true);
         }}
+      />
+    );
+  }
+
+  if (worldsScreenOpen && !readerMode) {
+    const worldsScreenItems: WorldItem[] = [
+      ...themes.map(th => ({ id: th.id, name: uiLang === "en" && th.nameEn ? th.nameEn : th.name, emoji: th.emoji })),
+      ...customThemes.map(ct => ({ id: ct.id, name: ct.name, image: ct.previewUrl, custom: true, description: ct.prompt })),
+    ];
+    return (
+      <WorldsScreen
+        worlds={worldsScreenItems}
+        onBack={() => setWorldsScreenOpen(false)}
+        onConfirm={w => { setSelectedTheme(w.id); setGpsSuccess(false); setWorldsScreenOpen(false); }}
+        onCreateWorld={createCustomWorldFromScreen}
+        onEditWorld={editCustomWorldFromScreen}
+        onRemoveWorld={removeCustomTheme}
+        onStudyWorld={studyWorldFromScreen}
       />
     );
   }
