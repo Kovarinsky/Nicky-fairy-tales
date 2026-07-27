@@ -697,6 +697,36 @@ export async function generateBackgroundImage(prompt: string, refImages: Referen
   throw lastErr;
 }
 
+// 🖼️ Vlastní pozadí z fotky (HomeScreen "+ VLASTNÍ"): appka pošle NAHRANOU
+// fotku a Gemini ji přemaluje do STEJNÉ ilustrační řeči jako zbytek appky
+// (viz BG_STYLE v lib/backgrounds.ts) — kompozice/motiv fotky zůstává
+// rozpoznatelný, jen se "obarví" do pohádkového stylu. Na rozdíl od
+// generateBackgroundImage (kde appka MALUJE novou scénu podle promptu a
+// fotka je jen reference na podobu postav) je tady fotka SAMOTNÝ podklad.
+export async function generateCustomBackgroundFromPhoto(photoBase64: string, photoMimeType: string): Promise<ImageResult> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
+  const model = IMAGE_MODEL.trim();
+  const prompt = [
+    "Repaint this exact photo as a warm, painterly children's storybook illustration background — Walt Disney animated style, rich saturated colors, cinematic warm lighting, portrait orientation.",
+    "Keep the same composition, subjects and framing as the photo — recognizable, just repainted in the illustration style, not a literal photo anymore.",
+    "Slightly dark and muted overall so white text on top of the image stays readable.",
+    "Absolutely no text, letters, words, signs, labels or watermarks anywhere in the image.",
+  ].join(" ");
+  const refImages: ReferenceImage[] = [{ data: photoBase64, mimeType: photoMimeType, label: "Photo to repaint as the illustration itself (not a character reference):" }];
+  let lastErr = new Error("Gemini nevrátil obrázek");
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await compressImage(await callGeminiImage(apiKey, model, prompt, "9:16", refImages));
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+      console.error(`[Gemini custom bg] attempt ${attempt}/3: ${lastErr.message}`);
+      if (attempt < 3) await new Promise(r => setTimeout(r, 3000 * attempt));
+    }
+  }
+  throw lastErr;
+}
+
 // 🎯 Vytáhne jmenovaný obsazovací seznam ze zavedené konvence, kterou vypravěč
 // VŽDY píše na konec imagePromptu ("Only X, Y present — no other people…").
 // Používá se jak pro explicitní "CAST:" popisek panelu v archu, tak pro

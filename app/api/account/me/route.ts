@@ -11,5 +11,5 @@ export async function GET(req: NextRequest) {
   const username = verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
   if (!username) return NextResponse.json({ error: "not logged in" }, { status: 401 });
   const acc = await readAccount(username);
-  return NextResponse.json({ username, credits: acc?.credits ?? 0 });
+  return NextResponse.json({ username, credits: acc?.credits ?? 0, email: acc?.email ?? null });
 }

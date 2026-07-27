@@ -10,6 +10,8 @@ import { BG_SCENES, bgSceneById, THEME_BG } from "@/lib/backgrounds";
 import { FOLK_TALES, folkTaleById } from "@/lib/folk-tales";
 import { THEMES } from "@/lib/themes";
 import { upload as uploadToBlob } from "@vercel/blob/client";
+import HomeScreen from "./HomeScreen";
+import type { AccountUser } from "./AccountModal";
 
 // ── Local types ─────────────────────────────────────────────────────────────
 interface CharOption { id: string; name: string; nameEn?: string; photo?: string; }
@@ -489,6 +491,10 @@ export default function Home() {
   // Reader mode: explicit switch so old story stays in memory when form opens
   const [viewMode, setViewMode] = useState<"form" | "reader">("form");
   const readerMode = viewMode === "reader";
+  // 🎨 v5.0 redesign: Home screen (cover) se ukáže PŘED starým formulářem —
+  // "Start nové pohádky" ho zavře. Zatím vede jen do stávajícího formuláře
+  // (StoryWorldStep/StoryDetailsStep z CD teprve čekají na napojení).
+  const [showIntro, setShowIntro] = useState(true);
 
   // UI language (CZ default; EN for Nicolas's foreign friends)
   const [uiLang, setUiLang] = useState<UILang>("cs");
@@ -3200,7 +3206,9 @@ export default function Home() {
     ? (THEME_BG[selectedTheme]
         ?? (customThemes.some(ct => ct.id === selectedTheme) || folkTaleById(selectedTheme) ? "fantasy" : "night"))
     : "fantasy"; // 🎨 výchozí pozadí appky = Kouzlo (bez vybraného tématu), na přání
-  const activeBg = bgChoice === "auto" ? autoBg : bgChoice;
+  // 🖼️ "custom" (viz HomeScreen "+ VLASTNÍ") NENÍ v BG_SCENES — je to vlastní
+  // fotka přemalovaná AI (customBg níž), ne jeden z 9 vestavěných světů.
+  const activeBg = bgChoice === "custom" ? "custom" : bgChoice === "auto" ? autoBg : bgChoice;
 
   // 🎨 Homepage: ambientní hudba podle SVĚTA POZADÍ — ale JEN když si ho
   // uživatel výslovně vybral ručně. V "auto" (výchozí, nezvoleno) appka hraje
@@ -3213,6 +3221,15 @@ export default function Home() {
     if (viewMode !== "form" || !musicOn) return;
     ambientRef.current?.setBackgroundWorld(bgChoice === "auto" ? undefined : bgChoice);
   }, [viewMode, bgChoice, musicOn]);
+
+  // 🖼️ Vlastní pozadí z fotky (HomeScreen "+ VLASTNÍ") — jedna URL na
+  // zařízení, uložená v localStorage; appka ji drží mimo bgUrlCacheRef
+  // (ten je klíčovaný podle scény z BG_SCENES, "custom" mezi ně nepatří).
+  const CUSTOM_BG_KEY = "nicky-custom-bg-url";
+  const [customBg, setCustomBg] = useState<string | null>(null);
+  useEffect(() => {
+    try { const v = localStorage.getItem(CUSTOM_BG_KEY); if (v) setCustomBg(v); } catch {}
+  }, []);
 
   const bgUrlCacheRef = useRef<Record<string, string>>({});
   useEffect(() => {
@@ -3227,6 +3244,10 @@ export default function Home() {
       img.src = url;
     };
     root.style.removeProperty("--bg-img");
+    if (activeBg === "custom") {
+      if (customBg) show(customBg);
+      return () => { dead = true; };
+    }
     const cached = bgUrlCacheRef.current[activeBg];
     if (cached) {
       show(cached);
@@ -3241,7 +3262,45 @@ export default function Home() {
         .catch(() => {});
     }
     return () => { dead = true; };
-  }, [activeBg]);
+  }, [activeBg, customBg]);
+
+  // 🎨 Home screen (v5.0): náhledy VŠECH vestavěných světů najednou (starý
+  // panel je ukazoval líně, jen při podržení) — první běh appky je vygeneruje
+  // (Gemini), Blob cache je pak drží hotové navždy pro všechny další.
+  const [bgAllUrls, setBgAllUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      for (const s of BG_SCENES) {
+        if (bgUrlCacheRef.current[s.id]) { setBgAllUrls(p => ({ ...p, [s.id]: bgUrlCacheRef.current[s.id] })); continue; }
+        try {
+          const r = await fetch(`/api/bg-image?scene=${s.id}`, { signal: AbortSignal.timeout(110_000) });
+          if (dead) return;
+          const d = r.ok ? (await r.json() as { url?: string }) : null;
+          if (dead || !d?.url) continue;
+          bgUrlCacheRef.current[s.id] = d.url;
+          setBgAllUrls(p => ({ ...p, [s.id]: d.url! }));
+        } catch { /* appka to zkusí znovu příště — fallback gradient zůstává vidět */ }
+      }
+    })();
+    return () => { dead = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function generateCustomBackground(photoDataUrl: string): Promise<string> {
+    const m = /^data:(.+?);base64,(.+)$/.exec(photoDataUrl);
+    if (!m) throw new Error("Neplatná fotka.");
+    const res = await fetch("/api/background-custom", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(110_000),
+      body: JSON.stringify({ photo: { data: m[2], mimeType: m[1] } }),
+    });
+    const d = await safeJson<{ url?: string; error?: string }>(res);
+    if (!res.ok || !d.url) throw new Error(d.error || "Nepodařilo se vytvořit ilustraci.");
+    setCustomBg(d.url);
+    try { localStorage.setItem(CUSTOM_BG_KEY, d.url); } catch {}
+    return d.url;
+  }
 
   // 🎬 Titulní obrazovka MUSÍ použít VLASTNÍ téma ČTENÉ pohádky, ne živý stav
   // formuláře (selectedTheme/activeBg) — jinak by při frontě víc pohádek s
@@ -3315,6 +3374,8 @@ export default function Home() {
   }
   const bgLabel = bgChoice === "auto"
     ? `🎨 ${t.bgAuto}`
+    : bgChoice === "custom"
+    ? (uiLang === "en" ? "🖼️ Custom" : "🖼️ Vlastní")
     : `${bgSceneById(bgChoice)!.emoji} ${uiLang === "en" ? bgSceneById(bgChoice)!.nameEn : bgSceneById(bgChoice)!.name}`;
 
   // 📝 Velký editor přání — ťuknutí do pole otevře okno přes displej,
@@ -3528,7 +3589,7 @@ export default function Home() {
     uiLang?: UILang;
   }
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const [account, setAccount] = useState<{ username: string } | null>(null);
+  const [account, setAccount] = useState<{ username: string; email?: string | null } | null>(null);
   // 💳 Kreditní systém (návrh „na čisto") — jen orientační zůstatek, žádné
   // vynucení v UI (server sám odmítne /api/job/start, když kreditů nezbývá)
   const [accountCredits, setAccountCredits] = useState<number | null>(null);
@@ -3547,7 +3608,7 @@ export default function Home() {
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         if (!d?.username) return;
-        setAccount({ username: d.username });
+        setAccount({ username: d.username, email: d.email ?? null });
         if (typeof d.credits === "number") setAccountCredits(d.credits);
         // ☁️ Doplnit z účtu i tehdy, když appka ZŮSTALA přihlášená (cookie
         // přežila), ale místní úložiště (historie pohádek) se ztratilo —
@@ -3636,20 +3697,26 @@ export default function Home() {
     if (data.uiLang && !localStorage.getItem(UI_LANG_KEY)) { localStorage.setItem(UI_LANG_KEY, data.uiLang); setUiLang(data.uiLang); }
   }
 
-  async function accountRegister() {
-    const username = accountUsername.trim();
-    const email = accountEmail.trim();
-    if (!username || accountPassword.length < 6) { setAccountError(t.accountErrShort); return; }
+  // 🎯 usernameArg/passwordArg/emailArg: appka teď má DVA formuláře, co
+  // volají tuhle funkci (starý draft panel STAVEM accountUsername/Password/
+  // Email, nový AccountModal/HomeScreen VLASTNÍMI daty z onLogin callbacku)
+  // — argumenty (když jsou zadané) mají přednost, ať se nečte živý draft-stav
+  // někoho jiného.
+  async function accountRegister(usernameArg?: string, passwordArg?: string, emailArg?: string) {
+    const username = (usernameArg ?? accountUsername).trim();
+    const password = passwordArg ?? accountPassword;
+    const email = (emailArg ?? accountEmail).trim();
+    if (!username || password.length < 6) { setAccountError(t.accountErrShort); return; }
     if (email && !EMAIL_RE.test(email)) { setAccountError(t.accountErrShortEmail); return; }
     setAccountBusy(true); setAccountError("");
     try {
       const res = await fetch("/api/account/register", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password: accountPassword, email: email || undefined, data: collectSyncData() }),
+        body: JSON.stringify({ username, password, email: email || undefined, data: collectSyncData() }),
       });
       const d = await safeJson<{ username?: string; credits?: number; error?: string }>(res);
       if (!res.ok || !d.username) { setAccountError(d.error || t.accountErrGeneric); return; }
-      setAccount({ username: d.username });
+      setAccount({ username: d.username, email: email || null });
       setAccountCredits(typeof d.credits === "number" ? d.credits : null);
       setAccountPanelOpen(false);
       setAccountUsername(""); setAccountPassword(""); setAccountEmail("");
@@ -3679,19 +3746,20 @@ export default function Home() {
     }
   }
 
-  async function accountLogin() {
-    const username = accountUsername.trim();
-    if (!username || !accountPassword) { setAccountError(t.accountErrShort); return; }
+  async function accountLogin(usernameArg?: string, passwordArg?: string) {
+    const username = (usernameArg ?? accountUsername).trim();
+    const password = passwordArg ?? accountPassword;
+    if (!username || !password) { setAccountError(t.accountErrShort); return; }
     setAccountBusy(true); setAccountError("");
     try {
       const res = await fetch("/api/account/login", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password: accountPassword }),
+        body: JSON.stringify({ username, password }),
       });
-      const d = await safeJson<{ username?: string; data?: SyncPayload; credits?: number; error?: string }>(res);
+      const d = await safeJson<{ username?: string; data?: SyncPayload; credits?: number; email?: string | null; error?: string }>(res);
       if (!res.ok || !d.username) { setAccountError(d.error || t.accountErrGeneric); return; }
       applySyncData(d.data);
-      setAccount({ username: d.username });
+      setAccount({ username: d.username, email: d.email ?? null });
       setAccountCredits(typeof d.credits === "number" ? d.credits : null);
       setAccountPanelOpen(false);
       setAccountUsername(""); setAccountPassword("");
@@ -3727,6 +3795,34 @@ export default function Home() {
       appAlert(t.accountErrGeneric);
     } finally {
       setAccountTopupBusy(false);
+    }
+  }
+
+  // 🎨 AccountModal (v5.0 redesign): dodatečná změna e-mailu/hesla u JIŽ
+  // přihlášeného účtu — appka to dřív uměla nastavit jen PŘI registraci.
+  async function accountSaveEmail(email: string) {
+    try {
+      const res = await fetch("/api/account/update", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const d = await safeJson<{ ok?: boolean; email?: string | null; error?: string }>(res);
+      if (!res.ok) { appAlert(d.error || t.accountErrGeneric); return; }
+      setAccount(a => a ? { ...a, email: d.email ?? null } : a);
+    } catch {
+      appAlert(t.accountErrGeneric);
+    }
+  }
+  async function accountSavePassword(current: string, next: string) {
+    try {
+      const res = await fetch("/api/account/update", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: current, newPassword: next }),
+      });
+      const d = await safeJson<{ ok?: boolean; error?: string }>(res);
+      if (!res.ok) { appAlert(d.error || t.accountErrGeneric); return; }
+    } catch {
+      appAlert(t.accountErrGeneric);
     }
   }
 
@@ -4263,6 +4359,32 @@ export default function Home() {
     }, delay);
     return () => clearTimeout(t);
   }, [current?.imageUrl, page, fixingScene]);
+
+  if (showIntro && !readerMode) {
+    const homeBgOptions = BG_SCENES.map(s => ({
+      id: s.id,
+      name: `${s.emoji} ${uiLang === "en" ? s.nameEn : s.name}`,
+      image: bgAllUrls[s.id] || "/bg-intro-v6.png",
+    }));
+    const homeUser: AccountUser | null = account ? { name: account.username, email: account.email ?? undefined, credits: accountCredits ?? 0 } : null;
+    return (
+      <HomeScreen
+        version={`v${APP_VERSION}`}
+        backgroundOptions={homeBgOptions}
+        selectedBackgroundId={bgChoice === "auto" ? autoBg : bgChoice}
+        onSelectBackground={pickBg}
+        customBackground={bgChoice === "custom" ? customBg : null}
+        onGenerateCustomBackground={generateCustomBackground}
+        user={homeUser}
+        onLogin={data => { if (data.isRegister) accountRegister(data.name, data.password, data.email); else accountLogin(data.name, data.password); }}
+        onLogout={accountLogout}
+        onTopUpCredits={accountTopup}
+        onSaveEmail={accountSaveEmail}
+        onSavePassword={accountSavePassword}
+        onStart={() => setShowIntro(false)}
+      />
+    );
+  }
 
   return (
     <div className={readerMode ? "container reader-mode" : "container"}>
@@ -5816,7 +5938,7 @@ export default function Home() {
                 <div className="app-confirm-btns">
                   <button type="button" className="cancel-btn" onClick={() => setAccountPanelOpen(false)}>✕ {t.cancel}</button>
                   <button type="button" className="btn-span2" disabled={accountBusy}
-                    onClick={accountMode === "login" ? accountLogin : accountRegister}>
+                    onClick={() => (accountMode === "login" ? accountLogin() : accountRegister())}>
                     {accountBusy ? "⏳" : accountMode === "login" ? "🔓" : "✨"} {accountMode === "login" ? t.accountLoginBtn : t.accountRegisterBtn}
                   </button>
                 </div>
