@@ -883,7 +883,12 @@ export default function Home() {
   // za sebou ("Připravuji pohádku" viselo, i když appka už dávno hlásila
   // hotovo). "Hotovo" teď znamená OPRAVDU hotovo — obrázky i hlas zároveň —
   // tahle dvojice sleduje postup namlouvání jako samostatný krok PO obrázcích.
-  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string; restarts?: number; stuckRestarts?: number; lastError?: string; log?: JobLogEntry[]; createdAt?: number; voiceDone?: number; voiceTotal?: number };
+  // 🎯 themeId/topic/selectedIds: snapshot toho, co bylo VYBRANÉ v okamžiku
+  // zadání TÉTO konkrétní pohádky — appka dřív tyhle údaje do historie
+  // dopisovala ze ŽIVÉHO stavu formuláře až po dokončení jobu; když si
+  // uživatel mezitím rozjel DALŠÍ pohádku s jiným světem, všechny rozdělané
+  // joby dostaly do historie to samé (poslední vybrané) téma/postavy/přání.
+  type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string; restarts?: number; stuckRestarts?: number; lastError?: string; log?: JobLogEntry[]; createdAt?: number; voiceDone?: number; voiceTotal?: number; themeId?: string; topic?: string; selectedIds?: string[] };
   const MAX_ACTIVE_JOBS = 3;
   // 📋 Otevřený deník běhu jobu (overlay) — entries se berou živě z pollů
   // (jobId → entries živě z pollů; entries → snapshot z hotové pohádky v historii)
@@ -2548,15 +2553,20 @@ export default function Home() {
       imageUrl: media[i]?.imageUrl || missingSvg,
       audioUrl: media[i]?.audioUrl,
     }));
+    // 🎯 Snapshot zadaný PŘI SPUŠTĚNÍ tohohle konkrétního jobu (viz addServerJob
+    // v createStory) — NE živý stav formuláře, který mezitím appka mohla
+    // přepsat kvůli DALŠÍ rozjeté pohádce. Fallback na živý stav zůstává jen
+    // pro joby obnovené ze starého localStorage (bez uloženého snapshotu).
+    const jobMeta = serverJobsRef.current.find(j => j.jobId === jobId);
     const entry: HistoryEntry = {
       id: jobId,
       title: st.title || "Pohádka",
       heroDescription: st.heroDescription || "",
       createdAt: new Date().toISOString(),
       scenes: script,
-      selectedIds,
-      themeId: selectedTheme,
-      topic,
+      selectedIds: jobMeta?.selectedIds ?? selectedIds,
+      themeId: jobMeta?.themeId ?? selectedTheme,
+      topic: jobMeta?.topic ?? topic,
       choice: st.choice,
       // ⏱ Tracker přípravy: celkem / z toho psaní (sekundy)
       prepSec: st.createdAt && st.finishedAt ? Math.max(0, Math.round((st.finishedAt - st.createdAt) / 1000)) : undefined,
@@ -2863,11 +2873,11 @@ export default function Home() {
     jobTimersRef.current.set(jobId, setInterval(tick, 4000));
   }
 
-  function addServerJob(jobId: string) {
+  function addServerJob(jobId: string, meta?: { themeId?: string; topic?: string; selectedIds?: string[] }) {
     if (!serverJobsRef.current.some(j => j.jobId === jobId)) {
       // ⏱ Optimistický start časomíry hned teď — první poll ho zpřesní na
       // skutečný serverový čas (st.createdAt), ať sedí i po obnovení stránky
-      syncServerJobs([...serverJobsRef.current, { jobId, phase: "writing", done: 0, total: 0, createdAt: Date.now() }]);
+      syncServerJobs([...serverJobsRef.current, { jobId, phase: "writing", done: 0, total: 0, createdAt: Date.now(), ...meta }]);
     }
     startJobPolling(jobId);
   }
@@ -2949,6 +2959,14 @@ export default function Home() {
       inspirationPdfBase64: inspPdfUse ? inspPdf?.base64 || undefined : undefined,
       inspirationPdfUrl: inspPdfUse ? inspPdf?.url || undefined : undefined,
     };
+    // 🎯 Snapshot TEĎ, synchronně — dole čeká dlouhý await (server job start
+    // i lokální /api/story fetch), během kterého appka klidně může mít
+    // rozjištěnou DALŠÍ pohádku a přepsat selectedTheme/topic/selectedIds.
+    // Historie musí dostat, co bylo vybrané PRO TUHLE pohádku, ne to, co je
+    // vybrané v okamžiku, kdy tenhle await doběhne.
+    const themeIdSnapshot = selectedTheme;
+    const topicSnapshot = topic;
+    const selectedIdsSnapshot = selectedIds;
 
     // Try the SERVER job first — generation survives app switches & screen off.
     // 2 attempts with a generous timeout (cold start + slow mobile upload);
@@ -2974,7 +2992,7 @@ export default function Home() {
           const { jobId } = await jobRes.json();
           if (jobId) {
             saveSettings({ selectedVoiceId, sceneCount, selectedTheme, selectedIds, selectedCustomIds });
-            addServerJob(jobId);
+            addServerJob(jobId, { themeId: themeIdSnapshot, topic: topicSnapshot, selectedIds: selectedIdsSnapshot });
             setSequelOf(null); // pokračování je zadané — chip zmizí
             return; // phone is free — the server does the work
           }
@@ -3044,9 +3062,9 @@ export default function Home() {
         heroDescription: script.heroDescription,
         createdAt: new Date().toISOString(),
         scenes: fullScenes,
-        selectedIds,
-        themeId: selectedTheme,
-        topic,
+        selectedIds: selectedIdsSnapshot,
+        themeId: themeIdSnapshot,
+        topic: topicSnapshot,
         choice: choiceMeta,
       };
       saveHistory(entry);
