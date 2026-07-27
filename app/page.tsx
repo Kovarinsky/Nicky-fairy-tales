@@ -8,6 +8,7 @@ import { APP_VERSION } from "@/lib/version";
 import { UI, UI_LANG_KEY, type UILang } from "@/lib/i18n";
 import { BG_SCENES, bgSceneById, THEME_BG } from "@/lib/backgrounds";
 import { FOLK_TALES, folkTaleById } from "@/lib/folk-tales";
+import HomeScreen from "./HomeScreen";
 import { THEMES } from "@/lib/themes";
 import { upload as uploadToBlob } from "@vercel/blob/client";
 
@@ -318,6 +319,12 @@ function goodnightText(lang: string): string {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function Home() {
+  // 🎨 v5.0 redesign (Claude Design): úvodní obrazovka před formulářem —
+  // appka ji od v4.99.9 vůbec neměla ("appka jde rovnou na formulář"), teď
+  // se vrací v nové podobě. Ukazuje se jednou za návštěvu (za otevřenou kartu
+  // prohlížeče) — "🏠 Domů" tlačítko jinde v appce se vrací na FORMULÁŘ, ne
+  // sem, ať to neruší rozjetou návštěvu.
+  const [showIntro, setShowIntro] = useState(true);
   // Form state
   const [chars, setChars] = useState<CharOption[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -4245,6 +4252,22 @@ export default function Home() {
     }, delay);
     return () => clearTimeout(t);
   }, [current?.imageUrl, page, fixingScene]);
+
+  if (showIntro && !readerMode) {
+    return (
+      <HomeScreen
+        version={`v${APP_VERSION}`}
+        onStart={() => setShowIntro(false)}
+        onNav={key => {
+          setShowIntro(false);
+          if (key === "postavy") setCharOpen(true);
+          else if (key === "svety") setWorldOpen(true);
+          else if (key === "hlas") setVoiceOpen(true);
+          else if (key === "pozadi") setBgPickerOpen(true);
+        }}
+      />
+    );
+  }
 
   return (
     <div className={readerMode ? "container reader-mode" : "container"}>
