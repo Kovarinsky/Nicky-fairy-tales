@@ -4368,21 +4368,23 @@ export default function Home() {
     }));
     const homeUser: AccountUser | null = account ? { name: account.username, email: account.email ?? undefined, credits: accountCredits ?? 0 } : null;
     return (
-      <HomeScreen
-        version={`v${APP_VERSION}`}
-        backgroundOptions={homeBgOptions}
-        selectedBackgroundId={bgChoice === "auto" ? autoBg : bgChoice}
-        onSelectBackground={pickBg}
-        customBackground={bgChoice === "custom" ? customBg : null}
-        onGenerateCustomBackground={generateCustomBackground}
-        user={homeUser}
-        onLogin={data => { if (data.isRegister) accountRegister(data.name, data.password, data.email); else accountLogin(data.name, data.password); }}
-        onLogout={accountLogout}
-        onTopUpCredits={accountTopup}
-        onSaveEmail={accountSaveEmail}
-        onSavePassword={accountSavePassword}
-        onStart={() => setShowIntro(false)}
-      />
+      <div className="cd-phone-frame">
+        <HomeScreen
+          version={`v${APP_VERSION}`}
+          backgroundOptions={homeBgOptions}
+          selectedBackgroundId={bgChoice === "auto" ? autoBg : bgChoice}
+          onSelectBackground={pickBg}
+          customBackground={bgChoice === "custom" ? customBg : null}
+          onGenerateCustomBackground={generateCustomBackground}
+          user={homeUser}
+          onLogin={data => { if (data.isRegister) accountRegister(data.name, data.password, data.email); else accountLogin(data.name, data.password); }}
+          onLogout={accountLogout}
+          onTopUpCredits={accountTopup}
+          onSaveEmail={accountSaveEmail}
+          onSavePassword={accountSavePassword}
+          onStart={() => setShowIntro(false)}
+        />
+      </div>
     );
   }
 

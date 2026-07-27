@@ -42,6 +42,22 @@ body {
   padding-bottom: var(--kb-pad, 0px);
 }
 
+/* 🎨 v5.0 redesign: CD kreslí každou obrazovku na pevných 390×844 px
+   (telefon) — jejich .screen je width:100%, takže bez tohohle wrapperu se
+   na širokém desktopu roztáhne přes celou stránku a rozhodí kompozici
+   (hvězdy/měsíc/svíčky mají pevné px pozice počítané pro úzký telefon).
+   Zabalením do max-width se to na desktopu chová jako telefon uprostřed
+   obrazovky — a platí to automaticky pro KAŽDOU další CD obrazovku, co se
+   sem napojí, žádná per-komponenta oprava. */
+.cd-phone-frame {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  height: 100dvh;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
 /* ── Pixelart pozadí přes celý screen ── */
 /* Nahrát soubor: public/bg-intro-v2.png (nebo .jpg / .webp / .gif) */
 .photo-bg {

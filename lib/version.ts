@@ -1,6 +1,9 @@
-export const APP_VERSION = "4.99.32";
+export const APP_VERSION = "4.99.33";
 
 // Changelog (newest first)
+// 4.99.33 - 🩺 OPRAVA: nový Home screen (v4.99.32) se na širokém desktopu roztahoval přes celou obrazovku a rozbil kompozici (CD kreslí na pevných 390×844 px pro telefon, hvězdy/svíčky mají pevné pozice) — přidán sdílený .cd-phone-frame wrapper (max-width 480px, na střed), který se použije na KAŽDOU další napojovanou CD obrazovku, ne jen tuhle.
+
+
 // 4.99.32 - 🎨 v5.0 REDESIGN, 1. OBRAZOVKA (tentokrát ze SKUTEČNÉHO čerstvého CD exportu, ne zastaralého): Home screen + Account modal. Jen 1 tlačítko "Start nové pohádky" (žádná lišta 4 ikon), chip vlevo nahoře na výběr pozadí (9 vestavěných ilustrovaných světů appky, viz lib/backgrounds.ts), avatar vpravo nahoře otevírá účet (kredity/e-mail/heslo/odhlásit). Nové kusy backendu: /api/account/update (appka dřív uměla nastavit e-mail/heslo jen PŘI registraci, ne pak dodatečně) a /api/background-custom (nahraná fotka → Gemini ji přemaluje do ilustračního stylu appky jako vlastní pozadí — úplně nová funkce z CD návrhu, appka dřív nic takového neměla). Zbytek appky (postavy/svět/hlas/atd.) zatím beze změny — napojuje se postupně, obrazovka po obrazovce.
 // 4.99.31 - 🐛 OPRAVA: fronta víc pohádek najednou (klasické+vlastní světy) mohla dopsat do historie VŠEM rozdělaným pohádkám STEJNÉ téma/přání/postavy — appka je do HistoryEntry dopisovala ze ŽIVÉHO stavu formuláře až po dokončení jobu (asynchronně), místo aby si je zapamatovala v okamžiku zadání. Když si uživatel mezitím rozjel DALŠÍ pohádku s jiným světem, starší rozjeté joby si "půjčily" poslední vybrané téma — a přes "Pokračování" se to mohlo přenést i do dalšího dílu. Teď se themeId/topic/selectedIds ukládají PŘÍMO k jobu v okamžiku zadání (serverová i lokální větev) a historie i pokračování je čtou odtud, ne ze živého stavu.
 // 4.99.30 - ⏪ Vráceno zpět: Home/Worlds screen redesign (v4.99.28-29) stavěl na zastaralém/nesprávném exportu z Claude Design (neodpovídal skutečnému aktuálnímu návrhu - jiné rozvržení, jiná tlačítka, jiná grafika). Appka je zpátky na původním flow, dokud nemáme přesný aktuální zdroj z CD.
