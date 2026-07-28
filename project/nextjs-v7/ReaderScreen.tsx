@@ -37,7 +37,7 @@ export default function ReaderScreen({
   const [uiVisible, setUiVisible] = useState(true);
   const [sentIdx, setSentIdx] = useState(0);
   const [wordIdx, setWordIdx] = useState(0);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     setSentIdx(0);
