@@ -370,6 +370,22 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           await write();
           return;
         }
+        // 🚦 I se SKUTEČNÝM pokrokem (stuckRestarts=0) může psaní teoreticky
+        // řetězit až st.chains>10 (~46 min, viz selfContinue výš) — daleko za
+        // dohodnutým cílem "max 5 min se vším všudy". overallTimeUp/
+        // hardDeadlineAt (280s od zadání) tenhle strop dřív hlídal jen pro
+        // KRESLENÍ, ne pro psaní — jenže psaní se, na rozdíl od kreslení,
+        // nedá "uzavřít s tím, co je hotovo" (rozepsaná pohádka bez konce se
+        // nedá přehrát). Vlastní, o něco velkorysejší strop (dává prostor
+        // dlouhým/dvoukoncovým pohádkám), ale ne neomezený.
+        const WRITING_HARD_DEADLINE_MS = 480_000; // 8 min od zadání
+        if (Date.now() - st.createdAt > WRITING_HARD_DEADLINE_MS) {
+          st.phase = "error";
+          st.error = "Psaní příběhu trvá výrazně déle než obvykle — appka to radši ukončí, než aby čekala donekonečna. Zrušte pohádku ✕ a zadejte ji znovu, případně s méně stránkami nebo bez alternativních konců.";
+          logEv(`⛔ STOP: psaní přesáhlo ${Math.round(WRITING_HARD_DEADLINE_MS / 1000)}s od zadání (${resumeText.length} znaků rozepsáno)`);
+          await write();
+          return;
+        }
       }
 
       // Heartbeat během psaní: stream průběžně obnovuje updatedAt (klient
