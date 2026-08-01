@@ -479,7 +479,14 @@ export default function Home() {
     }
   }
 
-  const allScenesReady = scenes.length > 0 && scenes.every(s => s.imageUrl && s.audioUrl);
+  // 🩺 Dřív tahle podmínka bral jen TRUTHY imageUrl — /api/scene ale při
+  // neúspěchu vrací i tak neprázdný string (SVG placeholder), takže scéna s
+  // NAVŽDY nepovedeným obrázkem (ale hotovým hlasem) appku přesvědčila, že je
+  // "celá pohádka hotová" (storyFullyReady níž), a pustila čtenáře do čtečky
+  // dřív, než bylo doopravdy vykresleno — přesně to, co appka NIKDY neměla
+  // dělat (viz komentář u bookReady). isPlaceholderImg tohle zavírá stejně,
+  // jako to už dřív dělalo bookReady pro scénu 1.
+  const allScenesReady = scenes.length > 0 && scenes.every(s => s.imageUrl && !isPlaceholderImg(s.imageUrl) && s.audioUrl);
   // bookReady: scéna 1 má SKUTEČNÝ (ne placeholder) obrázek — brána pro
   // zobrazení čtečky/titulky. Hlas VĚDOMĚ nevyžaduje: appka namlouvání
   // doplňuje líně/na pozadí (fillMissingAudio) i PO otevření pohádky — vázat
@@ -1231,6 +1238,19 @@ export default function Home() {
     const t = setTimeout(() => setTitleCardEscapeReady(true), 45_000);
     return () => clearTimeout(t);
   }, [titleCardOpen, storyFullyReady]);
+
+  // 🎨 Auto-retry nepovedené scény, DOKUD čtenář čeká na titulce (ne teprve
+  // až na ni narazí při listování — na tu stránku se totiž vůbec nedostane,
+  // dokud storyFullyReady není true, viz allScenesReady výš). Bez tohohle by
+  // JEDNA scéna, co se při generování nepovedla, appku uvěznila na
+  // "Připravuji pohádku…" navždy (jen 45s únik na Domů).
+  useEffect(() => {
+    if (!titleCardOpen || storyFullyReady || fixingScene !== null) return;
+    const broken = scenes.findIndex(s => s.imageUrl && isPlaceholderImg(s.imageUrl));
+    if (broken < 0) return;
+    const t = setTimeout(() => repairSceneImage(broken), 4000);
+    return () => clearTimeout(t);
+  }, [titleCardOpen, storyFullyReady, scenes, fixingScene]);
 
   // 🚫 ŽÁDNÉ automatické zavírání titulky ani časem, ani "číst i tak" — appka
   // čeká na výslovné ťuknutí, i kdyby to trvalo dlouho.

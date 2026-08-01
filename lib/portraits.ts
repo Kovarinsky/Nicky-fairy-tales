@@ -171,7 +171,10 @@ export async function loadPortraitRefs(characters: Character[]): Promise<Referen
 // nikdy stránku, kterou vidí čtenář, a jméno+cm napsané přímo u postavy nechá
 // jak kreslicí, tak kontrolní model přesně přiřadit barvu vlasů ke jménu —
 // cílí na nahlášenou záměnu „jednou Vája, potom Nicolásek".
-const FAMILY_SCALE_VERSION = 1;
+// v2: list teď prochází stejnou kontrolou (verifySceneImage) a zámkem
+// "absence je taky zámek" jako jednotlivé portréty (viz getFamilyScaleSheet
+// níž) — bump, ať se případný starý neověřený list v Blobu překreslí znovu
+const FAMILY_SCALE_VERSION = 2;
 // Duplikát CANONICAL_HEIGHT_CM z claude.ts (import by vytáhl celý claude.ts
 // do knihovny portrétů) — mění se JEN spolu s tamní tabulkou, viz komentář tam.
 const FAMILY_HEIGHT_CM: Record<string, number> = {
@@ -225,6 +228,10 @@ export async function getFamilyScaleSheet(): Promise<ReferenceImage | null> {
     const prompt = [
       `CHARACTER HEIGHT REFERENCE SHEET: ${cast.map(c => c.name).join(", ")} standing side by side in one row, shortest to tallest from left to right.`,
       `Exact appearances (copy faithfully): ${cast.map(c => c.description).join(" | ")}.`,
+      // 🩺 Stejná díra jako u portraitPrompt výš (viz komentář tam) — tenhle
+      // list ale navíc nemá ani kontrolu (verifySceneImage), takže chybný
+      // vzhled odsud šel rovnou do produkce jako "kotva" pro VŠECHNY scény.
+      `If any description above explicitly states a feature is ABSENT or DIFFERENT from what would be typical (e.g. "NO dark mask", "NO stripe", a specific marking instead of the usual one for this breed/type), that is a DELIBERATE correction — draw it EXACTLY as stated even if it contradicts what is typical/generic. Do not default to a stereotypical look when a description explicitly rules it out.`,
       `Every character FULL BODY head to toe, standing straight and relaxed facing the viewer, all feet on the SAME flat ground line, evenly spaced, plain soft warm-cream background, even flat lighting, no props, no scenery.`,
       `Their real heights are EXACTLY: ${cast.map(c => `${c.name} ${FAMILY_HEIGHT_CM[c.id]}cm`).join(", ")} — draw every body scaled precisely to these proportions relative to each other; this is the single most important requirement of this image.`,
       `Directly BELOW each character, print their name in capital letters and their height in parentheses as two short lines of clean plain text (e.g. "NICOLÁSEK" then "(111CM)") — this is the ONE exception in this whole book's art style where readable text is wanted, because this specific image is a private reference sheet for the illustrator, never a page shown to a reader.`,
@@ -232,7 +239,29 @@ export async function getFamilyScaleSheet(): Promise<ReferenceImage | null> {
       REFERENCE_SHEET_STYLE,
     ].join(" ");
     const photoRefs = loadReferenceImages(cast);
-    const img = await generateBackgroundImage(prompt, photoRefs);
+    const combinedDesc = cast.map(c => c.description).join(" | ");
+    const sceneDesc = `A height reference sheet with ${cast.map(c => c.name).join(", ")} standing side by side, shortest to tallest.`;
+    const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
+    let img = await generateBackgroundImage(prompt, photoRefs);
+    // 🩺 Portrét jednotlivce se OD v3 kontroluje (viz getCharacterPortrait
+    // výš — vadný portrét Belly se jinak stal referencí a chyba se
+    // replikovala do všech pohádek); tenhle celorodinný list byl na kontrolu
+    // dřív úplně slepý, přestože ho appka používá jako kotvu pro KAŽDOU
+    // scénu, ne jen pro jednu postavu — chyba tu měla ještě větší dosah.
+    let v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
+    if (v && !v.ok) {
+      console.warn(`[portraits] family scale sheet REJECTED (${v.problems.slice(0, 140)}) → redraw with correction`);
+      img = await generateBackgroundImage(
+        `${prompt} ⚠ CORRECTION: the previous attempt violated: ${v.problems.slice(0, 300)}. Follow every description EXACTLY (hair color, skin tone, markings, clothing).`,
+        photoRefs
+      );
+      v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
+      if (v && !v.ok) {
+        // ani oprava neprošla → RADĚJI ŽÁDNÝ list (scény pojedou bez výškové kotvy)
+        console.warn(`[portraits] family scale sheet still rejected (${v.problems.slice(0, 140)}) → skipping`);
+        return null;
+      }
+    }
     await put(pathName, img.buffer, {
       access: "public",
       contentType: img.mimeType,
