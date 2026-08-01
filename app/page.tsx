@@ -1298,6 +1298,10 @@ export default function Home() {
 
   // ── Auto-resume an interrupted generation after reload/app kill ───────────
   const resumeFiredRef = useRef(false);
+  // true while a FORGOTTEN pre-existing job silently finishes drawing in the
+  // background — see the effect below; excluded from the busy/"can't start
+  // another story" calculation (search localGen) so it never blocks new work.
+  const orphanResumeRef = useRef(false);
   useEffect(() => {
     if (resumeFiredRef.current) return;
     resumeFiredRef.current = true;
@@ -1317,7 +1321,16 @@ export default function Home() {
         return;
       }
       if (job.characterIds?.length) setSelectedIds(job.characterIds);
-      setLoading(true);
+      // 🩺 Tohle je TICHÉ doběhnutí staré přerušené pohádky z MINULÉ session
+      // (localStorage JOB_KEY), ne něco, co uživatel teď vědomě spustil.
+      // setLoading(true) tu dřív blokovalo "Start nové pohádky" (a celou
+      // frontu joblist) na CELOU dobu doběhnutí, i když fronta serverových
+      // jobů (SERVER_JOB_KEY, až 3 najednou) mezitím měla ještě volno —
+      // appka tak vypadala, že "zmizelo" tlačítko na další pohádku, jen
+      // proto, že na pozadí tiše dokresloval dávno zapomenutý starý pokus.
+      // orphanResumeRef appku informuje, ať tuhle konkrétní aktivitu
+      // nepočítá do "zaneprázdněno" pro tlačítko/frontu.
+      orphanResumeRef.current = true;
       try {
         // Background mode → progress toast; when done, the "Otevřít" toast appears
         const finalScenes = await generateMedia(
@@ -1325,7 +1338,7 @@ export default function Home() {
         );
         renderedMapRef.current.set(job.entryId, finalScenes);
       } catch {} finally {
-        setLoading(false);
+        orphanResumeRef.current = false;
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2050,26 +2063,42 @@ export default function Home() {
     if (missing.length === 0) return;
     let done = 0;
     let idx = 0;
+    // 🩺 Dřív appka zkusila namluvit chybějící scénu JEN JEDNOU — jeden
+    // ojedinělý timeout/chyba ElevenLabs u byť jediné scény z 12 znamenal, že
+    // tahle scéna nedostala hlas NIKDY. finalizeServerJob přesto pohádku
+    // označil za "hotovo" (žádná kontrola, že se fillMissingAudio doopravdy
+    // povedlo), takže appka pak čtenáře pustila do čtečky, kde na to
+    // storyFullyReady (obrázek I hlas KAŽDÉ scény) čekalo navždy — titulka
+    // uvízla na "Připravuji pohádku…" bez cesty ven (jen 45s únik na Domů).
+    // Až 3 pokusy na scénu s krátkou prodlevou tohle zavírá u drtivé většiny
+    // přechodných chyb, aniž by "hotovo" znamenalo "možná hotovo".
+    const MAX_ATTEMPTS = 3;
     const worker = async () => {
       while (idx < missing.length) {
         const i = missing[idx++];
-        try {
-          const s = entryScenes[i];
-          const res = await fetch("/api/scene", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            signal: AbortSignal.timeout(60_000),
-            body: JSON.stringify({
-              scene: { index: s.index, narration: s.narration, imagePrompt: s.imagePrompt || "x" },
-              audioOnly: true,
-              voiceId: voiceIdOverride ?? (selectedVoiceId || undefined),
-              deviceId: deviceId(),
-              language: uiLang,
-            }),
-          });
-          const d = await safeJson<{ audioUrl?: string }>(res);
-          if (res.ok && d.audioUrl) media[i] = { ...(media[i] || {}), audioUrl: d.audioUrl };
-        } catch {}
+        const s = entryScenes[i];
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+          try {
+            const res = await fetch("/api/scene", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              signal: AbortSignal.timeout(60_000),
+              body: JSON.stringify({
+                scene: { index: s.index, narration: s.narration, imagePrompt: s.imagePrompt || "x" },
+                audioOnly: true,
+                voiceId: voiceIdOverride ?? (selectedVoiceId || undefined),
+                deviceId: deviceId(),
+                language: uiLang,
+              }),
+            });
+            const d = await safeJson<{ audioUrl?: string }>(res);
+            if (res.ok && d.audioUrl) {
+              media[i] = { ...(media[i] || {}), audioUrl: d.audioUrl };
+              break;
+            }
+          } catch {}
+          if (attempt < MAX_ATTEMPTS) await new Promise(r => setTimeout(r, 2000 * attempt));
+        }
         done += 1;
         onProgress?.(done, missing.length);
       }
@@ -5156,7 +5185,7 @@ export default function Home() {
           // story the cards preview (default: the newest one)
           const activeJobs = serverJobs.filter(j => j.phase === "writing" || j.phase === "generating");
           const newestJob = activeJobs.find(j => j.jobId === focusJobId) ?? activeJobs[activeJobs.length - 1];
-          const localGen = loading || bgStatus === "writing" || bgStatus === "generating";
+          const localGen = loading || (!orphanResumeRef.current && (bgStatus === "writing" || bgStatus === "generating"));
           const isGenerating = localGen || !!newestJob;
           const bgGen = bgStatus === "generating";
           const jobGen = !localGen && newestJob?.phase === "generating";
