@@ -22,6 +22,16 @@ export default function ErrorBoundary({ error, reset }: { error: Error & { diges
           Appka narazila na neočekávanou chybu. Zkuste to prosím znovu — pokud
           se to bude opakovat, zkuste appku otevřít z hlavní stránky.
         </p>
+        {/* 🩺 Bez tohohle šlo nahlášení chyby jen jako screenshot obecné
+            hlášky ("Jejda, něco se pokazilo") bez jediné stopy, CO se
+            pokazilo — ladění pak bylo hádání bez důkazu. Technický řádek je
+            záměrně útlý/tlumený (rodičovská diagnostika, ne dětem na očích
+            jako hlavní sdělení), ale čitelný a screenshot-ovatelný. */}
+        {(error?.message || error?.digest) && (
+          <p style={{ opacity: 0.55, lineHeight: 1.4, margin: "0 0 1.2rem", fontSize: "0.8rem", fontFamily: "monospace", wordBreak: "break-word" }}>
+            {error?.message || "(bez zprávy)"}{error?.digest ? ` [${error.digest}]` : ""}
+          </p>
+        )}
         <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
           <button type="button" className="chip chip-btn chip-full chip-gps" onClick={() => reset()}>
             🔄 Zkusit znovu

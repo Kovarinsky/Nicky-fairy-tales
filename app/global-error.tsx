@@ -36,6 +36,11 @@ export default function GlobalErrorBoundary({ error, reset }: { error: Error & {
           <p style={{ opacity: 0.85, lineHeight: 1.55, margin: "0 0 1.2rem" }}>
             Appka narazila na neočekávanou chybu. Zkuste to prosím znovu.
           </p>
+          {(error?.message || error?.digest) && (
+            <p style={{ opacity: 0.55, lineHeight: 1.4, margin: "0 0 1.2rem", fontSize: "0.8rem", fontFamily: "monospace", wordBreak: "break-word" }}>
+              {error?.message || "(bez zprávy)"}{error?.digest ? ` [${error.digest}]` : ""}
+            </p>
+          )}
           <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
             <button type="button" onClick={() => reset()} style={{
               padding: "0.9rem", borderRadius: "14px", border: "none", fontWeight: 800, fontSize: "1rem",
