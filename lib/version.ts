@@ -1,6 +1,8 @@
-export const APP_VERSION = "4.99.33";
+export const APP_VERSION = "4.99.35";
 
 // Changelog (newest first)
+// 4.99.35 - 🩺 OPRAVA 3 velkých bugů z hlášení: (1) pád čtečky "po několika slidech" — auto-retry na nedokresleném obrázku volal repairSceneImage se zpožděním až 90s; pokud appka mezitím vyměnila/smazala pohádku, zápis výsledku spadl na neexistujícím indexu a shodil appku na "Jejda, něco se pokazilo" — teď se to tiše zahodí. (2) "Zkusit znovu"/"Domů" po pádu poslalo čtenáře úplně od začátku — draft rozečtené pohádky se dřív ukládal JEN při odchodu appky na pozadí (ne při běžném čtení), a i když se obnovil, appka nikdy nepřepnula zpátky do čtečky, jen na hlavní nabídku. Teď se pozice ukládá při každém otočení stránky a obnova rovnou vrátí do čtečky. (3) dokončená pohádka na pozadí "zmizela" a objevila se, až po reloadu appky, schovaná v Historii — appka teď rozečtenou/dokončenou pohádku otevře sama, pokud zrovna nečteš jinou.
+// 4.99.34 - 🩺 OPRAVA: dlaždice "+ VLASTNÍ" (vlastní pozadí z fotky) byla na běžné šířce telefonu vyseknutá mimo obrazovku a NEŠLA se k ní dostat vůbec (bgSheet byl neomezený flex řádek uvnitř overflow:hidden kontejneru, bez vlastního scrollu) — teď má bgSheet svůj horizontální scroll mezi existujícími okraji.
 // 4.99.33 - 🩺 OPRAVA: nový Home screen (v4.99.32) se na širokém desktopu roztahoval přes celou obrazovku a rozbil kompozici (CD kreslí na pevných 390×844 px pro telefon, hvězdy/svíčky mají pevné pozice) — přidán sdílený .cd-phone-frame wrapper (max-width 480px, na střed), který se použije na KAŽDOU další napojovanou CD obrazovku, ne jen tuhle.
 
 
