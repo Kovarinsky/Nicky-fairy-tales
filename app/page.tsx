@@ -491,6 +491,10 @@ export default function Home() {
   // Reader mode: explicit switch so old story stays in memory when form opens
   const [viewMode, setViewMode] = useState<"form" | "reader">("form");
   const readerMode = viewMode === "reader";
+  // Live mirror for async closures (job finish handlers) that can't see the
+  // latest render's viewMode via a stale closure — see finalizeServerJob.
+  const viewModeRef = useRef(viewMode);
+  useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
   // 🎨 v5.0 redesign: Home screen (cover) se ukáže PŘED starým formulářem —
   // "Start nové pohádky" ho zavře. Zatím vede jen do stávajícího formuláře
   // (StoryWorldStep/StoryDetailsStep z CD teprve čekají na napojení).
@@ -1077,6 +1081,13 @@ export default function Home() {
           readerHeroRef.current = histMatch.heroDescription || "";
           readerCharIdsRef.current = histMatch.selectedIds || [];
           setStoryChoice(histMatch.choice ?? null);
+          // 🩺 Dřív appka po přerušení (pád do chybové obrazovky, "Domů" po
+          // pádu, zabití appky na pozadí) obnovila data pohádky, ale nechala
+          // uživatele na hlavní ploše — vypadalo to, že musí začít znovu,
+          // i když rozečtená pohádka byla celá uložená. Rovnou ho vrátí do
+          // čtečky přesně na stránku, kde skončil.
+          setViewMode("reader");
+          setShowIntro(false);
           restored = true;
         }
         localStorage.removeItem(DRAFT_KEY);
@@ -1115,6 +1126,17 @@ export default function Home() {
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [scenes, title, page, viewMode]);
+
+  // 🩺 Draft se dřív ukládal JEN při odchodu z appky (visibilitychange) — pád
+  // za běhu čtení (appka zůstává na obrazovce viditelná) tak neměl co
+  // obnovit a "Zkusit znovu"/"Domů" po chybě poslalo čtenáře úplně od
+  // začátku. Ukládat i při každé změně stránky pokrývá i tenhle případ.
+  useEffect(() => {
+    if (!readerMode || scenes.length === 0 || !scenes.every(s => s.imageUrl)) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ id: readerEntryIdRef.current, title, scenes, page }));
+    } catch {}
+  }, [readerMode, scenes, title, page]);
 
   // ── Ambient music lifecycle ──
   useEffect(() => {
@@ -2420,6 +2442,11 @@ export default function Home() {
       const media = await safeJson<{ imageUrl?: string; audioUrl?: string; error?: string; imageDebug?: string }>(res);
       if (res.ok && media.imageUrl && !isPlaceholderImg(media.imageUrl)) {
         setScenes(prev => {
+          // Zatímco tenhle fetch (až 90s) běžel, mohla appka mezitím přepnout na
+          // jinou/žádnou pohádku (Domů, nová objednávka, ...) a scéna na indexu i
+          // už neexistuje — bez téhle pojistky n[i].audioUrl spadlo na
+          // "Cannot read properties of undefined" a shodilo celou appku.
+          if (!prev[i]) return prev;
           const n = [...prev];
           n[i] = { ...n[i], imageUrl: media.imageUrl, audioUrl: n[i].audioUrl || media.audioUrl };
           // překreslení se ULOŽÍ k pohádce — dřív po reloadu vadný obrázek zůstal
@@ -2628,6 +2655,14 @@ export default function Home() {
       done: rendered.filter(s => !isPlaceholderImg(s.imageUrl)).length,
       total: script.length,
     });
+    // 🚪 Dřív appka jen napsala "hotovo" do job-segu na formuláři a čekala na
+    // ruční ťuknutí "▶ Otevřít" — pokud uživatel mezitím zavřel appku nebo
+    // odešel jinam, pohádka "zmizela" a objevila se, až po reloadu, jen v
+    // Historii. Pokud čtenář zrovna nečte JINOU pohádku, appka teď dokončenou
+    // pohádku otevře sama, stejně jako by ťuknul na "▶ Otevřít".
+    if (viewModeRef.current !== "reader") {
+      openServerJob({ jobId, phase: "done", title: entry.title, done: script.length, total: script.length }).catch(() => {});
+    }
     // uvolnit průběžnou cache jobu
     jobMediaRef.current.delete(jobId);
     jobBuffersRef.current.delete(jobId);
