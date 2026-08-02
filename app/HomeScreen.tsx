@@ -9,6 +9,28 @@ import AccountModal, { AccountUser } from "./AccountModal";
  * Fonts (next/font or <link>): Alegreya 700–800, Nunito 600–800.
  */
 
+/** Zmenší obrázek (data URL) na max. rozměr na delší straně a přebalí jako
+ *  JPEG dané kvality — viz handleFile, proč je to nutné před uploadem. */
+function downscaleImage(dataUrl: string, maxDim: number, quality: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(dataUrl); return; }
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => reject(new Error("Fotku se nepodařilo zpracovat."));
+    img.src = dataUrl;
+  });
+}
+
 export interface HomeBackgroundOption {
   id: string;
   name: string;
@@ -89,7 +111,14 @@ export default function HomeScreen({
     const reader = new FileReader();
     reader.onload = async () => {
       try {
-        const out = await onGenerateCustomBackground(reader.result as string);
+        // 🩺 Fotky přímo z mobilu (typicky 3–8 MB) v base64 snadno přerostou
+        // limit payloadu serverové funkce (HTTP 413 "Request Entity Too
+        // Large / FUNCTION_PAYLOAD_TOO_LARGE") — appka tak vlastní pozadí
+        // nedokázala nahrát vůbec. Zmenšení na klientovi PŘED odesláním
+        // (1600px na delší straně stačí i pro AI referenci) tenhle limit
+        // spolehlivě obchází.
+        const downscaled = await downscaleImage(reader.result as string, 1600, 0.85);
+        const out = await onGenerateCustomBackground(downscaled);
         setFlowResult(out);
         setFlow("done");
       } catch (err) {
@@ -144,7 +173,24 @@ export default function HomeScreen({
       </header>
 
       <footer className={styles.footer}>
-        <button className={styles.cta} onClick={onStart}>
+        {/* 🔐 Přihlášení je teď POVINNÉ před vytvořením pohádky (appka
+            potřebuje sledovat aktivitu/kredity účtu) — proto je nahoře,
+            stejně velké a stejně "jiskřivé" jako Start, ne drobný vedlejší
+            odkaz pod ním jako dřív. */}
+        {!user && (
+          <button className={styles.loginBtn} onClick={() => setLoginOpen(true)}>
+            <span className={styles.sparkles} aria-hidden>
+              {SPARK_POS.map((s, i) => (
+                <span key={i} style={{ left: s[0], top: s[1], width: s[2], height: s[2], animationDelay: `${s[3]}s`, animationDuration: `${s[4]}s` }} />
+              ))}
+            </span>
+            <span className={styles.loginIcon}>
+              <UserIcon />
+            </span>
+            <span>Přihlásit se</span>
+          </button>
+        )}
+        <button className={styles.cta} onClick={() => { if (!user) { setLoginOpen(true); return; } onStart?.(); }}>
           <span className={styles.sparkles} aria-hidden>
             {SPARK_POS.map((s, i) => (
               <span key={i} style={{ left: s[0], top: s[1], width: s[2], height: s[2], animationDelay: `${s[3]}s`, animationDuration: `${s[4]}s` }} />
@@ -155,12 +201,6 @@ export default function HomeScreen({
           </span>
           <span>Start nové pohádky</span>
         </button>
-        {!user && (
-          <button className={styles.loginBtn} onClick={() => setLoginOpen(true)}>
-            <UserIcon />
-            <span>Přihlásit se</span>
-          </button>
-        )}
         <div className={styles.homeBar} />
       </footer>
 
@@ -168,9 +208,14 @@ export default function HomeScreen({
         <>
           <div className={styles.sheetScrim} onClick={() => setBgSheetOpen(false)} />
           <div className={styles.bgSheet}>
+            {/* 🏷️ Dřív byl u dlaždice jen kroužek s obrázkem — jméno světa
+                šlo poznat jen z aria-label (screen reader), vizuálně nebylo
+                jasné, co se vlastně vybírá. Teď je pod kroužkem i čitelný
+                popisek písmem appky (Nunito). */}
             {backgroundOptions.map((b) => (
               <button key={b.id} className={styles.bgOption} onClick={() => pickBg(b.id)} aria-label={b.name}>
                 <span className={activeBgId === b.id ? styles.bgOptionThumbActive : styles.bgOptionThumb} style={{ backgroundImage: `url(${b.image})` }} />
+                <span className={styles.bgOptionLabel}>{b.name}</span>
               </button>
             ))}
             <button className={activeBgId === "custom" ? styles.bgCustomTileActive : styles.bgCustomTile} onClick={() => setBgAddOpen(true)} aria-label="Vlastní pozadí z fotky">

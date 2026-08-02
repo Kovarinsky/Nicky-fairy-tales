@@ -935,12 +935,22 @@ export class AmbientPlayer {
     const { ctx } = this.setup();
     const t = ctx.currentTime;
 
+    // 🩺 Bez cancelScheduledValues appka občas SPADLA celá: rychlé listování
+    // stránek volá crossfadeToLayer dřív, než doběhne předchozí setValueCurveAtTime
+    // (1.6s náběh) — druhé volání na TÉTO STÁLE animující se vrstvě naplánovalo
+    // setTargetAtTime doprostřed běžící křivky, což Web Audio API zakazuje a
+    // vyhodí "setTargetAtTime(...) overlaps setValueCurveAtTime(...)", což
+    // shodilo celou appku (neodchycená chyba z audio vlákna). Zrušení
+    // naplánovaných hodnot před novým příkazem na STEJNÉM AudioParam je nutné
+    // pokaždé, když může doběhnout dřívější automatizace ještě neskončila.
     if (this.layer) {
       const old = this.layer;
+      old.gain.gain.cancelScheduledValues(t);
       old.gain.gain.setTargetAtTime(0, t, fadeOutSec);
       setTimeout(() => old.cleanup(), fadeOutSec * 6000);
     }
 
+    newLayer.gain.gain.cancelScheduledValues(t);
     newLayer.gain.gain.setValueAtTime(0, t);
     newLayer.gain.gain.setValueCurveAtTime(smoothstepCurve(), t + 0.05, fadeInSec);
     this.layer = newLayer;

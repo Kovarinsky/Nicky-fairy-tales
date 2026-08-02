@@ -8,10 +8,15 @@
 // Tahle stránka chybu odchytí a vždycky nabídne cestu ven.
 
 import { useEffect } from "react";
+import { recoverToHome, logClientError } from "@/lib/crash-recovery";
 
 export default function ErrorBoundary({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("[app error boundary]", error);
+    logClientError(error, "error");
+    // Appka NIKDY nesmí zůstat na výšku uzamčená v landscape/fullscreen
+    // z čtečky, i než čtenář stihne ťuknout na některé z tlačítek níž.
+    recoverToHome();
   }, [error]);
 
   return (
@@ -33,11 +38,11 @@ export default function ErrorBoundary({ error, reset }: { error: Error & { diges
           </p>
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-          <button type="button" className="chip chip-btn chip-full chip-gps" onClick={() => reset()}>
+          <button type="button" className="chip chip-btn chip-full chip-gps" onClick={() => { recoverToHome(); reset(); }}>
             🔄 Zkusit znovu
           </button>
           <button type="button" className="chip chip-btn chip-full"
-            onClick={() => { window.location.href = "/"; }}>
+            onClick={() => { recoverToHome(); window.location.href = "/"; }}>
             🏠 Domů (obnovit appku)
           </button>
         </div>
