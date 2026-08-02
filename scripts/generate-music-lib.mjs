@@ -90,7 +90,11 @@ async function generateSfx(text, durationSeconds, loop = false) {
 // ── 🎼 Nálady (Soundscape) — smyčkovatelné hudební podklady, 24s ──────────
 const SOUNDSCAPES = {
   magic: "Whimsical magical fairytale ambient music loop, soft twinkling bells, warm dreamy pad, sparkling and gentle, no drums, seamless loop, instrumental orchestral",
-  forest: "Peaceful forest ambient music loop, soft acoustic textures, gentle airy woodwind, light and calm atmosphere, no drums, seamless loop, instrumental",
+  // 🩺 Nahlášeno jako "moc creepy" — původní "peaceful forest... gentle
+  // airy woodwind" model interpretoval s temnějším/tajemným nádechem, i
+  // když text zněl klidně. Přepsáno v duchu "magic" nálady výš (třpytivé
+  // zvonky, teplá vrstva) + výslovný zákaz strašidelnosti, ne jen "klidné".
+  forest: "Whimsical magical forest ambient music loop, warm sparkling bells and soft airy woodwind, gentle dreamy pad, bright and inviting fairytale wonder, cheerful and cozy — NOT eerie, NOT dark, NOT spooky, NOT tense, major key throughout, no drums, seamless loop, instrumental",
   night: "Calm nighttime lullaby ambient music loop, soft dreamy pad, slow gentle bells, cozy and soothing, no drums, seamless loop, instrumental",
   adventure: "Adventurous storybook orchestral music loop, light rhythmic pulse, hopeful and energetic, playful brass and strings, seamless loop, instrumental",
   cozy: "Warm cozy fireside music loop, soft acoustic guitar and piano, gentle and comforting, seamless loop, instrumental",

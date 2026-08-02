@@ -18,7 +18,11 @@ import type { Character } from "./types";
 // v3: portréty procházejí KONTROLOU (dřív jediná cesta bez QA — vadný portrét
 // Belly se stal referencí a chyba se replikovala do všech pohádek) + popisy
 // nově zamykají barvu pleti; bump = celá knihovna se překreslí
-const PORTRAIT_VERSION = 3;
+// v4: Archieho popis dřív říkal "red-brindle" — model to bral jako výzvu k
+// výrazným tygřím pruhům, i když reálná fotka ukazuje skoro jednobarevnou
+// srst jen s náznakem žíhání; popis teď explicitně říká "SOLID... NOT
+// tiger-striped" (viz reference/characters.json)
+const PORTRAIT_VERSION = 4;
 const memCache = new Map<string, ReferenceImage>();
 
 const PORTRAIT_STYLE =
@@ -174,7 +178,9 @@ export async function loadPortraitRefs(characters: Character[]): Promise<Referen
 // v2: list teď prochází stejnou kontrolou (verifySceneImage) a zámkem
 // "absence je taky zámek" jako jednotlivé portréty (viz getFamilyScaleSheet
 // níž) — bump, ať se případný starý neověřený list v Blobu překreslí znovu
-const FAMILY_SCALE_VERSION = 2;
+// v3: Archieho popis se opravil (viz PORTRAIT_VERSION v4 výš) — list ho
+// cituje taky, musí se překreslit se stejnou opravou
+const FAMILY_SCALE_VERSION = 3;
 // Duplikát CANONICAL_HEIGHT_CM z claude.ts (import by vytáhl celý claude.ts
 // do knihovny portrétů) — mění se JEN spolu s tamní tabulkou, viz komentář tam.
 const FAMILY_HEIGHT_CM: Record<string, number> = {

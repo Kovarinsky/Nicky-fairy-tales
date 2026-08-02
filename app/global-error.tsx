@@ -5,10 +5,13 @@
 // vykreslila VLASTNÍ <html>/<body>, protože nahrazuje layout úplně).
 
 import { useEffect } from "react";
+import { recoverToHome, logClientError } from "@/lib/crash-recovery";
 
 export default function GlobalErrorBoundary({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("[app global error boundary]", error);
+    logClientError(error, "global");
+    recoverToHome();
   }, [error]);
 
   return (
@@ -42,13 +45,13 @@ export default function GlobalErrorBoundary({ error, reset }: { error: Error & {
             </p>
           )}
           <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-            <button type="button" onClick={() => reset()} style={{
+            <button type="button" onClick={() => { recoverToHome(); reset(); }} style={{
               padding: "0.9rem", borderRadius: "14px", border: "none", fontWeight: 800, fontSize: "1rem",
               background: "linear-gradient(135deg, #f59e0b 0%, #f97316 100%)", color: "#fff", cursor: "pointer",
             }}>
               🔄 Zkusit znovu
             </button>
-            <button type="button" onClick={() => { window.location.href = "/"; }} style={{
+            <button type="button" onClick={() => { recoverToHome(); window.location.href = "/"; }} style={{
               padding: "0.9rem", borderRadius: "14px", border: "1.5px solid rgba(255,255,255,0.3)", fontWeight: 800, fontSize: "1rem",
               background: "rgba(255,255,255,0.1)", color: "#fff", cursor: "pointer",
             }}>
