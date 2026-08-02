@@ -2991,6 +2991,14 @@ export default function Home() {
   // ── Create story (full flow) ──────────────────────────────────────────────
   async function createStory(e: React.FormEvent) {
     e.preventDefault();
+    // 🔐 Přihlášení je POVINNÉ před vytvořením pohádky (appka potřebuje
+    // sledovat aktivitu/kredity účtu) — vynuceno tady, ne jen na Home
+    // screen tlačítku, ať to nejde obejít žádnou jinou cestou k formuláři.
+    if (!account) {
+      setAccountPanelOpen(true);
+      setError(t.loginRequiredForStory);
+      return;
+    }
     const background = bookReady; // run in bg if current story (images) already visible
     setError("");
 

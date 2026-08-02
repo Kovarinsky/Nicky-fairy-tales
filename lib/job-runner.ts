@@ -13,14 +13,15 @@ import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/types";
 import { blobToken } from "@/lib/blob-token";
 import { chargeForCompletedStory } from "@/lib/accounts";
+import { estimateStoryCostCredits, actualStoryCostCredits } from "@/lib/pricing";
 
-// 💳 Kreditní systém (návrh „na čisto"): 1 kredit = 10 Kč = 1 pohádka.
-// Zatím jen jedna kvantifikovatelná přirážka (dva konce = dvojnásob psaní
-// i kreslení druhé poloviny) — další (delší pohádka, klonovaný hlas,
-// nastudování světa) přidáme, až budou mít vlastní pevnou cenovku.
-export function storyCreditCost(body: Record<string, unknown>): number {
-  return 1 + (body.twoEndings ? 1 : 0);
-}
+// 💳 Kreditní systém: "1 kredit = 1 Kč skutečných nákladů appky + 50% marže"
+// (viz lib/pricing.ts pro sazby a odůvodnění) — nahrazuje starý plochý model
+// (1 kredit = 1 pohádka bez ohledu na spotřebu). Před spuštěním appka umí
+// jen ODHADNOUT cenu (kolik obrázků/znaků pohádka bude potřebovat, viz
+// estimateStoryCostCredits) — skutečná cena (actualStoryCostCredits, dole
+// u "HOTOVO") vychází ze SKUTEČNĚ spotřebovaných zdrojů TÉTO pohádky.
+export { estimateStoryCostCredits };
 
 const ANCHOR_LABEL =
   "CONSISTENCY ANCHOR — an illustration from THIS SAME story. Copy from it EXACTLY: every character's design, clothing, hair, body size and the relative heights between characters, the art style, AND every recurring object. The car keeps the identical body type, shape, colors and details in this scene (a sedan stays a sedan — it never becomes a different car):";
@@ -429,12 +430,13 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         latestText = fullText;
         tryEarlyDraw(fullText);
         const now = Date.now();
-        if (now - lastBeat > 20_000) {
+        // 🕐 Klient polluje /api/job/status co 4s (viz startJobPolling,
+        // app/page.tsx) — 20s heartbeat tak nechal stejný "poslední" řádek
+        // viset klidně přes 4 polly v kuse a psaní působilo zaseknutě, i
+        // když appka reálně streamovala. 8s = skoro každý druhý poll vidí
+        // něco nového.
+        if (now - lastBeat > 8_000) {
           lastBeat = now;
-          // 📋 Dřív se během psaní do deníku nezapsalo nic 20–30s+ v kuse
-          // (jen heartbeat updatedAt) — vypadalo to zaseknuté, i když Claude
-          // reálně streamoval text. Teď je vidět živý postup: kolik znaků
-          // je zatím napsáno a jak dlouho psaní běží.
           logEv(`✍️ píšu… (${latestText.length} znaků zatím, ${secsSince(tWrite)}s)`);
           write();
           putJson(`jobs/${id}/partial.json`, { text: latestText })
@@ -498,11 +500,13 @@ export async function runJob(id: string, body: Record<string, unknown>) {
 
     // Měření spotřeby: SKUTEČNĚ vygenerované obrázky v tomto běhu (počítadlo
     // v gemini.ts — zahrnuje QA překreslení, portréty i archy; 1K a 4K se
-    // účtují zvlášť); hlas se účtuje líně v /api/scene
+    // účtují zvlášť). Namlouvání appka spouští líně až KLIENTSKY po
+    // dokončení jobu (fillMissingAudio, app/page.tsx), ale text scénáře —
+    // a tedy přesný počet znaků, co půjde do ElevenLabs — appka zná už teď.
     const genAtStart = { ...genCounter };
     const madeImages = () => Math.max(0, genCounter.img1k - genAtStart.img1k);
     const madeSheets = () => Math.max(0, genCounter.img4k - genAtStart.img4k);
-    const voiceChars = 0;
+    const voiceChars = scenesScript.reduce((sum, s) => sum + (s.narration?.length || 0), 0);
 
     // ── 2) Scenes (Gemini) with the consistency anchor ──
     // Reference postav = MALOVANÉ PORTRÉTY z kartotéky, ale CÍLENĚ: každá
@@ -869,9 +873,12 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     st.finishedAt = Date.now(); // ⏱ pohádka kompletní
     logEv(`✅ HOTOVO — celkem ${Math.round((st.finishedAt - st.createdAt) / 1000)}s od zadání (psaní ${st.wroteAt ? Math.round((st.wroteAt - st.createdAt) / 1000) : "?"}s, řetězů ${st.chains ?? 0})`);
     // 💳 Odečet kreditu — jen jednou (creditsCharged pojistí proti dvojímu
-    // odečtu, kdyby navázání/restart jobu proběhlo přes už dokončený stav)
+    // odečtu, kdyby navázání/restart jobu proběhlo přes už dokončený stav).
+    // Skutečná cena (ne odhad z /api/job/start) — portréty/archy z cache
+    // (jiná pohádka stejné rodiny) se neúčtují znovu, jen co se OPRAVDU
+    // nakreslilo v TOMHLE běhu (madeImages/madeSheets).
     if (st.username && !st.creditsCharged) {
-      const cost = storyCreditCost(body);
+      const cost = actualStoryCostCredits({ images1k: madeImages(), images4k: madeSheets(), voiceChars });
       await chargeForCompletedStory(st.username, cost).catch(() => {});
       st.creditsCharged = true;
     }
