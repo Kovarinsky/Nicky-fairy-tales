@@ -5204,6 +5204,12 @@ export default function Home() {
           // the SERVER job queue (serverJobs) — tapping a segment picks which
           // story the cards preview (default: the newest one)
           const activeJobs = serverJobs.filter(j => j.phase === "writing" || j.phase === "generating");
+          // 🩺 Job, co appka sama poznala jako zaseklý (j.stalled, viz
+          // maybeKickContinue), se NEPOČÍTÁ do stropu MAX_ACTIVE_JOBS — jinak
+          // stará tiše spadlá pohádka mohla natrvalo zabrat jedno ze 3 míst a
+          // zablokovat zadání úplně nové pohádky, dokud se auto-oživení
+          // nestihlo dokončit (nebo dokud si toho uživatel vůbec nevšiml).
+          const activeNonStalled = activeJobs.filter(j => !j.stalled);
           const newestJob = activeJobs.find(j => j.jobId === focusJobId) ?? activeJobs[activeJobs.length - 1];
           const localGen = loading || (!orphanResumeRef.current && (bgStatus === "writing" || bgStatus === "generating"));
           const isGenerating = localGen || !!newestJob;
@@ -5215,8 +5221,8 @@ export default function Home() {
           // Shimmer („píšu příběh") only while the LOCAL pipeline writes; a
           // queued server job shows its state in the toast rows instead
           const showShimmer = localGen && (bgStatus === "writing" || (bgStatus === "idle" && scenes.length === 0));
-          const canQueueMore = !localGen && activeJobs.length > 0 && activeJobs.length < MAX_ACTIVE_JOBS;
-          const btnBusy = localGen || activeJobs.length >= MAX_ACTIVE_JOBS;
+          const canQueueMore = !localGen && activeJobs.length > 0 && activeNonStalled.length < MAX_ACTIVE_JOBS;
+          const btnBusy = localGen || activeNonStalled.length >= MAX_ACTIVE_JOBS;
           const cardScenes: (RenderedScene | null)[] = jobGen
             ? (jobBuffersRef.current.get(newestJob.jobId) ?? Array(newestJob.total || sceneCount).fill(null))
             : bgGen
@@ -5694,8 +5700,14 @@ export default function Home() {
                       const dx = e.changedTouches[0].clientX - x0;
                       if (dx < -50) { swipeHandledRef.current = true; armDelete(entry.id); }        // swipe doleva = odjistit
                       else if (dx > 50 && confirmDeleteIdRef.current === entry.id) { swipeHandledRef.current = true; armDelete(null); } // swipe zpět
-                    }}
-                    disabled={loading && bgStatus === "idle"}>
+                    }}>
+                    {/* 🩺 Dřív disabled={loading && bgStatus === "idle"} — blokovalo
+                        otevření JAKÉKOLI uložené pohádky, kdykoli běželo generování
+                        na pozadí. replayStory je ale výslovně navržené fungovat
+                        SOUBĚŽNĚ s běžícím generováním (viz komentáře výš,
+                        "bg generation continues uninterrupted") — zaseklý/starý
+                        rozjetý běh tak zbytečně blokoval otevření úplně JINÉ,
+                        už dávno hotové pohádky. */}
                     {entry.coverUrl
                       ? <img src={entry.coverUrl} alt="" className="history-cover" loading="lazy" />
                       : <span className="history-cover history-cover-fallback" aria-hidden="true">📖</span>}
@@ -5703,6 +5715,10 @@ export default function Home() {
                       <span className="history-title-clip">
                         <span className={`history-title${entry.title.length > 24 ? " title-roll" : ""}`}>{entry.title}</span>
                       </span>
+                      {/* 🩺 Info odznaky (offline/velikost/scény/čas) odděleny od
+                          AKČNÍCH tlačítek (pokračování/poslat) — dřív byly
+                          namačkané v jedné řadě vedle sebe, špatně se od sebe
+                          rozeznávaly a hůř se na ně mířilo. */}
                       <div className="history-badges">
                         <span className="history-badge badge-offline">📥 offline</span>
                         <span className="history-badge badge-size">{estimateStorySize(entry.scenes.length)}</span>
@@ -5716,9 +5732,11 @@ export default function Home() {
                             ⏱ {fmtDur(entry.prepSec)}{entry.log?.length ? " 📋" : ""}
                           </span>
                         )}
-                        <span className="history-badge badge-sequel" role="button"
+                      </div>
+                      <div className="history-actions">
+                        <span className="history-action action-sequel" role="button"
                           onClick={e => startSequel(e, entry)}>✨ {t.sequelBtn}</span>
-                        <span className="history-badge badge-share" role="button"
+                        <span className="history-action action-share" role="button"
                           onClick={e => shareStory(e, entry)}>
                           {shareBusyId === entry.id
                             ? `⏳ ${shareProg ? `${shareProg.done}/${shareProg.total}` : ""}`
