@@ -201,7 +201,17 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   // obrázky (přijme první průchod i s vadami — jde je později 🖌 opravit
   // ručně) a nezahajuje další řetěz kvůli obrázkům — raději hotová pohádka
   // s pár nedokonalými scénami hned, než perfektní za 30 minut.
-  const HARD_DEADLINE_MS = 280_000; // 4:40 — necháváme ~20 s na dopsání a zápis
+  // 🕐 2026-08-05: pevných 280s napříč VŠEMI délkami neplatilo — živý test
+  // (5/10/15 scén) ukázal, že 15scénová pohádka narazila na strop s jen
+  // 10/15 hotovými scénami. Strop teď škáluje podle (efektivního, twoEndings
+  // navyšuje o ~30 %) počtu scén — delší pohádka dostane víc času, ne kratší
+  // rozpočet na scénu; ≤10 scén je beze změny (280s už ověřeně stíhá).
+  const requestedScenes = Math.max(1, Math.min(MAX_SCENES, Number(body.sceneCount) || 10));
+  const effectiveScenes = body.twoEndings ? Math.ceil(requestedScenes * 1.3) : requestedScenes;
+  const HARD_DEADLINE_MS =
+    effectiveScenes <= 10 ? 280_000 :  // 4:40 — ověřeno živě, stíhá
+    effectiveScenes <= 15 ? 360_000 :  // 6:00
+    480_000;                            // 8:00 — 16-20 (MAX_SCENES) scén
   const hardDeadlineAt = st.createdAt + HARD_DEADLINE_MS;
   const overallTimeUp = () => Date.now() > hardDeadlineAt;
 
@@ -813,9 +823,12 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     async function worker() {
       while (idx < total && !timeUp() && !overallTimeUp()) { const i = idx++; await doScene(i); }
     }
-    // 4 souběžní kreslíři (dřív 3) — sólo dokreslení po neprošlém archu je
-    // nejpomalejší fáze; Gemini limity 4 souběhy zvládají
-    await Promise.all(Array.from({ length: Math.min(4, Math.max(0, total - 1)) }, worker));
+    // 5 souběžných kreslířů (dřív 4, dřív 3) — sólo dokreslení po neprošlém
+    // archu je nejpomalejší fáze. 2026-08-05: opatrně zvýšeno o 1 kvůli
+    // testu, co ukázal 15scénové pohádky nestíhat — NEOVĚŘENO živě proti
+    // Gemini limitům, sleduj isDailyQuotaError/429 v logu po nasazení; při
+    // zhoršení (víc quota chyb, ne rychlejší dokreslení) vrať na 4.
+    await Promise.all(Array.from({ length: Math.min(5, Math.max(0, total - 1)) }, worker));
 
     // Verification rounds — the job is done only when every image exists
     for (let round = 0; round < 2 && !quotaExhausted && !timeUp() && !overallTimeUp(); round++) {
