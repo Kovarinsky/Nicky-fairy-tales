@@ -7,6 +7,7 @@
 // (oscillators, no files) in case a file is missing or fails to load —
 // appka must never go silent just because a music file 404s.
 
+import { GENDERED_SFX } from "./types";
 import type { Soundscape, SoundEffect } from "./types";
 export type { Soundscape, SoundEffect };
 
@@ -1054,13 +1055,19 @@ export class AmbientPlayer {
 
   /** 🔊 Jednorázový zvukový efekt podle děje scény — zkusí reálnou nahrávku
    *  (public/music-lib/sfx-<effect>.mp3), při chybě spadne na syntézu. Hraje
-   *  JEDNOU navrch aktuálního soundscape, ignorováno když appka mlčí. */
-  playEffect(effect: SoundEffect | undefined): void {
+   *  JEDNOU navrch aktuálního soundscape, ignorováno když appka mlčí.
+   *
+   *  U GENDERED_SFX (citoslovce) appka místo jednoho univerzálního souboru
+   *  přehraje mužskou/ženskou nahrávku podle Scene.sfxVoice (viz lib/types.ts)
+   *  — chybí-li (starší uložená pohádka bez pole, nebo appka scénu s ním
+   *  vůbec nepošle), spadne na ženskou variantu jako výchozí, ne na chybu. */
+  playEffect(effect: SoundEffect | undefined, voice?: "m" | "f"): void {
     if (!effect || !this.running) return;
     const { ctx } = this.setup();
     const fx = this.effectGain!;
-    this.loadBuffer(ctx, `sfx-${effect}`).then(buf => {
-      if (buf) this.playOneShot(ctx, buf, fx, `sfx-${effect}`);
+    const key = GENDERED_SFX.includes(effect) ? `sfx-${effect}-${voice || "f"}` : `sfx-${effect}`;
+    this.loadBuffer(ctx, key).then(buf => {
+      if (buf) this.playOneShot(ctx, buf, fx, key);
       else this.playEffectSynth(effect);
     });
   }

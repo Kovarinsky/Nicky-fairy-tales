@@ -1176,7 +1176,7 @@ export default function Home() {
     const key = `${readerEntryIdRef.current || "x"}:${page}`;
     if (sfxFiredRef.current === key) return;
     sfxFiredRef.current = key;
-    ambientRef.current?.playEffect(scenes[page]?.sfx);
+    ambientRef.current?.playEffect(scenes[page]?.sfx, scenes[page]?.sfxVoice);
   }, [page, bookReady, scenes]);
 
 

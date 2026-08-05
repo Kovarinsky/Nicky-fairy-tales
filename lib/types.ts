@@ -95,7 +95,20 @@ export interface Scene {
   soundscape?: Soundscape;
   /** Jednorázový zvukový efekt, pokud ho děj TÉTO scény výslovně zmiňuje */
   sfx?: SoundEffect;
+  /** U GENDERED_SFX klíčů (citoslovce) — pohlaví postavy, co zvuk vydává;
+   *  appka podle toho vybere mužskou/ženskou nahrávku (sfx-<klíč>-m/-f.mp3).
+   *  Bez efektu u ostatních (negenderovaných) sfx klíčů. */
+  sfxVoice?: "m" | "f";
 }
+
+/** 😊 Citoslovce/emoční reakce postav — jediná podmnožina SoundEffect, co má
+ *  mužskou i ženskou nahrávku (viz Scene.sfxVoice výš); generováno přes
+ *  ElevenLabs TTS (eleven_v3, audio tagy) konzistentním hlasem, ne přes
+ *  Sound Generation API univerzálním hlasem — viz scripts/generate-music-lib.mjs. */
+export const GENDERED_SFX: SoundEffect[] = [
+  "giggle", "cheer_yay", "sigh", "yawn", "sneeze", "hiccup", "hum_content",
+  "surprised_oh", "group_aww", "gasp_fear", "determined_grunt", "relief_exhale", "whisper",
+];
 
 /** Výstup Claude – hotový scénář */
 export interface StoryScript {

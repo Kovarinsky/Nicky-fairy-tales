@@ -96,6 +96,53 @@ async function generateSfx(text, durationSeconds, loop = false) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+// 😊 2026-08-05: citoslovce/emoční reakce postav (giggle/sigh/yawn/…) dřív
+// jely přes Sound Generation API univerzálním hlasem — cizím, nesouvisejícím
+// s hlasem vypravěče appky (nahlášeno jako "umělý" dojem). Přepsáno na
+// ElevenLabs TEXT-TO-SPEECH s modelem eleven_v3, který umí audio tagy
+// ([giggles], [sighs], [whispers]…) v 70+ jazycích včetně češtiny — a na
+// žádost uživatele generuje KAŽDÉ citoslovce v mužské I ženské verzi (viz
+// Scene.sfxVoice, lib/types.ts), appka vybere podle pohlaví postavy ve scéně.
+// Hlasy: Jessica (Playful, Bright, Warm) a Will (Relaxed Optimist) — obě
+// premade hlasy z ElevenLabs knihovny, ne klon konkrétního vypravěče (to by
+// vyžadovalo generovat zvlášť pro každý hlas z voice pickeru appky).
+const INTERJECTION_VOICES = {
+  f: "cgSgspJ2msm6clMCkdW9", // Jessica - Playful, Bright, Warm
+  m: "bIHbv24MWmeRgasZH58o", // Will - Relaxed Optimist
+};
+const INTERJECTIONS = {
+  giggle: "[giggles softly] Hihi!",
+  cheer_yay: "[cheers happily] Yay!",
+  // 🩺 audio-tag-ONLY text (bez skutečných slov/citoslovce navíc) API
+  // odmítá s "input_text_empty" — tag samotný po odstranění nepočítá jako
+  // obsah. Každá položka proto potřebuje aspoň krátké vokální "slovo".
+  sigh: "[sighs contentedly] Ahh...",
+  yawn: "[yawns sleepily] Ahhh...",
+  sneeze: "[sneezes softly] Achoo!",
+  hiccup: "[hiccups] Hic! [hiccups] Hic!",
+  hum_content: "[hums happily] Mmmmm...",
+  surprised_oh: "[gasps softly] Oh!",
+  group_aww: "[says warmly] Awww...",
+  gasp_fear: "[gasps in mild fright] Oh!",
+  determined_grunt: "[grunts with effort] Hff!",
+  relief_exhale: "[exhales in relief] Phew...",
+  whisper: "[whispers softly] Shh...",
+};
+
+async function generateVoiceLine(text, voiceId) {
+  const res = await fetch(`${API}/v1/text-to-speech/${voiceId}?output_format=mp3_44100_192`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      text,
+      model_id: "eleven_v3",
+      voice_settings: { stability: 0.5, similarity_boost: 0.8, use_speaker_boost: true },
+    }),
+  });
+  if (!res.ok) throw new Error(`TTS HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
 // ── 🎼 Nálady (Soundscape) — smyčkovatelné hudební podklady, 24s ──────────
 const SOUNDSCAPES = {
   magic: "Whimsical magical fairytale ambient music loop, soft twinkling bells, warm dreamy pad, sparkling and gentle, no drums, seamless loop, instrumental orchestral",
@@ -307,21 +354,9 @@ const SFX = {
   kite_flutter: ["a kite fluttering and flapping gently in the wind", 2.0, false],
   candle_blow: ["a person blowing out birthday candles with one breath, a soft whoosh of air, cheerful", 1.5, false],
   coin_collect: ["a cheerful video-game-style coin collect chime, bright bell-like ping", 1.0, false],
-  // 😊 citoslovce/emoční reakce postav — NEmluvené, jen zvuk (viz komentář
-  // v lib/claude.ts o možné umělosti; univerzální model, ne konkrétní hlas)
-  giggle: ["children giggling softly together, happy and playful", 2.0, false],
-  cheer_yay: ["a small group of children cheering happily, 'yay'", 1.5, false],
-  sigh: ["a person letting out a soft contented sigh", 1.5, false],
-  yawn: ["a person yawning softly, sleepy", 1.5, false],
-  sneeze: ["a person sneezing once, a gentle 'achoo'", 1.0, false],
-  hiccup: ["a person hiccupping twice, cute and small", 1.5, false],
-  hum_content: ["a person humming a short happy tune, content", 2.0, false],
-  surprised_oh: ["a person gasping softly in pleasant surprise, 'oh!'", 1.0, false],
-  group_aww: ["a small group softly saying 'aww' together, warm and endeared", 1.5, false],
-  gasp_fear: ["a person gasping in sudden but mild fright, not too scary", 1.0, false],
-  determined_grunt: ["a person letting out a short determined effortful grunt", 1.0, false],
-  relief_exhale: ["a person letting out a long relieved breath, calming down", 1.5, false],
-  whisper: ["a soft hushed whisper, a few quiet words, indistinct", 1.5, false],
+  // 😊 citoslovce/emoční reakce postav PŘESUNUTY NÍŽ na INTERJECTIONS — viz
+  // komentář tam, generují se přes TTS (eleven_v3, audio tagy) v mužské i
+  // ženské verzi, ne přes tuhle Sound Generation cestu.
   // 🎻 nástroje/předměty — obecný "masterprompt" pokrývá jakýkoli konkrétní
   // nástroj/objekt, kterým se v ději právě zahraje/manipuluje (viz lib/claude.ts)
   violin: ["a short cheerful violin melody being played, a simple folk tune", 3.0, false],
@@ -391,6 +426,19 @@ async function main() {
     if (buf) { writeFileSync(path, buf); manifest[`sfx-${key}`] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
     else fail++;
     await new Promise(r => setTimeout(r, 300)); // šetrné tempo k API
+  }
+
+  console.log(`🗣️ Citoslovce, mužský+ženský hlas (${Object.keys(INTERJECTIONS).length * 2})`);
+  for (const [key, text] of Object.entries(INTERJECTIONS)) {
+    for (const gender of ["f", "m"]) {
+      const outKey = `sfx-${key}-${gender}`;
+      const path = `${OUT_DIR}/${outKey}.mp3`;
+      if (shouldSkip(path)) { manifest[outKey] = statSync(path).size; console.log(`   ⏭️  ${outKey} (už existuje)`); continue; }
+      const buf = await withRetry(() => generateVoiceLine(text, INTERJECTION_VOICES[gender]), outKey);
+      if (buf) { writeFileSync(path, buf); manifest[outKey] = buf.length; ok++; console.log(`   ✅ ${outKey} (${buf.length} B)`); }
+      else fail++;
+      await new Promise(r => setTimeout(r, 300)); // šetrné tempo k API
+    }
   }
 
   writeFileSync(`${OUT_DIR}/manifest.json`, JSON.stringify(manifest, null, 2));
