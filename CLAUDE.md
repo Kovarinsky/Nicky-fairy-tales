@@ -13,6 +13,11 @@ nakreslí ilustrace s konzistentním hrdinou (fotky reálných dětí/mazlíčk�
   NEIMPLEMENTOVANÁ zadání (aby se neztratila mezi sezeními/agenty). Jakmile
   se položka odsud implementuje, přesune se jako záznam do `lib/version.ts`
   a tady se smaže.
+- **`ECONOMY-PLAN.md`** — 2026-08-06 zadání „5 stran <3min/7,5Kč, 10 <4min/10Kč,
+  15 6-7min/15Kč, cca 1 Kč/stránka" + „zamčená knihovna postav" architektura.
+  Research + plán, ČEKÁ na schválení směru (hlavně jak agresivně jít do
+  znovupoužívání pozadí/póz místo čerstvé ilustrace na každé stránce — mění
+  to vizuální identitu appky, viz dokument bod 3/6) — NEIMPLEMENTOVÁNO.
 
 ## Produktové principy (DNA)
 
