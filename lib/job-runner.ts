@@ -536,7 +536,14 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       { customCharacters: rawCustomForNames } as StoryExtras
     );
     const inventedRefs = new Map<string, ReferenceImage>();
-    const nameHit = (text: string, name: string): boolean => {
+    // 🩺 2026-08-05: nahlášeno "Cannot read properties of undefined (reading
+    // 'toLowerCase')" — job spadl hned po dokreslení scény 2 (viz volání na
+    // scene.imagePrompt níž). Buď scene.imagePrompt, nebo jméno z
+    // inventedNames může být za nějakých okolností undefined/prázdné (zatím
+    // se nepodařilo přesně dohledat proč, tenhle guard aspoň zavírá celou
+    // třídu pádu bez ohledu na to, které z obou to bylo).
+    const nameHit = (text: string | undefined, name: string | undefined): boolean => {
+      if (!text || !name) return false;
       const low = ` ${text.toLowerCase()} `;
       const k = name.toLowerCase();
       const i = low.indexOf(k);
