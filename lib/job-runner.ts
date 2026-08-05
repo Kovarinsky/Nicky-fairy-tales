@@ -717,6 +717,12 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // castSize teď počítá se SKUTEČNĚ použitým obsazením (charactersForNames
     // + rawCustomForNames), ne jen s explicitním výběrem klienta.
     const castSize = charactersForNames.length + (rawCustomForNames?.length ?? 0);
+    // 🩺 2026-08-05: nepodmíněný diagnostický log — dřívější "🧪" hlášky
+    // se vypisovaly jen nad určitým prahem, takže při NEČEKANĚ nízkém
+    // castSize (viz test: fallback na celou rodinu i tak vyšel <3, archy
+    // běžely v defaultu) appka mlčela a nešlo to ověřit jinak než odhadem
+    // z chování. Tohle ukáže castSize napřímo, pokaždé.
+    logEv(`🧬 castSize=${castSize} (charactersForNames=${charactersForNames.length}, rawCustomForNames=${rawCustomForNames?.length ?? 0}, body.characterIds=${JSON.stringify(body.characterIds)})`);
     // 🩺 stejný test: u castSize 4+ archy prošly v 0-8 % případů napříč
     // 5 dávkami — přeskočit je úplně je dražší (víc sólo obrázků), ale
     // mnohem rychlejší a spolehlivější než 250s skoro bez užitku.
