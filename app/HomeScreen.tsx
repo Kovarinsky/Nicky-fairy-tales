@@ -46,6 +46,7 @@ export default function HomeScreen({
   onGenerateCustomBackground,
   version,
   user,
+  accountChecked = true,
   onLogin,
   onLogout,
   onTopUpCredits,
@@ -62,6 +63,11 @@ export default function HomeScreen({
   onGenerateCustomBackground?: (photoDataUrl: string) => Promise<string>;
   version?: string;
   user?: AccountUser | null;
+  /** false, dokud appka ještě neověřila session cookie (/api/account/me) —
+   *  dokud appka neví jistě, jestli je uživatel přihlášený, radši nezobrazí
+   *  ani "Přihlásit se", ani odznak účtu (viz onStart), ať se u někoho, kdo
+   *  JE přihlášený z dřívějška, na okamžik nemihne špatný (odhlášený) stav. */
+  accountChecked?: boolean;
   onLogin?: (data: { name: string; password: string; email: string; isRegister: boolean }) => void;
   onLogout?: () => void;
   onTopUpCredits?: () => void;
@@ -165,7 +171,7 @@ export default function HomeScreen({
           <br />
           pohádky
         </h1>
-        {user && (
+        {accountChecked && user && (
           <button className={styles.avatarBtn} onClick={() => setAccountOpen(true)} aria-label="Účet">
             {user.name.charAt(0).toUpperCase()}
           </button>
@@ -176,8 +182,14 @@ export default function HomeScreen({
         {/* 🔐 Přihlášení je teď POVINNÉ před vytvořením pohádky (appka
             potřebuje sledovat aktivitu/kredity účtu) — proto je nahoře,
             stejně velké a stejně "jiskřivé" jako Start, ne drobný vedlejší
-            odkaz pod ním jako dřív. */}
-        {!user && (
+            odkaz pod ním jako dřív.
+            🩺 accountChecked hlídá i to, aby appka "Přihlásit se" nemihla
+            při KAŽDÉM startu ještě předtím, než se stihne ověřit session
+            cookie (/api/account/me) — nahlášeno jako "appka mě ukazuje
+            odhlášeného, i když jsem přihlášený" (self-healing do zlomku
+            vteřiny, ale u někoho přihlášeného z dřívějška je to matoucí i
+            tak krátce). */}
+        {accountChecked && !user && (
           <button className={styles.loginBtn} onClick={() => setLoginOpen(true)}>
             <span className={styles.sparkles} aria-hidden>
               {SPARK_POS.map((s, i) => (
@@ -190,7 +202,7 @@ export default function HomeScreen({
             <span>Přihlásit se</span>
           </button>
         )}
-        <button className={styles.cta} onClick={() => { if (!user) { setLoginOpen(true); return; } onStart?.(); }}>
+        <button className={styles.cta} onClick={() => { if (!accountChecked) return; if (!user) { setLoginOpen(true); return; } onStart?.(); }}>
           <span className={styles.sparkles} aria-hidden>
             {SPARK_POS.map((s, i) => (
               <span key={i} style={{ left: s[0], top: s[1], width: s[2], height: s[2], animationDelay: `${s[3]}s`, animationDuration: `${s[4]}s` }} />

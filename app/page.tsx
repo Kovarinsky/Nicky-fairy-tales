@@ -4461,6 +4461,7 @@ export default function Home() {
           customBackground={bgChoice === "custom" ? customBg : null}
           onGenerateCustomBackground={generateCustomBackground}
           user={homeUser}
+          accountChecked={accountChecked}
           onLogin={data => { if (data.isRegister) accountRegister(data.name, data.password, data.email); else accountLogin(data.name, data.password); }}
           onLogout={accountLogout}
           onTopUpCredits={accountTopup}
