@@ -74,13 +74,22 @@ async function composeMusic(prompt, durationMs) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+// 🎚️ 2026-08-05: uživatel hodnotil původní SFX (128kbps, prompt_influence
+// 0.4, holé popisy typu "a cow mooing once") jako "obyčejné/syntetické".
+// A/B test 10 vzorků s bohatším popisem ("realistic field recording",
+// "organic foley", "not synthesized") + nižší prompt_influence 0.25 (víc
+// volnosti modelu = přirozenější, míň doslovné) + 192kbps vyšel jako
+// zřetelně lepší → aplikováno plošně na všech 100 SFX přes REALISM_SUFFIX,
+// aby se nemusel ručně přepisovat každý jednotlivý prompt v SFX objektu níž.
+const REALISM_SUFFIX = ", realistic organic recording, natural acoustic texture, high fidelity, not synthesized";
+
 async function generateSfx(text, durationSeconds, loop = false) {
-  const res = await fetch(`${API}/v1/sound-generation?output_format=mp3_44100_128`, {
+  const res = await fetch(`${API}/v1/sound-generation?output_format=mp3_44100_192`, {
     method: "POST",
     headers,
     body: JSON.stringify({
-      text, duration_seconds: durationSeconds, loop,
-      prompt_influence: 0.4, model_id: "eleven_text_to_sound_v2",
+      text: text + REALISM_SUFFIX, duration_seconds: durationSeconds, loop,
+      prompt_influence: 0.25, model_id: "eleven_text_to_sound_v2",
     }),
   });
   if (!res.ok) throw new Error(`SFX HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
