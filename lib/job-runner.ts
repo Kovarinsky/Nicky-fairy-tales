@@ -214,6 +214,13 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     480_000;                            // 8:00 — 16-20 (MAX_SCENES) scén
   const hardDeadlineAt = st.createdAt + HARD_DEADLINE_MS;
   const overallTimeUp = () => Date.now() > hardDeadlineAt;
+  // 🩺 2026-08-05: diagnostika k nevysvětlené nesrovnalosti — živý test (15
+  // scén) ukázal, že 2. řetěz (po self-continue) uzavřel pohádku na "strop
+  // 280s", i když 15 scén mělo dostat 360s. body.sceneCount by měl být
+  // stejný v request.json napříč řetězy (viz /api/job/continue), ale
+  // nepotvrzeno přímým měřením — tenhle řádek to příště ukáže napřímo,
+  // místo dohledávání oklikou přes vytištěné "Xs" v log zprávách.
+  logEv(`🕐 deadline: sceneCount=${body.sceneCount} (typ ${typeof body.sceneCount}) requested=${requestedScenes} effective=${effectiveScenes} → ${Math.round(HARD_DEADLINE_MS / 1000)}s, chains=${st.chains ?? 0}`);
 
   // 🛟 Strop PRO TENTO BĚH: i když je do globálního limitu ještě daleko, jedna
   // jediná scéna nesměla dosud sama o sobě utéct přes bezpečnou rezervu do
@@ -702,13 +709,31 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // se 3+ lidmi v jednom panelu jdou vždy rovnou sólo, i v jinak "bohaté"
     // pohádce. Sleduj debug-logy (🗂️ vs 🎨 poměr a prošlé panely) a v případě
     // špatných výsledků vrať `castSize >= 3` větev z historie.
-    const castSize = (Array.isArray(body.characterIds) ? (body.characterIds as unknown[]).length : 0)
-      + (Array.isArray(body.customCharacters) ? (body.customCharacters as unknown[]).length : 0);
+    // 🩺 2026-08-05: castSize se dřív počítal jen z body.characterIds/
+    // customCharacters — u prázdného výběru appka ale kreslí CELOU rodinnou
+    // knihovnu (viz charactersForNames výš), takže castSize vyšel 0, i když
+    // scéna měla reálně 4-5 lidí. Živý test (15 scén, rodina 4 lidí přes
+    // fallback) ukázal archy 1/34 panelů za 250s (72 % celkového času) —
+    // castSize teď počítá se SKUTEČNĚ použitým obsazením (charactersForNames
+    // + rawCustomForNames), ne jen s explicitním výběrem klienta.
+    const castSize = charactersForNames.length + (rawCustomForNames?.length ?? 0);
+    // 🩺 stejný test: u castSize 4+ archy prošly v 0-8 % případů napříč
+    // 5 dávkami — přeskočit je úplně je dražší (víc sólo obrázků), ale
+    // mnohem rychlejší a spolehlivější než 250s skoro bez užitku.
+    const SHEET_SKIP_CAST_SIZE = 4;
     const sheetMode = (process.env.IMAGE_SHEET_MODE || "3x3").toLowerCase();
     if (st.sheetGaveUp) logEv("🗂️ archová fáze už dřív vzdala (žádný nový panel) → rovnou sólo");
-    else if (castSize >= 3) logEv(`🧪 ${castSize} postav v pohádce — archy grupují scény podle překryvu obsazení, zbytek sólo`);
-    if (sheetMode !== "off" && !quotaExhausted && !st.sheetGaveUp && st.sceneUrls![0]) {
-      const maxCells = sheetMode === "2x2" ? 4 : 9;
+    else if (castSize >= SHEET_SKIP_CAST_SIZE) logEv(`🧪 ${castSize} postav v pohádce (≥${SHEET_SKIP_CAST_SIZE}) — archy přeskočeny, rovnou sólo (viz test 2026-08-05)`);
+    else if (castSize === 3) logEv(`🧪 ${castSize} postavy v pohádce — mezistupeň: archy 2×2, max 2 lidi/panel (přísnější než obvykle)`);
+    // 🩺 2026-08-05: mezistupeň mezi "archy jako obvykle" (≤2) a "přeskočit
+    // úplně" (≥4) — u castSize přesně 3 zůstávají archy zapnuté, ale s
+    // přísnějším 2×2 (víc pixelů/panel, snazší posoudit výšku/barvu očí) a
+    // max 2 lidmi/panel (dřívější nálezy byly skoro vždy o poměru MEZI 2+
+    // lidmi v jednom panelu) — snaha zachránit část úspory místo rovnou
+    // padnout na dražší sólo.
+    const castMidTier = castSize === 3;
+    if (sheetMode !== "off" && !quotaExhausted && !st.sheetGaveUp && castSize < SHEET_SKIP_CAST_SIZE && st.sceneUrls![0]) {
+      const maxCells = castMidTier ? 4 : sheetMode === "2x2" ? 4 : 9;
       // ⚡ Archy jedné vlny běží PARALELNĚ (15 stránek = archy 9+5 najednou —
       // 4K arch generuje ~stejně dlouho jako jedna 1K scéna, sériově to byla
       // zbytečná minuta navíc). Max 2 vlny; vlna bez jediného nového panelu
@@ -731,7 +756,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         // panel smí mít až MAX_PANEL_PEOPLE lidí a celý arch až MAX_SHEET_PEOPLE
         // různých osob (per-panel popisky referencí `refsForPanels` umí i
         // míchané obsazení). Obojí jde stáhnout envem, kdyby kvalita klesla.
-        const maxPanelPeople = Number(process.env.IMAGE_SHEET_MAX_PANEL_PEOPLE || 3);
+        const maxPanelPeople = castMidTier ? 2 : Number(process.env.IMAGE_SHEET_MAX_PANEL_PEOPLE || 3);
         const maxSheetPeople = Number(process.env.IMAGE_SHEET_MAX_PEOPLE || 4);
         // ⚡ Skutečný počet panelů v JEDNOM archu — dřív šel až na maxCells (9 v
         // 3×3 mřížce). Čím víc panelů v jednom volání, tím víc verifikačních
@@ -810,9 +835,22 @@ export async function runJob(id: string, body: Record<string, unknown>) {
             if (isSpendCapError(msg)) spendCapped = true;
           }
         }));
-        if (Object.keys(st.sceneUrls!).length === before) {
+        const afterCount = Object.keys(st.sceneUrls!).length;
+        const roundPanels = groups.reduce((n, g) => n + g.length, 0);
+        const roundPassRate = roundPanels > 0 ? (afterCount - before) / roundPanels : 1;
+        if (afterCount === before) {
           logEv("🗂️ archy nepřinesly žádný nový panel → zbytek jde sólo cestou");
           st.sheetGaveUp = true; // příští řetěz už archy nezkouší znovu
+          break;
+        }
+        // 🩺 2026-08-05: dřív appka pokračovala do dalšího kola i po pouhých
+        // 1/12 (8 %) prošlých panelech — živý test ukázal, že další kolo za
+        // takové situace skoro nikdy nepomůže (0/11 v dalším kole té samé
+        // pohádky) a jen spálí dalších ~115s. Nízká úspěšnost (<25 %) rovnou
+        // vzdává, stejně jako nulová.
+        if (roundPassRate < 0.25) {
+          logEv(`🗂️ nízká úspěšnost archů (${afterCount - before}/${roundPanels}, ${Math.round(roundPassRate * 100)}%) → zbytek jde sólo cestou`);
+          st.sheetGaveUp = true;
           break;
         }
         prevRoundReports = roundReports.join(" | ");
