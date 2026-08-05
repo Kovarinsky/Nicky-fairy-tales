@@ -52,24 +52,29 @@ export type Soundscape = "magic" | "forest" | "night" | "adventure" | "cozy";
  *  Kategorie: zvířata, počasí, stroje, lidé/akce, náladové akcenty. */
 export type SoundEffect =
   // 🌦️ počasí/příroda
-  | "waves" | "thunder" | "wind_gust" | "rain" | "snow_crunch" | "water_flow"
+  | "waves" | "thunder" | "wind_gust" | "rain" | "snow_crunch" | "water_flow" | "ice_crack"
   | "campfire_crackle" | "waterfall" | "cave_drip" | "leaves_crunch" | "volcano_rumble" | "desert_wind"
+  | "mole_dig" | "bubbles_underwater"
   // 🐾 zvířata
-  | "cow" | "pig" | "chicken" | "sheep" | "horse" | "duck" | "dog" | "cat" | "frog" | "owl" | "rooster" | "bee"
-  | "rabbit" | "elephant" | "bear" | "mouse" | "bird" | "squirrel"
+  | "cow" | "pig" | "chicken" | "sheep" | "goat" | "horse" | "donkey" | "duck" | "dog" | "cat" | "frog" | "owl" | "rooster" | "bee"
+  | "rabbit" | "elephant" | "bear" | "mouse" | "bird" | "squirrel" | "wing_flap" | "dino_roar"
   | "fox" | "wolf" | "monkey" | "seagull" | "dolphin" | "cricket"
   // 🚀 stroje/doprava
-  | "car_engine" | "train" | "boat_horn" | "clock_tick" | "doorbell" | "phone_ring"
+  | "car_engine" | "car_horn" | "train" | "boat_horn" | "clock_tick" | "doorbell" | "phone_ring"
   | "airplane" | "bicycle_bell" | "rocket_launch" | "helicopter" | "race_car_rev" | "sailboat_flap"
+  | "sci_fi_beep" | "speed_whoosh" | "electric_zap"
   // 🙋 lidé/akce
-  | "footsteps" | "applause" | "laugh" | "splash" | "glass_clink"
+  | "footsteps" | "applause" | "laugh" | "splash" | "glass_clink" | "door_knock" | "gulp" | "single_clap"
+  | "baby_cry" | "baby_laugh"
+  // 🐉 fantazie/kouzla
+  | "witch_cackle" | "dragon_roar" | "giant_footsteps" | "magic_poof" | "treasure_open" | "book_close"
   // 🎻 nástroje/předměty, kterými se v ději právě zahraje/manipuluje
   | "violin" | "piano" | "guitar" | "flute" | "drum" | "trumpet" | "harp" | "accordion"
   | "xylophone" | "music_box" | "tambourine" | "harmonica" | "bell_ring"
   | "page_turn" | "key_turn" | "sword_clash" | "whistle"
   | "umbrella_open" | "camera_click" | "kettle_whistle" | "cart_wheels" | "coin_clink" | "drawer_open" | "zipper"
   // 🎈 hry/oslavy
-  | "ball_bounce" | "balloon_pop" | "firework_burst" | "rope_skip" | "kite_flutter"
+  | "ball_bounce" | "balloon_pop" | "firework_burst" | "rope_skip" | "kite_flutter" | "candle_blow" | "coin_collect"
   // ✨ náladové akcenty
   | "magic_chime" | "triumphant" | "tense_sting" | "sad_tone"
   // 😊 emoční reakce postav (neverbální)
