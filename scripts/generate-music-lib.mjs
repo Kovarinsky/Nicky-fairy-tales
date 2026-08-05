@@ -94,7 +94,10 @@ const SOUNDSCAPES = {
   // airy woodwind" model interpretoval s temnějším/tajemným nádechem, i
   // když text zněl klidně. Přepsáno v duchu "magic" nálady výš (třpytivé
   // zvonky, teplá vrstva) + výslovný zákaz strašidelnosti, ne jen "klidné".
-  forest: "Whimsical magical forest ambient music loop, warm sparkling bells and soft airy woodwind, gentle dreamy pad, bright and inviting fairytale wonder, cheerful and cozy — NOT eerie, NOT dark, NOT spooky, NOT tense, major key throughout, no drums, seamless loop, instrumental",
+  // 🧒 2026-08-05: uživatel chtěl více dětský nádech — přidán prvek
+  // hravé/říkankové melodie a pizzicato strun, výslovně "childlike"
+  // + rozšířen zákaz i o "mysterious", ať to nesklouzne zpět k tajemnu.
+  forest: "Playful, childlike magical forest ambient music loop, warm sparkling bells, soft airy woodwind and gentle pizzicato strings, simple bouncy sing-song melody like a children's nursery rhyme, bright and innocent fairytale wonder, cheerful, cozy and lighthearted — NOT eerie, NOT dark, NOT spooky, NOT tense, NOT mysterious, major key throughout, no drums, seamless loop, instrumental",
   night: "Calm nighttime lullaby ambient music loop, soft dreamy pad, slow gentle bells, cozy and soothing, no drums, seamless loop, instrumental",
   adventure: "Adventurous storybook orchestral music loop, light rhythmic pulse, hopeful and energetic, playful brass and strings, seamless loop, instrumental",
   cozy: "Warm cozy fireside music loop, soft acoustic guitar and piano, gentle and comforting, seamless loop, instrumental",
