@@ -34,11 +34,15 @@ export async function GET(req: NextRequest) {
   const scaleParam = req.nextUrl.searchParams.get("scale") || "";
 
   if (scaleParam) {
+    // 🩺 2026-08-06: getFamilyScaleSheet() dřív neuměla přijmout force vůbec
+    // — i tady spočítané forceScale se nikam nepředávalo, takže "?scale=redraw"
+    // tiše vrátilo starý cachovaný obrázek (appka to zjistila živě: runtime
+    // logy neukázaly žádné nové generování, i když endpoint hlásil drawn:true).
     const forceScale = scaleParam === "redraw";
     const existingScaleUrl = forceScale ? null : await familyScaleSheetUrl();
     const scaleSheet = existingScaleUrl
       ? { url: existingScaleUrl, drawn: false }
-      : await getFamilyScaleSheet().then(async s => ({ url: s ? await familyScaleSheetUrl() : null, drawn: !!s }));
+      : await getFamilyScaleSheet(forceScale).then(async s => ({ url: s ? await familyScaleSheetUrl() : null, drawn: !!s }));
     return NextResponse.json({ scaleSheet }, { headers: { "Cache-Control": "no-store" } });
   }
 
@@ -81,12 +85,13 @@ export async function GET(req: NextRequest) {
 
   let groupAnchor: { url: string | null; drawn: boolean } | undefined;
   if (anchorParam) {
+    // 🩺 stejná díra jako u scale výš — force se dřív nepředávalo dál.
     const forceAnchor = anchorParam === "redraw";
     const existingAnchorUrl = forceAnchor ? null : await familyGroupAnchorUrl();
     if (existingAnchorUrl) {
       groupAnchor = { url: existingAnchorUrl, drawn: false };
     } else {
-      const a = await getFamilyGroupAnchor();
+      const a = await getFamilyGroupAnchor(forceAnchor);
       groupAnchor = { url: a ? await familyGroupAnchorUrl() : null, drawn: !!a };
     }
   }

@@ -223,16 +223,21 @@ export function familyScaleSheetApplies(characterIds: string[]): boolean {
 
 /** Malovaný celorodinný výškový list se jmény a cm; null když se nepovede
  *  nebo chybí Blob úložiště. Kreslí se JEDNOU CELKOVĚ (ne na pohádku/postavu)
- *  a natrvalo se cachuje — bump FAMILY_SCALE_VERSION při změně cm/vzhledu. */
-export async function getFamilyScaleSheet(): Promise<ReferenceImage | null> {
+ *  a natrvalo se cachuje — bump FAMILY_SCALE_VERSION při změně cm/vzhledu.
+ *  force=true (nová 2026-08-06 — chybělo, na rozdíl od getCharacterPortrait)
+ *  přeskočí cache a namaluje znovu i na STEJNÉ verzované cestě — bez tohohle
+ *  `?scale=redraw` tiše vracelo starý cachovaný obrázek (appka to zjistila
+ *  živě: runtime logy neukázaly ŽÁDNÝ "drawing FAMILY scale sheet" řádek
+ *  po promptové opravě, i když endpoint hlásil `drawn: true`). */
+export async function getFamilyScaleSheet(force = false): Promise<ReferenceImage | null> {
   const key = `family-scale-v${FAMILY_SCALE_VERSION}`;
-  const cached = memCache.get(key);
+  const cached = !force && memCache.get(key);
   if (cached) return cached;
   const token = blobToken();
   if (!token) return null;
   const pathName = `portraits/${key}.img`;
 
-  try {
+  if (!force) try {
     const h = await head(pathName, { token });
     const r = await fetch(h.url, { cache: "force-cache" });
     if (r.ok) {
@@ -600,16 +605,18 @@ export async function promoteFamilyGroupAnchorCandidate(index: number): Promise<
 
 /** Malovaná skupinová kotva celé rodiny (jedna přirozená scéna, BEZ textu);
  *  null když se nepovede nebo chybí Blob úložiště. Používá stejné obsazení
- *  (a stejnou podmínku familyScaleSheetApplies) jako celorodinný výškový list. */
-export async function getFamilyGroupAnchor(): Promise<ReferenceImage | null> {
+ *  (a stejnou podmínku familyScaleSheetApplies) jako celorodinný výškový list.
+ *  force=true — viz stejný komentář u getFamilyScaleSheet (chybělo, appka
+ *  bez toho tiše vracela starý cachovaný obrázek na `?anchor=redraw`). */
+export async function getFamilyGroupAnchor(force = false): Promise<ReferenceImage | null> {
   const key = `family-anchor-v${GROUP_ANCHOR_VERSION}`;
-  const cached = memCache.get(key);
+  const cached = !force && memCache.get(key);
   if (cached) return cached;
   const token = blobToken();
   if (!token) return null;
   const pathName = `portraits/${key}.img`;
 
-  try {
+  if (!force) try {
     const h = await head(pathName, { token });
     const r = await fetch(h.url, { cache: "force-cache" });
     if (r.ok) {
