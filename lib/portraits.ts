@@ -261,15 +261,16 @@ export async function getFamilyScaleSheet(): Promise<ReferenceImage | null> {
       // list ale navíc nemá ani kontrolu (verifySceneImage), takže chybný
       // vzhled odsud šel rovnou do produkce jako "kotva" pro VŠECHNY scény.
       `If any description above explicitly states a feature is ABSENT or DIFFERENT from what would be typical (e.g. "NO dark mask", "NO stripe", a specific marking instead of the usual one for this breed/type), that is a DELIBERATE correction — draw it EXACTLY as stated even if it contradicts what is typical/generic. Do not default to a stereotypical look when a description explicitly rules it out.`,
+      pets.size ? `SPECIFICALLY for the dog: the coat is a SOLID warm reddish-brown/tan color, essentially ONE solid color from a normal viewing distance — do NOT draw visible tiger-stripe or heavy brindle patterning across the body; that is the single most common mistake to avoid here.` : "",
       `Every human character FULL BODY head to toe, standing straight and relaxed facing the viewer; the dog on all fours, not standing upright. All feet/paws on the SAME flat ground line, evenly spaced, plain soft warm-cream background, even flat lighting, no props, no scenery.`,
       `Their real heights are EXACTLY: ${cast.map(c => `${c.name} ${FAMILY_HEIGHT_CM[c.id]}cm`).join(", ")} (for the dog, height means how tall it stands on all fours) — draw every body scaled precisely to these proportions relative to each other; this is the single most important requirement of this image.`,
       `Directly BELOW each character, print their name in capital letters and their height in parentheses as two short lines of clean plain text (e.g. "NICOLÁSEK" then "(111CM)") — this is the ONE exception in this whole book's art style where readable text is wanted, because this specific image is a private reference sheet for the illustrator, never a page shown to a reader.`,
       `Exactly ${peopleCount} people plus ${cast.length - peopleCount} dog in the image — nobody else, no invented siblings or friends.`,
       REFERENCE_SHEET_STYLE,
-    ].join(" ");
+    ].filter(Boolean).join(" ");
     const photoRefs = loadReferenceImages(cast);
     const combinedDesc = cast.map(c => c.description).join(" | ");
-    const sceneDesc = `A height reference sheet with ${cast.map(c => c.name).join(", ")} standing side by side, grouped by family, shortest to tallest within each family. COUNT the people and the dog separately: ${peopleCount} people + ${cast.length - peopleCount} dog, no more, no fewer.`;
+    const sceneDesc = `A height reference sheet with EXACTLY these people and dog present, nobody else: ${cast.map(c => c.name).join(", ")} — standing side by side, grouped by family, shortest to tallest within each family. Every one of these names IS in the picture; do not flag any of them as "missing" or "extra". COUNT the people and the dog separately: ${peopleCount} people + ${cast.length - peopleCount} dog, no more, no fewer.`;
     const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
     let img = await generateBackgroundImage(prompt, photoRefs);
     // 🩺 Portrét jednotlivce se OD v3 kontroluje (viz getCharacterPortrait
