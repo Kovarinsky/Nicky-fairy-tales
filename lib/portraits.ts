@@ -188,6 +188,18 @@ const FAMILY_HEIGHT_CM: Record<string, number> = {
   jana: 175, eva: 180, jakob: 183, jan: 185,
 };
 
+// 🩺 2026-08-06: appka NIKDE neměla zapsané, kdo je čí rodič/dítě — jen
+// jednotlivé popisy postav. Skupinová kotva proto řadila lidi ČISTĚ podle
+// výšky (viz FAMILY_HEIGHT_CM), a model bez vztahové informace naskládal
+// dospělé/děti do dvou "rodinných" shluků NÁHODNĚ (Eva vyšla vedle
+// Nicoláska/Jana místo Jany, Jana vedle James/Belly místo Evy) — vizuálně
+// špatně spárované rodiny, nahlášeno uživatelem se skutečnou obrázkovou
+// ukázkou. Dvě SKUTEČNÉ rodiny appky (potvrzeno uživatelem):
+const FAMILY_UNITS: Array<{ parents: string[]; children: string[] }> = [
+  { parents: ["jan", "jana"], children: ["nicolas", "valentyna"] },
+  { parents: ["jakob", "eva"], children: ["james", "bella"] },
+];
+
 function familyScaleLabel(): string {
   return (
     "CANONICAL FAMILY HEIGHT REFERENCE SHEET — shows the EXACT height (cm) and hair/face/outfit of every named family member, sorted shortest to tallest, with their name and height printed under each one. " +
@@ -312,11 +324,29 @@ function groupAnchorLabel(): string {
 }
 
 /** Obsazení skupinové kotvy/výškového listu — postavy appka zná s přesným cm,
- *  seřazené od nejmenší po největší. Sdíleno mezi kandidáty i finální kotvou. */
+ *  seřazené PODLE RODINY (viz FAMILY_UNITS), uvnitř rodiny od nejmenší po
+ *  největší. Sdíleno mezi kandidáty i finální kotvou.
+ *  🩺 2026-08-06: PŮVODNĚ řazeno čistě podle výšky napříč VŠEMI — bez
+ *  vztahové informace to model poskládal do dvou vizuálních shluků náhodně
+ *  (Eva vyšla vedle Nicoláska/Jana, Jana vedle James/Belly — obě špatně,
+ *  viz komentář u FAMILY_UNITS). Řazení podle rodiny dá modelu ke
+ *  správnému seskupení i pořadí v promptu, ne jen text instrukci. */
 function groupAnchorCast(): Character[] {
-  return loadCharacters()
-    .filter(c => FAMILY_HEIGHT_CM[c.id] !== undefined)
-    .sort((a, b) => FAMILY_HEIGHT_CM[a.id] - FAMILY_HEIGHT_CM[b.id]);
+  const all = loadCharacters().filter(c => FAMILY_HEIGHT_CM[c.id] !== undefined);
+  const byId = new Map(all.map(c => [c.id, c]));
+  const used = new Set<string>();
+  const out: Character[] = [];
+  for (const unit of FAMILY_UNITS) {
+    const members = [...unit.children, ...unit.parents]
+      .map(id => byId.get(id))
+      .filter((c): c is Character => !!c)
+      .sort((a, b) => FAMILY_HEIGHT_CM[a.id] - FAMILY_HEIGHT_CM[b.id]);
+    for (const m of members) { out.push(m); used.add(m.id); }
+  }
+  // Postavy se známým cm, ale MIMO obě rodinné jednotky (dnes žádné,
+  // pojistka pro budoucí rozšíření kartotéky) — připojit na konec.
+  for (const c of all) if (!used.has(c.id)) out.push(c);
+  return out;
 }
 
 /** Prompt skupinové kotvy — `setting` popisuje prostředí/kompozici (mění se
@@ -325,9 +355,25 @@ function groupAnchorCast(): Character[] {
  *  (lib/gemini.ts) — ne vlastní kopii, ať appka vizuálně nedriftuje. */
 function groupAnchorPrompt(cast: Character[], setting: string): string {
   const numbered = cast.map((c, i) => `${i + 1}) ${c.name}`).join(", ");
+  const byId = new Map(cast.map(c => [c.id, c]));
+  // 🩺 Explicitní rodinné shluky pro model — kdo je čí rodič/dítě appka
+  // nikde neměla zapsané (viz FAMILY_UNITS výš); bez tohohle text jen
+  // řekl "dva dospělí vzadu, děti vepředu" a model si rodiny sám poskládal
+  // ŠPATNĚ (nahlášeno uživatelem se skutečnou obrázkovou ukázkou).
+  const familyGroups = FAMILY_UNITS
+    .map(unit => {
+      const parents = unit.parents.map(id => byId.get(id)?.name).filter((n): n is string => !!n);
+      const children = unit.children.map(id => byId.get(id)?.name).filter((n): n is string => !!n);
+      return parents.length && children.length
+        ? `${parents.join(" and ")} are a couple; ${children.join(" and ")} are THEIR children — this family stands together as one visual cluster`
+        : null;
+    })
+    .filter((s): s is string => !!s);
   return [
     `A single storybook illustration of ${cast.map(c => c.name).join(", ")} together — ${setting}`,
-    `Everyone facing the viewer with natural friendly smiles, arranged in a natural cluster (not a strict line): the two adults side by side near the back, the children grouped in front of or beside them, all standing close together as a real family would.`,
+    familyGroups.length
+      ? `There are TWO separate families in this picture, standing as two adjacent clusters (not mixed together): ${familyGroups.join(". ")}. A child must stand near THEIR OWN parents, never near the other family's parents.`
+      : `Everyone facing the viewer with natural friendly smiles, arranged in a natural cluster (not a strict line): the two adults side by side near the back, the children grouped in front of or beside them, all standing close together as a real family would.`,
     `Exact appearances (copy faithfully): ${cast.map(c => c.description).join(" | ")}.`,
     `If any description above explicitly states a feature is ABSENT or DIFFERENT from what would be typical (e.g. "NO dark mask", "NO stripe", a specific marking instead of the usual one for this breed/type), that is a DELIBERATE correction — draw it EXACTLY as stated even if it contradicts what is typical/generic. Do not default to a stereotypical look when a description explicitly rules it out.`,
     `Every character FULL BODY, head to toe, standing on the SAME ground line.`,
