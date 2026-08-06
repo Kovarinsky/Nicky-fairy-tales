@@ -10,8 +10,8 @@ import { generateSceneImage, generateSceneSheet, composeSceneOnBackground, genCo
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefEntries, refsForText, refsForPanels, getFamilyScaleSheet, familyScaleSheetApplies, getFamilyGroupAnchor } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
-import { THEME_BG } from "@/lib/backgrounds";
-import { getStoryBackground } from "@/lib/story-backgrounds";
+import { THEME_BG, bgSceneById } from "@/lib/backgrounds";
+import { getStoryBackground, settingCacheKey, buildSettingPrompt } from "@/lib/story-backgrounds";
 import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/types";
 import { blobToken } from "@/lib/blob-token";
 import { chargeForCompletedStory } from "@/lib/accounts";
@@ -89,11 +89,22 @@ export interface JobStatus {
   username?: string;
   /** 💳 Pojistka proti dvojímu odečtu při navázání rozděleného/restartovaného jobu */
   creditsCharged?: boolean;
-  /** 🧪 ECONOMY-PLAN.md Fáze 4B (mockup větev) — bg-scene id (lib/backgrounds.ts,
-   *  ne franšízové téma appky), jehož znovupoužívané pozadí appka pro tuhle
-   *  pohádku kreslí; uloženo při zadání, ať navazující řetězy/resume vědí,
-   *  ze kterého tématu kreslit i beze znalosti původního request body. */
+  /** 🧪 ECONOMY-PLAN.md Fáze 4B (mockup větev) — FALLBACK bg-scene id
+   *  (lib/backgrounds.ts), použije se JEN když appka nenajde vlastní
+   *  "World & setting lock" text pro tuhle pohádku (viz bgSettingKey níž).
+   *  Uloženo při zadání, ať navazující řetězy/resume vědí, ze kterého
+   *  tématu kreslit i beze znalosti původního request body. */
   bgThemeId?: string;
+  /** 🧪 ECONOMY-PLAN.md Fáze 4B v2 — PRIMÁRNÍ cache klíč pozadí, hash
+   *  Claudova vlastního "World & setting lock" textu PRO TUHLE pohádku
+   *  (viz extractSettingLock). Přednost před bgThemeId — živý test v1
+   *  ukázal, že appčina obecná "světová" dekorace se settingem konkrétní
+   *  pohádky reálně rozešla (denní slunečná louka v zadání × appka
+   *  kreslila obecný noční kouzelný les). */
+  bgSettingKey?: string;
+  /** 🧪 stejné jako bgSettingKey, ale samotný text promptu (appka ho
+   *  potřebuje znovu při KAŽDÉM doScene volání, ne jen jednou). */
+  bgSettingPrompt?: string;
 }
 
 export async function putJson(path: string, data: unknown): Promise<string> {
@@ -551,6 +562,24 @@ export async function runJob(id: string, body: Record<string, unknown>) {
 
     const scenesScript = st.scenesScript!;
     const heroDescription = st.heroDescription || "";
+    // 🧪 ECONOMY-PLAN.md Fáze 4B v2 (mockup větev) — appka pozadí staví z
+    // Claudova VLASTNÍHO "World & setting lock" textu PRO TUHLE pohádku
+    // (živý test v1 ukázal reálnou chybu: appčina obecná "světová" dekorace
+    // podle THEME_BG se se skutečným settingem pohádky rozešla — denní
+    // slunečná louka bez kouzel v zadání, appka ale kreslila obecný noční
+    // kouzelný "les" appky). Bez setting-locku appka padá zpátky na starší
+    // bgThemeId (pořád lepší než nic, i když méně přesné) — appka ho nepíše
+    // vždy, jen když to děj logicky vyžaduje (viz komentář u SETTING LOCK,
+    // lib/claude.ts). Počítá se JEDNOU tady (ne v doScene), ať appka
+    // nepočítá stejný regex znovu na každou scénu.
+    if (!st.bgSettingKey) {
+      const m = /World & setting lock:\s*([\s\S]+?)(?:\s*\||$)/i.exec(heroDescription);
+      const settingText = m ? m[1].trim() : "";
+      if (settingText) {
+        st.bgSettingKey = settingCacheKey(settingText);
+        st.bgSettingPrompt = settingText;
+      }
+    }
     // 🔀 Líná větev B: obrázky druhého konce se NEKRESLÍ při generování —
     // vzniknou až když na něj čtenář na rozcestí opravdu sáhne (klient si je
     // vyžádá přes /api/scene). Ušetří ~1/3 obrázků u pohádek se dvěma konci.
@@ -682,8 +711,16 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       // normální čerstvé generování při JAKÉKOLIV chybě (chybějící pozadí,
       // Gemini chyba) — appka nikdy nezůstane bez obrázku kvůli experimentu.
       let img: ImageResult | null = null;
-      if (ECONOMY_BG_REUSE && i > 0 && st.bgThemeId) {
-        const bg = await getStoryBackground(st.bgThemeId).catch(() => null);
+      if (ECONOMY_BG_REUSE && i > 0) {
+        // 🧪 v2: PŘEDNOST má appčin vlastní setting-lock text pro TUHLE
+        // pohádku (přesný, viz komentář výš u bgSettingKey); bez něj appka
+        // padá na starší obecné bgThemeId (méně přesné, ale pořád lepší
+        // než nic).
+        const bgKey = st.bgSettingKey || st.bgThemeId;
+        const bgPrompt = st.bgSettingPrompt
+          ? buildSettingPrompt(st.bgSettingPrompt)
+          : st.bgThemeId ? bgSceneById(st.bgThemeId)?.prompt : undefined;
+        const bg = bgKey && bgPrompt ? await getStoryBackground(bgKey, bgPrompt).catch(() => null) : null;
         if (bg) {
           img = await composeSceneOnBackground(scene, heroDescription, bg, refs).catch((e: Error) => {
             logEv(`🧪 scéna ${i + 1} kompozice na pozadí selhala (${e.message.slice(0, 100)}) → padám na čerstvé generování`);
