@@ -502,8 +502,14 @@ function heightsRelationalEntry(cast: Character[]): string {
   const byId = new Map(cast.map(c => [c.id, c]));
   const name = (id: string) => byId.get(id)?.name ?? id;
   const bits: string[] = [];
+  // 🩺 2026-08-06 (12): uživatel — "zvětši Jamese, ten je o něco [vyšší] než
+  // Nicolas (James 115cm, Nicolas 111cm)" — dosavadní věta evidentně
+  // nevyšla dost výrazně (jen 4cm reálný rozdíl appka poučeně neposílá
+  // jako holé číslo, viz komentář výš u FAMILY_HEIGHT_CM, ale slovní vazba
+  // "little taller/only to forehead" zjevně nestačila). Zesíleno na
+  // "half a head" + explicitní varování proti stejné výšce.
   if (ids.has("nicolas") && ids.has("james")) {
-    bits.push(`${name("james")} is a little taller than ${name("nicolas")} — the top of ${name("nicolas")}'s head reaches only to ${name("james")}'s forehead, NOT his ears or eyes, and definitely not above his head`);
+    bits.push(`${name("james")} is noticeably taller than ${name("nicolas")} — by about HALF A HEAD, not just a little. The top of ${name("nicolas")}'s head reaches only to ${name("james")}'s forehead or eyebrows, NOT his ears or eyes. If they look almost the same height, ${name("james")} has been drawn too short and must be enlarged`);
   }
   // 🩺 2026-08-06 (10): živý kandidát (top-of-head-waistband Archie test)
   // vyšel s Vájou nečekaně MALOU vůči Nicoláskovi — uživatel: "zase je
@@ -511,8 +517,12 @@ function heightsRelationalEntry(cast: Character[]): string {
   // hýbal Archiem". Archieho text se NEMĚNÍ (jen tenhle). Přidán konkrétní
   // oděvní orientační bod (límec/rameno trička) po vzoru Archieho pasu +
   // výslovné varování proti podkreslení (zrcadlí Archieho "too big" varování).
+  // 🩺 2026-08-06 (12b): uživatel — "Váju o 10% zvětši" (nad rámec (10)
+  // výš, poté co zafixovali velikost pro srovnání) — poměr posunut ze
+  // ~85-90 % na ~95 % Nicoláskovy výšky: teď sahá skoro k jeho OČÍM/UŠÍM,
+  // ne jen k ramenům.
   if (ids.has("valentyna") && ids.has("nicolas")) {
-    bits.push(`${name("valentyna")} is smaller — the top of her head reaches all the way UP to ${name("nicolas")}'s SHOULDERS, level with his shirt collar/shoulder seam — NOT his chest, NOT his waist, NOT his elbow — roughly 85-90% of his height. She is a toddler but visibly close to his height, only a bit shorter, not dramatically smaller. If she looks like she only reaches his chest or elbow, she has been drawn too SMALL and must be enlarged`);
+    bits.push(`${name("valentyna")} is only barely shorter than ${name("nicolas")} — the top of her head reaches almost all the way up to his EYES or EARS, well above his shoulders, roughly 95% of his height. She is a toddler but stands nearly as tall as him now — do NOT draw her only shoulder-height or lower, that is too small; if her head only reaches his shoulders or chest, she has been drawn too SMALL and must be enlarged further`);
   }
   if (ids.has("bella")) {
     const anchors = ["james", "nicolas"].filter(id => ids.has(id)).map(name);
@@ -560,8 +570,12 @@ function heightsRelationalEntry(cast: Character[]): string {
   // Archieho, ne jeho záda" (TOP OF HEAD/skull, ne ramena/kohoutek jako
   // dřív, a ne "uši" — uši nastražené vzhůru by mohly měřit výš než
   // samotná lebka a appka by tím dostala nejednoznačnou instrukci).
+  // 🩺 2026-08-06 (12c): uživatel — "stále je Archie moc velký, zmenši ho o
+  // 15%" — i cílený "waistband" test vyšel podle uživatele pořád moc velký.
+  // Ukotvující bod posunut NÍŽ než pas: na půlku mezi pasem a kolenem
+  // (odhad -15 % velikosti), s výslovným zákazem dosáhnout byť jen na pas.
   if (ids.has("archie") && ids.has("nicolas")) {
-    bits.push(`${name("archie")} is small — the TOP OF HIS HEAD (the skull/crown, his highest point standing on all fours — NOT his ears if they stick up higher, and NOT his back/shoulder which is much lower) must line up with the WAISTBAND of ${name("nicolas")}'s shorts, not any higher — if the top of his head reaches above that waistband line (up toward the ribs or chest), he has been drawn too big and must be shrunk further; his back/shoulder sits well below the waistband, closer to knee height`);
+    bits.push(`${name("archie")} is small — the TOP OF HIS HEAD (the skull/crown, his highest point standing on all fours — NOT his ears if they stick up higher, and NOT his back/shoulder which is much lower) must reach only to the MIDPOINT between the WAISTBAND and the KNEE of ${name("nicolas")}'s shorts — roughly mid-thigh height, clearly BELOW the waistband, not at it. If the top of his head reaches the waistband line or higher, he has been drawn too big and must be shrunk further; his back/shoulder sits even lower than that, close to the knee itself`);
   }
   // 🩺 2026-08-06 (11): uživatel nahlásil, že Archie "se zvětšil s Vájou" —
   // předchozí věta kotvila jeho velikost i na Váji ("waist seam of her
@@ -572,7 +586,7 @@ function heightsRelationalEntry(cast: Character[]): string {
   // vysvětluje, kam tím pádem u Váji vyjde (důsledek, ne cíl), a explicitně
   // zakazuje modelu dotahovat ho na její vlastní výšku.
   if (ids.has("archie") && ids.has("valentyna")) {
-    bits.push(`${name("archie")}'s size is set ONLY by the ${name("nicolas")} comparison above — it must NOT also be scaled to match ${name("valentyna")}'s height or waist. Whatever point on her body the top of his head ends up reaching (likely her chest or lower shoulder area, since she stands nearly as tall as ${name("nicolas")}) is simply the correct RESULT of his fixed size next to Nicolásek — it is not a separate target to aim for, and her height must never be used to make him bigger`);
+    bits.push(`${name("archie")}'s size is set ONLY by the ${name("nicolas")} comparison above — it must NOT also be scaled to match ${name("valentyna")}'s height. Whatever point on her body the top of his head ends up reaching (likely somewhere around her lower ribs or hip, now that she stands nearly as tall as ${name("nicolas")} while he stays small) is simply the correct RESULT of his fixed size next to Nicolásek — it is not a separate target to aim for, and her height must never be used to make him bigger`);
   }
   return bits.length ? bits.join("; ") + "." : "";
 }
