@@ -1295,8 +1295,15 @@ export function peekEarlyScene(partial: string): { heroDescription: string; scen
 // poměru 90/111 sahá hlavou k Nicoláskovým RAMENŮM, ne k uším (viz
 // canonicalHeightsEntry níž, dřívější "reaches to ears" byl i se starým
 // 85cm nekonzistentní/moc velkorysý).
+// v3 (2026-08-06): 90cm je pořád její SKUTEČNÁ tělesná výška — ale živý test
+// skupinové kotvy ukázal, že model i s relační větou ("sahá po ramena")
+// obrázkově vykreslil poměr menší, než reálně vypadá (uživatel po zhlédnutí
+// hotového obrázku: "ještě Vája trochu větší, Nicolaskovi po ramena a jsme
+// tam"). 90/111=0.81 evidentně nestačí na vizuální dojem "po ramena" — appka
+// tu proto drží mírně NADSAZENÉ číslo (96cm, ~0.86 poměr) čistě pro účely
+// KRESLENÍ, ne jako revizi jejího skutečného vzrůstu.
 const CANONICAL_HEIGHT_CM: Record<string, number> = {
-  valentyna: 90,
+  valentyna: 96,
   nicolas: 111,
   james: 115,
   bella: 135,
@@ -1330,7 +1337,7 @@ export function canonicalHeightsEntry(characters: Character[]): string | null {
     bits.push(`${name("james")} is a little taller than ${name("nicolas")} — the top of ${name("nicolas")}'s head reaches only to ${name("james")}'s ears`);
   }
   if (ids.has("valentyna") && ids.has("nicolas")) {
-    bits.push(`${name("valentyna")} is the smallest — the top of her head reaches only to ${name("nicolas")}'s SHOULDERS, not his ears or chin — she is noticeably shorter than him, about 4/5 of his height`);
+    bits.push(`${name("valentyna")} is the smallest — the top of her head reaches all the way UP to ${name("nicolas")}'s SHOULDERS (not his chest, not his waist), roughly 85-90% of his height — she is a toddler but visibly close to his height, only a bit shorter, not dramatically smaller`);
   }
   if (ids.has("bella")) {
     const anchors = ["james", "nicolas"].filter(id => ids.has(id)).map(name);

@@ -181,7 +181,12 @@ export async function loadPortraitRefs(characters: Character[]): Promise<Referen
 // v3: Archieho popis se opravil (viz PORTRAIT_VERSION v4 výš) — list ho
 // cituje taky, musí se překreslit se stejnou opravou
 // v4 (2026-08-06): Valentýnka 85→90cm (upřesnil uživatel, viz CANONICAL_HEIGHT_CM claude.ts) — list se musí překreslit se správným poměrem.
-const FAMILY_SCALE_VERSION = 4;
+// v5 (2026-08-06, 2): 90→96cm — živý test skupinové kotvy ukázal, že i s
+// relační větou ("sahá po ramena") 90/111 vizuálně nedosahovalo ramen;
+// uživatel po zhlédnutí hotového obrázku: "ještě Vája trochu větší,
+// Nicolaskovi po ramena a jsme tam. Ostatní neměnit" — číslo tu jde nahoru
+// jen kvůli vykreslení, ne jako revize její skutečné výšky (viz claude.ts).
+const FAMILY_SCALE_VERSION = 5;
 // Duplikát CANONICAL_HEIGHT_CM z claude.ts (import by vytáhl celý claude.ts
 // do knihovny portrétů) — mění se JEN spolu s tamní tabulkou, viz komentář tam.
 // archie: 40cm — reálná výška při běžném postoji (upřesnil uživatel
@@ -189,7 +194,7 @@ const FAMILY_SCALE_VERSION = 4;
 // výškovém listu/kotvě vůbec neuváděla (bez cm ho filtr FAMILY_HEIGHT_CM
 // vyřazoval).
 const FAMILY_HEIGHT_CM: Record<string, number> = {
-  valentyna: 90, nicolas: 111, james: 115, bella: 135,
+  valentyna: 96, nicolas: 111, james: 115, bella: 135,
   jana: 175, eva: 180, jakob: 183, jan: 185, archie: 40,
 };
 
@@ -361,7 +366,11 @@ export async function familyScaleSheetUrl(): Promise<string | null> {
 // se skutečnými ukázkami stránek). v2 používá stejný STYLE_SUFFIX i stejný
 // poměr stran jako opravdové scény.
 // v3 (2026-08-06): Valentýnka 85→90cm — kotva se musí překreslit se správným poměrem.
-const GROUP_ANCHOR_VERSION = 3;
+// v4 (2026-08-06, 2): 90→96cm — uživatel po zhlédnutí v2 obrázku: "ještě Vája
+// trochu větší, Nicolaskovi po ramena a jsme tam. Ostatní neměnit" — jen
+// výška Valentýnky se posouvá (viz FAMILY_HEIGHT_CM výš), nic dalšího v
+// promptu (rodinné seskupení, prostředí, styl) se v tomhle kroku nemění.
+const GROUP_ANCHOR_VERSION = 4;
 
 function groupAnchorLabel(): string {
   return (
@@ -416,7 +425,7 @@ function heightsRelationalEntry(cast: Character[]): string {
     bits.push(`${name("james")} is a little taller than ${name("nicolas")} — the top of ${name("nicolas")}'s head reaches only to ${name("james")}'s forehead, NOT his ears or eyes, and definitely not above his head`);
   }
   if (ids.has("valentyna") && ids.has("nicolas")) {
-    bits.push(`${name("valentyna")} is much smaller — the top of her head reaches ${name("nicolas")}'s SHOULDERS, roughly 4/5 of his height. She is a TODDLER, visibly much shorter than him, not just "a bit shorter"`);
+    bits.push(`${name("valentyna")} is smaller — the top of her head reaches all the way UP to ${name("nicolas")}'s SHOULDERS (not his chest, not his waist), roughly 85-90% of his height. She is a toddler but visibly close to his height, only a bit shorter, not dramatically smaller`);
   }
   if (ids.has("bella")) {
     const anchors = ["james", "nicolas"].filter(id => ids.has(id)).map(name);
