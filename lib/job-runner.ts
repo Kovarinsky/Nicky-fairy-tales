@@ -57,6 +57,10 @@ export interface JobStatus {
   chains?: number;
   /** 💰 Obrázky vygenerované za VŠECHNY běhy jobu (rozpočtová pojistka) */
   imgSpent?: number;
+  /** 🩺 2026-08-06: reálné tokeny psaní scénáře (napříč všemi pokusy/řetězy
+   *  téhle pohádky) místo paušálu COST_USD_PER_STORY_WRITING — viz
+   *  actualStoryCostCredits, lib/pricing.ts. */
+  writeTokens?: { input: number; output: number };
   /** Délka rozepsaného textu při minulém běhu — restart s delším partial = zdravé navázání */
   partialLen?: number;
   /** Restarty psaní BEZ pokroku v partial.json — jen ty znamenají zaseknutí */
@@ -459,7 +463,13 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           putJson(`jobs/${id}/partial.json`, { text: latestText })
             .catch(e => console.warn(`[job ${id}] partial write failed:`, e));
         }
-        }, resumeText || undefined, logEv);
+        }, resumeText || undefined, logEv, usage => {
+          // Sčítá se napříč pokusy/řetězy (resume = víc volání Claudovi za
+          // stejnou pohádku) — appka teď zná REÁLNOU cenu psaní, ne paušál.
+          const prevIn = st.writeTokens?.input ?? 0;
+          const prevOut = st.writeTokens?.output ?? 0;
+          st.writeTokens = { input: prevIn + usage.inputTokens, output: prevOut + usage.outputTokens };
+        });
       } finally {
         clearTimeout(writingKick);
       }
@@ -942,7 +952,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // (jiná pohádka stejné rodiny) se neúčtují znovu, jen co se OPRAVDU
     // nakreslilo v TOMHLE běhu (madeImages/madeSheets).
     if (st.username && !st.creditsCharged) {
-      const cost = actualStoryCostCredits({ images1k: madeImages(), images4k: madeSheets(), voiceChars });
+      const cost = actualStoryCostCredits({ images1k: madeImages(), images4k: madeSheets(), voiceChars }, st.writeTokens);
       await chargeForCompletedStory(st.username, cost).catch(() => {});
       st.creditsCharged = true;
     }

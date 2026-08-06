@@ -25,10 +25,24 @@ export const COST_USD_PER_IMAGE_4K = COST_USD_PER_IMAGE_1K * 3;
 /** ElevenLabs namlouvání — veřejně inzerovaná sazba se podle tarifu liší;
  *  $0.24 / 1000 znaků je střední odhad, NE ověřeno proti účtu appky. */
 export const COST_USD_PER_1K_VOICE_CHARS = 0.24;
-/** Claude (psaní scénáře) se dosud netrackuje po tokenech (žádné
- *  input_tokens/output_tokens volání v lib/claude.ts) — paušál na
- *  10stránkovou pohádku jako hrubý odhad, dokud nepřibude skutečné měření. */
+/** Claude (psaní scénáře) — paušál na 10stránkovou pohádku, POUZE fallback
+ *  pro staré/nedohledatelné joby bez writeTokens (viz job-runner.ts). Od
+ *  2026-08-06 appka měří SKUTEČNÉ tokeny (message_start/message_delta SSE,
+ *  lib/claude.ts onUsage) → actualStoryCostCredits() je použije místo
+ *  tohohle paušálu, když jsou k dispozici. */
 export const COST_USD_PER_STORY_WRITING = 0.15;
+
+/** Claude Sonnet 5 (claude-sonnet-5) — oficiální ceník platform.claude.com,
+ *  ověřeno 2026-08-06. Introduktorní sazba (~1/3 sleva) platí jen do
+ *  2026-08-31 — POTOM přepnout na standardní $3/$15 za MTok, jinak appka
+ *  bude náklady na psaní podhodnocovat. */
+const CLAUDE_INTRO_PRICING_EXPIRES = "2026-08-31";
+const claudeIntroPricingActive = new Date() <= new Date(`${CLAUDE_INTRO_PRICING_EXPIRES}T23:59:59Z`);
+/** USD za 1M input tokenů. */
+export const COST_USD_PER_MTOK_INPUT = claudeIntroPricingActive ? 2.0 : 3.0;
+/** USD za 1M output tokenů (zahrnuje thinking tokeny, appka thinking
+ *  nepoužívá — viz callAnthropicApi). */
+export const COST_USD_PER_MTOK_OUTPUT = claudeIntroPricingActive ? 10.0 : 15.0;
 
 /** Marže appky nad reálné náklady. */
 export const MARGIN_MULTIPLIER = 1.5;
@@ -59,10 +73,22 @@ export function estimateStoryCostCredits(body: { sceneCount?: unknown; twoEnding
 }
 
 /** Skutečná cena PO dokončení — podle toho, co appka OPRAVDU nakreslila a
- *  namluvila (portréty/archy z cache se neúčtují znovu). */
-export function actualStoryCostCredits(usage: { images1k: number; images4k: number; voiceChars: number }): number {
+ *  namluvila (portréty/archy z cache se neúčtují znovu). `writeTokens`
+ *  (reálné input/output tokeny Claudova psaní scénáře, sečtené napříč
+ *  všemi pokusy/resume té které pohádky — viz st.writeTokens v
+ *  job-runner.ts) je od 2026-08-06 volitelné a POKUD je k dispozici,
+ *  nahradí paušál COST_USD_PER_STORY_WRITING skutečnou cenou. Bez něj
+ *  (staré cachované joby) appka spadne zpátky na paušál. */
+export function actualStoryCostCredits(
+  usage: { images1k: number; images4k: number; voiceChars: number },
+  writeTokens?: { input: number; output: number }
+): number {
+  const writingCostUsd = writeTokens
+    ? (writeTokens.input / 1_000_000) * COST_USD_PER_MTOK_INPUT +
+      (writeTokens.output / 1_000_000) * COST_USD_PER_MTOK_OUTPUT
+    : COST_USD_PER_STORY_WRITING;
   const usd =
-    COST_USD_PER_STORY_WRITING +
+    writingCostUsd +
     usage.images1k * COST_USD_PER_IMAGE_1K +
     usage.images4k * COST_USD_PER_IMAGE_4K +
     (usage.voiceChars / 1000) * COST_USD_PER_1K_VOICE_CHARS;

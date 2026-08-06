@@ -698,7 +698,14 @@ async function callAnthropicApi(
   // 📋 Volitelný zápis do TRVALÉHO deníku joby (job-runner posílá logEv) —
   // dřív šly retry pokusy jen do server konzole, kterou appka/uživatel
   // nevidí, takže dlouhé „psaní… (N. pokus)" bylo bez jakéhokoli vysvětlení.
-  onRetry?: (msg: string) => void
+  onRetry?: (msg: string) => void,
+  // 🩺 2026-08-06: appka dřív Claude tokeny vůbec neměřila — cena psaní byla
+  // paušál $0,15/pohádku (viz lib/pricing.ts, COST_USD_PER_STORY_WRITING),
+  // ne skutečná spotřeba. SSE stream posílá input_tokens v message_start a
+  // finální output_tokens v message_delta — appka je dřív jen ignorovala.
+  // Stejný vzor jako onDelta/onRetry: volitelný callback, žádný stávající
+  // volající se nemusí měnit.
+  onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void
 ): Promise<string> {
   const apiKey = sanitizeApiKey(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) throw new Error("Chybí ANTHROPIC_API_KEY.");
@@ -764,6 +771,8 @@ async function callAnthropicApi(
     let buf = "";
     let out = "";
     let stopReason: string | undefined;
+    let inputTokens = 0;
+    let outputTokens = 0;
     try {
       for (;;) {
         const { done, value } = await reader.read();
@@ -775,14 +784,30 @@ async function callAnthropicApi(
           if (!line.startsWith("data:")) continue;
           const payload = line.slice(5).trim();
           if (!payload) continue;
-          let ev: { type?: string; delta?: { type?: string; text?: string; stop_reason?: string }; error?: { message?: string } };
+          let ev: {
+            type?: string;
+            delta?: { type?: string; text?: string; stop_reason?: string };
+            error?: { message?: string };
+            message?: { usage?: { input_tokens?: number; output_tokens?: number } };
+            usage?: { input_tokens?: number; output_tokens?: number };
+          };
           try { ev = JSON.parse(payload); } catch { continue; }
           if (ev.type === "error" || ev.error) throw new Error(`Anthropic stream error: ${ev.error?.message || "unknown"}`);
           if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) {
             out += ev.delta.text;
             onDelta?.(out.length, out);
           }
-          if (ev.type === "message_delta" && ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
+          // message_start nese input_tokens (a malý počáteční output_tokens);
+          // message_delta pak PRŮBĚŽNĚ aktualizuje finální output_tokens —
+          // poslední hodnota před koncem streamu je ta skutečná.
+          if (ev.type === "message_start" && ev.message?.usage) {
+            inputTokens = ev.message.usage.input_tokens ?? inputTokens;
+            outputTokens = ev.message.usage.output_tokens ?? outputTokens;
+          }
+          if (ev.type === "message_delta") {
+            if (ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
+            if (ev.usage?.output_tokens != null) outputTokens = ev.usage.output_tokens;
+          }
         }
       }
     } catch (e) {
@@ -805,6 +830,7 @@ async function callAnthropicApi(
     // se to nikde nekontrolovalo, appka tichý ořez prostě přijala jako hotový
     // text (viz „Enrich" u bohatého zadání, uříznuté u „A Habsburg…")
     if (stopReason === "max_tokens") console.warn(`[Claude] odpověď uřízlá limitem max_tokens (${out.length} znaků)`);
+    if (inputTokens || outputTokens) onUsage?.({ inputTokens, outputTokens });
     return out;
   }
   throw lastErr || new Error("Anthropic: no response");
@@ -1085,7 +1111,10 @@ export async function generateStory(
   // 📋 Zápis do trvalého deníku joby — ať jsou retry pokusy Clauda (síťová
   // chyba, přetížení, prázdný stream) vidět appce/uživateli, ne jen v
   // server konzoli
-  onLog?: (msg: string) => void
+  onLog?: (msg: string) => void,
+  // 🩺 2026-08-06: reálná cena psaní místo paušálu — job-runner sečte
+  // vstupní/výstupní tokeny napříč pokusy (resume/redraw = víc volání)
+  onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void
 ): Promise<StoryScript> {
   const model = MODEL.trim();
   const parts: AnthropicPart[] = [];
@@ -1158,7 +1187,7 @@ export async function generateStory(
       messages,
     }, prefix
       ? (chars, fullText) => onDelta?.(prefix.length + chars, prefix + fullText)
-      : onDelta, onLog);
+      : onDelta, onLog, onUsage);
     const raw = prefix ? mergeContinuation(prefix, continuation) : continuation;
     try {
       const script = parseScript(raw);
