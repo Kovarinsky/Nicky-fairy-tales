@@ -13,6 +13,8 @@
 // povýší na finální kotvu (kopie bajtů, žádné nové placené generování).
 // Obě anchor=candidates/promote NEprocházejí portrétovou smyčku výš (ať
 // se vedlejším efektem znovu nepokusí dokreslit chybějící sólo portréty).
+// GET /api/portraits?scale=1 — zajistí i celorodinný výškový list
+// (getFamilyScaleSheet) a vrátí jeho URL; ?scale=redraw ho namaluje znovu.
 
 import { NextRequest, NextResponse } from "next/server";
 import { loadCharacters } from "@/lib/characters";
@@ -20,6 +22,7 @@ import {
   getCharacterPortrait, portraitUrl,
   getFamilyGroupAnchor, familyGroupAnchorUrl,
   generateFamilyGroupAnchorCandidates, promoteFamilyGroupAnchorCandidate,
+  getFamilyScaleSheet, familyScaleSheetUrl,
 } from "@/lib/portraits";
 
 export const runtime = "nodejs";
@@ -28,6 +31,16 @@ export const maxDuration = 300;
 export async function GET(req: NextRequest) {
   const redraw = req.nextUrl.searchParams.get("redraw") || "";
   const anchorParam = req.nextUrl.searchParams.get("anchor") || "";
+  const scaleParam = req.nextUrl.searchParams.get("scale") || "";
+
+  if (scaleParam) {
+    const forceScale = scaleParam === "redraw";
+    const existingScaleUrl = forceScale ? null : await familyScaleSheetUrl();
+    const scaleSheet = existingScaleUrl
+      ? { url: existingScaleUrl, drawn: false }
+      : await getFamilyScaleSheet().then(async s => ({ url: s ? await familyScaleSheetUrl() : null, drawn: !!s }));
+    return NextResponse.json({ scaleSheet }, { headers: { "Cache-Control": "no-store" } });
+  }
 
   if (anchorParam === "candidates") {
     const n = Math.max(1, Math.min(3, Number(req.nextUrl.searchParams.get("n")) || 3));

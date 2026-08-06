@@ -308,6 +308,18 @@ export async function getFamilyScaleSheet(): Promise<ReferenceImage | null> {
   }
 }
 
+/** Veřejná URL výškového listu (pro náhled), null když ještě není namalovaný. */
+export async function familyScaleSheetUrl(): Promise<string | null> {
+  const token = blobToken();
+  if (!token) return null;
+  try {
+    const h = await head(`portraits/family-scale-v${FAMILY_SCALE_VERSION}.img`, { token });
+    return h.url;
+  } catch {
+    return null;
+  }
+}
+
 // ── 🖼️ SKUPINOVÁ KOTVA — jeden obrázek CELÉ rodiny pohromadě v PŘÍBĚHOVÉ
 // (ne referenční) kompozici, viz ECONOMY-PLAN.md Fáze 2. Na rozdíl od
 // getFamilyScaleSheet výš (klinický řádek vedle sebe, se jmény+cm popisky,
