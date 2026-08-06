@@ -540,11 +540,15 @@ function heightsRelationalEntry(cast: Character[]): string {
   // JEN kandidátní test (?anchor=candidates), NEpřepisuje kanonickou v8/v9 —
   // podle uživatelova rozhodnutí buď tahle věta zůstane a appka to zafixuje
   // (bump verzí), nebo se vrátí zpět na "shoulder reaches waistline".
-  if (ids.has("archie") && ids.has("valentyna")) {
-    bits.push(`${name("archie")} is SMALL — standing on all fours the TOP OF HIS HEAD (ears/skull, his highest point) reaches EXACTLY to ${name("valentyna")}'s WAISTLINE, no higher; his shoulder/back is noticeably LOWER than that, well below her waist. He must look noticeably smaller than every child in the picture; this is the single most commonly drawn-too-big detail in this whole image, so err on the side of drawing him SMALLER than feels natural`);
-  }
+  // 🩺 2026-08-06 (8) EXPERIMENT pokračuje — uživatel chce ještě menšího:
+  // "výška Archieho uší bude na úrovni Nicoláskova pasu" — nový PRIMÁRNÍ
+  // ukotvující bod je teď Nicolásek (ne Vája), a je to uši, ne temeno hlavy.
+  // Pořád jen kandidátní test, kanonická v8/v9 nedotčená.
   if (ids.has("archie") && ids.has("nicolas")) {
-    bits.push(`${name("archie")}'s shoulder reaches only just ABOVE ${name("nicolas")}'s KNEE, nowhere near his thigh or hip`);
+    bits.push(`${name("archie")} is now even smaller — the height of his EARS (his highest point, standing on all fours) is level with ${name("nicolas")}'s WAIST, not his chest or ribs and not his hip; his back/shoulder is well below that, only a little above ${name("nicolas")}'s knee`);
+  }
+  if (ids.has("archie") && ids.has("valentyna")) {
+    bits.push(`compared to ${name("valentyna")}, ${name("archie")}'s ears reach only to about her lower ribs/hip — a clearly small dog next to her too, not a knee-high or ankle-high toy dog, but still small`);
   }
   return bits.length ? bits.join("; ") + "." : "";
 }
