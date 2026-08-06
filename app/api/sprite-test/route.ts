@@ -5,6 +5,9 @@
 // vyseká ho na průhlednost a složí na sdílený tematický základ (lib/
 // story-backgrounds.ts) — vrací URL všech tří mezikroků k ručnímu prohlédnutí.
 // ?pose=<text> — vlastní póza místo výchozí.
+// ?reuseRaw=<url> — přeskočí čerstvou (placenou) sprite generaci a použije
+// už jednou namalovaný obrázek — ať appka při ladění stínu/světla neplatí
+// za novou generaci pokaždé.
 
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
@@ -23,16 +26,25 @@ export async function GET(req: NextRequest) {
 
   const pose = req.nextUrl.searchParams.get("pose")
     || "standing upright, facing forward, one arm raised waving hello, big cheerful smile";
+  const reuseRaw = req.nextUrl.searchParams.get("reuseRaw");
 
   const [nicolas] = charactersByIds(["nicolas"]);
   if (!nicolas) return NextResponse.json({ error: "nicolas-not-found" }, { status: 500 });
 
-  // 1) čerstvá sprite generace (bez portrétové cache — chceme vidět POZICI/styl v nové póze)
-  const sprite = await generateCharacterSprite([], nicolas.description, pose);
-  const spritePath = `sprite-test/1-raw-${Date.now()}.png`;
-  const { url: rawUrl } = await put(spritePath, sprite.buffer, {
-    access: "public", contentType: sprite.mimeType, token, addRandomSuffix: false, allowOverwrite: true,
-  });
+  let sprite: { buffer: Buffer; mimeType: string };
+  let rawUrl: string;
+  if (reuseRaw) {
+    const r = await fetch(reuseRaw);
+    sprite = { buffer: Buffer.from(await r.arrayBuffer()), mimeType: r.headers.get("content-type") || "image/png" };
+    rawUrl = reuseRaw;
+  } else {
+    // čerstvá sprite generace (bez portrétové cache — chceme vidět POZICI/styl v nové póze)
+    sprite = await generateCharacterSprite([], nicolas.description, pose);
+    const spritePath = `sprite-test/1-raw-${Date.now()}.png`;
+    rawUrl = (await put(spritePath, sprite.buffer, {
+      access: "public", contentType: sprite.mimeType, token, addRandomSuffix: false, allowOverwrite: true,
+    })).url;
+  }
 
   // 2) chroma-key vysekání na průhlednost
   const transparentPng = await chromaKeyToTransparent(sprite.buffer);
