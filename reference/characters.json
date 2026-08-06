@@ -2,7 +2,7 @@
   {
     "id": "nicolas",
     "name": "Nicolásek",
-    "description": "Nicolas: straight light-blond hair, hazel eyes (brown-green), fair light skin, white T-shirt with two red horizontal stripes, mid-blue denim shorts, white sneakers with grey soles, tall boy",
+    "description": "Nicolas: straight light-blond hair, hazel eyes (brown-green), fair light skin, white T-shirt with two red horizontal stripes, mid-blue denim shorts, white sneakers with grey soles, a 6-YEAR-OLD SCHOOL-AGE BOY — not a teenager, not a young adult, not a preschooler either. Draw him with genuine young-child proportions: a fairly large head-to-body ratio, a slim straight torso, not yet an athletic/lanky teenage build. If he looks like a teenager or an adult who merely got smaller, he has been drawn wrong.",
     "referenceFile": "nicolas.jpg",
     "nameEn": "Nicolas"
   },
@@ -44,14 +44,14 @@
   {
     "id": "james",
     "name": "James",
-    "description": "James: boy with straight mid-brown hair with a fringe, dark brown eyes, fair light skin, cheeky warm smile, green T-shirt with cartoon dog print, white shorts, black sneakers with orange laces; Nicolas's best friend from Riverside school, exactly the SAME height as Nicolas",
+    "description": "James: boy with straight mid-brown hair with a fringe, dark brown eyes, fair light skin, cheeky warm smile, green T-shirt with cartoon dog print, white shorts, black sneakers with orange laces; Nicolas's best friend from Riverside school, exactly the SAME height AND the same 6-year-old school-age child proportions as Nicolas — not a teenager, not older-looking than Nicolas in any way",
     "referenceFile": "james.jpg",
     "nameEn": "James"
   },
   {
     "id": "bella",
     "name": "Bella",
-    "description": "Bella: girl with very long straight light-brown hair, blue-grey eyes, fair light skin, bright friendly smile, small shell earrings, cream sweatshirt, blue-grey shorts, pink sneakers; James's big sister, about half a head taller than James and Nicolas (who are the same height as each other)",
+    "description": "Bella: girl with very long straight light-brown hair, blue-grey eyes, fair light skin, bright friendly smile, small shell earrings, cream sweatshirt, blue-grey shorts, pink sneakers; James's big sister, a school-age CHILD a few years older than James and Nicolas — about half a head taller than them (who are the same height as each other) — but still clearly a CHILD, not a teenager or a young adult",
     "referenceFile": "bella.jpg",
     "nameEn": "Bella"
   },

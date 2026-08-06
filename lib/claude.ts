@@ -1333,6 +1333,21 @@ export function canonicalHeightsEntry(characters: Character[]): string | null {
   for (const id of ["valentyna", "nicolas", "james", "bella"] as const) {
     if (ids.has(id)) bits.push(`${name(id)} is ${CANONICAL_HEIGHT_CM[id]} cm tall`);
   }
+  // 🩺 2026-08-07: nahlášeno na scéně BEZ Váji ("Nicky vyrostl") — dřívější
+  // explicitní VĚK ("6-year-old"/"school-age") se objevoval JEN uvnitř
+  // Valentýnka+Nicolas dvojice níž, takže sólo Nicolásek (nebo s kýmkoli
+  // JINÝM než sourozenci/kamarády výš) neměl vůbec žádnou textovou pojistku
+  // věku — jen cm číslo, které appka sama nedokáže z geometrie odhadnout bez
+  // vizuální reference. Věk teď appka posílá VŽDY, nezávisle na obsazení.
+  const CHILD_AGE_LINE: Record<string, string> = {
+    nicolas: `${name("nicolas")} is a 6-year-old school-age boy — not a teenager, not a young adult`,
+    james: `${name("james")} is a 6-year-old school-age boy, the same age as ${name("nicolas")} — not a teenager`,
+    valentyna: `${name("valentyna")} is a true 2-year-old toddler with toddler body proportions (larger head-to-body ratio, shorter chubbier limbs) — not a preschooler or older child`,
+    bella: `${name("bella")} is a school-age child a few years older than ${name("nicolas")}/${name("james")} — not a teenager or adult`,
+  };
+  for (const id of ["nicolas", "valentyna", "james", "bella"] as const) {
+    if (ids.has(id)) bits.push(CHILD_AGE_LINE[id]);
+  }
   if (ids.has("nicolas") && ids.has("james")) {
     bits.push(`${name("james")} is a little taller than ${name("nicolas")} — the top of ${name("nicolas")}'s head reaches only to ${name("james")}'s ears`);
   }
