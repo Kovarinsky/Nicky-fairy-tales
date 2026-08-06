@@ -31,7 +31,9 @@ export async function GET(req: NextRequest) {
 
   if (anchorParam === "candidates") {
     const n = Math.max(1, Math.min(3, Number(req.nextUrl.searchParams.get("n")) || 3));
-    const candidates = await generateFamilyGroupAnchorCandidates(n);
+    const settingParam = req.nextUrl.searchParams.get("setting");
+    const settingIndex = settingParam != null && settingParam !== "" ? Number(settingParam) : undefined;
+    const candidates = await generateFamilyGroupAnchorCandidates(n, settingIndex);
     return NextResponse.json(
       { candidates, hint: "?anchor=promote&pick=<index> povýší vybraného kandidáta na finální kotvu" },
       { headers: { "Cache-Control": "no-store" } }

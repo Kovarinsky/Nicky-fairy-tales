@@ -324,6 +324,7 @@ function groupAnchorCast(): Character[] {
  *  vždy stejný. Používá STEJNÝ STYLE_SUFFIX jako skutečné stránky pohádky
  *  (lib/gemini.ts) — ne vlastní kopii, ať appka vizuálně nedriftuje. */
 function groupAnchorPrompt(cast: Character[], setting: string): string {
+  const numbered = cast.map((c, i) => `${i + 1}) ${c.name}`).join(", ");
   return [
     `A single storybook illustration of ${cast.map(c => c.name).join(", ")} together — ${setting}`,
     `Everyone facing the viewer with natural friendly smiles, arranged in a natural cluster (not a strict line): the two adults side by side near the back, the children grouped in front of or beside them, all standing close together as a real family would.`,
@@ -331,7 +332,12 @@ function groupAnchorPrompt(cast: Character[], setting: string): string {
     `If any description above explicitly states a feature is ABSENT or DIFFERENT from what would be typical (e.g. "NO dark mask", "NO stripe", a specific marking instead of the usual one for this breed/type), that is a DELIBERATE correction — draw it EXACTLY as stated even if it contradicts what is typical/generic. Do not default to a stereotypical look when a description explicitly rules it out.`,
     `Every character FULL BODY, head to toe, standing on the SAME ground line.`,
     `Their real heights are EXACTLY: ${cast.map(c => `${c.name} ${FAMILY_HEIGHT_CM[c.id]}cm`).join(", ")} — draw every body scaled precisely to these proportions relative to each other; this is the single most important requirement of this image.`,
-    `Exactly ${cast.length} people in the image — nobody else, no pets, no other characters.`,
+    // 🩺 2026-08-06: první živý test (kandidát "obývák") vygeneroval 9 lidí
+    // místo 8 — model si sám přidal vymyšlené dítě navíc, které navíc
+    // vzhledem splývalo s Nicoláskem ("dva Nicoláskové"). Bez konkrétního
+    // vyjmenovaného seznamu appka jen řekla "přesně N lidí", bez toho, ať si
+    // model VÝSLOVNĚ spočítá, koho vlastně kreslí.
+    `The cast is EXACTLY these ${cast.length} people and NO ONE else — count them as you draw: ${numbered}. Do NOT invent, add, or duplicate any additional sibling, friend, cousin, or background child/adult — if you are tempted to add anyone not on this numbered list, leave that space empty instead. Each of the ${cast.length} people above must be a CLEARLY DIFFERENT, DISTINCT individual — no two people (especially the children) may share the same face, hairstyle silhouette, or look like copies of one another; their described hair color, hairstyle and outfit are what tells them apart, follow those exactly per name.`,
     STYLE_SUFFIX,
   ].join(" ");
 }
@@ -343,7 +349,10 @@ async function drawGroupAnchorCandidate(cast: Character[], setting: string): Pro
   const prompt = groupAnchorPrompt(cast, setting);
   const photoRefs = loadReferenceImages(cast);
   const combinedDesc = cast.map(c => c.description).join(" | ");
-  const sceneDesc = `A family-portrait style illustration with ${cast.map(c => c.name).join(", ")} together — ${setting}`;
+  // 🩺 sceneDesc jde do appčiny vizuální kontroly (verifySceneImage) — bez
+  // výslovného počtu appka nepoznala, že model přidal 9. postavu navíc
+  // (viz komentář u groupAnchorPrompt), obrázek prošel bez povšimnutí.
+  const sceneDesc = `A family-portrait style illustration with EXACTLY ${cast.length} people — ${cast.map(c => c.name).join(", ")} — together, ${setting}. COUNT the people in the image: if there are more or fewer than ${cast.length}, or if any two people (especially children) look like duplicates of each other, that is a MAJOR violation.`;
   const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
   let img = await generateBackgroundImage(prompt, photoRefs, "16:9");
   let v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
@@ -373,13 +382,18 @@ const CANDIDATE_SETTINGS = [
  *  prostředí, viz CANDIDATE_SETTINGS) a uloží je do Blobu na DOČASNÉ cesty
  *  (ne na finální cestu family-anchor-vN.img) — appka žádnou z nich
  *  nepoužívá jako referenci, dokud se ručně nepromuje přes
- *  promoteFamilyGroupAnchorCandidate. Vrací URL/stav každého kandidáta. */
-export async function generateFamilyGroupAnchorCandidates(count = 3): Promise<Array<{ index: number; setting: string; url: string | null; ok: boolean }>> {
+ *  promoteFamilyGroupAnchorCandidate. Vrací URL/stav každého kandidáta.
+ *  `settingIndex` (volitelné): místo RŮZNÝCH prostředí vygeneruje N
+ *  OPAKOVÁNÍ TÉHOŽ prostředí z CANDIDATE_SETTINGS[settingIndex] — pro
+ *  ověření konzistence/opravy promptu na stejné kompozici. */
+export async function generateFamilyGroupAnchorCandidates(count = 3, settingIndex?: number): Promise<Array<{ index: number; setting: string; url: string | null; ok: boolean }>> {
   const token = blobToken();
   if (!token) return [];
   const cast = groupAnchorCast();
   if (cast.length < 2) return [];
-  const settings = CANDIDATE_SETTINGS.slice(0, count);
+  const settings = settingIndex != null && CANDIDATE_SETTINGS[settingIndex]
+    ? Array.from({ length: count }, () => CANDIDATE_SETTINGS[settingIndex])
+    : CANDIDATE_SETTINGS.slice(0, count);
   const out: Array<{ index: number; setting: string; url: string | null; ok: boolean }> = [];
   for (let i = 0; i < settings.length; i++) {
     const setting = settings[i];
