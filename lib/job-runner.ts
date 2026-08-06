@@ -6,14 +6,23 @@
 
 import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, peekEarlyScene, enforceCanonicalAppearance, inventedCharacterNames, type StoryExtras } from "@/lib/claude";
-import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, isCreditsDepletedError, isSpendCapError, sceneCastList } from "@/lib/gemini";
+import { generateSceneImage, generateSceneSheet, composeSceneOnBackground, genCounter, isDailyQuotaError, isCreditsDepletedError, isSpendCapError, sceneCastList, type ImageResult } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefEntries, refsForText, refsForPanels, getFamilyScaleSheet, familyScaleSheetApplies, getFamilyGroupAnchor } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
+import { THEME_BG } from "@/lib/backgrounds";
+import { getStoryBackground } from "@/lib/story-backgrounds";
 import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/types";
 import { blobToken } from "@/lib/blob-token";
 import { chargeForCompletedStory } from "@/lib/accounts";
 import { estimateStoryCostCredits, actualStoryCostCredits } from "@/lib/pricing";
+
+// 🧪 ECONOMY-PLAN.md Fáze 4B (mockup větev claude/economy-mockup) — appka
+// "plně agresivně" zkouší znovupoužití JEDNOHO pozadí napříč VŠEMI scénami
+// (kromě scény 0, ta zůstává čerstvá jako titulní/"wow" kotva stylu, viz
+// plán bod 3/Fáze 4B). Vypínatelné jednou proměnnou, ať jde snadno srovnat
+// se starým chováním na TÉTO větvi, aniž by se dotklo main.
+const ECONOMY_BG_REUSE = process.env.ECONOMY_BG_REUSE !== "0";
 
 // 💳 Kreditní systém: "1 kredit = 1 Kč skutečných nákladů appky + 50% marže"
 // (viz lib/pricing.ts pro sazby a odůvodnění) — nahrazuje starý plochý model
@@ -80,6 +89,11 @@ export interface JobStatus {
   username?: string;
   /** 💳 Pojistka proti dvojímu odečtu při navázání rozděleného/restartovaného jobu */
   creditsCharged?: boolean;
+  /** 🧪 ECONOMY-PLAN.md Fáze 4B (mockup větev) — bg-scene id (lib/backgrounds.ts,
+   *  ne franšízové téma appky), jehož znovupoužívané pozadí appka pro tuhle
+   *  pohádku kreslí; uloženo při zadání, ať navazující řetězy/resume vědí,
+   *  ze kterého tématu kreslit i beze znalosti původního request body. */
+  bgThemeId?: string;
 }
 
 export async function putJson(path: string, data: unknown): Promise<string> {
@@ -295,6 +309,13 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       await write();
       const topic = String(body.topic || "").trim();
       const theme = body.themeId ? themeById(String(body.themeId)) : undefined;
+      // 🧪 ECONOMY-PLAN.md Fáze 4B (mockup větev) — appka dnes NEPOSÍLÁ do
+      // /api/job/start žádnou vybranou "svět" dlaždici (🎨 na domovské
+      // obrazovce je čistě klientská dekorace appky, nesouvisí s pohádkou),
+      // takže jediný dostupný signál je franšízové téma → bg-scéna
+      // (lib/backgrounds.ts THEME_BG); bez tématu appka padá na "forest"
+      // jako rozumný univerzální výchozí svět pro tenhle test.
+      st.bgThemeId = (theme && THEME_BG[theme.id]) || "forest";
       const ids: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
       let characters: Character[] = ids.length ? charactersByIds(ids) : loadCharacters();
       if (characters.length === 0) characters = [{ id: "hero", name: "Hrdina", description: "a young child" }];
@@ -654,14 +675,32 @@ export async function runJob(id: string, body: Record<string, unknown>) {
       // 🎙️ Hlas se NEVYRÁBÍ při generování — namluvení vzniká líně až při
       // čtení hotové pohádky (klient si ho vyžádá přes /api/scene audioOnly).
       // Nepřehrané pohádky tak hlas vůbec neplatí.
-      const img = await generateSceneImage(scene, heroDescription, refs, sceneDeadline()).catch((e: Error) => {
-        logEv(`🎨 scéna ${i + 1} CHYBA po ${secsSince(tScene)}s: ${e.message.slice(0, 140)}`);
-        st.imgError = e.message.slice(0, 220);
-        if (isDailyQuotaError(e.message)) quotaExhausted = true;
-        if (isCreditsDepletedError(e.message)) creditsDepleted = true;
-        if (isSpendCapError(e.message)) spendCapped = true;
-        return null;
-      });
+      // 🧪 ECONOMY-PLAN.md Fáze 4B (mockup větev) — scéna 0 zůstává VŽDY
+      // čerstvá (titulní/"wow" kotva stylu, viz plán bod 3); od scény 1 dál
+      // appka zkusí složit obrázek na jednou zaplaceném, znovupoužitém
+      // pozadí (composeSceneOnBackground) místo generování od nuly. Pád na
+      // normální čerstvé generování při JAKÉKOLIV chybě (chybějící pozadí,
+      // Gemini chyba) — appka nikdy nezůstane bez obrázku kvůli experimentu.
+      let img: ImageResult | null = null;
+      if (ECONOMY_BG_REUSE && i > 0 && st.bgThemeId) {
+        const bg = await getStoryBackground(st.bgThemeId).catch(() => null);
+        if (bg) {
+          img = await composeSceneOnBackground(scene, heroDescription, bg, refs).catch((e: Error) => {
+            logEv(`🧪 scéna ${i + 1} kompozice na pozadí selhala (${e.message.slice(0, 100)}) → padám na čerstvé generování`);
+            return null;
+          });
+        }
+      }
+      if (!img) {
+        img = await generateSceneImage(scene, heroDescription, refs, sceneDeadline()).catch((e: Error) => {
+          logEv(`🎨 scéna ${i + 1} CHYBA po ${secsSince(tScene)}s: ${e.message.slice(0, 140)}`);
+          st.imgError = e.message.slice(0, 220);
+          if (isDailyQuotaError(e.message)) quotaExhausted = true;
+          if (isCreditsDepletedError(e.message)) creditsDepleted = true;
+          if (isSpendCapError(e.message)) spendCapped = true;
+          return null;
+        });
+      }
       if (!img) { await write(); return; } // retry rounds below; chybu vidí klient
       logEv(`🎨 scéna ${i + 1} hotová za ${secsSince(tScene)}s`);
       st.imgError = undefined;

@@ -670,6 +670,61 @@ async function editSceneImage(
   throw new Error("NO_IMAGE: editace nevrátila obrázek");
 }
 
+// ── 🧪 ECONOMY-PLAN.md Fáze 4B (mockup větev claude/economy-mockup) ─────────
+// Složí SCÉNU na existující, už jednou zaplacené POZADÍ (lib/story-backgrounds.ts)
+// místo generování úplně nového obrázku od nuly. Na rozdíl od editSceneImage
+// výš (drží VŠECHNO pixel-identické, mění jen jednu vadu) tahle funkce
+// ZÁMĚRNĚ dovolí modelu volně umístit postavy a jejich pózu/akci podle
+// KONKRÉTNÍ scény — jen samotné POZADÍ (scenérie, barevná nálada, celkový
+// rámec/osvětlení) má zůstat rozpoznatelně stejné jako na vstupním obrázku.
+// 💰 Cenově STEJNÉ jako čerstvá generace (Gemini účtuje za obrázek, ne
+// obsah) — úspora NENÍ v ceně JEDNOHO volání, je v tom, že appka neplatí za
+// NOVÉ pozadí na KAŽDOU scénu zvlášť (pozadí je amortizované napříč mnoha
+// scénami/pohádkami stejného tématu) a v nižší míře zamítnutí kontrolou
+// (ověřená kompozice pozadí = méně prostoru na chybu — viz ECONOMY-PLAN.md
+// bod 8.2, kde appka tohle cenové vyjasnění poprvé odvodila z kódu).
+export async function composeSceneOnBackground(
+  scene: Scene, heroDescription: string, background: ImageResult,
+  refImages: ReferenceImage[] = []
+): Promise<ImageResult> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
+  const model = IMAGE_MODEL.trim();
+  const { open: charLockOpen, close: charLockClose } = buildAppearanceLock(heroDescription);
+
+  const parts: Array<Record<string, unknown>> = [];
+  parts.push({ text: "ESTABLISHED BACKGROUND — this is the SAME setting this whole book reuses across its pages; keep its scenery, color palette, lighting mood and overall camera framing recognizably the same place. You MAY naturally adapt small foreground details, exact character positions and poses to fit THIS specific moment — this is a new page set in the same place, not a pixel-identical edit:" });
+  parts.push({ inlineData: { data: background.buffer.toString("base64"), mimeType: background.mimeType } });
+  for (const ref of refImages.slice(0, 8)) {
+    parts.push({ text: ref.label || `Canonical reference of ${ref.name || "a story character"}:` });
+    parts.push({ inlineData: { data: ref.data, mimeType: ref.mimeType } });
+  }
+  parts.push({ text: [
+    charLockOpen,
+    `Using the established background above as this page's setting, draw this NEW moment of the story: ${scene.imagePrompt}`,
+    `The background's scenery, palette and lighting must stay recognizably the SAME place as shown above — do not invent a different location, time of day or weather. Populate it with the characters described above, in whatever pose/action THIS specific moment of the story calls for.`,
+    charLockClose,
+    STYLE_SUFFIX,
+  ].filter(Boolean).join(" ") });
+
+  const generationConfig: Record<string, unknown> = {
+    responseModalities: ["IMAGE", "TEXT"],
+    imageConfig: { aspectRatio: "16:9" },
+  };
+  const raw = await geminiPost(apiKey, model, { contents: [{ role: "user", parts }], generationConfig }, GEMINI_IMAGE_TIMEOUT_MS);
+  const data = JSON.parse(raw) as { candidates?: GeminiCandidate[]; promptFeedback?: { blockReason?: string } };
+  if (data.promptFeedback?.blockReason) throw new Error(`Gemini BLOCKED: ${data.promptFeedback.blockReason}`);
+  for (const cand of data.candidates || []) {
+    for (const part of cand.content?.parts || []) {
+      if (part.inlineData?.data) {
+        genCounter.img1k += 1; // 💰 kompozice na pozadí je placená generace jako každá jiná
+        return await compressImage({ buffer: Buffer.from(part.inlineData.data, "base64"), mimeType: part.inlineData.mimeType || "image/png" });
+      }
+    }
+  }
+  throw new Error("NO_IMAGE: kompozice na pozadí nevrátila obrázek");
+}
+
 // Pozadí aplikace — ilustrovaná scenérie ve stejném stylu jako pohádky,
 // na výšku (telefon). Volitelně s referenčními fotkami postav (Nicolásek
 // a Valentýnka bývají součástí každého světa). Prompt je bezpečný a pevně
