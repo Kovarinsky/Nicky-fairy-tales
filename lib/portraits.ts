@@ -534,8 +534,14 @@ function heightsRelationalEntry(cast: Character[]): string {
   // 🩺 2026-08-06 (6): živý výsledek už byl BLÍZKO (appka odhadla "waist"),
   // uživatel žádal už jen jemné doladění dolů ("lehce ho zmenši, aby byl
   // Valentýnce po pás a jsme tam") — ne další drastickou opravu.
+  // 🩺 2026-08-06 (7) EXPERIMENT — uživatel chce srovnat variantu, kde k
+  // pasu Váji sahá Archieho HLAVA (temeno/uši), ne rameno — to je MENŠÍ pes
+  // než v8 (hlava psa na všech čtyřech bývá výš než rameno/kohoutek). Zatím
+  // JEN kandidátní test (?anchor=candidates), NEpřepisuje kanonickou v8/v9 —
+  // podle uživatelova rozhodnutí buď tahle věta zůstane a appka to zafixuje
+  // (bump verzí), nebo se vrátí zpět na "shoulder reaches waistline".
   if (ids.has("archie") && ids.has("valentyna")) {
-    bits.push(`${name("archie")} is SMALL — standing on all fours his shoulder reaches EXACTLY to ${name("valentyna")}'s WAISTLINE, no higher (not her ribs, not her chest). He must look noticeably smaller than every child in the picture; this is the single most commonly drawn-too-big detail in this whole image, so err on the side of drawing him SMALLER than feels natural`);
+    bits.push(`${name("archie")} is SMALL — standing on all fours the TOP OF HIS HEAD (ears/skull, his highest point) reaches EXACTLY to ${name("valentyna")}'s WAISTLINE, no higher; his shoulder/back is noticeably LOWER than that, well below her waist. He must look noticeably smaller than every child in the picture; this is the single most commonly drawn-too-big detail in this whole image, so err on the side of drawing him SMALLER than feels natural`);
   }
   if (ids.has("archie") && ids.has("nicolas")) {
     bits.push(`${name("archie")}'s shoulder reaches only just ABOVE ${name("nicolas")}'s KNEE, nowhere near his thigh or hip`);
