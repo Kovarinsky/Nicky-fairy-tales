@@ -180,12 +180,17 @@ export async function loadPortraitRefs(characters: Character[]): Promise<Referen
 // níž) — bump, ať se případný starý neověřený list v Blobu překreslí znovu
 // v3: Archieho popis se opravil (viz PORTRAIT_VERSION v4 výš) — list ho
 // cituje taky, musí se překreslit se stejnou opravou
-const FAMILY_SCALE_VERSION = 3;
+// v4 (2026-08-06): Valentýnka 85→90cm (upřesnil uživatel, viz CANONICAL_HEIGHT_CM claude.ts) — list se musí překreslit se správným poměrem.
+const FAMILY_SCALE_VERSION = 4;
 // Duplikát CANONICAL_HEIGHT_CM z claude.ts (import by vytáhl celý claude.ts
 // do knihovny portrétů) — mění se JEN spolu s tamní tabulkou, viz komentář tam.
+// archie: 40cm — reálná výška při běžném postoji (upřesnil uživatel
+// 2026-08-06), NE veterinární kohoutková míra; dřív appka Archieho na
+// výškovém listu/kotvě vůbec neuváděla (bez cm ho filtr FAMILY_HEIGHT_CM
+// vyřazoval).
 const FAMILY_HEIGHT_CM: Record<string, number> = {
-  valentyna: 85, nicolas: 111, james: 115, bella: 135,
-  jana: 175, eva: 180, jakob: 183, jan: 185,
+  valentyna: 90, nicolas: 111, james: 115, bella: 135,
+  jana: 175, eva: 180, jakob: 183, jan: 185, archie: 40,
 };
 
 // 🩺 2026-08-06: appka NIKDE neměla zapsané, kdo je čí rodič/dítě — jen
@@ -194,9 +199,10 @@ const FAMILY_HEIGHT_CM: Record<string, number> = {
 // dospělé/děti do dvou "rodinných" shluků NÁHODNĚ (Eva vyšla vedle
 // Nicoláska/Jana místo Jany, Jana vedle James/Belly místo Evy) — vizuálně
 // špatně spárované rodiny, nahlášeno uživatelem se skutečnou obrázkovou
-// ukázkou. Dvě SKUTEČNÉ rodiny appky (potvrzeno uživatelem):
-const FAMILY_UNITS: Array<{ parents: string[]; children: string[] }> = [
-  { parents: ["jan", "jana"], children: ["nicolas", "valentyna"] },
+// ukázkou. Dvě SKUTEČNÉ rodiny appky (potvrzeno uživatelem), Archie patří
+// k rodině Jan+Jana+Nicolásek+Valentýnka (upřesnil uživatel):
+const FAMILY_UNITS: Array<{ parents: string[]; children: string[]; pets?: string[] }> = [
+  { parents: ["jan", "jana"], children: ["nicolas", "valentyna"], pets: ["archie"] },
   { parents: ["jakob", "eva"], children: ["james", "bella"] },
 ];
 
@@ -238,27 +244,32 @@ export async function getFamilyScaleSheet(): Promise<ReferenceImage | null> {
   } catch {}
 
   try {
-    const cast = loadCharacters()
-      .filter(c => FAMILY_HEIGHT_CM[c.id] !== undefined)
-      .sort((a, b) => FAMILY_HEIGHT_CM[a.id] - FAMILY_HEIGHT_CM[b.id]);
+    // 🩺 2026-08-06: dřív řazeno ČISTĚ podle výšky napříč všemi — stejná
+    // díra jako u skupinové kotvy (viz FAMILY_UNITS komentář), model bez
+    // vztahové informace mohl postavit dvě rodiny vedle sebe špatně
+    // spárované. groupAnchorCast() řadí PODLE RODINY (uvnitř rodiny podle
+    // výšky) a od teď zahrnuje i Archieho (viz FAMILY_HEIGHT_CM.archie).
+    const cast = groupAnchorCast();
     if (cast.length < 2) return null;
+    const pets = petIds();
+    const peopleCount = cast.filter(c => !pets.has(c.id)).length;
     console.log(`[portraits] drawing FAMILY scale sheet (${cast.map(c => c.id).join("+")})…`);
     const prompt = [
-      `CHARACTER HEIGHT REFERENCE SHEET: ${cast.map(c => c.name).join(", ")} standing side by side in one row, shortest to tallest from left to right.`,
+      `CHARACTER HEIGHT REFERENCE SHEET: ${cast.map(c => c.name).join(", ")} standing side by side in one row, grouped by family (not just by height) — ${familyGroupSentence(cast)}`,
       `Exact appearances (copy faithfully): ${cast.map(c => c.description).join(" | ")}.`,
       // 🩺 Stejná díra jako u portraitPrompt výš (viz komentář tam) — tenhle
       // list ale navíc nemá ani kontrolu (verifySceneImage), takže chybný
       // vzhled odsud šel rovnou do produkce jako "kotva" pro VŠECHNY scény.
       `If any description above explicitly states a feature is ABSENT or DIFFERENT from what would be typical (e.g. "NO dark mask", "NO stripe", a specific marking instead of the usual one for this breed/type), that is a DELIBERATE correction — draw it EXACTLY as stated even if it contradicts what is typical/generic. Do not default to a stereotypical look when a description explicitly rules it out.`,
-      `Every character FULL BODY head to toe, standing straight and relaxed facing the viewer, all feet on the SAME flat ground line, evenly spaced, plain soft warm-cream background, even flat lighting, no props, no scenery.`,
-      `Their real heights are EXACTLY: ${cast.map(c => `${c.name} ${FAMILY_HEIGHT_CM[c.id]}cm`).join(", ")} — draw every body scaled precisely to these proportions relative to each other; this is the single most important requirement of this image.`,
+      `Every human character FULL BODY head to toe, standing straight and relaxed facing the viewer; the dog on all fours, not standing upright. All feet/paws on the SAME flat ground line, evenly spaced, plain soft warm-cream background, even flat lighting, no props, no scenery.`,
+      `Their real heights are EXACTLY: ${cast.map(c => `${c.name} ${FAMILY_HEIGHT_CM[c.id]}cm`).join(", ")} (for the dog, height means how tall it stands on all fours) — draw every body scaled precisely to these proportions relative to each other; this is the single most important requirement of this image.`,
       `Directly BELOW each character, print their name in capital letters and their height in parentheses as two short lines of clean plain text (e.g. "NICOLÁSEK" then "(111CM)") — this is the ONE exception in this whole book's art style where readable text is wanted, because this specific image is a private reference sheet for the illustrator, never a page shown to a reader.`,
-      `Exactly ${cast.length} people in the image — nobody else.`,
+      `Exactly ${peopleCount} people plus ${cast.length - peopleCount} dog in the image — nobody else, no invented siblings or friends.`,
       REFERENCE_SHEET_STYLE,
     ].join(" ");
     const photoRefs = loadReferenceImages(cast);
     const combinedDesc = cast.map(c => c.description).join(" | ");
-    const sceneDesc = `A height reference sheet with ${cast.map(c => c.name).join(", ")} standing side by side, shortest to tallest.`;
+    const sceneDesc = `A height reference sheet with ${cast.map(c => c.name).join(", ")} standing side by side, grouped by family, shortest to tallest within each family. COUNT the people and the dog separately: ${peopleCount} people + ${cast.length - peopleCount} dog, no more, no fewer.`;
     const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
     let img = await generateBackgroundImage(prompt, photoRefs);
     // 🩺 Portrét jednotlivce se OD v3 kontroluje (viz getCharacterPortrait
@@ -313,7 +324,8 @@ export async function getFamilyScaleSheet(): Promise<ReferenceImage | null> {
 // v1 proto vizuálně neseděla se skutečným stylem appky (nahlášeno uživatelem
 // se skutečnými ukázkami stránek). v2 používá stejný STYLE_SUFFIX i stejný
 // poměr stran jako opravdové scény.
-const GROUP_ANCHOR_VERSION = 2;
+// v3 (2026-08-06): Valentýnka 85→90cm — kotva se musí překreslit se správným poměrem.
+const GROUP_ANCHOR_VERSION = 3;
 
 function groupAnchorLabel(): string {
   return (
@@ -337,7 +349,7 @@ function groupAnchorCast(): Character[] {
   const used = new Set<string>();
   const out: Character[] = [];
   for (const unit of FAMILY_UNITS) {
-    const members = [...unit.children, ...unit.parents]
+    const members = [...unit.children, ...unit.parents, ...(unit.pets ?? [])]
       .map(id => byId.get(id))
       .filter((c): c is Character => !!c)
       .sort((a, b) => FAMILY_HEIGHT_CM[a.id] - FAMILY_HEIGHT_CM[b.id]);
@@ -349,41 +361,55 @@ function groupAnchorCast(): Character[] {
   return out;
 }
 
+/** Set ID mazlíčků napříč FAMILY_UNITS — použito, kde appka potřebuje
+ *  rozlišit "lidi" od "mazlíčky" (počítání osob, popis "N people"). */
+function petIds(): Set<string> {
+  return new Set(FAMILY_UNITS.flatMap(u => u.pets ?? []));
+}
+
+/** Sdílená věta popisující DVĚ rodinné jednotky (kdo je čí rodič/dítě/pes) —
+ *  appka nikde neměla zapsané vztahy (viz FAMILY_UNITS výš), takže bez
+ *  tohohle textu model rodiny skládal ŠPATNĚ (nahlášeno uživatelem se
+ *  skutečnou obrázkovou ukázkou). Používá skupinová kotva i výškový list. */
+function familyGroupSentence(cast: Character[]): string {
+  const byId = new Map(cast.map(c => [c.id, c]));
+  const groups = FAMILY_UNITS
+    .map(unit => {
+      const parents = unit.parents.map(id => byId.get(id)?.name).filter((n): n is string => !!n);
+      const children = unit.children.map(id => byId.get(id)?.name).filter((n): n is string => !!n);
+      const petNames = (unit.pets ?? []).map(id => byId.get(id)?.name).filter((n): n is string => !!n);
+      if (!parents.length || !children.length) return null;
+      const petBit = petNames.length ? `, along with their dog ${petNames.join(" and ")}` : "";
+      return `${parents.join(" and ")} are a couple; ${children.join(" and ")} are THEIR children${petBit} — this family stands together as one visual cluster`;
+    })
+    .filter((s): s is string => !!s);
+  return groups.length ? `There are TWO separate families here, grouped together (not mixed): ${groups.join(". ")}.` : "";
+}
+
 /** Prompt skupinové kotvy — `setting` popisuje prostředí/kompozici (mění se
  *  mezi kandidátními variantami), zbytek (obsazení, výšky, styl appky) je
  *  vždy stejný. Používá STEJNÝ STYLE_SUFFIX jako skutečné stránky pohádky
  *  (lib/gemini.ts) — ne vlastní kopii, ať appka vizuálně nedriftuje. */
 function groupAnchorPrompt(cast: Character[], setting: string): string {
-  const numbered = cast.map((c, i) => `${i + 1}) ${c.name}`).join(", ");
-  const byId = new Map(cast.map(c => [c.id, c]));
-  // 🩺 Explicitní rodinné shluky pro model — kdo je čí rodič/dítě appka
-  // nikde neměla zapsané (viz FAMILY_UNITS výš); bez tohohle text jen
-  // řekl "dva dospělí vzadu, děti vepředu" a model si rodiny sám poskládal
-  // ŠPATNĚ (nahlášeno uživatelem se skutečnou obrázkovou ukázkou).
-  const familyGroups = FAMILY_UNITS
-    .map(unit => {
-      const parents = unit.parents.map(id => byId.get(id)?.name).filter((n): n is string => !!n);
-      const children = unit.children.map(id => byId.get(id)?.name).filter((n): n is string => !!n);
-      return parents.length && children.length
-        ? `${parents.join(" and ")} are a couple; ${children.join(" and ")} are THEIR children — this family stands together as one visual cluster`
-        : null;
-    })
-    .filter((s): s is string => !!s);
+  const pets = petIds();
+  const numbered = cast.map((c, i) => `${i + 1}) ${c.name}${pets.has(c.id) ? " (the family dog)" : ""}`).join(", ");
+  const peopleCount = cast.filter(c => !pets.has(c.id)).length;
+  const familyGroups = familyGroupSentence(cast);
   return [
     `A single storybook illustration of ${cast.map(c => c.name).join(", ")} together — ${setting}`,
-    familyGroups.length
-      ? `There are TWO separate families in this picture, standing as two adjacent clusters (not mixed together): ${familyGroups.join(". ")}. A child must stand near THEIR OWN parents, never near the other family's parents.`
+    familyGroups
+      ? `${familyGroups} They stand as two adjacent clusters (not mixed together), each family close together, facing the viewer with natural friendly smiles. A child (or pet) must stand near THEIR OWN family, never near the other family's members.`
       : `Everyone facing the viewer with natural friendly smiles, arranged in a natural cluster (not a strict line): the two adults side by side near the back, the children grouped in front of or beside them, all standing close together as a real family would.`,
     `Exact appearances (copy faithfully): ${cast.map(c => c.description).join(" | ")}.`,
     `If any description above explicitly states a feature is ABSENT or DIFFERENT from what would be typical (e.g. "NO dark mask", "NO stripe", a specific marking instead of the usual one for this breed/type), that is a DELIBERATE correction — draw it EXACTLY as stated even if it contradicts what is typical/generic. Do not default to a stereotypical look when a description explicitly rules it out.`,
-    `Every character FULL BODY, head to toe, standing on the SAME ground line.`,
-    `Their real heights are EXACTLY: ${cast.map(c => `${c.name} ${FAMILY_HEIGHT_CM[c.id]}cm`).join(", ")} — draw every body scaled precisely to these proportions relative to each other; this is the single most important requirement of this image.`,
+    `Every human character FULL BODY, head to toe, standing on the SAME ground line; the dog on all fours on the same ground line, not standing upright.`,
+    `Their real heights are EXACTLY: ${cast.map(c => `${c.name} ${FAMILY_HEIGHT_CM[c.id]}cm`).join(", ")} (for the dog, height means how tall it stands on all fours, not a human comparison pose) — draw every body scaled precisely to these proportions relative to each other; this is the single most important requirement of this image.`,
     // 🩺 2026-08-06: první živý test (kandidát "obývák") vygeneroval 9 lidí
     // místo 8 — model si sám přidal vymyšlené dítě navíc, které navíc
     // vzhledem splývalo s Nicoláskem ("dva Nicoláskové"). Bez konkrétního
     // vyjmenovaného seznamu appka jen řekla "přesně N lidí", bez toho, ať si
     // model VÝSLOVNĚ spočítá, koho vlastně kreslí.
-    `The cast is EXACTLY these ${cast.length} people and NO ONE else — count them as you draw: ${numbered}. Do NOT invent, add, or duplicate any additional sibling, friend, cousin, or background child/adult — if you are tempted to add anyone not on this numbered list, leave that space empty instead. Each of the ${cast.length} people above must be a CLEARLY DIFFERENT, DISTINCT individual — no two people (especially the children) may share the same face, hairstyle silhouette, or look like copies of one another; their described hair color, hairstyle and outfit are what tells them apart, follow those exactly per name.`,
+    `The cast is EXACTLY these ${cast.length} individuals (${peopleCount} people + ${cast.length - peopleCount} dog) and NO ONE else — count them as you draw: ${numbered}. Do NOT invent, add, or duplicate any additional sibling, friend, cousin, pet, or background child/adult — if you are tempted to add anyone not on this numbered list, leave that space empty instead. Each of the ${peopleCount} people above must be a CLEARLY DIFFERENT, DISTINCT individual — no two people (especially the children) may share the same face, hairstyle silhouette, or look like copies of one another; their described hair color, hairstyle and outfit are what tells them apart, follow those exactly per name.`,
     STYLE_SUFFIX,
   ].join(" ");
 }
@@ -395,10 +421,13 @@ async function drawGroupAnchorCandidate(cast: Character[], setting: string): Pro
   const prompt = groupAnchorPrompt(cast, setting);
   const photoRefs = loadReferenceImages(cast);
   const combinedDesc = cast.map(c => c.description).join(" | ");
+  const pets = petIds();
+  const peopleCount = cast.filter(c => !pets.has(c.id)).length;
+  const dogCount = cast.length - peopleCount;
   // 🩺 sceneDesc jde do appčiny vizuální kontroly (verifySceneImage) — bez
   // výslovného počtu appka nepoznala, že model přidal 9. postavu navíc
   // (viz komentář u groupAnchorPrompt), obrázek prošel bez povšimnutí.
-  const sceneDesc = `A family-portrait style illustration with EXACTLY ${cast.length} people — ${cast.map(c => c.name).join(", ")} — together, ${setting}. COUNT the people in the image: if there are more or fewer than ${cast.length}, or if any two people (especially children) look like duplicates of each other, that is a MAJOR violation.`;
+  const sceneDesc = `A family-portrait style illustration with EXACTLY ${peopleCount} people${dogCount ? ` and ${dogCount} dog` : ""} — ${cast.map(c => c.name).join(", ")} — together, ${setting}. COUNT the people (and the dog, separately) in the image: if the people-count or dog-count is off, or if any two people (especially children) look like duplicates of each other, that is a MAJOR violation.`;
   const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
   let img = await generateBackgroundImage(prompt, photoRefs, "16:9");
   let v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);

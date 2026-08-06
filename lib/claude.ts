@@ -1291,8 +1291,12 @@ export function peekEarlyScene(partial: string): { heroDescription: string; scen
 // Valentýnku podle celorodinného výškového listu od CD (dřív appka znala jen
 // jejich RELATIVNÍ vztah k jinému dítěti, ne přesné číslo). Mění se, jen když
 // rodina naměří nové skutečné číslo — neodhaduj/nedopočítávej sám.
+// v2 (2026-08-06): Valentýnka opravena 85→90cm (upřesnil uživatel) — u
+// poměru 90/111 sahá hlavou k Nicoláskovým RAMENŮM, ne k uším (viz
+// canonicalHeightsEntry níž, dřívější "reaches to ears" byl i se starým
+// 85cm nekonzistentní/moc velkorysý).
 const CANONICAL_HEIGHT_CM: Record<string, number> = {
-  valentyna: 85,
+  valentyna: 90,
   nicolas: 111,
   james: 115,
   bella: 135,
@@ -1320,7 +1324,7 @@ function canonicalHeightsEntry(characters: Character[]): string | null {
     bits.push(`${name("james")} is a little taller than ${name("nicolas")} — the top of ${name("nicolas")}'s head reaches only to ${name("james")}'s ears`);
   }
   if (ids.has("valentyna") && ids.has("nicolas")) {
-    bits.push(`${name("valentyna")} is the smallest — the top of her head reaches only to ${name("nicolas")}'s ears`);
+    bits.push(`${name("valentyna")} is the smallest — the top of her head reaches only to ${name("nicolas")}'s SHOULDERS, not his ears or chin — she is noticeably shorter than him, about 4/5 of his height`);
   }
   if (ids.has("bella")) {
     const anchors = ["james", "nicolas"].filter(id => ids.has(id)).map(name);
