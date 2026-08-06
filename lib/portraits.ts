@@ -285,6 +285,111 @@ export async function getFamilyScaleSheet(): Promise<ReferenceImage | null> {
   }
 }
 
+// ── 🖼️ SKUPINOVÁ KOTVA — jeden obrázek CELÉ rodiny pohromadě v PŘÍBĚHOVÉ
+// (ne referenční) kompozici, viz ECONOMY-PLAN.md Fáze 2. Na rozdíl od
+// getFamilyScaleSheet výš (klinický řádek vedle sebe, se jmény+cm popisky,
+// text VÝJIMEČNĚ povolený) je tohle normální stránková ilustrace appky —
+// ŽÁDNÝ text, přirozené seskupení jako na rodinné fotce — a slouží jako
+// DALŠÍ reference vedle jednotlivých portrétů: model tak vidí, jak rodina
+// vypadá POHROMADĚ v appčině stylu (ne jen izolovaně jeden po druhém),
+// což by mělo snížit počet zamítnutí kontrolou u vícepostavových scén.
+// Kreslí se JEDNOU CELKOVĚ (ne na pohádku) a natrvalo se cachuje — bump
+// GROUP_ANCHOR_VERSION při změně vzhledu/výšek rodiny.
+const GROUP_ANCHOR_VERSION = 1;
+
+function groupAnchorLabel(): string {
+  return (
+    "CANONICAL FAMILY GROUP REFERENCE — shows the whole family standing together naturally, in this book's exact art style, with correct relative body-size proportions between them. " +
+    "Use it to match how these characters look and scale WHEN SEEN TOGETHER in a scene — same hair colors, faces, outfits and relative heights as here. " +
+    "IGNORE any person in this reference who is NOT named in this scene's cast — they are shown here only for style/scale reference, they are not present in the scene."
+  );
+}
+
+/** Malovaná skupinová kotva celé rodiny (jedna přirozená scéna, BEZ textu);
+ *  null když se nepovede nebo chybí Blob úložiště. Používá stejné obsazení
+ *  (a stejnou podmínku familyScaleSheetApplies) jako celorodinný výškový list. */
+export async function getFamilyGroupAnchor(): Promise<ReferenceImage | null> {
+  const key = `family-anchor-v${GROUP_ANCHOR_VERSION}`;
+  const cached = memCache.get(key);
+  if (cached) return cached;
+  const token = blobToken();
+  if (!token) return null;
+  const pathName = `portraits/${key}.img`;
+
+  try {
+    const h = await head(pathName, { token });
+    const r = await fetch(h.url, { cache: "force-cache" });
+    if (r.ok) {
+      const buf = Buffer.from(await r.arrayBuffer());
+      const ref: ReferenceImage = { data: buf.toString("base64"), mimeType: h.contentType || "image/webp", label: groupAnchorLabel() };
+      memCache.set(key, ref);
+      return ref;
+    }
+  } catch {}
+
+  try {
+    const cast = loadCharacters()
+      .filter(c => FAMILY_HEIGHT_CM[c.id] !== undefined)
+      .sort((a, b) => FAMILY_HEIGHT_CM[a.id] - FAMILY_HEIGHT_CM[b.id]);
+    if (cast.length < 2) return null;
+    console.log(`[portraits] drawing FAMILY GROUP anchor (${cast.map(c => c.id).join("+")})…`);
+    const prompt = [
+      `A single storybook illustration of ${cast.map(c => c.name).join(", ")} standing together outdoors in a sunny meadow with soft green grass, a few flowers, and a gentle blue sky — a warm, relaxed family-portrait moment, everyone facing the viewer with natural friendly smiles, arranged in a natural cluster (not a strict line): the two adults side by side near the back, the children grouped in front of or beside them, all looking comfortable standing close together as a real family would.`,
+      `Exact appearances (copy faithfully): ${cast.map(c => c.description).join(" | ")}.`,
+      `If any description above explicitly states a feature is ABSENT or DIFFERENT from what would be typical (e.g. "NO dark mask", "NO stripe", a specific marking instead of the usual one for this breed/type), that is a DELIBERATE correction — draw it EXACTLY as stated even if it contradicts what is typical/generic. Do not default to a stereotypical look when a description explicitly rules it out.`,
+      `Every character FULL BODY, head to toe, standing on the SAME ground line.`,
+      `Their real heights are EXACTLY: ${cast.map(c => `${c.name} ${FAMILY_HEIGHT_CM[c.id]}cm`).join(", ")} — draw every body scaled precisely to these proportions relative to each other; this is the single most important requirement of this image.`,
+      `Exactly ${cast.length} people in the image — nobody else, no pets, no other characters.`,
+      PORTRAIT_STYLE,
+    ].join(" ");
+    const photoRefs = loadReferenceImages(cast);
+    const combinedDesc = cast.map(c => c.description).join(" | ");
+    const sceneDesc = `A family-portrait style illustration with ${cast.map(c => c.name).join(", ")} standing together in a meadow.`;
+    const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
+    let img = await generateBackgroundImage(prompt, photoRefs);
+    let v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
+    if (v && !v.ok) {
+      console.warn(`[portraits] family group anchor REJECTED (${v.problems.slice(0, 140)}) → redraw with correction`);
+      img = await generateBackgroundImage(
+        `${prompt} ⚠ CORRECTION: the previous attempt violated: ${v.problems.slice(0, 300)}. Follow every description EXACTLY (hair color, skin tone, markings, clothing).`,
+        photoRefs
+      );
+      v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
+      if (v && !v.ok) {
+        // ani oprava neprošla → RADĚJI ŽÁDNÁ kotva (scény pojedou bez ní)
+        console.warn(`[portraits] family group anchor still rejected (${v.problems.slice(0, 140)}) → skipping`);
+        return null;
+      }
+    }
+    await put(pathName, img.buffer, {
+      access: "public",
+      contentType: img.mimeType,
+      token,
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      cacheControlMaxAge: 31536000,
+    });
+    const ref: ReferenceImage = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: groupAnchorLabel() };
+    memCache.set(key, ref);
+    return ref;
+  } catch (e) {
+    console.warn(`[portraits] family group anchor failed: ${e instanceof Error ? e.message : e}`);
+    return null; // scény pojedou jako dřív, jen bez skupinové kotvy
+  }
+}
+
+/** Veřejná URL skupinové kotvy (pro náhled), null když ještě není namalovaná. */
+export async function familyGroupAnchorUrl(): Promise<string | null> {
+  const token = blobToken();
+  if (!token) return null;
+  try {
+    const h = await head(`portraits/family-anchor-v${GROUP_ANCHOR_VERSION}.img`, { token });
+    return h.url;
+  } catch {
+    return null;
+  }
+}
+
 // ── Cílené reference: scéna dostane JEN portréty postav, které v ní vystupují ──
 // Při velkém obsazení (9 postav) dostával model 9 portrétů na každou scénu
 // a míchal identity (Janova polokošile na cizím dítěti…). Filtruje se podle

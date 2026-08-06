@@ -8,7 +8,7 @@ import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, peekEarlyScene, enforceCanonicalAppearance, inventedCharacterNames, type StoryExtras } from "@/lib/claude";
 import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, isCreditsDepletedError, isSpendCapError, sceneCastList } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
-import { loadPortraitRefEntries, refsForText, refsForPanels, getFamilyScaleSheet, familyScaleSheetApplies } from "@/lib/portraits";
+import { loadPortraitRefEntries, refsForText, refsForPanels, getFamilyScaleSheet, familyScaleSheetApplies, getFamilyGroupAnchor } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/types";
 import { blobToken } from "@/lib/blob-token";
@@ -279,6 +279,11 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   // změřit neumí). Připojuje se jen když je v pohádce 2+ postav, které appka
   // zná s přesným cm. Načítá se souběžně s psaním; null = bez výškové kotvy.
   const scaleSheetPromise = familyScaleSheetApplies(refIds) ? getFamilyScaleSheet().catch(() => null) : Promise.resolve(null);
+  // 🖼️ Skupinová kotva (ECONOMY-PLAN.md Fáze 2) — jedna natrvalo vygenerovaná
+  // ilustrace CELÉ rodiny pohromadě (bez textu, na rozdíl od výškového listu
+  // výš), doplňuje portréty jako DALŠÍ reference pro vícepostavové scény.
+  // Stejná podmínka i stejné souběžné načítání jako výškový list.
+  const groupAnchorPromise = familyScaleSheetApplies(refIds) ? getFamilyGroupAnchor().catch(() => null) : Promise.resolve(null);
 
   try {
     logEv(`▶ běh funkce start${(st.chains ?? 0) > 0 ? ` (řetěz ${st.chains})` : ""}${st.scenesScript?.length ? ` — scénář hotový, ${Object.keys(st.sceneUrls || {}).length}/${st.total ?? "?"} scén nakresleno` : (st.restarts ?? 0) > 0 ? ` — psaní pokus ${(st.restarts ?? 0) + 1}` : ""}`);
@@ -435,7 +440,11 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           // 📏 Scéna 1 je KOTVA pro celý zbytek pohádky — poměry výšek v ní
           // musí sedět především, jinak se chyba replikuje do všech scén
           const sheet0 = await scaleSheetPromise;
-          if (sheet0 && early.length >= 2) early.push(sheet0);
+          const groupAnchor0 = await groupAnchorPromise;
+          if (early.length >= 2) {
+            if (sheet0) early.push(sheet0);
+            if (groupAnchor0) early.push(groupAnchor0);
+          }
           const img = await generateSceneImage(peek.scene, hero, early, sceneDeadline());
           earlyImg = img;
           logEv("⚡ scéna 1 dokreslena během psaní");
@@ -541,6 +550,7 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // na každou scénu vedlo k míchání identit
     const refEntries = await refEntriesPromise; // načtené souběžně s psaním
     const scaleSheet = await scaleSheetPromise;  // 📏 kanonické poměry výšek (může být null)
+    const groupAnchor = await groupAnchorPromise; // 🖼️ skupinová kotva rodiny (může být null)
     const customRefs: ReferenceImage[] = [];
     const customImages = Array.isArray(body.customCharacterImages)
       ? (body.customCharacterImages as Array<{ data?: string; mimeType?: string }>)
@@ -581,10 +591,13 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     const refsFor = (txt: string): ReferenceImage[] => {
       const own = refsForText(refEntries, txt);
       const invented = inventedNames.filter(n => inventedRefs.has(n) && nameHit(txt, n)).map(n => inventedRefs.get(n)!);
-      // 📏 Výškový list přiložit JEN když ve scéně stojí 2+ postavy vedle sebe
-      // (u sólo scény nemá poměr výšek co držet a jen by ubíral pozornost)
-      const withScale = scaleSheet && own.length + customRefs.length + invented.length >= 2 ? [scaleSheet] : [];
-      return [...own, ...customRefs, ...invented, ...withScale];
+      // 📏 Výškový list + 🖼️ skupinová kotva přiložit JEN když ve scéně stojí
+      // 2+ postavy vedle sebe (u sólo scény nemá poměr výšek co držet a jen
+      // by ubíraly pozornost)
+      const multiChar = own.length + customRefs.length + invented.length >= 2;
+      const withScale = multiChar && scaleSheet ? [scaleSheet] : [];
+      const withGroupAnchor = multiChar && groupAnchor ? [groupAnchor] : [];
+      return [...own, ...customRefs, ...invented, ...withScale, ...withGroupAnchor];
     };
 
     let anchor: ReferenceImage | null = null;
@@ -818,9 +831,11 @@ export async function runJob(id: string, body: Record<string, unknown>) {
             // vymýšlel obličeje (nevěděl, který portrét patří ke kterému panelu)
             const panelTexts = group.map(i => `${scenesScript[i].imagePrompt} ${scenesScript[i].narration}`);
             const groupRefs = [...refsForPanels(refEntries, panelTexts), ...customRefs];
-            // 📏 Arch kreslí víc scén najednou → poměry výšek se v něm musí
-            // držet napříč panely; výškový list je tu proto vždy (když existuje)
+            // 📏🖼️ Arch kreslí víc scén najednou → poměry výšek se v něm musí
+            // držet napříč panely; výškový list i skupinová kotva jsou tu
+            // proto vždy (když existují)
             if (scaleSheet) groupRefs.push(scaleSheet);
+            if (groupAnchor) groupRefs.push(groupAnchor);
             const refs = anchor ? [...groupRefs, anchor] : groupRefs;
             // ⚡ Panely se ukládají HNED, jak je každý jednotlivě hotový (ne až
             // po nejpomalejším z celého archu) — appka dřív čekala na CELOU
