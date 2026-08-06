@@ -725,6 +725,52 @@ export async function composeSceneOnBackground(
   throw new Error("NO_IMAGE: kompozice na pozadí nevrátila obrázek");
 }
 
+// ── 🎨 ECONOMY-PLAN.md Fáze 4B v3 (mockup větev) — PŘEBARVENÍ sdíleného
+// pozadí ────────────────────────────────────────────────────────────────
+// Vezme appkou už jednou zaplacenou STRUKTURÁLNÍ scenérii (jedna na
+// franšízové téma, viz getThemeBaseBackground v lib/story-backgrounds.ts —
+// obdoba appčiny "zamčené knihovny postav", jen pro krajinu) a přemaluje ji
+// do NÁLADY/ROČNÍHO OBDOBÍ/DENNÍ DOBY, kterou si Claude napsal pro
+// KONKRÉTNÍ pohádku (World & setting lock) — kompozice (kde jsou stromy,
+// cesta, budovy) zůstává stejná, appka mění jen barvy/světlo/počasí.
+// 💰 Cenově STEJNÉ jako jedna generace (appka za obrázek platí stejně bez
+// ohledu na to, jestli je to "edit" nebo "od nuly") — úspora je v tom, že
+// appka jednu STRUKTURÁLNÍ investici (téma) sdílí napříč MNOHA budoucími
+// pohádkami/náladami, místo aby každá pohádka platila za úplně novou
+// scenérii od nuly — a přebarvení z už dobré kompozice by mělo mít vyšší
+// šanci projít kontrolou napoprvé (stejná logika jako composeSceneOnBackground).
+export async function recolorBackground(base: ImageResult, moodPrompt: string): Promise<ImageResult> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
+  const model = IMAGE_MODEL.trim();
+
+  const parts: Array<Record<string, unknown>> = [];
+  parts.push({ text: "ESTABLISHED BACKGROUND LAYOUT — keep the exact same composition, camera angle, and structural elements (where the trees/paths/rocks/buildings/terrain shapes are positioned) as this reference image:" });
+  parts.push({ inlineData: { data: base.buffer.toString("base64"), mimeType: base.mimeType } });
+  parts.push({ text: [
+    `Recolor and re-light this SAME scene to match this specific setting/mood: ${moodPrompt}`,
+    "Change the color palette, lighting, time of day, season and weather to match the description above — but keep the underlying composition, camera framing and structural layout recognizably the SAME as the reference (same general shapes and positions of trees/paths/rocks/buildings), just repainted in the new light/season/mood.",
+    "Hand-painted 2D storybook illustration, soft painterly brushwork in classic Disney animated-film style, landscape orientation. No people, no animals, no creatures — pure scenery/backdrop only. Absolutely no text, letters, words, signs, labels or writing of any kind anywhere in the image.",
+  ].join(" ") });
+
+  const generationConfig: Record<string, unknown> = {
+    responseModalities: ["IMAGE", "TEXT"],
+    imageConfig: { aspectRatio: "16:9" },
+  };
+  const raw = await geminiPost(apiKey, model, { contents: [{ role: "user", parts }], generationConfig }, GEMINI_IMAGE_TIMEOUT_MS);
+  const data = JSON.parse(raw) as { candidates?: GeminiCandidate[]; promptFeedback?: { blockReason?: string } };
+  if (data.promptFeedback?.blockReason) throw new Error(`Gemini BLOCKED: ${data.promptFeedback.blockReason}`);
+  for (const cand of data.candidates || []) {
+    for (const part of cand.content?.parts || []) {
+      if (part.inlineData?.data) {
+        genCounter.img1k += 1; // 💰 přebarvení je placená generace jako každá jiná
+        return await compressImage({ buffer: Buffer.from(part.inlineData.data, "base64"), mimeType: part.inlineData.mimeType || "image/png" });
+      }
+    }
+  }
+  throw new Error("NO_IMAGE: přebarvení pozadí nevrátilo obrázek");
+}
+
 // Pozadí aplikace — ilustrovaná scenérie ve stejném stylu jako pohádky,
 // na výšku (telefon). Volitelně s referenčními fotkami postav (Nicolásek
 // a Valentýnka bývají součástí každého světa). Prompt je bezpečný a pevně

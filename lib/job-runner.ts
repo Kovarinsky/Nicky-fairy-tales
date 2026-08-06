@@ -720,7 +720,10 @@ export async function runJob(id: string, body: Record<string, unknown>) {
         const bgPrompt = st.bgSettingPrompt
           ? buildSettingPrompt(st.bgSettingPrompt)
           : st.bgThemeId ? bgSceneById(st.bgThemeId)?.prompt : undefined;
-        const bg = bgKey && bgPrompt ? await getStoryBackground(bgKey, bgPrompt).catch(() => null) : null;
+        // v3: bgThemeId (franšízové téma, vždy nastaveno, aspoň "forest"
+        // fallback) appka teď posílá i jako recolorBaseThemeId — přednost má
+        // PŘEBARVENÍ sdíleného tematického základu před čerstvou generací.
+        const bg = bgKey && bgPrompt ? await getStoryBackground(bgKey, bgPrompt, false, st.bgThemeId).catch(() => null) : null;
         if (bg) {
           img = await composeSceneOnBackground(scene, heroDescription, bg, refs).catch((e: Error) => {
             logEv(`🧪 scéna ${i + 1} kompozice na pozadí selhala (${e.message.slice(0, 100)}) → padám na čerstvé generování`);

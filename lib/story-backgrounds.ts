@@ -33,10 +33,70 @@
 import { put, head } from "@vercel/blob";
 import { createHash } from "crypto";
 import { blobToken } from "./blob-token";
-import { generateBackgroundImage, type ImageResult } from "./gemini";
+import { generateBackgroundImage, recolorBackground, type ImageResult } from "./gemini";
+import { bgSceneById } from "./backgrounds";
 
 const STORY_BG_VERSION = 2;
 const memCache = new Map<string, ImageResult>();
+
+// ── 🎨 v3 (mockup, na žádost "zkus sdílené pozadí, nebo jeho části, které
+// budou přebarvené") — TÉMATICKÝ STRUKTURÁLNÍ ZÁKLAD: appka namaluje JEDNU
+// scenérii NA CELÉ FRANŠÍZOVÉ TÉMA (les/hory/moře…, viz lib/backgrounds.ts,
+// 9 celkem) — obdoba zamčené knihovny postav (lib/portraits.ts), jen pro
+// krajinu. Tenhle základ appka nikdy neukazuje přímo — vždycky ho nejdřív
+// PŘEBARVÍ (viz recolorBackground, lib/gemini.ts) do nálady/ročního
+// období/denní doby, kterou má KONKRÉTNÍ pohádka. Skutečná úspora: appka
+// dřív platila za NOVOU scenérii ke KAŽDÉMU jinak formulovanému settingu
+// (byť konceptově stejnému tématu) — teď platí strukturální investici JEN
+// JEDNOU NA TÉMA a sdílí ji napříč VŠEMI budoucími náladami/pohádkami.
+const THEME_BASE_VERSION = 1;
+
+function themeBasePathFor(themeId: string): string {
+  return `backgrounds/theme-base-${themeId}-v${THEME_BASE_VERSION}.img`;
+}
+
+/** Vrátí (z cache/Blobu, případně jednou namaluje) STRUKTURÁLNÍ základ pro
+ *  dané franšízové téma appky (lib/backgrounds.ts BG_SCENES) — appka ho
+ *  NIKDY neukazuje přímo, jen jako podklad pro recolorBackground níž. */
+export async function getThemeBaseBackground(themeId: string, force = false): Promise<ImageResult | null> {
+  const scene = bgSceneById(themeId);
+  if (!scene) return null;
+  const cacheKey = `theme-base-${themeId}-v${THEME_BASE_VERSION}`;
+  const cached = !force && memCache.get(cacheKey);
+  if (cached) return cached;
+  const token = blobToken();
+  if (!token) return null;
+  const pathName = themeBasePathFor(themeId);
+
+  if (!force) try {
+    const h = await head(pathName, { token });
+    const r = await fetch(h.url, { cache: "force-cache" });
+    if (r.ok) {
+      const buf = Buffer.from(await r.arrayBuffer());
+      const img: ImageResult = { buffer: buf, mimeType: h.contentType || "image/webp" };
+      memCache.set(cacheKey, img);
+      return img;
+    }
+  } catch {}
+
+  try {
+    console.log(`[story-bg] 🎨 drawing THEME BASE (structural, sdílený napříč pohádkami) for "${themeId}"…`);
+    const img = await generateBackgroundImage(scene.prompt, [], "16:9");
+    await put(pathName, img.buffer, {
+      access: "public",
+      contentType: img.mimeType,
+      token,
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      cacheControlMaxAge: 31536000,
+    });
+    memCache.set(cacheKey, img);
+    return img;
+  } catch (e) {
+    console.warn(`[story-bg] theme base "${themeId}" failed: ${e instanceof Error ? e.message : e}`);
+    return null;
+  }
+}
 
 /** Krátký stabilní hash textu settingu — appka ho používá jako cache klíč,
  *  ať appka dvě pohádky se STEJNÝM settingem (stejný text) nemaluje dvakrát. */
@@ -64,8 +124,15 @@ export async function storyBackgroundUrl(key: string): Promise<string | null> {
  *  `prompt` je appkou sestavený popis scenérie (viz buildSettingPrompt níž
  *  nebo přímo Claudův "World & setting lock" text) — appka ho maluje jen
  *  jednou pod klíčem `key` (viz settingCacheKey). force=true přeskočí cache
- *  a namaluje znovu (stejný vzor jako lib/portraits.ts). */
-export async function getStoryBackground(key: string, prompt: string, force = false): Promise<ImageResult | null> {
+ *  a namaluje znovu (stejný vzor jako lib/portraits.ts).
+ *  `recolorBaseThemeId` (v3, nové): když appka nemá tenhle přesný setting
+ *  ještě v cache, NEJDŘÍV zkusí PŘEBARVIT sdílený tematický základ (viz
+ *  getThemeBaseBackground výš) místo malování úplně od nuly — teprve když
+ *  ani tenhle základ není k dispozici (chybí téma) nebo přebarvení selže,
+ *  appka spadne na starší čerstvou generaci od nuly (v2 chování). */
+export async function getStoryBackground(
+  key: string, prompt: string, force = false, recolorBaseThemeId?: string
+): Promise<ImageResult | null> {
   if (!prompt.trim()) return null;
   const cacheKey = `${key}-v${STORY_BG_VERSION}`;
   const cached = !force && memCache.get(cacheKey);
@@ -85,8 +152,29 @@ export async function getStoryBackground(key: string, prompt: string, force = fa
     }
   } catch {}
 
+  // v3: PŘEBARVENÍ sdíleného tematického základu má přednost před čerstvou
+  // generací od nuly — strukturální náklad (téma) je pak sdílený napříč
+  // MNOHA budoucími pohádkami/náladami, ne jen touhle jednou.
+  if (recolorBaseThemeId) {
+    const base = await getThemeBaseBackground(recolorBaseThemeId).catch(() => null);
+    if (base) {
+      try {
+        console.log(`[story-bg] 🎨 recoloring THEME BASE "${recolorBaseThemeId}" for key "${key}" (setting: ${prompt.slice(0, 100)}…)`);
+        const img = await recolorBackground(base, prompt);
+        await put(pathName, img.buffer, {
+          access: "public", contentType: img.mimeType, token,
+          addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 31536000,
+        });
+        memCache.set(cacheKey, img);
+        return img;
+      } catch (e) {
+        console.warn(`[story-bg] recolor of "${recolorBaseThemeId}" for key "${key}" failed (${e instanceof Error ? e.message : e}) → padám na čerstvou generaci od nuly`);
+      }
+    }
+  }
+
   try {
-    console.log(`[story-bg] 🧪 drawing STORY background for key "${key}" (setting: ${prompt.slice(0, 100)}…)`);
+    console.log(`[story-bg] 🧪 drawing STORY background from scratch for key "${key}" (setting: ${prompt.slice(0, 100)}…)`);
     // BEZ postav (appka je vkládá až za scénu, composeSceneOnBackground).
     // 16:9 místo 9:16 appčiny domovské dekorace — musí sedět na skutečné
     // rozvržení stránky.
