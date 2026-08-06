@@ -195,3 +195,130 @@ je to produktová identita appky, ne jen technický detail.**
 Žádné další placené živé testy dnes v noci — všechny dnešní testy (SFX,
 5/10/15 scén, castSize opravy) proběhly s tebou u toho. Tohle je plán na
 schválení, ne další útrata bez dozoru přes noc.
+
+## 8) Detailní rozpracování tří technik (na žádost, 2026-08-06 ráno)
+
+Zaměřeno na to, co appka SKUTEČNĚ dělá dnes v kódu (ověřeno čtením, ne
+odhadem) — ne obecný přehled technik z internetu.
+
+### 8.1 Prompt caching (Claude, psaní scénáře)
+
+**Stav: appka to už dělá.** `generateStory` (`lib/claude.ts`) posílá system
+prompt (`buildSystemPrompt`, ~4k tokenů, neměnný napříč pohádkami STEJNÉHO
+jazyka) s `cache_control: { type: "ephemeral" }` — 5minutová TTL cache.
+Proměnná část (téma, postavy, počet stran…) jde do `messages`, ne do
+`system` — přesně správné pořadí (stabilní napřed, proměnné na konci), viz
+`shared/prompt-caching.md`.
+
+**Co jsem dnes v noci našel a opravil (commit `9ed36f5`):** appka reálné
+tokeny měří teprve od dnešního večera (viz bod 1 výš), ale měřila jen
+`input_tokens` z odpovědi — což je u KEŠOVANÉHO requestu jen NEKEŠOVANÝ
+zbytek promptu, ne jeho celková velikost. `cache_creation_input_tokens`
+(zápis, 1,25× cena) a `cache_read_input_tokens` (čtení, 0,1× cena) appka
+ignorovala → cena psaní byla systematicky podhodnocená u KAŽDÉHO volání,
+co trefilo cache (typicky většina — fronta pohádek/restarty/navázání).
+Opraveno, appka teď cení všechny čtyři kategorie tokenů zvlášť.
+
+**Co by šlo dál (nejde o zapnutí, appka to má zapnuté — jde o vyladění):**
+- Appka zatím NELOGUJE skutečný hit rate (`cacheReadTokens` vs
+  `cacheCreationTokens` v poměru). Stálo by za to si to jednou vypsat
+  z produkce a zjistit, jak často appka reálně trefuje 5min okno — u
+  appky s nárazovým, ne kontinuálním provozem (rodinná appka, ne SaaS
+  s tisíci requesty/min) může být reálný hit rate nízký, a pak appka
+  častěji platí 1,25× zápis, než 0,1× čtení.
+- Pokud by se ukázalo, že provoz je řídký (mezery >5 min mezi
+  pohádkami), `ttl: "1h"` by mohla dávat větší smysl — ale 2× cena
+  zápisu potřebuje aspoň 3 zásahy na vyplacení (vs 2 u 5minutové), takže
+  to nemá cenu měnit bez skutečných dat.
+- Ostatní volání Claudovi (`suggestTopicIdea`, `expandTopicIdea`,
+  `translateTopicText`, `extractPdfBrief`, `studyWorld`,
+  `reviewSoundDesign`) cache nemají a pravděpodobně by z ní ani
+  neprofitovaly — jsou to krátké, jednorázové prompty pod appčinou
+  vlastní ~1-2k token velikostí, tedy pod prahem 512 tokenů pro Sonnet 5
+  jen tak tak nad ním, ale hlavně: nejsou to REPETIČNÍ prompty (každé
+  volání má jiný obsah), takže by cache nikdy nic nenašla ke čtení.
+
+**Závěr: nic tu není potřeba URGENTNĚ dodělat** — hlavní díra (chybějící
+metrika) je opravená. Zbytek je měření a případné doladění TTL, ne nová
+funkcionalita.
+
+### 8.2 Image editing — znovupoužití postav/scén nebo jejich částí
+
+**Stav: appka to částečně už dělá — ale jen uvnitř JEDNÉ scény, ne napříč
+scénami/pohádkami.** `editSceneImage()` (`lib/gemini.ts:640`) bere hotový
+obrázek + referenční portréty + opravnou instrukci a vrátí STEJNOU
+kompozici s jedinou požadovanou změnou (appka to používá, když appčina
+vlastní kontrola `verifySceneImage` vrátí verdikt `EDIT` místo `REDRAW` —
+`QaAction = "ACCEPT" | "EDIT" | "REDRAW"`) — dvě volací místa: oprava
+jednotlivé scény (`gemini.ts:860`) a oprava jednoho panelu v archu
+(`gemini.ts:1144`). Tohle appka dělá dnes, funguje to, a je to přesně ten
+"image editing" mechanismus, na který cílí Fáze 4B v bodě 3 výš — appka ho
+prostě zatím používá jen na OPRAVU chyby, ne na ZNOVUPOUŽITÍ mezi scénami.
+
+**Co by "cross-scene reuse" znamenalo konkrétně:** appka už dnes generuje
+a cachuje 9 světových pozadí (`lib/backgrounds.ts`, `generateBackgroundImage`)
+a teď i portréty + skupinovou kotvu (`lib/portraits.ts`). Fáze 4B by
+znamenala: vzít jedno z těchhle už schválených pozadí jako `base` pro
+`editSceneImage()`, a místo "namaluj celou novou scénu" poslat "zachovej
+tohle přesné pozadí/kompozici, jen sem vlož [postava] v [pozice/gesto]".
+
+**Důležité vyjasnění cenového dopadu (appka to má zaznamenané v kódu, ne
+jen jako domněnku):** komentář u `genCounter.img1k += 1` v `editSceneImage`
+říká doslova *"editace je placená generace jako každá jiná"* — tedy JEDNA
+editace stojí STEJNĚ jako JEDNA čerstvá generace (žádná přímá sleva na
+$/volání). Úspora by nebyla v ceně JEDNOHO obrázku, ale v MÍŘE ZAMÍTNUTÍ
+kontrolou: ověřené pozadí + jen menší úprava = menší "plocha" pro chybu →
+míň drahých REDRAW cyklů. To je přesně to, co plán už v bodě 4A/4B
+předpokládal, teď jen potvrzeno přímo z kódu.
+
+**Riziko (beze změny oproti tomu, co plán říkal): appka by přestala být
+"každá stránka čerstvá malba" a stala se "appka skládá z ověřených dílů +
+malé úpravy" — vizuální identita appky, ne jen technický detail. Tohle
+zůstává TVOJE rozhodnutí, ne moje, a nedělám to bez tvého ano.**
+
+**Bezpečnější mezikrok, kdybys chtěl vyzkoušet málo riskantní verzi:**
+znovupoužít pozadí jen na 1-2 vyloženě "přechodové" stránky pohádky (ne
+titulní, ne "wow" moment) — menší úspora, ale menší riziko, snáz se dá
+zrušit, kdyby to vypadalo "poskládaně".
+
+### 8.3 LoRA / vlastní model
+
+**Stav: NEimplementováno a appka na to dnešní architekturou není
+nastavená.** Gemini image model appka volá přes veřejné API
+(`gemini-3.1-flash-image`) — Google U TOHOTO modelu přes veřejné API
+netrénuje LoRA na zákaznická data (LoRA je technika z open-weights světa —
+Stable Diffusion/FLUX — appka by potřebovala BUĎ vlastní hosting
+(GPU/inference server), NEBO třetí stranu (Replicate/fal.ai/RunPod-styl
+služby), NE Gemini.
+
+**Co by to reálně znamenalo:** appka by nemusela jen "přidat funkci" —
+znamenalo by to NOVÉHO dodavatele (trénink + hosting inference), novou
+platební/vendor závislost, a ztrátu dnešní flexibility (Gemini umí z
+JEDNÉHO promptu nakreslit jak rodinné postavy z fotek, tak VYMYŠLENÉ
+postavy jen z textového popisu — LoRA natrénovaný na konkrétní tváře umí
+JEN ty tváře, na vymyšlené postavy uprostřed pohádky by appka pořád
+potřebovala normální image model vedle toho).
+
+**Proč bych tohle NEDOPORUČIL jako další krok (ne teď):**
+- Appčin současný problém (konzistence VZHLEDU zamčené rodiny napříč
+  scénami) appka už řeší portréty + skupinovou kotvou + kontrolní smyčkou
+  — tahle session právě dolaďuje přesně tenhle mechanismus (styl, poměr
+  stran, správné rodinné shluky). Nemá smysl přidávat druhou, mnohem
+  dražší cestu ke STEJNÉMU cíli, dokud appka nezkusí, jestli ta první
+  (levnější) stačí.
+- LoRA se ekonomicky vyplácí, když appka slouží MNOHA různým rodinám,
+  z nichž každá potřebuje vlastní natrénovaný model — appka dnes slouží
+  primárně JEDNÉ rodině (plus obecným uživatelům bez vlastních fotek).
+  Trénovat model na rodinu, kterou appka může stejně dobře popsat
+  referenčním obrázkem (bez tréninku, bez čekání, bez GPU nákladu), je
+  nadbytečné.
+- Číselné odhady nákladů tréninku (řádově jednotky až desítky $ na běh),
+  co jsem dostal z Gemini researche, NEJSOU ověřené proti oficiální
+  dokumentaci žádného konkrétního dodavatele — beru je jako orientační
+  řád velikosti, ne jako podklad k rozhodnutí.
+
+**Doporučení: nechat na později, ne zavrhnout natrvalo.** Kdyby po
+dnešních opravách (styl kotvy, rodinné shluky) appka i tak dál měla
+vysokou míru zamítnutí kontrolou u vícepostavových scén, LoRA/vlastní
+model je legitimní další krok — ale až JAKO REAKCE na změřený problém,
+ne jako preventivní investice bez důkazu, že referenční obrázky nestačí.
