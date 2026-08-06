@@ -755,21 +755,27 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // běžely v defaultu) appka mlčela a nešlo to ověřit jinak než odhadem
     // z chování. Tohle ukáže castSize napřímo, pokaždé.
     logEv(`🧬 castSize=${castSize} (charactersForNames=${charactersForNames.length}, rawCustomForNames=${rawCustomForNames?.length ?? 0}, body.characterIds=${JSON.stringify(body.characterIds)})`);
-    // 🩺 stejný test: u castSize 4+ archy prošly v 0-8 % případů napříč
-    // 5 dávkami — přeskočit je úplně je dražší (víc sólo obrázků), ale
-    // mnohem rychlejší a spolehlivější než 250s skoro bez užitku.
-    const SHEET_SKIP_CAST_SIZE = 4;
+    // 🧪 VĚTEV claude/sheet-retest (2026-08-06, NEmerguje se do main) —
+    // znovu-test, jestli dnešní vylepšená konzistence postav (zamčené
+    // portréty z lib/portraits.ts, best-of-2 QA fix) zvedla úspěšnost archů
+    // u VĚTŠÍHO obsazení natolik, aby šlo práh zvednout. Původní test
+    // (2026-08-05, viz komentář níž) měřil 0-8% úspěšnost u castSize 4+, ale
+    // to bylo PŘED dnešními opravami rodinné knihovny. Práh dočasně zvednut
+    // 4→7 (pokrývá testovaný rozsah 4-6 postav) + mezistupeň (2×2, max 2
+    // lidi/panel) rozšířen na CELÝ rozsah 3-6, ne jen přesně 3 — opatrnější
+    // start než rovnou plné 3×3/3 lidi na neznámém terénu.
+    const SHEET_SKIP_CAST_SIZE = 7;
     const sheetMode = (process.env.IMAGE_SHEET_MODE || "3x3").toLowerCase();
     if (st.sheetGaveUp) logEv("🗂️ archová fáze už dřív vzdala (žádný nový panel) → rovnou sólo");
     else if (castSize >= SHEET_SKIP_CAST_SIZE) logEv(`🧪 ${castSize} postav v pohádce (≥${SHEET_SKIP_CAST_SIZE}) — archy přeskočeny, rovnou sólo (viz test 2026-08-05)`);
-    else if (castSize === 3) logEv(`🧪 ${castSize} postavy v pohádce — mezistupeň: archy 2×2, max 2 lidi/panel (přísnější než obvykle)`);
+    else if (castSize >= 3) logEv(`🧪 ${castSize} postav v pohádce — mezistupeň: archy 2×2, max 2 lidi/panel (přísnější než obvykle, RETEST větev)`);
     // 🩺 2026-08-05: mezistupeň mezi "archy jako obvykle" (≤2) a "přeskočit
-    // úplně" (≥4) — u castSize přesně 3 zůstávají archy zapnuté, ale s
-    // přísnějším 2×2 (víc pixelů/panel, snazší posoudit výšku/barvu očí) a
-    // max 2 lidmi/panel (dřívější nálezy byly skoro vždy o poměru MEZI 2+
-    // lidmi v jednom panelu) — snaha zachránit část úspory místo rovnou
-    // padnout na dražší sólo.
-    const castMidTier = castSize === 3;
+    // úplně" (≥4, dnes 7 na téhle větvi) — u castSize 3+ zůstávají archy
+    // zapnuté, ale s přísnějším 2×2 (víc pixelů/panel, snazší posoudit
+    // výšku/barvu očí) a max 2 lidmi/panel (dřívější nálezy byly skoro vždy
+    // o poměru MEZI 2+ lidmi v jednom panelu) — snaha zachránit část úspory
+    // místo rovnou padnout na dražší sólo.
+    const castMidTier = castSize >= 3;
     if (sheetMode !== "off" && !quotaExhausted && !st.sheetGaveUp && castSize < SHEET_SKIP_CAST_SIZE && st.sceneUrls![0]) {
       const maxCells = castMidTier ? 4 : sheetMode === "2x2" ? 4 : 9;
       // ⚡ Archy jedné vlny běží PARALELNĚ (15 stránek = archy 9+5 najednou —
