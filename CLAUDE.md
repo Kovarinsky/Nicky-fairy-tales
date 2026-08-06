@@ -134,3 +134,37 @@ list s pravítkem — to je overkill pro typicky 1 vlastní hrdinu):**
 **Cena**: +1 Gemini obrázek + 1 kontrola navíc na začátku každé pohádky
 s vlastní postavou (pár vteřin, pár korun) — třeba zvážit proti cíli
 ECONOMY-PLAN.md (~1 Kč/stránka).
+
+### 4. Oddělit vývojářský (Jan) login od běžných uživatelů
+
+Rozhodnuto v session 2026-08-07: "Nezapomeň že chci rozdělit můj —
+developerský login a loginy všech ostatních uživatelů (ti neuvidí logy /
+statistiky / errory atd.)." NEIMPLEMENTOVÁNO — jen zapsáno, ať se neztratí.
+
+**Zjištěný stav (kód, ne dohad):** appka dnes nemá ŽÁDNÝ koncept role/účtu
+s právy (`lib/accounts.ts` → `AccountRecord` nemá `isAdmin`/`role` pole,
+jen `username`/`credits`/`storiesCompleted`). Tři endpointy dnes ukazují
+citlivá data:
+- **`GET /api/usage`** (skutečná útrata za AI služby) — **ÚPLNĚ BEZ
+  AUTENTIZACE**, kdokoli se znalostí URL vidí reálné náklady appky.
+- **`GET /api/job/debug-log?id=`** (diagnostický log běhu) — **ÚPLNĚ BEZ
+  AUTENTIZACE**, jen chráněno tím, že `id` je UUID (bezpečnost skrze
+  neprůhlednost, ne skutečná kontrola přístupu).
+- **`GET /api/admin/accounts`** a **`GET /api/client-error`** (přehled
+  účtů / chybové reporty) — chráněné, ale sdíleným statickým heslem v env
+  (`ADMIN_PASSWORD` v hlavičce `X-Admin-Password`), NE navázané na Janovo
+  přihlášení — kdokoli se heslem prolomí, ne jen "Jan vs. zbytek rodiny".
+
+**Navržený mechanismus:**
+1. Přidat `isAdmin: boolean` (nebo `role: "admin" | "user"`) do
+   `AccountRecord` — nastavit `true` jen pro Janův účet (ručně/migrací).
+2. `/api/usage` a `/api/job/debug-log` přesunout ze "žádná kontrola" na
+   stejnou session-cookie kontrolu jako `/api/job/start`
+   (`verifySessionToken`), + navíc vyžadovat `acc.isAdmin === true`.
+3. `/api/admin/accounts` a `GET /api/client-error` — buď zachovat
+   `ADMIN_PASSWORD` jako dnes (jednodušší, appka na ně nemá žádné UI, jen
+   ruční/CLI přístup), nebo sjednotit na stejnou `isAdmin` kontrolu jako
+   výš, ať appka drží JEN jeden mechanismus místo dvou paralelních.
+4. V UI appky (pokud/až bude existovat nějaký admin panel — dnes žádný
+   není, jen holé API endpointy) skrýt jakýkoli odkaz na logy/statistiky
+   pro `isAdmin !== true`.
