@@ -32,6 +32,9 @@ import type { Character } from "./types";
 // čele a typické bílé srdíčko") + explicitní "small-to-medium, NOT large"
 // (uživatel: "stále je gigantický"). Zase záměrně NEBUMPnuto, cílený
 // ?redraw=archie.
+// 2026-08-06 (6): srdíčko na hrudi ZASE ZRUŠENO (uživatel si to rozmyslel:
+// "sundej Archiemu srdíčko z hrudi") — zpět na obyčejný bílý flek. Poslední
+// doladění velikosti dolů ("lehce ho zmenši, aby byl Valentýnce po pás").
 const PORTRAIT_VERSION = 4;
 const memCache = new Map<string, ReferenceImage>();
 
@@ -222,7 +225,10 @@ export async function loadPortraitRefs(characters: Character[]): Promise<Referen
 // instrukci, relační věta zesílena (explicitní varování před obvyklou
 // chybou "psi se kreslí větší kvůli roztomilosti"), James dostal
 // samostatnou větu vůči dospělým (dřív byl vztah jen jednosměrný).
-const FAMILY_SCALE_VERSION = 8;
+// v9 (2026-08-06, 6): uživatel — "sundej Archiemu srdíčko z hrudi a lehce ho
+// zmenši, aby byl Valentýnce po pás a jsme tam" — srdíčko na hrudi zrušeno
+// zpět na obyčejný bílý flek, poměr doladěn o poslední kousek dolů.
+const FAMILY_SCALE_VERSION = 9;
 // Duplikát CANONICAL_HEIGHT_CM z claude.ts (import by vytáhl celý claude.ts
 // do knihovny portrétů) — mění se JEN spolu s tamní tabulkou, viz komentář tam.
 // archie: 40cm — reálná výška při běžném postoji (upřesnil uživatel
@@ -442,7 +448,10 @@ export async function familyScaleSheetUrl(): Promise<string | null> {
 // Archie "stále je gigantický" i po v6, chyběl mu bílý flek na čele a
 // srdíčkový tvar hrudní skvrny (characters.json rozšířeno), James vyšel
 // neúměrně velký vedle Belly/dospělých (nová samostatná relační věta).
-const GROUP_ANCHOR_VERSION = 7;
+// v8 (2026-08-06, 6): uživatel — "sundej Archiemu srdíčko z hrudi a lehce ho
+// zmenši, aby byl Valentýnce po pás a jsme tam" — srdíčko zrušeno zpět na
+// obyčejný bílý flek, poměr doladěn o poslední kousek dolů.
+const GROUP_ANCHOR_VERSION = 8;
 
 function groupAnchorLabel(): string {
   return (
@@ -522,8 +531,11 @@ function heightsRelationalEntry(cast: Character[]): string {
   // — textová relace sama nestačila. Zesíleno na explicitní kontrast +
   // varování před obvyklou chybou (ilustrace psy běžně kreslí většího kvůli
   // "roztomilosti") a instrukci radši ho podkreslit, než překreslit.
+  // 🩺 2026-08-06 (6): živý výsledek už byl BLÍZKO (appka odhadla "waist"),
+  // uživatel žádal už jen jemné doladění dolů ("lehce ho zmenši, aby byl
+  // Valentýnce po pás a jsme tam") — ne další drastickou opravu.
   if (ids.has("archie") && ids.has("valentyna")) {
-    bits.push(`${name("archie")} is SMALL — standing on all fours his shoulder reaches only to ${name("valentyna")}'s WAIST, not her chest, not her shoulders. He must look noticeably smaller than every child in the picture; this is the single most commonly drawn-too-big detail in this whole image, so err on the side of drawing him SMALLER than feels natural`);
+    bits.push(`${name("archie")} is SMALL — standing on all fours his shoulder reaches EXACTLY to ${name("valentyna")}'s WAISTLINE, no higher (not her ribs, not her chest). He must look noticeably smaller than every child in the picture; this is the single most commonly drawn-too-big detail in this whole image, so err on the side of drawing him SMALLER than feels natural`);
   }
   if (ids.has("archie") && ids.has("nicolas")) {
     bits.push(`${name("archie")}'s shoulder reaches only just ABOVE ${name("nicolas")}'s KNEE, nowhere near his thigh or hip`);
