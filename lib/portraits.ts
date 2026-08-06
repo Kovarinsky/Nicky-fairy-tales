@@ -114,19 +114,29 @@ export async function getCharacterPortrait(c: Character, force = false): Promise
     const sceneDesc = `A full-body standing storybook portrait of ${c.name}. Only ${c.name} present — exactly one person/animal.`;
     let img = await generateBackgroundImage(portraitPrompt(c), photoRefs);
     let v = await verifySceneImage(apiKey, img, c.description, sceneDesc, photoRefs);
+    // 🩺 2026-08-06: appka dřív po 2. neúspěšné kontrole zahodila CELÝ portrét
+    // (return null → scéna dostane syrovou fotku), i když šlo často jen o
+    // opakovaný FALEŠNÝ nález QA (appčina vlastní diagnóza, viz
+    // SUSPICIOUS_FINDINGS_COUNT ve sdíleném verifySceneImage, gemini.ts —
+    // živě potvrzeno na výškovém listu: "styl je správný painterly" nahlášeno
+    // jako MAJOR chyba). generateSceneImage (gemini.ts, scény pohádky) tohle
+    // řeší jinak: nikdy nezahazuje na null, drží si NEJLÉPE ověřený pokus a
+    // POUŽIJE ho, i nedokonalý — portrét teď dělá totéž.
+    let best = { img, badRules: v && !v.ok ? v.badRules : 0, problems: v?.problems || "" };
     if (v && !v.ok) {
       console.warn(`[portraits] ${c.id} REJECTED (${v.problems.slice(0, 140)}) → redraw with correction`);
-      img = await generateBackgroundImage(
+      const img2 = await generateBackgroundImage(
         `${portraitPrompt(c)} ⚠ CORRECTION: the previous attempt violated: ${v.problems.slice(0, 300)}. Follow the description EXACTLY (hair color and length, skin tone, eye color, clothing).`,
         photoRefs
       );
-      v = await verifySceneImage(apiKey, img, c.description, sceneDesc, photoRefs);
-      if (v && !v.ok) {
-        // ani oprava neprošla → RADĚJI ŽÁDNÝ portrét (scény dostanou fotky)
-        console.warn(`[portraits] ${c.id} still rejected (${v.problems.slice(0, 140)}) → falling back to photos`);
-        return null;
+      const v2 = await verifySceneImage(apiKey, img2, c.description, sceneDesc, photoRefs);
+      if (v2 && (v2.ok || v2.badRules < best.badRules)) {
+        best = { img: img2, badRules: v2.ok ? 0 : v2.badRules, problems: v2.problems };
       }
+      if (best.badRules > 0) console.warn(`[portraits] ${c.id} still imperfect [${best.badRules}] (${best.problems}) → using best available attempt`);
+      else console.log(`[portraits] ${c.id} fixed ✓`);
     }
+    img = best.img;
     await put(pathName, img.buffer, {
       access: "public",
       contentType: img.mimeType,
@@ -307,19 +317,27 @@ export async function getFamilyScaleSheet(force = false): Promise<ReferenceImage
     // dřív úplně slepý, přestože ho appka používá jako kotvu pro KAŽDOU
     // scénu, ne jen pro jednu postavu — chyba tu měla ještě větší dosah.
     let v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
+    // 🩺 2026-08-06: živě zjištěno na TOMTO obrázku, že "2× zamítnuto → žádný
+    // list" zahazovalo i fakticky správné pokusy — QA se protiřečila mezi
+    // pokusy (jednou "flat vector/clipart", podruhé "soft painterly", jednou
+    // dokonce označila SPRÁVNÝ styl jako MAJOR chybu). Stejná oprava jako u
+    // getCharacterPortrait výš — drží se NEJLÉPE ověřený pokus a POUŽIJE se,
+    // i nedokonalý, místo aby appka skončila úplně bez listu.
+    let best = { img, badRules: v && !v.ok ? v.badRules : 0, problems: v?.problems || "" };
     if (v && !v.ok) {
       console.warn(`[portraits] family scale sheet REJECTED (${v.problems.slice(0, 140)}) → redraw with correction`);
-      img = await generateBackgroundImage(
+      const img2 = await generateBackgroundImage(
         `${prompt} ⚠ CORRECTION: the previous attempt violated: ${v.problems.slice(0, 300)}. Follow every description EXACTLY (hair color, skin tone, markings, clothing).`,
         photoRefs
       );
-      v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
-      if (v && !v.ok) {
-        // ani oprava neprošla → RADĚJI ŽÁDNÝ list (scény pojedou bez výškové kotvy)
-        console.warn(`[portraits] family scale sheet still rejected (${v.problems.slice(0, 140)}) → skipping`);
-        return null;
+      const v2 = await verifySceneImage(apiKey, img2, combinedDesc, sceneDesc, photoRefs);
+      if (v2 && (v2.ok || v2.badRules < best.badRules)) {
+        best = { img: img2, badRules: v2.ok ? 0 : v2.badRules, problems: v2.problems };
       }
+      if (best.badRules > 0) console.warn(`[portraits] family scale sheet still imperfect [${best.badRules}] (${best.problems}) → using best available attempt`);
+      else console.log(`[portraits] family scale sheet fixed ✓`);
     }
+    img = best.img;
     await put(pathName, img.buffer, {
       access: "public",
       contentType: img.mimeType,
@@ -517,20 +535,25 @@ async function drawGroupAnchorCandidate(cast: Character[], setting: string): Pro
   const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
   let img = await generateBackgroundImage(prompt, photoRefs, "16:9");
   let v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
+  // 🩺 2026-08-06: stejná oprava jako u portrétu/výškového listu výš — "2×
+  // zamítnuto → žádný kandidát" zahazovalo i pokusy, co byly fakticky OK a QA
+  // se jen protiřečila mezi koly. Drží se NEJLÉPE ověřený pokus a POUŽIJE se.
+  let best = { img, badRules: v && !v.ok ? v.badRules : 0, problems: v?.problems || "" };
   if (v && !v.ok) {
     console.warn(`[portraits] group anchor candidate REJECTED (${v.problems.slice(0, 140)}) → redraw with correction`);
-    img = await generateBackgroundImage(
+    const img2 = await generateBackgroundImage(
       `${prompt} ⚠ CORRECTION: the previous attempt violated: ${v.problems.slice(0, 300)}. Follow every description EXACTLY (hair color, skin tone, markings, clothing).`,
       photoRefs,
       "16:9"
     );
-    v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
-    if (v && !v.ok) {
-      console.warn(`[portraits] group anchor candidate still rejected (${v.problems.slice(0, 140)}) → skipping`);
-      return null;
+    const v2 = await verifySceneImage(apiKey, img2, combinedDesc, sceneDesc, photoRefs);
+    if (v2 && (v2.ok || v2.badRules < best.badRules)) {
+      best = { img: img2, badRules: v2.ok ? 0 : v2.badRules, problems: v2.problems };
     }
+    if (best.badRules > 0) console.warn(`[portraits] group anchor candidate still imperfect [${best.badRules}] (${best.problems}) → using best available attempt`);
+    else console.log(`[portraits] group anchor candidate fixed ✓`);
   }
-  return img;
+  return best.img;
 }
 
 const CANDIDATE_SETTINGS = [
