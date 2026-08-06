@@ -228,7 +228,13 @@ export async function loadPortraitRefs(characters: Character[]): Promise<Referen
 // v9 (2026-08-06, 6): uživatel — "sundej Archiemu srdíčko z hrudi a lehce ho
 // zmenši, aby byl Valentýnce po pás a jsme tam" — srdíčko na hrudi zrušeno
 // zpět na obyčejný bílý flek, poměr doladěn o poslední kousek dolů.
-const FAMILY_SCALE_VERSION = 9;
+// v10 (2026-08-06, 13) po schválení kotvy: uživatel — "dej ještě pls všechny
+// vedle sebe a přidej výškové linky" — přepsáno z DVOU řádků (jeden pro
+// každou rodinu, viz komentář u prompt níž) na JEDEN vodorovný řádek se
+// všemi 9 (mezera mezi rodinami místo přeskoku na nový řádek) + přidány
+// vodorovné referenční linky/pravítko po straně, ať jde výška vyčíst přímo
+// z obrázku, ne jen z tištěného cm popisku pod postavou.
+const FAMILY_SCALE_VERSION = 10;
 // Duplikát CANONICAL_HEIGHT_CM z claude.ts (import by vytáhl celý claude.ts
 // do knihovny portrétů) — mění se JEN spolu s tamní tabulkou, viz komentář tam.
 // archie: 40cm — reálná výška při běžném postoji (upřesnil uživatel
@@ -306,36 +312,42 @@ export async function getFamilyScaleSheet(force = false): Promise<ReferenceImage
     const pets = petIds();
     const peopleCount = cast.filter(c => !pets.has(c.id)).length;
     console.log(`[portraits] drawing FAMILY scale sheet (${cast.map(c => c.id).join("+")})…`);
-    // 🩺 2026-08-06: živý test ukázal DVĚ chyby najednou: (1) appka řekla
-    // "one row", ale 9 lidí je na jeden řádek moc, takže si model sám
-    // udělal DVA řádky — a Jana/Nicoláska přitom vykreslil ZNOVU i do
-    // druhého řádku (duplicita napříč řádky). (2) holá cm čísla appka
-    // posílala bez vztahových vět, takže Valentýnka vyšla vizuálně moc
-    // malá a Nicolásek vyšel větší než James, přestože čísla byla správná
-    // (nahlášeno uživatelem). Teď appka řekne PŘESNĚ který řádek pro
-    // kterou rodinu (žádná improvizace) + přidá heightsRelationalEntry.
-    const rowLines = FAMILY_UNITS
-      .map((unit, i) => {
-        const members = [...unit.children, ...unit.parents, ...(unit.pets ?? [])]
-          .map(id => cast.find(c => c.id === id)?.name)
-          .filter((n): n is string => !!n)
-          .sort((a, b) => FAMILY_HEIGHT_CM[cast.find(c => c.name === a)!.id] - FAMILY_HEIGHT_CM[cast.find(c => c.name === b)!.id]);
-        return members.length ? `ROW ${i + 1}: ${members.join(", ")} (shortest to tallest, left to right) — ONLY these people, none of the row-${i === 0 ? 2 : 1} people` : null;
-      })
-      .filter((s): s is string => !!s);
+    // 🩺 2026-08-06: PŮVODNĚ appka řekla "one row", ale 9 lidí je na jeden
+    // řádek moc, takže si model sám udělal DVA řádky — a Jana/Nicoláska
+    // přitom vykreslil ZNOVU i do druhého řádku (duplicita napříč řádky).
+    // Appka proto přešla na DVA VÝSLOVNÉ řádky (jeden per rodina).
+    // v10 (2026-08-06, 13): uživatel po schválení kotvy chce zpátky JEDEN
+    // řádek ("všechny vedle sebe") + výškové linky — appka teď řeší
+    // duplicitní riziko jinak: širší plátno (16:9 místo výchozích 9:16) +
+    // výslovný zákaz rozdělení na víc řádků + mezera v seznamu mezi
+    // rodinami (ne nový řádek) pro vizuální oddělení, které appka předtím
+    // řešila stackováním.
+    const familyGroups = FAMILY_UNITS
+      .map(unit => [...unit.children, ...unit.parents, ...(unit.pets ?? [])]
+        .map(id => cast.find(c => c.id === id)?.name)
+        .filter((n): n is string => !!n)
+        .sort((a, b) => FAMILY_HEIGHT_CM[cast.find(c => c.name === a)!.id] - FAMILY_HEIGHT_CM[cast.find(c => c.name === b)!.id]))
+      .filter(m => m.length > 0);
+    const lineupOrder = familyGroups.map(m => m.join(", ")).join(" | [small visible gap] | ");
     const prompt = [
-      `CHARACTER HEIGHT REFERENCE SHEET, arranged in TWO SEPARATE ROWS (one family per row, stacked vertically) — ${rowLines.join("; ")}. Every person appears EXACTLY ONCE in the whole image, in their own row only — do NOT repeat anyone in both rows, do NOT redraw a row-1 person in row 2.`,
+      `CHARACTER HEIGHT REFERENCE SHEET, all ${cast.length} individuals standing in ONE SINGLE HORIZONTAL ROW on the same ground line, side by side — do NOT split them into two rows or stack anyone above another, even though there are ${cast.length} of them; use a WIDE panoramic canvas so everyone fits comfortably in a single line. Left-to-right order: ${lineupOrder} — leave a small but clearly visible gap in the lineup exactly where the first family's list ends and the second begins, so the single row still visually reads as two families standing near each other, not one random crowd. Every person appears EXACTLY ONCE in the whole row.`,
       `Exact appearances (copy faithfully): ${cast.map(c => c.description).join(" | ")}.`,
       // 🩺 Stejná díra jako u portraitPrompt výš (viz komentář tam) — tenhle
       // list ale navíc nemá ani kontrolu (verifySceneImage), takže chybný
       // vzhled odsud šel rovnou do produkce jako "kotva" pro VŠECHNY scény.
       `If any description above explicitly states a feature is ABSENT or DIFFERENT from what would be typical (e.g. "NO dark mask", "NO stripe", a specific marking instead of the usual one for this breed/type), that is a DELIBERATE correction — draw it EXACTLY as stated even if it contradicts what is typical/generic. Do not default to a stereotypical look when a description explicitly rules it out.`,
       pets.size ? `SPECIFICALLY for the dog: the coat is a SOLID warm reddish-brown/tan color, essentially ONE solid color from a normal viewing distance — do NOT draw visible tiger-stripe or heavy brindle patterning across the body; that is the single most common mistake to avoid here.` : "",
-      `Every human character FULL BODY head to toe, standing straight and relaxed facing the viewer; the dog on all fours, not standing upright. Within each row, all feet/paws on the SAME flat ground line, evenly spaced, plain soft warm-cream background, even flat lighting, no props, no scenery.`,
+      `Every human character FULL BODY head to toe, standing straight and relaxed facing the viewer; the dog on all fours, not standing upright. Every single foot/paw on the SAME flat ground line, evenly spaced, plain soft warm-cream background, even flat lighting, no props, no scenery.`,
       `Their real heights are EXACTLY: ${cast.map(c => `${c.name} ${FAMILY_HEIGHT_CM[c.id]}cm`).join(", ")} (for the dog, height means how tall it stands on all fours) — draw every body scaled precisely to these proportions relative to each other; this is the single most important requirement of this image.`,
       heightsRelationalEntry(cast),
-      `Directly BELOW each character, print their name in capital letters and their height in parentheses as two short lines of clean plain text (e.g. "NICOLÁSEK" then "(111CM)") — this is the ONE exception in this whole book's art style where readable text is wanted, because this specific image is a private reference sheet for the illustrator, never a page shown to a reader.`,
-      `Exactly ${peopleCount} people plus ${cast.length - peopleCount} dog in the WHOLE image (both rows combined) — nobody else, no invented siblings or friends, no one repeated.`,
+      // 🩺 2026-08-06 (13): uživatel — "přidej výškové linky" — appka dřív
+      // tenhle list kreslila BEZ žádných vizuálních vodicích čar, jen s
+      // tištěným cm popiskem pod postavou; teď přidán skutečný vizuální
+      // odměřovací prvek (jako výškový žebřík na zdi/policejní lineup), aby
+      // šla výška vyčíst přímo z obrázku, ne jen z čísla v textu.
+      `Draw a set of thin, evenly-spaced horizontal reference/guide lines running the FULL WIDTH of the image at regular height intervals (roughly every 20cm of height, like a growth-chart wall or a police lineup backdrop), so a viewer can see exactly how tall each character is by which line their head reaches. Add small, faint plain-text cm numbers (20, 40, 60, 80...) along the left edge next to each line. These measuring lines and numbers are a DELIBERATE exception to the book's normal no-text, no-props style — this is a private measuring reference for the illustrator, never a page a reader sees.`,
+      `Directly BELOW each character, print their name in capital letters and their height in parentheses as two short lines of clean plain text (e.g. "NICOLÁSEK" then "(111CM)") — this is the OTHER exception in this whole book's art style where readable text is wanted, for the same reason as the ruler lines above.`,
+      `Exactly ${peopleCount} people plus ${cast.length - peopleCount} dog in the WHOLE image — nobody else, no invented siblings or friends, no one repeated, everyone in the single row.`,
       REFERENCE_SHEET_STYLE,
     ].filter(Boolean).join(" ");
     // 🩺 2026-08-06: dřív loadReferenceImages(cast) — syrové FOTKY. Appka
@@ -350,9 +362,13 @@ export async function getFamilyScaleSheet(force = false): Promise<ReferenceImage
     // jak postava vypadá ve skutečné pohádce.
     const photoRefs = await loadPortraitRefs(cast);
     const combinedDesc = cast.map(c => c.description).join(" | ");
-    const sceneDesc = `A height reference sheet in TWO ROWS with EXACTLY these people and dog present ONCE EACH, nobody else, nobody repeated across rows: ${cast.map(c => c.name).join(", ")}. Every one of these names IS in the picture exactly once; do not flag any of them as "missing" or "extra". COUNT the people and the dog separately: ${peopleCount} people + ${cast.length - peopleCount} dog, no more, no fewer, and no one appearing in both rows.`;
+    const sceneDesc = `A height reference sheet in a SINGLE ROW with EXACTLY these people and dog present ONCE EACH, nobody else, nobody repeated: ${cast.map(c => c.name).join(", ")}. Every one of these names IS in the picture exactly once; do not flag any of them as "missing" or "extra". COUNT the people and the dog separately: ${peopleCount} people + ${cast.length - peopleCount} dog, no more, no fewer. If the image shows more than one row, that is a MAJOR violation.`;
     const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
-    let img = await generateBackgroundImage(prompt, photoRefs);
+    // 🩺 2026-08-06 (13): širší plátno (16:9 místo výchozích 9:16 pro
+    // generateBackgroundImage) — 9 postav v jednom vodorovném řádku se do
+    // úzkého portrétového formátu nevejde, appka by tím model znovu tlačila
+    // k neschválenému rozdělení na víc řádků.
+    let img = await generateBackgroundImage(prompt, photoRefs, "16:9");
     // 🩺 Portrét jednotlivce se OD v3 kontroluje (viz getCharacterPortrait
     // výš — vadný portrét Belly se jinak stal referencí a chyba se
     // replikovala do všech pohádek); tenhle celorodinný list byl na kontrolu
@@ -370,7 +386,8 @@ export async function getFamilyScaleSheet(force = false): Promise<ReferenceImage
       console.warn(`[portraits] family scale sheet REJECTED (${v.problems.slice(0, 140)}) → redraw with correction`);
       const img2 = await generateBackgroundImage(
         `${prompt} ⚠ CORRECTION: the previous attempt violated: ${v.problems.slice(0, 300)}. Follow every description EXACTLY (hair color, skin tone, markings, clothing).`,
-        photoRefs
+        photoRefs,
+        "16:9"
       );
       const v2 = await verifySceneImage(apiKey, img2, combinedDesc, sceneDesc, photoRefs);
       if (v2 && (v2.ok || v2.badRules < best.badRules)) {
@@ -451,7 +468,13 @@ export async function familyScaleSheetUrl(): Promise<string | null> {
 // v8 (2026-08-06, 6): uživatel — "sundej Archiemu srdíčko z hrudi a lehce ho
 // zmenši, aby byl Valentýnce po pás a jsme tam" — srdíčko zrušeno zpět na
 // obyčejný bílý flek, poměr doladěn o poslední kousek dolů.
-const GROUP_ANCHOR_VERSION = 8;
+// v9 (2026-08-06, 12-13) FINÁLNÍ: po sérii kandidátních testů (7)-(12)
+// uživatel potvrdil ("Konečně!!") kombinaci Archie -15 % (kotví na
+// Nicoláskovi, půlka mezi pasem a kolenem), Vája +10 % (~95 % Nicoláskovy
+// výšky), James zřetelně vyšší než Nicolásek. Tahle verze POVYŠUJE přesně
+// ten schválený kandidátní obrázek (promoteFamilyGroupAnchorCandidate) —
+// žádné nové (placené) kreslení, jen kopie už schválených bajtů.
+const GROUP_ANCHOR_VERSION = 9;
 
 function groupAnchorLabel(): string {
   return (
