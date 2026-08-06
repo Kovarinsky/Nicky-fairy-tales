@@ -11,7 +11,7 @@
 
 import { put, head } from "@vercel/blob";
 import { blobToken } from "./blob-token";
-import { generateBackgroundImage, verifySceneImage } from "./gemini";
+import { generateBackgroundImage, verifySceneImage, STYLE_SUFFIX, type ImageResult } from "./gemini";
 import { loadReferenceImages, loadCharacters, type ReferenceImage } from "./characters";
 import type { Character } from "./types";
 
@@ -295,7 +295,13 @@ export async function getFamilyScaleSheet(): Promise<ReferenceImage | null> {
 // což by mělo snížit počet zamítnutí kontrolou u vícepostavových scén.
 // Kreslí se JEDNOU CELKOVĚ (ne na pohádku) a natrvalo se cachuje — bump
 // GROUP_ANCHOR_VERSION při změně vzhledu/výšek rodiny.
-const GROUP_ANCHOR_VERSION = 1;
+// v2: v1 kreslila na výšku (9:16) vlastním PORTRAIT_STYLE textem — appka
+// SKUTEČNÉ stránky pohádky kreslí na šířku (16:9) sdíleným STYLE_SUFFIX
+// (lib/gemini.ts), který má navíc "cinematic"/"expressive faces" apod. —
+// v1 proto vizuálně neseděla se skutečným stylem appky (nahlášeno uživatelem
+// se skutečnými ukázkami stránek). v2 používá stejný STYLE_SUFFIX i stejný
+// poměr stran jako opravdové scény.
+const GROUP_ANCHOR_VERSION = 2;
 
 function groupAnchorLabel(): string {
   return (
@@ -303,6 +309,132 @@ function groupAnchorLabel(): string {
     "Use it to match how these characters look and scale WHEN SEEN TOGETHER in a scene — same hair colors, faces, outfits and relative heights as here. " +
     "IGNORE any person in this reference who is NOT named in this scene's cast — they are shown here only for style/scale reference, they are not present in the scene."
   );
+}
+
+/** Obsazení skupinové kotvy/výškového listu — postavy appka zná s přesným cm,
+ *  seřazené od nejmenší po největší. Sdíleno mezi kandidáty i finální kotvou. */
+function groupAnchorCast(): Character[] {
+  return loadCharacters()
+    .filter(c => FAMILY_HEIGHT_CM[c.id] !== undefined)
+    .sort((a, b) => FAMILY_HEIGHT_CM[a.id] - FAMILY_HEIGHT_CM[b.id]);
+}
+
+/** Prompt skupinové kotvy — `setting` popisuje prostředí/kompozici (mění se
+ *  mezi kandidátními variantami), zbytek (obsazení, výšky, styl appky) je
+ *  vždy stejný. Používá STEJNÝ STYLE_SUFFIX jako skutečné stránky pohádky
+ *  (lib/gemini.ts) — ne vlastní kopii, ať appka vizuálně nedriftuje. */
+function groupAnchorPrompt(cast: Character[], setting: string): string {
+  return [
+    `A single storybook illustration of ${cast.map(c => c.name).join(", ")} together — ${setting}`,
+    `Everyone facing the viewer with natural friendly smiles, arranged in a natural cluster (not a strict line): the two adults side by side near the back, the children grouped in front of or beside them, all standing close together as a real family would.`,
+    `Exact appearances (copy faithfully): ${cast.map(c => c.description).join(" | ")}.`,
+    `If any description above explicitly states a feature is ABSENT or DIFFERENT from what would be typical (e.g. "NO dark mask", "NO stripe", a specific marking instead of the usual one for this breed/type), that is a DELIBERATE correction — draw it EXACTLY as stated even if it contradicts what is typical/generic. Do not default to a stereotypical look when a description explicitly rules it out.`,
+    `Every character FULL BODY, head to toe, standing on the SAME ground line.`,
+    `Their real heights are EXACTLY: ${cast.map(c => `${c.name} ${FAMILY_HEIGHT_CM[c.id]}cm`).join(", ")} — draw every body scaled precisely to these proportions relative to each other; this is the single most important requirement of this image.`,
+    `Exactly ${cast.length} people in the image — nobody else, no pets, no other characters.`,
+    STYLE_SUFFIX,
+  ].join(" ");
+}
+
+/** Namaluje + ověří (s jedním opravným pokusem) jeden kandidát skupinové
+ *  kotvy pro dané `setting`. Vrací null když appčina QA obrázek dvakrát
+ *  zamítne — RADĚJI ŽÁDNÝ kandidát než neověřený. */
+async function drawGroupAnchorCandidate(cast: Character[], setting: string): Promise<ImageResult | null> {
+  const prompt = groupAnchorPrompt(cast, setting);
+  const photoRefs = loadReferenceImages(cast);
+  const combinedDesc = cast.map(c => c.description).join(" | ");
+  const sceneDesc = `A family-portrait style illustration with ${cast.map(c => c.name).join(", ")} together — ${setting}`;
+  const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
+  let img = await generateBackgroundImage(prompt, photoRefs, "16:9");
+  let v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
+  if (v && !v.ok) {
+    console.warn(`[portraits] group anchor candidate REJECTED (${v.problems.slice(0, 140)}) → redraw with correction`);
+    img = await generateBackgroundImage(
+      `${prompt} ⚠ CORRECTION: the previous attempt violated: ${v.problems.slice(0, 300)}. Follow every description EXACTLY (hair color, skin tone, markings, clothing).`,
+      photoRefs,
+      "16:9"
+    );
+    v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
+    if (v && !v.ok) {
+      console.warn(`[portraits] group anchor candidate still rejected (${v.problems.slice(0, 140)}) → skipping`);
+      return null;
+    }
+  }
+  return img;
+}
+
+const CANDIDATE_SETTINGS = [
+  "standing close together in their cozy living room, warm afternoon light through a window, a soft rug and a couch visible behind them",
+  "standing together outdoors in a sunny meadow with soft green grass, a few flowers, and a gentle blue sky",
+  "standing together on a sunny front porch/yard, warm golden-hour light, a bit of garden greenery around them",
+];
+
+/** Vygeneruje N kandidátních variant skupinové kotvy (default 3, různá
+ *  prostředí, viz CANDIDATE_SETTINGS) a uloží je do Blobu na DOČASNÉ cesty
+ *  (ne na finální cestu family-anchor-vN.img) — appka žádnou z nich
+ *  nepoužívá jako referenci, dokud se ručně nepromuje přes
+ *  promoteFamilyGroupAnchorCandidate. Vrací URL/stav každého kandidáta. */
+export async function generateFamilyGroupAnchorCandidates(count = 3): Promise<Array<{ index: number; setting: string; url: string | null; ok: boolean }>> {
+  const token = blobToken();
+  if (!token) return [];
+  const cast = groupAnchorCast();
+  if (cast.length < 2) return [];
+  const settings = CANDIDATE_SETTINGS.slice(0, count);
+  const out: Array<{ index: number; setting: string; url: string | null; ok: boolean }> = [];
+  for (let i = 0; i < settings.length; i++) {
+    const setting = settings[i];
+    console.log(`[portraits] drawing group anchor CANDIDATE ${i + 1}/${settings.length} (${cast.map(c => c.id).join("+")})…`);
+    try {
+      const img = await drawGroupAnchorCandidate(cast, setting);
+      if (!img) {
+        out.push({ index: i + 1, setting, url: null, ok: false });
+        continue;
+      }
+      const pathName = `portraits/family-anchor-candidate-${i + 1}.img`;
+      const { url } = await put(pathName, img.buffer, {
+        access: "public",
+        contentType: img.mimeType,
+        token,
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        cacheControlMaxAge: 3600, // dočasné — kandidáti, ne finální kotva
+      });
+      out.push({ index: i + 1, setting, url, ok: true });
+    } catch (e) {
+      console.warn(`[portraits] group anchor candidate ${i + 1} failed: ${e instanceof Error ? e.message : e}`);
+      out.push({ index: i + 1, setting, url: null, ok: false });
+    }
+  }
+  return out;
+}
+
+/** Povýší už vygenerovaného kandidáta (viz generateFamilyGroupAnchorCandidates)
+ *  na FINÁLNÍ skupinovou kotvu — zkopíruje jeho bajty na cestu, kterou appka
+ *  skutečně čte (family-anchor-vN.img), BEZ nového (placeného) generování.
+ *  Vrátí URL finální kotvy, nebo null když se kopie nepovede. */
+export async function promoteFamilyGroupAnchorCandidate(index: number): Promise<string | null> {
+  const token = blobToken();
+  if (!token) return null;
+  try {
+    const h = await head(`portraits/family-anchor-candidate-${index}.img`, { token });
+    const r = await fetch(h.url, { cache: "no-store" });
+    if (!r.ok) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    const key = `family-anchor-v${GROUP_ANCHOR_VERSION}`;
+    const { url } = await put(`portraits/${key}.img`, buf, {
+      access: "public",
+      contentType: h.contentType || "image/webp",
+      token,
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      cacheControlMaxAge: 31536000,
+    });
+    memCache.delete(key); // ať se příští getFamilyGroupAnchor() nevrátí ke staré in-memory kopii
+    return url;
+  } catch (e) {
+    console.warn(`[portraits] promote candidate ${index} failed: ${e instanceof Error ? e.message : e}`);
+    return null;
+  }
 }
 
 /** Malovaná skupinová kotva celé rodiny (jedna přirozená scéna, BEZ textu);
@@ -327,40 +459,17 @@ export async function getFamilyGroupAnchor(): Promise<ReferenceImage | null> {
     }
   } catch {}
 
+  // Žádná kotva na Blobu ještě neexistuje: nabídni jednu z kandidátních
+  // variant rovnou jako finální (zvolí se ta první ze seznamu) — appka
+  // preferuje mít NĚJAKOU kotvu k dispozici nad žádnou; ruční review přes
+  // generateFamilyGroupAnchorCandidates/promote zůstává lepší cestou, když
+  // je čas si vybrat mezi variantami.
   try {
-    const cast = loadCharacters()
-      .filter(c => FAMILY_HEIGHT_CM[c.id] !== undefined)
-      .sort((a, b) => FAMILY_HEIGHT_CM[a.id] - FAMILY_HEIGHT_CM[b.id]);
+    const cast = groupAnchorCast();
     if (cast.length < 2) return null;
     console.log(`[portraits] drawing FAMILY GROUP anchor (${cast.map(c => c.id).join("+")})…`);
-    const prompt = [
-      `A single storybook illustration of ${cast.map(c => c.name).join(", ")} standing together outdoors in a sunny meadow with soft green grass, a few flowers, and a gentle blue sky — a warm, relaxed family-portrait moment, everyone facing the viewer with natural friendly smiles, arranged in a natural cluster (not a strict line): the two adults side by side near the back, the children grouped in front of or beside them, all looking comfortable standing close together as a real family would.`,
-      `Exact appearances (copy faithfully): ${cast.map(c => c.description).join(" | ")}.`,
-      `If any description above explicitly states a feature is ABSENT or DIFFERENT from what would be typical (e.g. "NO dark mask", "NO stripe", a specific marking instead of the usual one for this breed/type), that is a DELIBERATE correction — draw it EXACTLY as stated even if it contradicts what is typical/generic. Do not default to a stereotypical look when a description explicitly rules it out.`,
-      `Every character FULL BODY, head to toe, standing on the SAME ground line.`,
-      `Their real heights are EXACTLY: ${cast.map(c => `${c.name} ${FAMILY_HEIGHT_CM[c.id]}cm`).join(", ")} — draw every body scaled precisely to these proportions relative to each other; this is the single most important requirement of this image.`,
-      `Exactly ${cast.length} people in the image — nobody else, no pets, no other characters.`,
-      PORTRAIT_STYLE,
-    ].join(" ");
-    const photoRefs = loadReferenceImages(cast);
-    const combinedDesc = cast.map(c => c.description).join(" | ");
-    const sceneDesc = `A family-portrait style illustration with ${cast.map(c => c.name).join(", ")} standing together in a meadow.`;
-    const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
-    let img = await generateBackgroundImage(prompt, photoRefs);
-    let v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
-    if (v && !v.ok) {
-      console.warn(`[portraits] family group anchor REJECTED (${v.problems.slice(0, 140)}) → redraw with correction`);
-      img = await generateBackgroundImage(
-        `${prompt} ⚠ CORRECTION: the previous attempt violated: ${v.problems.slice(0, 300)}. Follow every description EXACTLY (hair color, skin tone, markings, clothing).`,
-        photoRefs
-      );
-      v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
-      if (v && !v.ok) {
-        // ani oprava neprošla → RADĚJI ŽÁDNÁ kotva (scény pojedou bez ní)
-        console.warn(`[portraits] family group anchor still rejected (${v.problems.slice(0, 140)}) → skipping`);
-        return null;
-      }
-    }
+    const img = await drawGroupAnchorCandidate(cast, CANDIDATE_SETTINGS[0]);
+    if (!img) return null; // radši žádná kotva než neověřená
     await put(pathName, img.buffer, {
       access: "public",
       contentType: img.mimeType,
