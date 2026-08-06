@@ -725,59 +725,14 @@ export async function composeSceneOnBackground(
   throw new Error("NO_IMAGE: kompozice na pozadí nevrátila obrázek");
 }
 
-// ── 🧩 ECONOMY-PLAN.md — vrstvový/sprite prototyp (mockup větev, POUZE
-// technický průzkum proveditelnosti, NENAPOJENO na job-runner) ───────────
-// Myšlenka: postavu appka namaluje JEDNOU na plnou, sytou "chroma-key"
-// barvu (Gemini samo o sobě průhledné pozadí/alfa kanál nevrací), appka pak
-// tuhle barvu vlastním kódem (sharp, viz lib/sprite-compositing.ts) vyseká
-// na průhlednost a hotovou postavičku vloží do KTERÉHOKOLIV pozadí BEZ
-// dalšího AI volání = nulový mezní náklad za stránku, jen jednorázová
-// investice za pózu. Kritická neznámá: udrží Gemini konzistentní styl/
-// proporce/oblečení postavy napříč RŮZNÝMI pózami stejně dobře jako dnešní
-// portrét? A bude okraj postavy (vlasy, prsty) čistý dost na to, aby
-// chroma-key nezanechal barevný lem? Tenhle prototyp na to teprve odpovídá.
-export async function generateCharacterSprite(
-  refImages: ReferenceImage[], heroDescription: string, poseDescription: string,
-  keyColorName = "solid saturated pure magenta (#FF00FF)"
-): Promise<ImageResult> {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
-  const model = IMAGE_MODEL.trim();
-  const { open: charLockOpen, close: charLockClose } = buildAppearanceLock(heroDescription);
-
-  const parts: Array<Record<string, unknown>> = [];
-  for (const ref of refImages.slice(0, 4)) {
-    parts.push({ text: ref.label || `Canonical reference of ${ref.name || "a story character"}:` });
-    parts.push({ inlineData: { data: ref.data, mimeType: ref.mimeType } });
-  }
-  parts.push({ text: [
-    charLockOpen,
-    `Draw ONLY this one character, full body head-to-toe, in this exact pose/action: ${poseDescription}`,
-    `THE ENTIRE BACKGROUND behind the character must be a completely flat, solid, uniform ${keyColorName} — no gradient, no shadow, no texture, no scenery, no floor line, nothing except the flat color fill. This is a cutout sprite for compositing, not a scene.`,
-    `The character must be fully inside the frame with a small clean margin on all sides (not cropped at the edges), standing on an invisible ground (no visible ground/shadow drawn).`,
-    charLockClose,
-    STYLE_SUFFIX,
-  ].filter(Boolean).join(" ") });
-
-  const generationConfig: Record<string, unknown> = {
-    responseModalities: ["IMAGE", "TEXT"],
-    imageConfig: { aspectRatio: "3:4" },
-  };
-  const raw = await geminiPost(apiKey, model, { contents: [{ role: "user", parts }], generationConfig }, GEMINI_IMAGE_TIMEOUT_MS);
-  const data = JSON.parse(raw) as { candidates?: GeminiCandidate[]; promptFeedback?: { blockReason?: string } };
-  if (data.promptFeedback?.blockReason) throw new Error(`Gemini BLOCKED: ${data.promptFeedback.blockReason}`);
-  for (const cand of data.candidates || []) {
-    for (const part of cand.content?.parts || []) {
-      if (part.inlineData?.data) {
-        genCounter.img1k += 1; // 💰 sprite je placená generace jako každá jiná
-        // POZOR: bez compressImage (WebP) — chroma-key potřebuje čistý PNG
-        // beze ztrátové komprese na okrajích postavy.
-        return { buffer: Buffer.from(part.inlineData.data, "base64"), mimeType: part.inlineData.mimeType || "image/png" };
-      }
-    }
-  }
-  throw new Error("NO_IMAGE: sprite se nevrátil");
-}
+// ── 🧩 ECONOMY-PLAN.md — vrstvový/sprite prototyp — ZAMÍTNUTO 2026-08-07 ──
+// Vyzkoušeno a odstraněno: postava namalovaná na chroma-key a vyseknutá
+// kódem do libovolného pozadí měla nulový mezní náklad, ale i s dodatečným
+// kontaktním stínem + doladěním barvy/jasu (čistý kód, sharp) zůstávala
+// vizuálně "vystřižená nálepka" — chybí SKUTEČNÁ směrová stínohra, na tu by
+// bylo potřeba AI přesvětlení (= zpátky další placené volání, smazalo by to
+// výhodu). Uživatel: "Sprite se nám nelíbí, dej to pryč." Recolor+compose
+// (níž) zůstává hlavním úsporným mechanismem této větve.
 
 // ── 🎨 ECONOMY-PLAN.md Fáze 4B v3 (mockup větev) — PŘEBARVENÍ sdíleného
 // pozadí ────────────────────────────────────────────────────────────────
