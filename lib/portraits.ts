@@ -563,8 +563,16 @@ function heightsRelationalEntry(cast: Character[]): string {
   if (ids.has("archie") && ids.has("nicolas")) {
     bits.push(`${name("archie")} is small — the TOP OF HIS HEAD (the skull/crown, his highest point standing on all fours — NOT his ears if they stick up higher, and NOT his back/shoulder which is much lower) must line up with the WAISTBAND of ${name("nicolas")}'s shorts, not any higher — if the top of his head reaches above that waistband line (up toward the ribs or chest), he has been drawn too big and must be shrunk further; his back/shoulder sits well below the waistband, closer to knee height`);
   }
+  // 🩺 2026-08-06 (11): uživatel nahlásil, že Archie "se zvětšil s Vájou" —
+  // předchozí věta kotvila jeho velikost i na Váji ("waist seam of her
+  // dress"), takže když appka zvětšila JI (viz oprava (10) výš), model
+  // zvětšil NEZÁMĚRNĚ i jeho, aby dorovnal její nový (vyšší) pas. Uživatel
+  // výslovně žádal "rozpoj spojení velikosti Váji a Archieka" — jeho
+  // velikost teď určuje VÝHRADNĚ Nicolásek (věta výš), tahle věta jen
+  // vysvětluje, kam tím pádem u Váji vyjde (důsledek, ne cíl), a explicitně
+  // zakazuje modelu dotahovat ho na její vlastní výšku.
   if (ids.has("archie") && ids.has("valentyna")) {
-    bits.push(`the same rule applies next to ${name("valentyna")}: the top of his head (not his ears, not his back) lines up with the waist seam of her dress, not higher — he is a small dog, clearly no taller than a child's waist even next to the smaller child, not a knee-high toy dog but genuinely small`);
+    bits.push(`${name("archie")}'s size is set ONLY by the ${name("nicolas")} comparison above — it must NOT also be scaled to match ${name("valentyna")}'s height or waist. Whatever point on her body the top of his head ends up reaching (likely her chest or lower shoulder area, since she stands nearly as tall as ${name("nicolas")}) is simply the correct RESULT of his fixed size next to Nicolásek — it is not a separate target to aim for, and her height must never be used to make him bigger`);
   }
   return bits.length ? bits.join("; ") + "." : "";
 }
