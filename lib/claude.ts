@@ -1337,7 +1337,16 @@ export function canonicalHeightsEntry(characters: Character[]): string | null {
     bits.push(`${name("james")} is a little taller than ${name("nicolas")} — the top of ${name("nicolas")}'s head reaches only to ${name("james")}'s ears`);
   }
   if (ids.has("valentyna") && ids.has("nicolas")) {
-    bits.push(`${name("valentyna")} is the smallest — the top of her head reaches all the way UP to ${name("nicolas")}'s SHOULDERS (not his chest, not his waist), roughly 85-90% of his height — she is a toddler but visibly close to his height, only a bit shorter, not dramatically smaller`);
+    // 🩺 2026-08-06 (6): živý test SKUTEČNÝCH pohádek (ne jen referenčních
+    // obrázků) ukázal, že tahle věta ve skutečnosti tlačila opačným směrem,
+    // než měla — "visibly close to his height, only a bit shorter, not
+    // dramatically smaller" byla reakce na DŘÍVĚJŠÍ nahlášení "je moc malá"
+    // (z ladění skupinové kotvy, viz FAMILY_HEIGHT_CM v portraits.ts), ale
+    // v obyčejné dvoupostavové scéně appka díky ní vykreslila Váju skoro
+    // stejně vysokou jako Nicoláska (nahlášeno uživatelem přímo na skutečné
+    // pohádce). Nahrazeno důrazem na BATOLECÍ PROPORCE (ne jen výškový
+    // poměr) + výslovným varováním proti druhému extrému.
+    bits.push(`${name("valentyna")} is a TRUE 2-YEAR-OLD TODDLER, not a preschooler or similarly-aged child — she has genuine toddler body proportions (a proportionally LARGER head relative to her body, shorter chubbier legs and arms), unlike ${name("nicolas")}'s leaner school-age proportions. She is noticeably shorter than him: the top of her head reaches only to his SHOULDERS, roughly 80-85% of his height. If she looks like a similarly-aged, similarly-proportioned child who is merely a bit shorter, she has been drawn too old and too tall — she must read as visibly younger and smaller, like a real 2-year-old next to a 6-year-old`);
   }
   if (ids.has("bella")) {
     const anchors = ["james", "nicolas"].filter(id => ids.has(id)).map(name);
