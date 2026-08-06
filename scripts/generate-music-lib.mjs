@@ -160,7 +160,13 @@ const SOUNDSCAPES = {
   // 🌙 NENÍ vybíratelná scénová nálada (Scene.soundscape) — hraje jen pod
   // závěrečnými titulky (AmbientPlayer.enterSleepMode), samostatný soubor
   // soundscape-lullaby.mp3, proto v tomto configu, ne v app/lib/types.ts.
-  lullaby: "Very gentle sleepy lullaby ambient music loop, soft solo music box and hushed strings, minimal, slow and deeply calming, no drums, seamless loop, instrumental",
+  // 🩺 2026-08-07: nahlášeno "hudba je dost creepy" na skutečné závěrečné
+  // titulce — "solo music box and hushed strings, minimal" je klasická
+  // filmová zkratka pro STRAŠIDELNOU ukolébavku (osamělý zvonkohra + řídké
+  // "hushed" ticho), ne pro vřelou/útěšnou. Přepsáno s teplejšími nástroji
+  // (piano/struny jako HLAVNÍ vrstva, zvonkohra jen jako doplněk) + explicitním
+  // zákazem "eerie/creepy/spooky/haunting/unsettling", po vzoru opravy "forest" výš.
+  lullaby: "Warm, sweet children's bedtime lullaby ambient music loop, soft piano and gentle warm strings as the main layer with just a touch of soft music box sparkle, cozy and deeply comforting like a parent's goodnight hug — NOT eerie, NOT creepy, NOT spooky, NOT haunting, NOT unsettling, no minor-key dissonance, major key throughout, no drums, seamless loop, instrumental",
 };
 
 // ── 🎺 Intro/outro — jednou na celou pohádku ──────────────────────────────
@@ -175,7 +181,9 @@ const FANFARES = {
   // soundscape-lullaby) — outro je teď jen jemný, pomalý doznívající vstup
   // do TÉ SAMÉ ukolébavkové nálady, ne samostatná fanfára, co po sobě
   // nechá ticho před nástupem smyčky.
-  outro: { prompt: "Very soft, slow descending lullaby phrase, solo music box or gentle harp fading into a warm hushed pad, sleepy and tender, no strong attack, drifting gently into silence, instrumental", ms: 8000 },
+  // 🩺 2026-08-07: stejná oprava jako lullaby výš — "solo music box... hushed
+  // pad" nahlášeno jako creepy. Teplejší nástroje + výslovný zákaz eerie/spooky.
+  outro: { prompt: "Warm, sweet, gentle descending lullaby phrase for the end of a children's bedtime story, soft piano or harp with warm strings, cozy and reassuring like a goodnight kiss — NOT eerie, NOT creepy, NOT spooky, NOT haunting, no strong attack, major key throughout, drifting gently into silence, instrumental", ms: 8000 },
   // 🎺 Úvodní fanfáry LADĚNÉ podle prostředí první scény (viz AmbientPlayer.
   // playIntro) — appka zkusí intro-<scene> první, "intro" výše je jen obecný
   // záchranný fallback, kdyby konkrétní varianta chyběla/selhala.
