@@ -674,11 +674,11 @@ async function editSceneImage(
 // na výšku (telefon). Volitelně s referenčními fotkami postav (Nicolásek
 // a Valentýnka bývají součástí každého světa). Prompt je bezpečný a pevně
 // daný (lib/backgrounds.ts), sanitizace není potřeba.
-export async function generateBackgroundImage(prompt: string, refImages: ReferenceImage[] = []): Promise<ImageResult> {
+export async function generateBackgroundImage(prompt: string, refImages: ReferenceImage[] = [], initialAspect: string | null = "9:16"): Promise<ImageResult> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
   const model = IMAGE_MODEL.trim();
-  let aspect: string | null = "9:16";
+  let aspect: string | null = initialAspect;
   let lastErr = new Error("Gemini nevrátil obrázek");
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
@@ -745,7 +745,15 @@ export function sceneCastList(imagePrompt: string): string | null {
 // v toleranci — co ale mezi scénami skákalo (a působilo jako „postava je jinak
 // velká"), byla VZDÁLENOST KAMERY: jednou děti přes půl obrázku, jinde malé
 // v krajině. Jednotný záběr je proto součástí stylu, ne volba scény.
-const STYLE_SUFFIX ="Hand-painted 2D storybook illustration, soft painterly brushwork in classic Disney animated-film style, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. CONSISTENT CAMERA: frame every scene as a comfortable medium-wide shot at a child's eye level, with the named characters occupying roughly one third of the image height, their whole bodies visible, and enough of the surroundings to show where they are. Keep this same shot distance and eye level in every scene of the book — never cut to an extreme close-up of faces and never shrink the characters into tiny distant figures in a landscape. THIS ART STYLE IS FIXED FOR THE WHOLE STORY, PAGE AFTER PAGE — never drift toward a different rendering style, palette, linework or level of detail from one scene to the next, and never let brand-new characters introduced mid-story pull the picture toward a different style; THEY are drawn to match this established style, never the other way round. Strictly FLAT 2D painting — NOT a 3D render, no CGI, no plastic skin, no photorealism. Correct natural anatomy: every person has EXACTLY two arms, two legs and five fingers on each hand — no extra, missing or deformed limbs; bicycles have exactly two wheels. Absolutely no text, letters, words, signs, labels, captions, subtitles, watermarks, or artist signatures of any kind anywhere in the image.";
+// 🩺 2026-08-06: EXPORTOVÁNO, ať ho může sdílet i lib/portraits.ts —
+// portrétová kartotéka měla svou VLASTNÍ, dřív ručně kopírovanou verzi
+// stylu (PORTRAIT_STYLE), která se odsud postupně odchýlila (chybělo
+// "cinematic"/"expressive faces" atd.) a navíc kreslila na výšku (9:16)
+// místo landscape (16:9) jako skutečné stránky pohádky — výsledek
+// (portréty, výškový list, skupinová kotva) pak vizuálně neseděl se
+// skutečnými stránkami appky. Sdílený konstant napříč oběma soubory =
+// jedna pravda o stylu, žádná budoucí odchylka.
+export const STYLE_SUFFIX ="Hand-painted 2D storybook illustration, soft painterly brushwork in classic Disney animated-film style, warm cinematic lighting, rich saturated colors, expressive faces, landscape orientation. CONSISTENT CAMERA: frame every scene as a comfortable medium-wide shot at a child's eye level, with the named characters occupying roughly one third of the image height, their whole bodies visible, and enough of the surroundings to show where they are. Keep this same shot distance and eye level in every scene of the book — never cut to an extreme close-up of faces and never shrink the characters into tiny distant figures in a landscape. THIS ART STYLE IS FIXED FOR THE WHOLE STORY, PAGE AFTER PAGE — never drift toward a different rendering style, palette, linework or level of detail from one scene to the next, and never let brand-new characters introduced mid-story pull the picture toward a different style; THEY are drawn to match this established style, never the other way round. Strictly FLAT 2D painting — NOT a 3D render, no CGI, no plastic skin, no photorealism. Correct natural anatomy: every person has EXACTLY two arms, two legs and five fingers on each hand — no extra, missing or deformed limbs; bicycles have exactly two wheels. Absolutely no text, letters, words, signs, labels, captions, subtitles, watermarks, or artist signatures of any kind anywhere in the image.";
 
 // 📜 KONZISTENČNÍ BIBLE — kompletní, očíslovaný seznam pravidel pro KAŽDÝ
 // jednotlivý obrázek. Je součástí SERVEROVÉHO promptu (běží v `generateSceneImage`

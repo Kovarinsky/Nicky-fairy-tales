@@ -1,4 +1,5 @@
 import type { StoryRequest, StoryScript, Character, Scene, Soundscape, SoundEffect } from "./types";
+import { GENDERED_SFX } from "./types";
 
 // Příběhy píše Sonnet — kvalitou pohádek srovnatelný s Opusem, ~5× levnější.
 // Starší proměnná ANTHROPIC_MODEL (na Vercelu claude-opus-4-8) se už nepoužívá;
@@ -142,24 +143,26 @@ function buildSystemPrompt(language: string): string {
       "═══ SOUND EFFECT (sfx) ═══",
       "Optional `sfx` field on a scene — a ONE-SHOT sound effect for something the NARRATION OF THAT SCENE explicitly describes happening RIGHT THEN, on top of the ambient soundscape. This covers ANY scene where a specific sound-making object or action is the center of that moment — an instrument being played, a bell rung, a book's pages turning, a key turning in a lock, swords clashing, someone whistling a tune — the categories below are examples of the PATTERN, not an exhaustive list of situations; but the `sfx` VALUE itself must always be the single closest key from this list (never invent a key that isn't listed).",
       "SFX SHOULD BE THE DEFAULT, NOT THE EXCEPTION: aim for roughly 70-90% of scenes to carry an sfx (for a typical 10-scene story that's about 7-9 scenes; scale up for longer stories, down only for very short ones) — a story with hardly any sfx sounds flat and lifeless. Don't just look for sfx opportunities in scenes you already planned — actively WRITE the scenes (plot beat, character action, imagePrompt) so they naturally CONTAIN a sound-making moment: a character playing an instrument, an animal reacting, a door creaking, rain starting, a gasp of surprise, a page turning. Vary the CATEGORY scene to scene (animal, then object, then weather, then an emotion, then a machine…) — don't lean on the same one or two categories the whole story. Only skip `sfx` for the rare scene where truly nothing sound-worthy happens, and never pick more than one per scene:",
-      '  WEATHER/WATER: "waves" (sea/ocean lapping or crashing) · "water_flow" (a calm river, stream or fountain flowing/trickling nearby — use this, NOT "waves", for rivers like the Vltava, streams, brooks and fountains) · "thunder" (thunder/lightning striking) · "wind_gust" (a gust or steady breeze of wind — use whenever the scene mentions wind, leaves rustling in the breeze, hair/clothes blowing) · "rain" (rain falling) · "snow_crunch" (footsteps crunching in snow)',
-      '  NATURE/PLACES: "campfire_crackle" (a campfire crackling nearby) · "waterfall" (a waterfall rushing in the distance) · "cave_drip" (water dripping in a cave) · "leaves_crunch" (footsteps through fallen autumn leaves) · "volcano_rumble" (a distant volcanic rumble) · "desert_wind" (dry wind over sand)',
-      '  ANIMALS (the animal itself makes its sound in THIS scene): "cow" (moo) · "pig" (oink) · "chicken" (cluck) · "sheep" (bleat) · "horse" (neigh) · "duck" (quack) · "dog" (bark) · "cat" (meow) · "frog" (croak) · "owl" (hoot) · "rooster" (crow) · "bee" (buzzing) · "rabbit" (soft hop/sniff) · "elephant" (trumpet) · "bear" (gentle friendly grumble/huff) · "mouse" (squeak) · "bird" (chirp/tweet) · "squirrel" (chatter) · "fox" (soft yip-bark) · "wolf" (a gentle distant howl) · "monkey" (chatter/hoot) · "seagull" (cry) · "dolphin" (click/whistle) · "cricket" (chirping at night)',
-      '  MACHINES/TRAVEL: "car_engine" (a car engine starting/running) · "train" (a train chugging/whistling) · "boat_horn" (a boat/ship horn) · "clock_tick" (a clock ticking) · "doorbell" (a doorbell or knock) · "phone_ring" (a phone ringing) · "airplane" (a small plane flying overhead) · "bicycle_bell" (a bicycle bell) · "rocket_launch" (a toy-like rocket launching) · "helicopter" (rotor blades whirring) · "race_car_rev" (a race car revving) · "sailboat_flap" (a sail flapping in the wind)',
-      '  GAMES/CELEBRATIONS: "ball_bounce" (a ball bouncing) · "balloon_pop" (a balloon popping) · "firework_burst" (a single gentle festive firework) · "rope_skip" (a jump rope hitting the ground) · "kite_flutter" (a kite fluttering in the wind)',
-      '  PEOPLE/ACTIONS: "footsteps" (someone walking, on a normal surface) · "applause" (clapping/cheering) · "laugh" (laughter) · "splash" (something splashing into water) · "glass_clink" (glasses/cups clinking)',
+      '  WEATHER/WATER: "waves" (sea/ocean lapping or crashing) · "water_flow" (a calm river, stream or fountain flowing/trickling nearby — use this, NOT "waves", for rivers like the Vltava, streams, brooks and fountains) · "thunder" (thunder/lightning striking) · "wind_gust" (a gust or steady breeze of wind — use whenever the scene mentions wind, leaves rustling in the breeze, hair/clothes blowing) · "rain" (rain falling) · "snow_crunch" (footsteps crunching in snow) · "ice_crack" (ice cracking/creaking, e.g. a frozen lake or icicles)',
+      '  NATURE/PLACES: "campfire_crackle" (a campfire crackling nearby) · "waterfall" (a waterfall rushing in the distance) · "cave_drip" (water dripping in a cave) · "leaves_crunch" (footsteps through fallen autumn leaves) · "volcano_rumble" (a distant volcanic rumble) · "desert_wind" (dry wind over sand) · "mole_dig" (a small creature digging/burrowing in the ground) · "bubbles_underwater" (bubbles rising underwater)',
+      '  ANIMALS (the animal itself makes its sound in THIS scene): "cow" (moo) · "pig" (oink) · "chicken" (cluck) · "sheep" (bleat) · "goat" (bleat, distinct pitch from sheep) · "horse" (neigh) · "donkey" (bray/hee-haw) · "duck" (quack) · "dog" (bark) · "cat" (meow) · "frog" (croak) · "owl" (hoot) · "rooster" (crow) · "bee" (buzzing) · "rabbit" (soft hop/sniff) · "elephant" (trumpet) · "bear" (gentle friendly grumble/huff) · "mouse" (squeak) · "bird" (chirp/tweet) · "squirrel" (chatter) · "wing_flap" (a bird\'s wings flapping as it takes off) · "dino_roar" (a friendly, playful dinosaur roar) · "fox" (soft yip-bark) · "wolf" (a gentle distant howl) · "monkey" (chatter/hoot) · "seagull" (cry) · "dolphin" (click/whistle) · "cricket" (chirping at night)',
+      '  MACHINES/TRAVEL: "car_engine" (a car engine starting/running) · "car_horn" (a car horn honking) · "train" (a train chugging/whistling) · "boat_horn" (a boat/ship horn) · "clock_tick" (a clock ticking) · "doorbell" (a doorbell or knock) · "phone_ring" (a phone ringing) · "airplane" (a small plane flying overhead) · "bicycle_bell" (a bicycle bell) · "rocket_launch" (a toy-like rocket launching) · "helicopter" (rotor blades whirring) · "race_car_rev" (a race car revving) · "sailboat_flap" (a sail flapping in the wind) · "sci_fi_beep" (a playful robot/spaceship beeping) · "speed_whoosh" (something zooming past at high speed) · "electric_zap" (a playful electric spark/zap)',
+      '  GAMES/CELEBRATIONS: "ball_bounce" (a ball bouncing) · "balloon_pop" (a balloon popping) · "firework_burst" (a single gentle festive firework) · "rope_skip" (a jump rope hitting the ground) · "kite_flutter" (a kite fluttering in the wind) · "candle_blow" (blowing out birthday candles) · "coin_collect" (a bright video-game-style coin chime)',
+      '  PEOPLE/ACTIONS: "footsteps" (someone walking, on a normal surface) · "applause" (clapping/cheering) · "laugh" (laughter) · "splash" (something splashing into water) · "glass_clink" (glasses/cups clinking) · "door_knock" (knocking on a door) · "gulp" (a satisfied gulp of food/drink) · "single_clap" (one sharp hand clap) · "baby_cry" (a baby softly crying) · "baby_laugh" (a baby giggling happily)',
+      '  FANTASY/MAGIC: "witch_cackle" (a playful, NOT scary, witch\'s cackling laugh) · "dragon_roar" (a friendly, NOT scary, dragon roar) · "giant_footsteps" (heavy giant footsteps, playful not scary) · "magic_poof" (a sparkly magical transformation whoosh-and-pop) · "treasure_open" (a treasure chest creaking open with a sparkle) · "book_close" (a book closing shut with a soft thud)',
       '  INSTRUMENTS/OBJECTS (a specific instrument or object is played, rung, or handled in THIS scene): "violin" (a violin is played) · "piano" (a piano is played) · "guitar" (a guitar is played/strummed) · "flute" (a flute is played) · "drum" (a drum is beaten) · "trumpet" (a trumpet is played) · "harp" (a harp is played) · "accordion" (an accordion is played) · "xylophone" (a xylophone is played) · "music_box" (a music box plays) · "tambourine" (a tambourine is shaken) · "harmonica" (a harmonica is played) · "bell_ring" (a hand bell/chime rings once) · "page_turn" (a book page turns) · "key_turn" (a key turns in a lock) · "sword_clash" (swords clash once) · "whistle" (a character whistles a tune) · "umbrella_open" (an umbrella opens) · "camera_click" (a camera shutter clicks) · "kettle_whistle" (a kettle whistles) · "cart_wheels" (a cart/wagon creaks and rolls) · "coin_clink" (coins clink) · "drawer_open" (a drawer slides open) · "zipper" (a zipper is pulled)',
       '  MOOD ACCENTS (a musical sting, not a literal sound effect): "magic_chime" (a magical sparkle moment) · "triumphant" (a victorious/joyful high point) · "tense_sting" (a sudden scare or shock) · "sad_tone" (a sorrowful, tender beat)',
       '  EMOTIONS (a character\'s own non-verbal reaction, in THIS scene — use to make feelings audible, not just narrated): "giggle" (soft happy giggling) · "cheer_yay" (a joyful group cheer) · "sigh" (a soft contented sigh) · "yawn" (a sleepy yawn) · "sneeze" (a gentle sneeze) · "hiccup" (cute hiccupping) · "hum_content" (contented humming) · "surprised_oh" (a soft gasp of pleasant surprise) · "group_aww" (a warm, endeared "aww") · "gasp_fear" (a mild fright gasp, never terrifying) · "determined_grunt" (a short effortful grunt) · "relief_exhale" (a long relieved breath) · "whisper" (a soft hushed whisper)',
+      '  EMOTIONS VOICE: these 13 EMOTIONS keys are recorded in both a male and a female voice — whenever `sfx` is one of them, ALSO set `sfxVoice` to `"m"` or `"f"` matching the gender of the character making that sound in THIS scene (the narration/imagePrompt makes this clear). Every other sfx category ignores `sfxVoice` entirely — never set it for a non-EMOTIONS sfx.',
       '  SLEEP: "snore" (a character audibly snoring/sleeping in THIS scene)',
       "Omit `sfx` only for the rare scene where none of these genuinely fit — never pick more than one per scene.",
       "SOUND MUST MATCH THE PICTURE: whenever you DO set `sfx`, the imagePrompt for that same scene MUST visibly show that exact sound happening — the listener hears it AND sees it. An animal `sfx` needs the animal drawn mid-sound (mouth open barking/mooing/quacking, an expressive sound-making pose) — but ALWAYS gentle and FRIENDLY, never aggressive or scary: a happy open-mouth bark with a wagging tail and soft eyes, NEVER bared teeth, a snarl, or a threatening posture, even for a big dog breed. An instrument `sfx` needs a character actively playing it (bow on the violin strings, hands on the piano keys, fingers on the guitar strings), an object or vehicle `sfx` needs the object shown mid-action (the bell mid-ring with motion lines, the key turning in the lock, the page mid-turn, the airplane visible in the sky, the ball mid-bounce), a weather or NATURE/PLACES `sfx` needs that weather or setting visibly present in the scene (rain falling, lightning flashing, leaves blown sideways in the wind, a campfire glowing, a waterfall in the background), drawn as gentle/cozy rather than dramatic, and an EMOTIONS `sfx` needs the character's face/body clearly showing that exact feeling (a wide giggling smile, a big yawn with an open mouth, arms raised mid-cheer) — never set one whose feeling isn't also visible on the character's face. Never set an `sfx` whose source is off-screen or already finished by the time of the picture. ANY OTHER named character present in that same scene (not just the one making the sound) must ALSO visibly react to it — turned head or eyes toward the source, a startled/delighted/curious expression, a hand cupped to an ear, a small flinch or lean-in — so the cause-and-effect between sound and picture reads clearly even with the volume off, not just the sound-maker performing in isolation.",
       "",
       "═══ OUTPUT ═══",
       "Reply with ONLY valid RFC 8259 JSON — no markdown, no code fences, no // comments, no trailing commas.",
-      "Required fields per scene: index (number), narration (string), imagePrompt (string), soundscape (one of the 5 values). Optional: sfx.",
+      "Required fields per scene: index (number), narration (string), imagePrompt (string), soundscape (one of the 5 values). Optional: sfx, sfxVoice (only alongside an EMOTIONS sfx, see above).",
       "Compact example structure (fill in real content):",
-      '{"title":"...","heroDescription":"...","worldNotes":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"night","sfx":"snore"}]}',
+      '{"title":"...","heroDescription":"...","worldNotes":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"cozy","sfx":"giggle","sfxVoice":"f"},{"index":3,"narration":"...","imagePrompt":"...","soundscape":"night","sfx":"snore"}]}',
     ].join("\n");
   }
 
@@ -262,24 +265,26 @@ function buildSystemPrompt(language: string): string {
     "═══ ZVUKOVÝ EFEKT (sfx) ═══",
     "Volitelné pole `sfx` u scény — JEDNORÁZOVÝ zvukový efekt navíc k ambientnímu soundscape, pro něco, co DĚJ TÉTO KONKRÉTNÍ scény výslovně popisuje PRÁVĚ TEĎ. Zahrnuje JAKOUKOLI scénu, kde je středem okamžiku konkrétní zvuk-tvořící předmět nebo akce — hraje se na nástroj, zazvoní zvonek, listuje se v knize, otočí se klíč v zámku, střetnou se meče, někdo si zapíská melodii — kategorie níže jsou příklady TOHOTO VZORU, ne vyčerpávající seznam situací; ale samotná HODNOTA `sfx` musí být vždy nejbližší klíč z tohoto seznamu (nikdy nevymýšlej klíč, který tam není).",
     "SFX MÁ BÝT PRAVIDLO, NE VÝJIMKA: cíl je zhruba 70-90 % scén se sfx (u typické 10scénové pohádky to je asi 7-9 scén, u delší pohádky víc, míň jen u opravdu krátké) — pohádka skoro bez sfx zní ploše a bez života. Nehledej sfx příležitosti jen ve scénách, co už máš naplánované — rovnou PIŠ scény (dějový bod, akce postavy, imagePrompt) tak, aby zvuková chvíle byla PŘIROZENOU součástí děje: postava hraje na nástroj, zvíře zareaguje, vrznou dveře, spustí se déšť, někdo se nadechne překvapením, otočí se stránka. Střídej KATEGORIE scénu od scény (zvíře, pak předmět, pak počasí, pak emoce, pak stroj…) — nedrž se pořád jen jedné nebo dvou kategorií. Pole `sfx` vynech jen u té výjimečné scény, kde se opravdu nic zvukového nehodí, a nikdy nevybírej víc než jeden na scénu:",
-    '  POČASÍ/VODA: "waves" (moře naráží/šplouchá) · "water_flow" (klidná řeka, potok nebo fontánka poblíž teče/zurčí — použij TOHLE, ne "waves", pro řeky jako Vltava, potoky a fontánky) · "thunder" (hrom/blesk udeří) · "wind_gust" (poryv nebo stálý vánek větru — použij vždy, když scéna zmiňuje vítr, šumění listí ve větru, vlající vlasy/oblečení) · "rain" (padá déšť) · "snow_crunch" (kroky křupou ve sněhu)',
-    '  PŘÍRODA/MÍSTA: "campfire_crackle" (praská ohníček poblíž) · "waterfall" (v dálce hučí vodopád) · "cave_drip" (v jeskyni kape voda) · "leaves_crunch" (kroky šustí napadaným podzimním listím) · "volcano_rumble" (vzdálené sopečné dunění) · "desert_wind" (suchý vítr nad pískem)',
-    '  ZVÍŘATA (zvíře se v TÉTO scéně samo ozve): "cow" (bučení) · "pig" (chrochtání) · "chicken" (kdákání) · "sheep" (bečení) · "horse" (řehtání) · "duck" (kvákání) · "dog" (štěkání) · "cat" (mňoukání) · "frog" (kuňkání) · "owl" (houkání) · "rooster" (kokrhání) · "bee" (bzučení) · "rabbit" (tiché poskakování/čenichání) · "elephant" (troubení) · "bear" (jemné přátelské mručení/funění) · "mouse" (pískání) · "bird" (cvrlikání) · "squirrel" (rychlé cvakání) · "fox" (tiché zaštěknutí) · "wolf" (jemné vzdálené vytí) · "monkey" (chichotání/houkání) · "seagull" (křik racka) · "dolphin" (cvakání/pískání) · "cricket" (cvrlikání cvrčků v noci)',
-    '  STROJE/DOPRAVA: "car_engine" (nastartuje/jede auto) · "train" (rachotí/houká vlak) · "boat_horn" (houkačka lodi) · "clock_tick" (tikají hodiny) · "doorbell" (zvonek/zaklepání u dveří) · "phone_ring" (zvoní telefon) · "airplane" (nad hlavou letí malé letadlo) · "bicycle_bell" (zvonek na kole) · "rocket_launch" (odstartuje hračkovská raketa) · "helicopter" (vrtule vrtulníku) · "race_car_rev" (řve motor závodního auta) · "sailboat_flap" (plachta plácá ve větru)',
-    '  HRY/OSLAVY: "ball_bounce" (odráží se míč) · "balloon_pop" (praskne balónek) · "firework_burst" (jeden jemný slavnostní ohňostroj) · "rope_skip" (švihadlo dopadá na zem) · "kite_flutter" (drak se třepotá ve větru)',
-    '  LIDÉ/AKCE: "footsteps" (někdo jde po normálním povrchu) · "applause" (tleskání/jásot) · "laugh" (smích) · "splash" (šplouchnutí do vody) · "glass_clink" (cinknutí sklenic/hrnků)',
+    '  POČASÍ/VODA: "waves" (moře naráží/šplouchá) · "water_flow" (klidná řeka, potok nebo fontánka poblíž teče/zurčí — použij TOHLE, ne "waves", pro řeky jako Vltava, potoky a fontánky) · "thunder" (hrom/blesk udeří) · "wind_gust" (poryv nebo stálý vánek větru — použij vždy, když scéna zmiňuje vítr, šumění listí ve větru, vlající vlasy/oblečení) · "rain" (padá déšť) · "snow_crunch" (kroky křupou ve sněhu) · "ice_crack" (praská/vrže led, např. na zamrzlém jezeře nebo rampouchy)',
+    '  PŘÍRODA/MÍSTA: "campfire_crackle" (praská ohníček poblíž) · "waterfall" (v dálce hučí vodopád) · "cave_drip" (v jeskyni kape voda) · "leaves_crunch" (kroky šustí napadaným podzimním listím) · "volcano_rumble" (vzdálené sopečné dunění) · "desert_wind" (suchý vítr nad pískem) · "mole_dig" (malý tvor hrabe/hloubí v zemi) · "bubbles_underwater" (bubliny stoupají pod vodou)',
+    '  ZVÍŘATA (zvíře se v TÉTO scéně samo ozve): "cow" (bučení) · "pig" (chrochtání) · "chicken" (kdákání) · "sheep" (bečení) · "goat" (mečení, jiná výška než ovce) · "horse" (řehtání) · "donkey" (hýkání) · "duck" (kvákání) · "dog" (štěkání) · "cat" (mňoukání) · "frog" (kuňkání) · "owl" (houkání) · "rooster" (kokrhání) · "bee" (bzučení) · "rabbit" (tiché poskakování/čenichání) · "elephant" (troubení) · "bear" (jemné přátelské mručení/funění) · "mouse" (pískání) · "bird" (cvrlikání) · "squirrel" (rychlé cvakání) · "wing_flap" (pták mocně zamává křídly při vzletu) · "dino_roar" (přátelský, hravý řev dinosaura) · "fox" (tiché zaštěknutí) · "wolf" (jemné vzdálené vytí) · "monkey" (chichotání/houkání) · "seagull" (křik racka) · "dolphin" (cvakání/pískání) · "cricket" (cvrlikání cvrčků v noci)',
+    '  STROJE/DOPRAVA: "car_engine" (nastartuje/jede auto) · "car_horn" (houkne klakson auta) · "train" (rachotí/houká vlak) · "boat_horn" (houkačka lodi) · "clock_tick" (tikají hodiny) · "doorbell" (zvonek/zaklepání u dveří) · "phone_ring" (zvoní telefon) · "airplane" (nad hlavou letí malé letadlo) · "bicycle_bell" (zvonek na kole) · "rocket_launch" (odstartuje hračkovská raketa) · "helicopter" (vrtule vrtulníku) · "race_car_rev" (řve motor závodního auta) · "sailboat_flap" (plachta plácá ve větru) · "sci_fi_beep" (hravé pípání robota/vesmírné lodi) · "speed_whoosh" (něco se řítí kolem vysokou rychlostí) · "electric_zap" (hravé elektrické jiskření/výboj)',
+    '  HRY/OSLAVY: "ball_bounce" (odráží se míč) · "balloon_pop" (praskne balónek) · "firework_burst" (jeden jemný slavnostní ohňostroj) · "rope_skip" (švihadlo dopadá na zem) · "kite_flutter" (drak se třepotá ve větru) · "candle_blow" (sfouknutí narozeninových svíček) · "coin_collect" (jasné herní cinknutí sebrané mince)',
+    '  LIDÉ/AKCE: "footsteps" (někdo jde po normálním povrchu) · "applause" (tleskání/jásot) · "laugh" (smích) · "splash" (šplouchnutí do vody) · "glass_clink" (cinknutí sklenic/hrnků) · "door_knock" (zaklepání na dveře) · "gulp" (spokojené polknutí jídla/pití) · "single_clap" (jedno ostré plesknutí do rukou) · "baby_cry" (miminko tiše pláče) · "baby_laugh" (miminko se šťastně směje)',
+    '  FANTAZIE/KOUZLA: "witch_cackle" (hravý, NE strašidelný, čarodějnický smích) · "dragon_roar" (přátelský, NE strašidelný, dračí řev) · "giant_footsteps" (těžké obří kroky, hravé ne děsivé) · "magic_poof" (jiskřivé kouzelné "puf" se svištěním) · "treasure_open" (poklad se vrže otevře s jiskřením) · "book_close" (kniha se zavře s měkkým žuchnutím)',
     '  NÁSTROJE/PŘEDMĚTY (v TÉTO scéně se hraje na konkrétní nástroj nebo se manipuluje s předmětem): "violin" (hraje se na housle) · "piano" (hraje se na klavír) · "guitar" (hraje/brnká se na kytaru) · "flute" (hraje se na flétnu) · "drum" (bubnuje se) · "trumpet" (hraje se na trumpetu) · "harp" (hraje se na harfu) · "accordion" (hraje se na tahací harmoniku) · "xylophone" (hraje se na xylofon) · "music_box" (hraje hrací skříňka) · "tambourine" (rozeznívá se tamburína) · "harmonica" (hraje se na foukací harmoniku) · "bell_ring" (jednou zazvoní ruční zvonek/zvoneček) · "page_turn" (otočí se stránka knihy) · "key_turn" (otočí se klíč v zámku) · "sword_clash" (jednou se střetnou meče) · "whistle" (postava si zapíská melodii) · "umbrella_open" (otevře se deštník) · "camera_click" (cvakne spoušť fotoaparátu) · "kettle_whistle" (píská konvička) · "cart_wheels" (vrže/jede vozík či kára) · "coin_clink" (cinknou mince) · "drawer_open" (vysune se zásuvka) · "zipper" (zapne se zip)',
     '  NÁLADOVÉ AKCENTY (hudební akcent, ne doslovný zvuk): "magic_chime" (kouzelný jiskřivý moment) · "triumphant" (vítězný/radostný vrchol) · "tense_sting" (náhlé leknutí/napětí) · "sad_tone" (smutný, dojemný moment)',
     '  EMOCE (postava sama neverbálně reaguje v TÉTO scéně — použij, ať jsou pocity SLYŠET, ne jen popsané): "giggle" (tiché šťastné hihňání) · "cheer_yay" (radostné hurá skupinky) · "sigh" (spokojený povzdech) · "yawn" (ospalé zívnutí) · "sneeze" (jemné kýchnutí) · "hiccup" (roztomilé škytání) · "hum_content" (spokojené broukání) · "surprised_oh" (tiché nadechnutí příjemným překvapením) · "group_aww" (vřelé, dojaté "ách") · "gasp_fear" (mírné leknutí, nikdy hrůza) · "determined_grunt" (krátké odhodlané zabručení při snaze) · "relief_exhale" (dlouhý úlevný výdech) · "whisper" (tichý šepot)',
+    '  HLAS U EMOCÍ: těchto 13 klíčů kategorie EMOCE je nahraných v mužské i ženské verzi — kdykoli je `sfx` jeden z nich, NASTAV NAVÍC `sfxVoice` na `"m"` nebo `"f"` podle pohlaví postavy, co ten zvuk v TÉTO scéně vydává (jasné z narace/imagePromptu). Žádná jiná kategorie sfx `sfxVoice` nepoužívá — u ne-EMOČNÍHO sfx ho nikdy nenastavuj.',
     '  SPÁNEK: "snore" (postava slyšitelně chrápe/spí v téhle scéně)',
     "Pole `sfx` vynech jen u výjimečné scény, kde se z tohoto seznamu opravdu nic nehodí — nikdy nevybírej víc než jeden na scénu.",
     "ZVUK MUSÍ SEDĚT S OBRÁZKEM: kdykoli `sfx` NASTAVÍŠ, imagePrompt téže scény MUSÍ ten přesný zvuk viditelně ukazovat — posluchač ho slyší A VIDÍ. Zvíře u `sfx` potřebuje být nakreslené PŘI zvuku (otevřená tlama při štěkání/bučení/kvákání, výrazná póza) — ale VŽDY jemně a PŘÁTELSKY, nikdy agresivně nebo strašidelně: šťastné štěknutí s otevřenou tlamou, vrtícím ocasem a měkkýma očima, NIKDY vyceněné zuby, vrčení nebo výhružná póza, ani u velkého psího plemene. Nástroj potřebuje postavu AKTIVNĚ hrající (smyčec na strunách houslí, prsty na klávesách klavíru, prsty na strunách kytary), předmět nebo vozidlo potřebuje být zachycené PŘI akci (zvoneček uprostřed zvonění s pohybovými čarami, klíč otáčející se v zámku, stránka uprostřed otáčení, letadlo viditelné na obloze, míč uprostřed odrazu), počasí nebo PŘÍRODA/MÍSTA u `sfx` potřebuje to počasí nebo prostředí viditelně být ve scéně přítomné (padající déšť, blesk, vítr čechrající listí do strany, zářící ohníček, vodopád v pozadí), nakreslené útulně, ne dramaticky, a EMOCE u `sfx` potřebují ten přesný pocit vidět i na tváři/postoji postavy (široký hihňavý úsměv, velké zívnutí s otevřenou pusou, ruce vzhůru při jásotu) — nikdy nenastavuj emoci, kterou postava zároveň nedává najevo v obrázku. Nikdy nenastavuj `sfx`, jehož zdroj je mimo záběr nebo už v obrázku dávno doznělý. KAŽDÁ DALŠÍ jmenovaná postava v téže scéně (ne jen ta, co zvuk vydává) musí na něj VIDITELNĚ reagovat — otočená hlava nebo pohled směrem ke zdroji, polekaný/nadšený/zvědavý výraz, dlaň u ucha, mírné nadskočení nebo naklonění k němu — ať je souvislost zvuku a obrázku jasná i beze zvuku, ne aby zvukotvorná postava hrála úplně sama.",
     "",
     "═══ VÝSTUP ═══",
     "Odpověz POUZE validním RFC 8259 JSON — bez markdown, bez ``` obalení, bez // komentářů, bez trailing čárek.",
-    "Povinné pole na každou scénu: index (číslo), narration (string), imagePrompt (string), soundscape (jedna z 5 hodnot). Volitelné: sfx.",
+    "Povinné pole na každou scénu: index (číslo), narration (string), imagePrompt (string), soundscape (jedna z 5 hodnot). Volitelné: sfx, sfxVoice (jen spolu se sfx z kategorie EMOCE, viz výše).",
     "Příklad struktury (vyplň reálným obsahem):",
-    '{"title":"...","heroDescription":"...","worldNotes":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"night","sfx":"snore"}]}',
+    '{"title":"...","heroDescription":"...","worldNotes":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"cozy","sfx":"giggle","sfxVoice":"f"},{"index":3,"narration":"...","imagePrompt":"...","soundscape":"night","sfx":"snore"}]}',
   ].join("\n");
 }
 
@@ -664,7 +669,13 @@ async function reviewSoundDesign(scenes: Scene[], language: string): Promise<voi
       const scene = scenes.find(s => s.index === fix.index);
       if (!scene) continue;
       if (fix.soundscape) scene.soundscape = fix.soundscape;
-      if ("sfx" in fix) scene.sfx = fix.sfx ?? undefined;
+      if ("sfx" in fix) {
+        scene.sfx = fix.sfx ?? undefined;
+        // 🎙️ dozor nezná sfxVoice, ať tam po výměně sfx nezůstane sirotek ze
+        // starého párování (viz Scene.sfxVoice, lib/types.ts) — vymaž ho,
+        // kdykoli nový sfx není z GENDERED_SFX (nebo se sfx smazal úplně).
+        if (!scene.sfx || !GENDERED_SFX.includes(scene.sfx)) scene.sfxVoice = undefined;
+      }
     }
   } catch (e) {
     console.warn("[Claude] sound-design review selhala, scénář jede beze změny:", e instanceof Error ? e.message : e);
@@ -687,7 +698,19 @@ async function callAnthropicApi(
   // 📋 Volitelný zápis do TRVALÉHO deníku joby (job-runner posílá logEv) —
   // dřív šly retry pokusy jen do server konzole, kterou appka/uživatel
   // nevidí, takže dlouhé „psaní… (N. pokus)" bylo bez jakéhokoli vysvětlení.
-  onRetry?: (msg: string) => void
+  onRetry?: (msg: string) => void,
+  // 🩺 2026-08-06: appka dřív Claude tokeny vůbec neměřila — cena psaní byla
+  // paušál $0,15/pohádku (viz lib/pricing.ts, COST_USD_PER_STORY_WRITING),
+  // ne skutečná spotřeba. SSE stream posílá input_tokens v message_start a
+  // finální output_tokens v message_delta — appka je dřív jen ignorovala.
+  // Stejný vzor jako onDelta/onRetry: volitelný callback, žádný stávající
+  // volající se nemusí měnit.
+  // 🩺 2026-08-06 (2): rozšířeno o cache_creation/cache_read tokeny —
+  // buildSystemPrompt() se posílá s cache_control: ephemeral (viz volání
+  // v generateStory), takže `input_tokens` v odpovědi je JEN nekešovaný
+  // zbytek, ne celková velikost promptu; bez týhle trojice appka cenu psaní
+  // systematicky podhodnocovala u každého volání, co trefilo cache.
+  onUsage?: (usage: { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number }) => void
 ): Promise<string> {
   const apiKey = sanitizeApiKey(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) throw new Error("Chybí ANTHROPIC_API_KEY.");
@@ -753,6 +776,10 @@ async function callAnthropicApi(
     let buf = "";
     let out = "";
     let stopReason: string | undefined;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let cacheCreationTokens = 0;
+    let cacheReadTokens = 0;
     try {
       for (;;) {
         const { done, value } = await reader.read();
@@ -764,14 +791,35 @@ async function callAnthropicApi(
           if (!line.startsWith("data:")) continue;
           const payload = line.slice(5).trim();
           if (!payload) continue;
-          let ev: { type?: string; delta?: { type?: string; text?: string; stop_reason?: string }; error?: { message?: string } };
+          let ev: {
+            type?: string;
+            delta?: { type?: string; text?: string; stop_reason?: string };
+            error?: { message?: string };
+            message?: { usage?: { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number } };
+            usage?: { input_tokens?: number; output_tokens?: number };
+          };
           try { ev = JSON.parse(payload); } catch { continue; }
           if (ev.type === "error" || ev.error) throw new Error(`Anthropic stream error: ${ev.error?.message || "unknown"}`);
           if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) {
             out += ev.delta.text;
             onDelta?.(out.length, out);
           }
-          if (ev.type === "message_delta" && ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
+          // message_start nese input_tokens (a malý počáteční output_tokens)
+          // PLUS cache_creation_input_tokens/cache_read_input_tokens, když
+          // request poslal cache_control — bez nich by input_tokens sám
+          // ukazoval jen nekešovaný ZBYTEK promptu, ne skutečnou cenu.
+          // message_delta pak PRŮBĚŽNĚ aktualizuje finální output_tokens —
+          // poslední hodnota před koncem streamu je ta skutečná.
+          if (ev.type === "message_start" && ev.message?.usage) {
+            inputTokens = ev.message.usage.input_tokens ?? inputTokens;
+            outputTokens = ev.message.usage.output_tokens ?? outputTokens;
+            cacheCreationTokens = ev.message.usage.cache_creation_input_tokens ?? cacheCreationTokens;
+            cacheReadTokens = ev.message.usage.cache_read_input_tokens ?? cacheReadTokens;
+          }
+          if (ev.type === "message_delta") {
+            if (ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
+            if (ev.usage?.output_tokens != null) outputTokens = ev.usage.output_tokens;
+          }
         }
       }
     } catch (e) {
@@ -794,6 +842,7 @@ async function callAnthropicApi(
     // se to nikde nekontrolovalo, appka tichý ořez prostě přijala jako hotový
     // text (viz „Enrich" u bohatého zadání, uříznuté u „A Habsburg…")
     if (stopReason === "max_tokens") console.warn(`[Claude] odpověď uřízlá limitem max_tokens (${out.length} znaků)`);
+    if (inputTokens || outputTokens) onUsage?.({ inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens });
     return out;
   }
   throw lastErr || new Error("Anthropic: no response");
@@ -1074,7 +1123,10 @@ export async function generateStory(
   // 📋 Zápis do trvalého deníku joby — ať jsou retry pokusy Clauda (síťová
   // chyba, přetížení, prázdný stream) vidět appce/uživateli, ne jen v
   // server konzoli
-  onLog?: (msg: string) => void
+  onLog?: (msg: string) => void,
+  // 🩺 2026-08-06: reálná cena psaní místo paušálu — job-runner sečte
+  // vstupní/výstupní tokeny napříč pokusy (resume/redraw = víc volání)
+  onUsage?: (usage: { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number }) => void
 ): Promise<StoryScript> {
   const model = MODEL.trim();
   const parts: AnthropicPart[] = [];
@@ -1147,7 +1199,7 @@ export async function generateStory(
       messages,
     }, prefix
       ? (chars, fullText) => onDelta?.(prefix.length + chars, prefix + fullText)
-      : onDelta, onLog);
+      : onDelta, onLog, onUsage);
     const raw = prefix ? mergeContinuation(prefix, continuation) : continuation;
     try {
       const script = parseScript(raw);
@@ -1239,8 +1291,19 @@ export function peekEarlyScene(partial: string): { heroDescription: string; scen
 // Valentýnku podle celorodinného výškového listu od CD (dřív appka znala jen
 // jejich RELATIVNÍ vztah k jinému dítěti, ne přesné číslo). Mění se, jen když
 // rodina naměří nové skutečné číslo — neodhaduj/nedopočítávej sám.
+// v2 (2026-08-06): Valentýnka opravena 85→90cm (upřesnil uživatel) — u
+// poměru 90/111 sahá hlavou k Nicoláskovým RAMENŮM, ne k uším (viz
+// canonicalHeightsEntry níž, dřívější "reaches to ears" byl i se starým
+// 85cm nekonzistentní/moc velkorysý).
+// v3 (2026-08-06): 90cm je pořád její SKUTEČNÁ tělesná výška — ale živý test
+// skupinové kotvy ukázal, že model i s relační větou ("sahá po ramena")
+// obrázkově vykreslil poměr menší, než reálně vypadá (uživatel po zhlédnutí
+// hotového obrázku: "ještě Vája trochu větší, Nicolaskovi po ramena a jsme
+// tam"). 90/111=0.81 evidentně nestačí na vizuální dojem "po ramena" — appka
+// tu proto drží mírně NADSAZENÉ číslo (96cm, ~0.86 poměr) čistě pro účely
+// KRESLENÍ, ne jako revizi jejího skutečného vzrůstu.
 const CANONICAL_HEIGHT_CM: Record<string, number> = {
-  valentyna: 85,
+  valentyna: 96,
   nicolas: 111,
   james: 115,
   bella: 135,
@@ -1250,7 +1313,13 @@ const CANONICAL_HEIGHT_CM: Record<string, number> = {
   jan: 185,
 };
 
-function canonicalHeightsEntry(characters: Character[]): string | null {
+// 🩺 2026-08-06: exportováno, ať stejnou relační logiku (appka poučena, že
+// samotné cm číslo model nezmění v geometrii, ale slovní vztah "sahá mu po
+// ramena" ano) může použít i lib/portraits.ts pro skupinovou kotvu/výškový
+// list — ty dřív posílaly JEN holá cm čísla bez vztahových vět, a živý test
+// ukázal přesně tenhle důsledek (Valentýnka vyšla vizuálně moc malá,
+// Nicolásek vyšel větší než James, i když čísla pod obrázkem byla správná).
+export function canonicalHeightsEntry(characters: Character[]): string | null {
   const ids = new Set(characters.map(c => c.id));
   const name = (id: string): string => {
     const c = characters.find(x => x.id === id);
@@ -1264,15 +1333,46 @@ function canonicalHeightsEntry(characters: Character[]): string | null {
   for (const id of ["valentyna", "nicolas", "james", "bella"] as const) {
     if (ids.has(id)) bits.push(`${name(id)} is ${CANONICAL_HEIGHT_CM[id]} cm tall`);
   }
+  // 🩺 2026-08-07: nahlášeno na scéně BEZ Váji ("Nicky vyrostl") — dřívější
+  // explicitní VĚK ("6-year-old"/"school-age") se objevoval JEN uvnitř
+  // Valentýnka+Nicolas dvojice níž, takže sólo Nicolásek (nebo s kýmkoli
+  // JINÝM než sourozenci/kamarády výš) neměl vůbec žádnou textovou pojistku
+  // věku — jen cm číslo, které appka sama nedokáže z geometrie odhadnout bez
+  // vizuální reference. Věk teď appka posílá VŽDY, nezávisle na obsazení.
+  const CHILD_AGE_LINE: Record<string, string> = {
+    nicolas: `${name("nicolas")} is a 6-year-old school-age boy — not a teenager, not a young adult`,
+    james: `${name("james")} is a 6-year-old school-age boy, the same age as ${name("nicolas")} — not a teenager`,
+    valentyna: `${name("valentyna")} is a true 2-year-old toddler with toddler body proportions (larger head-to-body ratio, shorter chubbier limbs) — not a preschooler or older child`,
+    bella: `${name("bella")} is a school-age child a few years older than ${name("nicolas")}/${name("james")} — not a teenager or adult`,
+  };
+  for (const id of ["nicolas", "valentyna", "james", "bella"] as const) {
+    if (ids.has(id)) bits.push(CHILD_AGE_LINE[id]);
+  }
   if (ids.has("nicolas") && ids.has("james")) {
     bits.push(`${name("james")} is a little taller than ${name("nicolas")} — the top of ${name("nicolas")}'s head reaches only to ${name("james")}'s ears`);
   }
   if (ids.has("valentyna") && ids.has("nicolas")) {
-    bits.push(`${name("valentyna")} is the smallest — the top of her head reaches only to ${name("nicolas")}'s ears`);
+    // 🩺 2026-08-06 (6): živý test SKUTEČNÝCH pohádek (ne jen referenčních
+    // obrázků) ukázal, že tahle věta ve skutečnosti tlačila opačným směrem,
+    // než měla — "visibly close to his height, only a bit shorter, not
+    // dramatically smaller" byla reakce na DŘÍVĚJŠÍ nahlášení "je moc malá"
+    // (z ladění skupinové kotvy, viz FAMILY_HEIGHT_CM v portraits.ts), ale
+    // v obyčejné dvoupostavové scéně appka díky ní vykreslila Váju skoro
+    // stejně vysokou jako Nicoláska (nahlášeno uživatelem přímo na skutečné
+    // pohádce). Nahrazeno důrazem na BATOLECÍ PROPORCE (ne jen výškový
+    // poměr) + výslovným varováním proti druhému extrému.
+    bits.push(`${name("valentyna")} is a TRUE 2-YEAR-OLD TODDLER, not a preschooler or similarly-aged child — she has genuine toddler body proportions (a proportionally LARGER head relative to her body, shorter chubbier legs and arms), unlike ${name("nicolas")}'s leaner school-age proportions. She is noticeably shorter than him: the top of her head reaches only to his SHOULDERS, roughly 80-85% of his height. If she looks like a similarly-aged, similarly-proportioned child who is merely a bit shorter, she has been drawn too old and too tall — she must read as visibly younger and smaller, like a real 2-year-old next to a 6-year-old`);
   }
   if (ids.has("bella")) {
     const anchors = ["james", "nicolas"].filter(id => ids.has(id)).map(name);
     if (anchors.length) bits.push(`${name("bella")} is about half a head taller than ${anchors.join(" and ")}`);
+  }
+  // 🩺 2026-08-06 (5): nahlášeno na výškovém listu (lib/portraits.ts, zrcadlí
+  // se sem) — "James se neúměrně zvětšil" vedle dospělých. Dřívější vztah šel
+  // jen jedním směrem (Bella vůči Jamesovi); přidán i opačný směr.
+  if (ids.has("james") && (ids.has("eva") || ids.has("jakob"))) {
+    const adultAnchors = ["eva", "jakob"].filter(id => ids.has(id)).map(name);
+    bits.push(`${name("james")} is a school-age CHILD, clearly much shorter than ${adultAnchors.join(" and ")} — his head reaches only to about their chest/upper ribs, nowhere near their shoulders`);
   }
 
   // Dospělí: přesné cm

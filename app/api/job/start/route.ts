@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { blobToken } from "@/lib/blob-token";
-import { runJob, putJson, storyCreditCost } from "@/lib/job-runner";
+import { runJob, putJson, estimateStoryCostCredits } from "@/lib/job-runner";
 import { SESSION_COOKIE, verifySessionToken, readAccount } from "@/lib/accounts";
 
 export const runtime = "nodejs";
@@ -21,15 +21,20 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json();
-    // 💳 Kreditní systém (návrh „na čisto"): jen pro přihlášené účty — anonymní/
-    // rodinné použití v prohlížeči zůstává bez omezení, dokud se nerozhodne jinak.
+    // 🔐 Přihlášení je POVINNÉ (appka potřebuje sledovat aktivitu/kredity
+    // účtu) — appka to hlídá i na klientovi (Home screen, createStory), ale
+    // tenhle server endpoint je AUTORITATIVNÍ místo: bez platné session se
+    // sem vůbec nedostane, ať klient obejde cokoliv jinde.
     const username = verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
-    if (username) {
-      const cost = storyCreditCost(body);
+    if (!username) {
+      return NextResponse.json({ error: "Pro vytvoření pohádky se prosím přihlaste." }, { status: 401 });
+    }
+    {
+      const cost = estimateStoryCostCredits(body);
       const acc = await readAccount(username);
       if (!acc || (acc.credits ?? 0) < cost) {
         return NextResponse.json(
-          { error: `Nedostatek kreditů (potřeba ${cost}, máte ${acc?.credits ?? 0}). Dobijte kredit v účtu.` },
+          { error: `Nedostatek kreditů (odhad ${cost}, máte ${acc?.credits ?? 0}). Dobijte kredit v účtu.` },
           { status: 402 }
         );
       }

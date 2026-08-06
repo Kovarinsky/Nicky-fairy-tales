@@ -3,6 +3,7 @@ import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, type StoryExtras } f
 import { charactersByIds, loadCharacters } from "@/lib/characters";
 import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character } from "@/lib/types";
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/accounts";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -35,6 +36,15 @@ async function fetchUrlText(url: string): Promise<string> {
 
 export async function POST(req: NextRequest) {
   try {
+    // 🔐 Přihlášení je POVINNÉ (viz /api/job/start) — tenhle endpoint je
+    // JEN záložní lokální cesta (Blob úložiště nedostupné), nemá ale vlastní
+    // sledování spotřeby/kreditů jako job-runner.ts, takže se tu zatím jen
+    // vynucuje přihlášení, ne odečet kreditů (ta cesta je dnes výjimečná,
+    // ne hlavní tok — dořešit, pokud se z ní stane běžná fallback varianta).
+    const username = verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
+    if (!username) {
+      return NextResponse.json({ error: "Pro vytvoření pohádky se prosím přihlaste." }, { status: 401 });
+    }
     const body = await req.json();
 
     const topic = String(body.topic || "").trim();

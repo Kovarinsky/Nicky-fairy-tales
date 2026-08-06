@@ -74,16 +74,72 @@ async function composeMusic(prompt, durationMs) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+// 🎚️ 2026-08-05: uživatel hodnotil původní SFX (128kbps, prompt_influence
+// 0.4, holé popisy typu "a cow mooing once") jako "obyčejné/syntetické".
+// A/B test 10 vzorků s bohatším popisem ("realistic field recording",
+// "organic foley", "not synthesized") + nižší prompt_influence 0.25 (víc
+// volnosti modelu = přirozenější, míň doslovné) + 192kbps vyšel jako
+// zřetelně lepší → aplikováno plošně na všech 100 SFX přes REALISM_SUFFIX,
+// aby se nemusel ručně přepisovat každý jednotlivý prompt v SFX objektu níž.
+const REALISM_SUFFIX = ", realistic organic recording, natural acoustic texture, high fidelity, not synthesized";
+
 async function generateSfx(text, durationSeconds, loop = false) {
-  const res = await fetch(`${API}/v1/sound-generation?output_format=mp3_44100_128`, {
+  const res = await fetch(`${API}/v1/sound-generation?output_format=mp3_44100_192`, {
     method: "POST",
     headers,
     body: JSON.stringify({
-      text, duration_seconds: durationSeconds, loop,
-      prompt_influence: 0.4, model_id: "eleven_text_to_sound_v2",
+      text: text + REALISM_SUFFIX, duration_seconds: durationSeconds, loop,
+      prompt_influence: 0.25, model_id: "eleven_text_to_sound_v2",
     }),
   });
   if (!res.ok) throw new Error(`SFX HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+// 😊 2026-08-05: citoslovce/emoční reakce postav (giggle/sigh/yawn/…) dřív
+// jely přes Sound Generation API univerzálním hlasem — cizím, nesouvisejícím
+// s hlasem vypravěče appky (nahlášeno jako "umělý" dojem). Přepsáno na
+// ElevenLabs TEXT-TO-SPEECH s modelem eleven_v3, který umí audio tagy
+// ([giggles], [sighs], [whispers]…) v 70+ jazycích včetně češtiny — a na
+// žádost uživatele generuje KAŽDÉ citoslovce v mužské I ženské verzi (viz
+// Scene.sfxVoice, lib/types.ts), appka vybere podle pohlaví postavy ve scéně.
+// Hlasy: Jessica (Playful, Bright, Warm) a Will (Relaxed Optimist) — obě
+// premade hlasy z ElevenLabs knihovny, ne klon konkrétního vypravěče (to by
+// vyžadovalo generovat zvlášť pro každý hlas z voice pickeru appky).
+const INTERJECTION_VOICES = {
+  f: "cgSgspJ2msm6clMCkdW9", // Jessica - Playful, Bright, Warm
+  m: "bIHbv24MWmeRgasZH58o", // Will - Relaxed Optimist
+};
+const INTERJECTIONS = {
+  giggle: "[giggles softly] Hihi!",
+  cheer_yay: "[cheers happily] Yay!",
+  // 🩺 audio-tag-ONLY text (bez skutečných slov/citoslovce navíc) API
+  // odmítá s "input_text_empty" — tag samotný po odstranění nepočítá jako
+  // obsah. Každá položka proto potřebuje aspoň krátké vokální "slovo".
+  sigh: "[sighs contentedly] Ahh...",
+  yawn: "[yawns sleepily] Ahhh...",
+  sneeze: "[sneezes softly] Achoo!",
+  hiccup: "[hiccups] Hic! [hiccups] Hic!",
+  hum_content: "[hums happily] Mmmmm...",
+  surprised_oh: "[gasps softly] Oh!",
+  group_aww: "[says warmly] Awww...",
+  gasp_fear: "[gasps in mild fright] Oh!",
+  determined_grunt: "[grunts with effort] Hff!",
+  relief_exhale: "[exhales in relief] Phew...",
+  whisper: "[whispers softly] Shh...",
+};
+
+async function generateVoiceLine(text, voiceId) {
+  const res = await fetch(`${API}/v1/text-to-speech/${voiceId}?output_format=mp3_44100_192`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      text,
+      model_id: "eleven_v3",
+      voice_settings: { stability: 0.5, similarity_boost: 0.8, use_speaker_boost: true },
+    }),
+  });
+  if (!res.ok) throw new Error(`TTS HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   return Buffer.from(await res.arrayBuffer());
 }
 
@@ -94,7 +150,10 @@ const SOUNDSCAPES = {
   // airy woodwind" model interpretoval s temnějším/tajemným nádechem, i
   // když text zněl klidně. Přepsáno v duchu "magic" nálady výš (třpytivé
   // zvonky, teplá vrstva) + výslovný zákaz strašidelnosti, ne jen "klidné".
-  forest: "Whimsical magical forest ambient music loop, warm sparkling bells and soft airy woodwind, gentle dreamy pad, bright and inviting fairytale wonder, cheerful and cozy — NOT eerie, NOT dark, NOT spooky, NOT tense, major key throughout, no drums, seamless loop, instrumental",
+  // 🧒 2026-08-05: uživatel chtěl více dětský nádech — přidán prvek
+  // hravé/říkankové melodie a pizzicato strun, výslovně "childlike"
+  // + rozšířen zákaz i o "mysterious", ať to nesklouzne zpět k tajemnu.
+  forest: "Playful, childlike magical forest ambient music loop, warm sparkling bells, soft airy woodwind and gentle pizzicato strings, simple bouncy sing-song melody like a children's nursery rhyme, bright and innocent fairytale wonder, cheerful, cozy and lighthearted — NOT eerie, NOT dark, NOT spooky, NOT tense, NOT mysterious, major key throughout, no drums, seamless loop, instrumental",
   night: "Calm nighttime lullaby ambient music loop, soft dreamy pad, slow gentle bells, cozy and soothing, no drums, seamless loop, instrumental",
   adventure: "Adventurous storybook orchestral music loop, light rhythmic pulse, hopeful and energetic, playful brass and strings, seamless loop, instrumental",
   cozy: "Warm cozy fireside music loop, soft acoustic guitar and piano, gentle and comforting, seamless loop, instrumental",
@@ -201,6 +260,7 @@ const SFX = {
   wind_gust: ["a sudden gust of wind whooshing through trees", 2.5, false],
   rain: ["steady gentle rain falling", 3.0, true],
   snow_crunch: ["footsteps crunching in fresh snow, two steps", 1.5, false],
+  ice_crack: ["ice cracking and creaking sharply, cold and crisp, not alarming", 1.5, false],
   // 🏕️ další příroda/prostředí
   campfire_crackle: ["a cozy campfire gently crackling and popping", 3.0, true],
   waterfall: ["a distant waterfall steadily rushing and splashing", 3.5, true],
@@ -208,11 +268,15 @@ const SFX = {
   leaves_crunch: ["footsteps crunching through fallen autumn leaves, a few steps", 1.5, false],
   volcano_rumble: ["a deep distant volcanic rumble, low and adventurous, not scary", 3.0, false],
   desert_wind: ["a dry desert wind gently blowing over sand", 3.0, true],
+  mole_dig: ["a small creature digging and burrowing energetically in soft earth, cheerful scratching", 2.0, false],
+  bubbles_underwater: ["gentle underwater bubbles rising and popping softly, calm and playful", 2.0, false],
   cow: ["a cow mooing once, farm animal", 2.0, false],
   pig: ["a pig oinking twice", 1.5, false],
   chicken: ["a chicken clucking", 1.5, false],
   sheep: ["a sheep bleating once", 1.5, false],
+  goat: ["a goat bleating twice, a higher pitch than a sheep, farm animal", 1.5, false],
   horse: ["a horse neighing", 2.0, false],
+  donkey: ["a donkey braying loudly, cheerful hee-haw", 2.0, false],
   duck: ["a duck quacking twice", 1.5, false],
   dog: ["a friendly dog barking twice", 1.5, false],
   cat: ["a cat meowing once", 1.5, false],
@@ -226,6 +290,8 @@ const SFX = {
   mouse: ["a small mouse squeaking twice, tiny and cute", 1.5, false],
   bird: ["a small bird cheerfully chirping and tweeting", 2.0, false],
   squirrel: ["a squirrel chattering quickly, a soft chittering sound", 1.5, false],
+  wing_flap: ["a bird's wings flapping powerfully as it takes off, a few strong flaps", 1.5, false],
+  dino_roar: ["a friendly, playful dinosaur roar, big and rumbly but not scary", 2.0, false],
   fox: ["a fox making a short soft yip-bark, curious not alarming", 1.5, false],
   wolf: ["a distant gentle wolf howl, mysterious but friendly, not scary", 2.5, false],
   monkey: ["a playful monkey chattering and hooting", 2.0, false],
@@ -233,6 +299,7 @@ const SFX = {
   dolphin: ["a dolphin clicking and whistling happily", 2.0, false],
   cricket: ["crickets gently chirping at night", 3.0, true],
   car_engine: ["a car engine starting and idling briefly", 2.0, false],
+  car_horn: ["a cheerful car horn honking twice", 1.0, false],
   train: ["a steam train chugging and a distant whistle", 3.0, false],
   boat_horn: ["a deep boat horn sounding once", 2.0, false],
   clock_tick: ["a clock ticking steadily, four ticks", 2.0, false],
@@ -245,11 +312,27 @@ const SFX = {
   helicopter: ["a helicopter's rotor blades whirring overhead, friendly not loud", 2.5, false],
   race_car_rev: ["a race car engine revving excitedly before a race", 2.0, false],
   sailboat_flap: ["a sailboat's canvas sail flapping gently in the wind", 2.0, false],
+  // 🤖 sci-fi/rychlost
+  sci_fi_beep: ["a cheerful sci-fi robot or spaceship beeping and blipping, playful electronic tones", 1.5, false],
+  speed_whoosh: ["a fast cartoonish whoosh of something zooming past at high speed", 1.0, false],
+  electric_zap: ["a playful cartoonish electric spark and zap sound, bright not scary", 1.0, false],
   footsteps: ["footsteps walking on a wooden floor, four steps", 1.5, false],
   applause: ["a small group of people clapping and cheering happily", 2.0, false],
   laugh: ["children laughing happily together", 2.0, false],
   splash: ["a small splash of something falling into water", 1.5, false],
   glass_clink: ["two glasses gently clinking together in a toast", 1.0, false],
+  door_knock: ["a cheerful knock on a wooden door, three knocks", 1.5, false],
+  gulp: ["a person swallowing food or drink with a satisfied gulp", 1.0, false],
+  single_clap: ["a single sharp hand clap", 1.0, false],
+  baby_cry: ["a baby softly crying, gentle and brief, not distressing", 2.0, false],
+  baby_laugh: ["a baby giggling happily and joyfully", 2.0, false],
+  // 🐉 fantazie/kouzla
+  witch_cackle: ["a playful witch's cackling laugh, mischievous and theatrical but NOT scary, cartoonish", 2.0, false],
+  dragon_roar: ["a friendly dragon's roar, big and rumbly but NOT scary or aggressive, playful", 2.0, false],
+  giant_footsteps: ["heavy giant footsteps thudding on the ground, two steps, playful not scary", 2.0, false],
+  magic_poof: ["a magical poof transformation sound, a sparkly whoosh with a soft pop, whimsical", 1.5, false],
+  treasure_open: ["a wooden treasure chest creaking open with a magical sparkle, exciting and warm", 2.0, false],
+  book_close: ["a book closing shut with a soft satisfying thud", 1.0, false],
   magic_chime: ["a magical sparkling chime, whimsical and enchanting", 1.5, false],
   triumphant: ["a short triumphant heroic musical sting, victorious", 1.5, false],
   tense_sting: ["a short suspenseful dramatic musical sting, sudden tension", 1.0, false],
@@ -269,21 +352,11 @@ const SFX = {
   firework_burst: ["a single gentle festive firework bursting softly, distant and warm", 2.0, false],
   rope_skip: ["a jump rope softly slapping the ground in rhythm, a few skips", 1.5, false],
   kite_flutter: ["a kite fluttering and flapping gently in the wind", 2.0, false],
-  // 😊 citoslovce/emoční reakce postav — NEmluvené, jen zvuk (viz komentář
-  // v lib/claude.ts o možné umělosti; univerzální model, ne konkrétní hlas)
-  giggle: ["children giggling softly together, happy and playful", 2.0, false],
-  cheer_yay: ["a small group of children cheering happily, 'yay'", 1.5, false],
-  sigh: ["a person letting out a soft contented sigh", 1.5, false],
-  yawn: ["a person yawning softly, sleepy", 1.5, false],
-  sneeze: ["a person sneezing once, a gentle 'achoo'", 1.0, false],
-  hiccup: ["a person hiccupping twice, cute and small", 1.5, false],
-  hum_content: ["a person humming a short happy tune, content", 2.0, false],
-  surprised_oh: ["a person gasping softly in pleasant surprise, 'oh!'", 1.0, false],
-  group_aww: ["a small group softly saying 'aww' together, warm and endeared", 1.5, false],
-  gasp_fear: ["a person gasping in sudden but mild fright, not too scary", 1.0, false],
-  determined_grunt: ["a person letting out a short determined effortful grunt", 1.0, false],
-  relief_exhale: ["a person letting out a long relieved breath, calming down", 1.5, false],
-  whisper: ["a soft hushed whisper, a few quiet words, indistinct", 1.5, false],
+  candle_blow: ["a person blowing out birthday candles with one breath, a soft whoosh of air, cheerful", 1.5, false],
+  coin_collect: ["a cheerful video-game-style coin collect chime, bright bell-like ping", 1.0, false],
+  // 😊 citoslovce/emoční reakce postav PŘESUNUTY NÍŽ na INTERJECTIONS — viz
+  // komentář tam, generují se přes TTS (eleven_v3, audio tagy) v mužské i
+  // ženské verzi, ne přes tuhle Sound Generation cestu.
   // 🎻 nástroje/předměty — obecný "masterprompt" pokrývá jakýkoli konkrétní
   // nástroj/objekt, kterým se v ději právě zahraje/manipuluje (viz lib/claude.ts)
   violin: ["a short cheerful violin melody being played, a simple folk tune", 3.0, false],
@@ -353,6 +426,19 @@ async function main() {
     if (buf) { writeFileSync(path, buf); manifest[`sfx-${key}`] = buf.length; ok++; console.log(`   ✅ ${key} (${buf.length} B)`); }
     else fail++;
     await new Promise(r => setTimeout(r, 300)); // šetrné tempo k API
+  }
+
+  console.log(`🗣️ Citoslovce, mužský+ženský hlas (${Object.keys(INTERJECTIONS).length * 2})`);
+  for (const [key, text] of Object.entries(INTERJECTIONS)) {
+    for (const gender of ["f", "m"]) {
+      const outKey = `sfx-${key}-${gender}`;
+      const path = `${OUT_DIR}/${outKey}.mp3`;
+      if (shouldSkip(path)) { manifest[outKey] = statSync(path).size; console.log(`   ⏭️  ${outKey} (už existuje)`); continue; }
+      const buf = await withRetry(() => generateVoiceLine(text, INTERJECTION_VOICES[gender]), outKey);
+      if (buf) { writeFileSync(path, buf); manifest[outKey] = buf.length; ok++; console.log(`   ✅ ${outKey} (${buf.length} B)`); }
+      else fail++;
+      await new Promise(r => setTimeout(r, 300)); // šetrné tempo k API
+    }
   }
 
   writeFileSync(`${OUT_DIR}/manifest.json`, JSON.stringify(manifest, null, 2));

@@ -1176,7 +1176,7 @@ export default function Home() {
     const key = `${readerEntryIdRef.current || "x"}:${page}`;
     if (sfxFiredRef.current === key) return;
     sfxFiredRef.current = key;
-    ambientRef.current?.playEffect(scenes[page]?.sfx);
+    ambientRef.current?.playEffect(scenes[page]?.sfx, scenes[page]?.sfxVoice);
   }, [page, bookReady, scenes]);
 
 
@@ -1244,11 +1244,25 @@ export default function Home() {
   // dokud storyFullyReady není true, viz allScenesReady výš). Bez tohohle by
   // JEDNA scéna, co se při generování nepovedla, appku uvěznila na
   // "Připravuji pohádku…" navždy (jen 45s únik na Domů).
+  //
+  // 🩺 2026-08-05: tohle řešilo jen nepovedený OBRÁZEK (placeholder) — ale
+  // allScenesReady/storyFullyReady vyžaduje u KAŽDÉ scény i audioUrl, a
+  // fillMissingAudio (server-side dokreslení hlasu po dokončení jobu) po 3
+  // pokusech na scénu prostě VZDÁ, aniž by o tom finalizeServerJob věděl
+  // (viz komentář u fillMissingAudio) — appka pak nahlásí "hotovo", ale
+  // titulka zůstane viset na "Připravuji pohádku…" navždy, protože žádný
+  // další pokus o namluvení už nikdy nepřijde. Efekt teď hlídá i tenhle
+  // případ (obrázek OK, ale audioUrl chybí) a dodělá ho stejným způsobem.
   useEffect(() => {
     if (!titleCardOpen || storyFullyReady || fixingScene !== null) return;
-    const broken = scenes.findIndex(s => s.imageUrl && isPlaceholderImg(s.imageUrl));
-    if (broken < 0) return;
-    const t = setTimeout(() => repairSceneImage(broken), 4000);
+    const brokenImg = scenes.findIndex(s => s.imageUrl && isPlaceholderImg(s.imageUrl));
+    if (brokenImg >= 0) {
+      const t = setTimeout(() => repairSceneImage(brokenImg), 4000);
+      return () => clearTimeout(t);
+    }
+    const brokenAudio = scenes.findIndex(s => s.imageUrl && !isPlaceholderImg(s.imageUrl) && s.narration && !s.audioUrl);
+    if (brokenAudio < 0) return;
+    const t = setTimeout(() => repairSceneAudio(brokenAudio), 4000);
     return () => clearTimeout(t);
   }, [titleCardOpen, storyFullyReady, scenes, fixingScene]);
 
@@ -2518,6 +2532,51 @@ export default function Home() {
     }
   }
 
+  // ── Repair a single scene's missing audio (auto, from the title-card
+  //    watchdog above) — mirrors fillMissingAudio's single-attempt call,
+  //    but keeps retrying (every 4s, via the effect) instead of giving up
+  //    after 3 attempts like fillMissingAudio does. ────────────────────────
+  async function repairSceneAudio(i: number) {
+    const scene = scenes[i];
+    if (!scene || fixingScene !== null) return;
+    setFixingScene(i);
+    try {
+      const res = await fetch("/api/scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(60_000),
+        body: JSON.stringify({
+          scene: { index: scene.index, narration: scene.narration, imagePrompt: scene.imagePrompt || "x" },
+          audioOnly: true,
+          voiceId: selectedVoiceId || undefined,
+          deviceId: deviceId(),
+          language: uiLang,
+        }),
+      });
+      const d = await safeJson<{ audioUrl?: string }>(res);
+      if (res.ok && d.audioUrl) {
+        setScenes(prev => {
+          // Stejná pojistka jako v repairSceneImage výš — mezitím se appka
+          // mohla přepnout jinam a scéna na indexu i už neexistuje.
+          if (!prev[i]) return prev;
+          const n = [...prev];
+          n[i] = { ...n[i], audioUrl: d.audioUrl };
+          const eid = readerEntryIdRef.current;
+          if (eid) {
+            renderedMapRef.current.set(eid, n);
+            cacheStory(eid, n).catch(() => {});
+          }
+          return n;
+        });
+      }
+    } catch {
+      // Tichý neúspěch — efekt výš to za 4s zkusí znovu, dokud fixingScene
+      // není null a titulka pořád čeká.
+    } finally {
+      setFixingScene(null);
+    }
+  }
+
   // ── ✏️ Ruční úprava textu stránky (jako u běžné pohádky — funguje na
   //    vlastní i zkopírované/přijaté pohádce) ─────────────────────────────
   const [editingPage, setEditingPage] = useState<{ page: number; text: string } | null>(null);
@@ -2991,6 +3050,14 @@ export default function Home() {
   // ── Create story (full flow) ──────────────────────────────────────────────
   async function createStory(e: React.FormEvent) {
     e.preventDefault();
+    // 🔐 Přihlášení je POVINNÉ před vytvořením pohádky (appka potřebuje
+    // sledovat aktivitu/kredity účtu) — vynuceno tady, ne jen na Home
+    // screen tlačítku, ať to nejde obejít žádnou jinou cestou k formuláři.
+    if (!account) {
+      setAccountPanelOpen(true);
+      setError(t.loginRequiredForStory);
+      return;
+    }
     const background = bookReady; // run in bg if current story (images) already visible
     setError("");
 

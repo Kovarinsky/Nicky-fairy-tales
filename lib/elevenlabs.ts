@@ -98,7 +98,10 @@ export async function narrateScene(scene: Scene, overrideVoiceId?: string, tunin
   const voiceId = sanitizeApiKey(overrideVoiceId || process.env.ELEVENLABS_VOICE_ID);
   if (!voiceId) throw new Error("Chybi ELEVENLABS_VOICE_ID.");
 
-  const modelId = sanitizeApiKey(process.env.ELEVENLABS_MODEL_ID) || "eleven_multilingual_v2";
+  // 🩺 2026-08-06: eleven_flash_v2_5 potvrzeno A/B testem (uživatel poslechl,
+  // schválil) — stejná čeština, poloviční cena ($0,091 vs $0,182/1000 znaků
+  // v rámci Creator plánu, viz ECONOMY-PLAN.md). Přepnuto z multilingual_v2.
+  const modelId = sanitizeApiKey(process.env.ELEVENLABS_MODEL_ID) || "eleven_flash_v2_5";
 
   // Use native fetch (Node 18+) -- avoids node:https header-char validation quirks
   const res = await fetch(

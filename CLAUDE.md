@@ -13,6 +13,11 @@ nakreslí ilustrace s konzistentním hrdinou (fotky reálných dětí/mazlíčk�
   NEIMPLEMENTOVANÁ zadání (aby se neztratila mezi sezeními/agenty). Jakmile
   se položka odsud implementuje, přesune se jako záznam do `lib/version.ts`
   a tady se smaže.
+- **`ECONOMY-PLAN.md`** — 2026-08-06 zadání „5 stran <3min/7,5Kč, 10 <4min/10Kč,
+  15 6-7min/15Kč, cca 1 Kč/stránka" + „zamčená knihovna postav" architektura.
+  Research + plán, ČEKÁ na schválení směru (hlavně jak agresivně jít do
+  znovupoužívání pozadí/póz místo čerstvé ilustrace na každé stránce — mění
+  to vizuální identitu appky, viz dokument bod 3/6) — NEIMPLEMENTOVÁNO.
 
 ## Produktové principy (DNA)
 
@@ -83,3 +88,83 @@ Co to vyžaduje (žádný z těchto kroků není hotový):
   okamžité přehrání)? Předgenerovaná knihovna = jednorázový generovací
   náklad + úložiště, ale nulové čekání pro uživatele. Rozhodnout před
   implementací.
+
+### 3. Portrét + ověření pro VLASTNÍ (uživatelem zadané) postavy
+Rozhodnuto v session 2026-08-06, po opravě rodinné knihovny (`lib/portraits.ts`,
+viz `lib/version.ts` 4.99.66–4.99.77): stejný mechanismus („namaluj portrét →
+ověř → zamkni → z něj kresli všechny další stránky"), co dnes večer vyřešil
+opakovaný drift u Jana a proporční chyby u Archieho/Váji, se má rozšířit i na
+vlastní postavy zadané rodičem — dnes ho NEMAJÍ vůbec.
+
+**Zjištěný stav (kód, ne dohad):**
+- `CustomChar` (`app/page.tsx`) má jen `name` + volný text `description` + až
+  5 fotek — žádné strukturované pole věk/pohlaví/výška (to je i položka 1 výš).
+- **Žádný malovaný portrét ani zamčení podoby**: `lib/portraits.ts`
+  (`getCharacterPortrait`/`loadPortraitRefs`) pracuje výhradně s pevnou
+  9člennou knihovnou (`loadCharacters()`, `reference/characters.json`).
+  Vlastní postavy jedou paralelní, jednodušší cestou —
+  `customCharacterImages` (`job-runner.ts`) posílá SYROVÉ fotky do KAŽDÉ
+  scény znovu, model je nezávisle reinterpretuje pokaždé — přesně ten bug,
+  co appka dnes večer opravila u Jana ("vypadá zase trochu jinak"), jen u
+  vlastních postav zůstává neopravený.
+- **Žádná verifikace předem**: appka nemá žádný preview/portrét krok před
+  spuštěním scénáře — první ilustrace, kterou rodič uvidí, je rovnou scéna 1
+  SKUTEČNÉ, placené pohádky.
+- **Bonus nález**: 2+ vlastní postavy ve stejné pohádce dostanou fotky
+  smíchané do jedné neroztříděné hromady s obecným labelem
+  `"a custom story character"` (`job-runner.ts`) — model neví, které fotky
+  patří ke komu.
+- `castSize` (gating pro "archy"/sheet economy mód) už dnes VLASTNÍ postavy
+  počítá — 2+ vlastní postavy snadno spustí `castSize >= 4` a appka přeskočí
+  levnější sheet mód, každá scéna jede draze sólo (`job-runner.ts`).
+
+**Navržený mechanismus (odlehčená verze dnešního výškového listu, ne celý
+list s pravítkem — to je overkill pro typicky 1 vlastní hrdinu):**
+1. Při zadání vlastní postavy appka JEDNOU namaluje její portrét (stejný
+   QA+best-of-2 mechanismus jako `getCharacterPortrait`).
+2. Pokud jde do stejné pohádky s rodinnými/dalšími vlastními postavami, přidá
+   malý porovnávací obrázek jen těch postav, co se v TÉTO pohádce potkají
+   (mini verze dnešního výškového listu, na míru obsazení).
+3. Ukázat rodiči jako rychlé "vypadá to takhle dobře?" PŘED spuštěním celého
+   (5–6minutového, placeného) generování pohádky.
+4. Všechny další stránky kreslí z tohoto zamčeného portrétu (ne ze syrové
+   fotky znovu) — čeká se zlepšení konzistence napříč knihou + vedlejší efekt
+   snížení počtu zamítnutí kontrolou (= mírná úspora).
+
+**Cena**: +1 Gemini obrázek + 1 kontrola navíc na začátku každé pohádky
+s vlastní postavou (pár vteřin, pár korun) — třeba zvážit proti cíli
+ECONOMY-PLAN.md (~1 Kč/stránka).
+
+### 4. Oddělit vývojářský (Jan) login od běžných uživatelů
+
+Rozhodnuto v session 2026-08-07: "Nezapomeň že chci rozdělit můj —
+developerský login a loginy všech ostatních uživatelů (ti neuvidí logy /
+statistiky / errory atd.)." NEIMPLEMENTOVÁNO — jen zapsáno, ať se neztratí.
+
+**Zjištěný stav (kód, ne dohad):** appka dnes nemá ŽÁDNÝ koncept role/účtu
+s právy (`lib/accounts.ts` → `AccountRecord` nemá `isAdmin`/`role` pole,
+jen `username`/`credits`/`storiesCompleted`). Tři endpointy dnes ukazují
+citlivá data:
+- **`GET /api/usage`** (skutečná útrata za AI služby) — **ÚPLNĚ BEZ
+  AUTENTIZACE**, kdokoli se znalostí URL vidí reálné náklady appky.
+- **`GET /api/job/debug-log?id=`** (diagnostický log běhu) — **ÚPLNĚ BEZ
+  AUTENTIZACE**, jen chráněno tím, že `id` je UUID (bezpečnost skrze
+  neprůhlednost, ne skutečná kontrola přístupu).
+- **`GET /api/admin/accounts`** a **`GET /api/client-error`** (přehled
+  účtů / chybové reporty) — chráněné, ale sdíleným statickým heslem v env
+  (`ADMIN_PASSWORD` v hlavičce `X-Admin-Password`), NE navázané na Janovo
+  přihlášení — kdokoli se heslem prolomí, ne jen "Jan vs. zbytek rodiny".
+
+**Navržený mechanismus:**
+1. Přidat `isAdmin: boolean` (nebo `role: "admin" | "user"`) do
+   `AccountRecord` — nastavit `true` jen pro Janův účet (ručně/migrací).
+2. `/api/usage` a `/api/job/debug-log` přesunout ze "žádná kontrola" na
+   stejnou session-cookie kontrolu jako `/api/job/start`
+   (`verifySessionToken`), + navíc vyžadovat `acc.isAdmin === true`.
+3. `/api/admin/accounts` a `GET /api/client-error` — buď zachovat
+   `ADMIN_PASSWORD` jako dnes (jednodušší, appka na ně nemá žádné UI, jen
+   ruční/CLI přístup), nebo sjednotit na stejnou `isAdmin` kontrolu jako
+   výš, ať appka drží JEN jeden mechanismus místo dvou paralelních.
+4. V UI appky (pokud/až bude existovat nějaký admin panel — dnes žádný
+   není, jen holé API endpointy) skrýt jakýkoli odkaz na logy/statistiky
+   pro `isAdmin !== true`.

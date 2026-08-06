@@ -28,8 +28,11 @@ export interface AccountRecord {
   storiesCompleted?: number;
 }
 
-/** Nový účet dostává na vyzkoušení tento počet kreditů zdarma. */
-export const SIGNUP_FREE_CREDITS = 2;
+/** Nový účet dostává na vyzkoušení tento počet kreditů zdarma. Pod novým
+ *  cenovým modelem (1 kredit = 1 Kč nákladů + 50% marže, viz lib/pricing.ts)
+ *  typická pohádka stojí řádově 50–70 kreditů — 100 pokryje zhruba 1–2
+ *  pohádky na vyzkoušení. */
+export const SIGNUP_FREE_CREDITS = 100;
 
 /** Přičte (nebo odečte, se záporným `delta`) kredity na účtu; vrací nový
  *  zůstatek, nebo null když účet neexistuje. Nechrání proti souběhu dvou

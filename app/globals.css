@@ -53,7 +53,10 @@ body {
   position: relative;
   width: 100%;
   max-width: 480px;
-  height: 100dvh;
+  /* 🩺 2026-08-05: stejný důvod jako .screen v HomeScreen.module.css — 100svh
+     místo 100dvh, ať se rámeček po reloadu neusazuje z větší odhadnuté výšky
+     na menší skutečnou (viz komentář tam). */
+  height: 100svh;
   margin: 0 auto;
   overflow: hidden;
 }

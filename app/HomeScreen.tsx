@@ -219,7 +219,20 @@ export default function HomeScreen({
       {bgSheetOpen && (
         <>
           <div className={styles.sheetScrim} onClick={() => setBgSheetOpen(false)} />
-          <div className={styles.bgSheet}>
+          <div
+            className={styles.bgSheet}
+            onWheel={(e) => {
+              // 🖱️ 2026-08-05: nahlášeno "mezi světy nejde listovat" — ověřeno
+              // živě (Playwright): scrollbar je schválně skrytý a čistě svislé
+              // kolečko myši (bez trackpadu/dotykové obrazovky) samo o sobě
+              // vodorovný overflow-x:auto nerolovalo, ani click-drag nefungoval
+              // — na PC s obyčejnou myší nebyla ŽÁDNÁ cesta k dlaždicím za
+              // okrajem (dotykem/trackpadem to fungovalo nativně). Svislý
+              // scroll delta se teď přemapuje na vodorovný posun.
+              if (e.deltaY === 0) return;
+              e.currentTarget.scrollLeft += e.deltaY;
+            }}
+          >
             {/* 🏷️ Dřív byl u dlaždice jen kroužek s obrázkem — jméno světa
                 šlo poznat jen z aria-label (screen reader), vizuálně nebylo
                 jasné, co se vlastně vybírá. Teď je pod kroužkem i čitelný
