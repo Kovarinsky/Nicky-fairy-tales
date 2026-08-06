@@ -22,6 +22,11 @@ import type { Character } from "./types";
 // výrazným tygřím pruhům, i když reálná fotka ukazuje skoro jednobarevnou
 // srst jen s náznakem žíhání; popis teď explicitně říká "SOLID... NOT
 // tiger-striped" (viz reference/characters.json)
+// 2026-08-06: Valentýnka (hnědé→hnědo-zelené oči) a Eva (hnědé→hnědo-blond
+// vlasy) — uživatelovo přání ("zamknout tyto podoby, s jemnou změnou…").
+// Záměrně NEBUMPnuto (stejný precedent jako Archie výš) — jen tyhle dvě
+// postavy se překreslí cíleně přes ?redraw=valentyna / ?redraw=eva, ne
+// celá devítičlenná knihovna.
 const PORTRAIT_VERSION = 4;
 const memCache = new Map<string, ReferenceImage>();
 
@@ -196,7 +201,13 @@ export async function loadPortraitRefs(characters: Character[]): Promise<Referen
 // uživatel po zhlédnutí hotového obrázku: "ještě Vája trochu větší,
 // Nicolaskovi po ramena a jsme tam. Ostatní neměnit" — číslo tu jde nahoru
 // jen kvůli vykreslení, ne jako revize její skutečné výšky (viz claude.ts).
-const FAMILY_SCALE_VERSION = 5;
+// v6 (2026-08-06, 3): reference se přepnuly ze syrových FOTEK na NATRVALO
+// ULOŽENÉ malované portréty (loadPortraitRefs místo loadReferenceImages) —
+// uživatel nahlásil, že táta Jan "vypadá zase trochu jinak" i beze změny
+// promptu (appka fotku při každém nezávislém kreslení reinterpretuje znovu).
+// Zároveň drobná úprava popisu: Valentýnka hnědé→hnědo-zelené (hazel) oči,
+// Eva hnědé→hnědo-blond vlasy (uživatelovo přání "zamknout tyto podoby").
+const FAMILY_SCALE_VERSION = 6;
 // Duplikát CANONICAL_HEIGHT_CM z claude.ts (import by vytáhl celý claude.ts
 // do knihovny portrétů) — mění se JEN spolu s tamní tabulkou, viz komentář tam.
 // archie: 40cm — reálná výška při běžném postoji (upřesnil uživatel
@@ -306,7 +317,17 @@ export async function getFamilyScaleSheet(force = false): Promise<ReferenceImage
       `Exactly ${peopleCount} people plus ${cast.length - peopleCount} dog in the WHOLE image (both rows combined) — nobody else, no invented siblings or friends, no one repeated.`,
       REFERENCE_SHEET_STYLE,
     ].filter(Boolean).join(" ");
-    const photoRefs = loadReferenceImages(cast);
+    // 🩺 2026-08-06: dřív loadReferenceImages(cast) — syrové FOTKY. Appka
+    // ale KAŽDÉ nezávislé malování reinterpretuje fotku znovu od nuly, takže
+    // i beze změny promptu vyšel třeba Jan pokaždé trochu jinak (nahlášeno:
+    // "táta Jan vypadá zase trochu jinak"). Model má už namalovaný, natrvalo
+    // uložený portrét KAŽDÉ postavy (getCharacterPortrait) — ten samý obrázek
+    // appka posílá i do každé scény pohádky (loadPortraitRefs), takže je to
+    // SKUTEČNÁ zamčená podoba. Výškový list/kotva teď kreslí ze stejného
+    // zdroje místo fotek (chybějící portrét = tichý fallback na fotku, jako
+    // v loadPortraitRefs) — příští překreslení by se mělo shodovat s tím,
+    // jak postava vypadá ve skutečné pohádce.
+    const photoRefs = await loadPortraitRefs(cast);
     const combinedDesc = cast.map(c => c.description).join(" | ");
     const sceneDesc = `A height reference sheet in TWO ROWS with EXACTLY these people and dog present ONCE EACH, nobody else, nobody repeated across rows: ${cast.map(c => c.name).join(", ")}. Every one of these names IS in the picture exactly once; do not flag any of them as "missing" or "extra". COUNT the people and the dog separately: ${peopleCount} people + ${cast.length - peopleCount} dog, no more, no fewer, and no one appearing in both rows.`;
     const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
@@ -388,7 +409,15 @@ export async function familyScaleSheetUrl(): Promise<string | null> {
 // trochu větší, Nicolaskovi po ramena a jsme tam. Ostatní neměnit" — jen
 // výška Valentýnky se posouvá (viz FAMILY_HEIGHT_CM výš), nic dalšího v
 // promptu (rodinné seskupení, prostředí, styl) se v tomhle kroku nemění.
-const GROUP_ANCHOR_VERSION = 4;
+// v5 (2026-08-06, 3): reference se přepnuly ze syrových FOTEK na NATRVALO
+// ULOŽENÉ malované portréty (loadPortraitRefs) — uživatel nahlásil "táta Jan
+// vypadá zase trochu jinak" i beze změny promptu (appka fotku při každém
+// nezávislém kreslení reinterpretuje znovu, na rozdíl od jednou namalovaného
+// a natrvalo cachovaného portrétu, co appka i tak posílá do KAŽDÉ scény
+// pohádky — kotva teď kreslí ze stejného zdroje = "zamčená" podoba).
+// Zároveň drobná úprava popisu: Valentýnka hnědé→hnědo-zelené (hazel) oči,
+// Eva hnědé→hnědo-blond vlasy.
+const GROUP_ANCHOR_VERSION = 5;
 
 function groupAnchorLabel(): string {
   return (
@@ -519,11 +548,16 @@ function groupAnchorPrompt(cast: Character[], setting: string): string {
 }
 
 /** Namaluje + ověří (s jedním opravným pokusem) jeden kandidát skupinové
- *  kotvy pro dané `setting`. Vrací null když appčina QA obrázek dvakrát
- *  zamítne — RADĚJI ŽÁDNÝ kandidát než neověřený. */
+ *  kotvy pro dané `setting`. Drží NEJLÉPE ověřený ze dvou pokusů a ten vrátí
+ *  (viz komentář u "best" níž) — nikdy nezahazuje jen kvůli QA nesouhlasu. */
 async function drawGroupAnchorCandidate(cast: Character[], setting: string): Promise<ImageResult | null> {
   const prompt = groupAnchorPrompt(cast, setting);
-  const photoRefs = loadReferenceImages(cast);
+  // 🩺 2026-08-06: dřív loadReferenceImages(cast) — syrové FOTKY, které appka
+  // při KAŽDÉM nezávislém malování reinterpretuje znovu od nuly (proto
+  // "táta Jan vypadá zase trochu jinak" i beze změny promptu). Kreslí se
+  // teď ze stejného zdroje jako skutečné scény pohádky (loadPortraitRefs —
+  // natrvalo uložený malovaný portrét, chybějící = tichý fallback na fotku).
+  const photoRefs = await loadPortraitRefs(cast);
   const combinedDesc = cast.map(c => c.description).join(" | ");
   const pets = petIds();
   const peopleCount = cast.filter(c => !pets.has(c.id)).length;
