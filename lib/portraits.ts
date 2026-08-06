@@ -27,6 +27,11 @@ import type { Character } from "./types";
 // Záměrně NEBUMPnuto (stejný precedent jako Archie výš) — jen tyhle dvě
 // postavy se překreslí cíleně přes ?redraw=valentyna / ?redraw=eva, ne
 // celá devítičlenná knihovna.
+// 2026-08-06 (5): Archieho popis dál rozšířen — bílý flek na ČELE (dřív jen
+// čenich) + hrudní skvrna má SRDÍČKOVÝ tvar (uživatel: "nemá bílé fleky na
+// čele a typické bílé srdíčko") + explicitní "small-to-medium, NOT large"
+// (uživatel: "stále je gigantický"). Zase záměrně NEBUMPnuto, cílený
+// ?redraw=archie.
 const PORTRAIT_VERSION = 4;
 const memCache = new Map<string, ReferenceImage>();
 
@@ -209,7 +214,15 @@ export async function loadPortraitRefs(characters: Character[]): Promise<Referen
 // Eva hnědé→hnědo-blond vlasy (uživatelovo přání "zamknout tyto podoby").
 // v7 (2026-08-06, 4): Archieho relační věta upřesněna na skutečná data
 // ("do pasu Váji, lehce nad kolena Nicoláska", ne appčin odhad "koleno-bok").
-const FAMILY_SCALE_VERSION = 7;
+// v8 (2026-08-06, 5): nahlášeno přímo na v7 obrázku — Archie "stále je
+// gigantický" (textová relace z v7 zjevně nestačila) + appka mu chyběl
+// bílý flek na čele a srdíčkový tvar hrudní skvrny; James navíc vyšel
+// neúměrně velký vedle Belly/dospělých. Popis Archieho (characters.json)
+// rozšířen o čelní skvrnu + srdíčko + "small-to-medium, NOT large"
+// instrukci, relační věta zesílena (explicitní varování před obvyklou
+// chybou "psi se kreslí větší kvůli roztomilosti"), James dostal
+// samostatnou větu vůči dospělým (dřív byl vztah jen jednosměrný).
+const FAMILY_SCALE_VERSION = 8;
 // Duplikát CANONICAL_HEIGHT_CM z claude.ts (import by vytáhl celý claude.ts
 // do knihovny portrétů) — mění se JEN spolu s tamní tabulkou, viz komentář tam.
 // archie: 40cm — reálná výška při běžném postoji (upřesnil uživatel
@@ -425,7 +438,11 @@ export async function familyScaleSheetUrl(): Promise<string | null> {
 // Posílena instrukce (explicitní "spočítej hlavy naposledy" + QA cíleně
 // hlídá mezeru mezi shluky) + Archieho relační věta upřesněna na "do pasu
 // Váji, lehce nad kolena Nicoláska" (uživatelova reálná data).
-const GROUP_ANCHOR_VERSION = 6;
+// v7 (2026-08-06, 5): stejná dávka oprav jako FAMILY_SCALE_VERSION v8 výš —
+// Archie "stále je gigantický" i po v6, chyběl mu bílý flek na čele a
+// srdíčkový tvar hrudní skvrny (characters.json rozšířeno), James vyšel
+// neúměrně velký vedle Belly/dospělých (nová samostatná relační věta).
+const GROUP_ANCHOR_VERSION = 7;
 
 function groupAnchorLabel(): string {
   return (
@@ -486,17 +503,30 @@ function heightsRelationalEntry(cast: Character[]): string {
     const anchors = ["james", "nicolas"].filter(id => ids.has(id)).map(name);
     if (anchors.length) bits.push(`${name("bella")} is about half a head taller than ${anchors.join(" and ")}`);
   }
+  // 🩺 2026-08-06 (5): nahlášeno přímo na výškovém listu — "James se
+  // neúměrně zvětšil" (v řádku 2 vedle Belly/dospělých vyšel nepřiměřeně
+  // velký). Dřívější věta ("Bella je o půl hlavy vyšší") byla jen jedním
+  // směrem (Bella vůči Jamesovi) — přidána i explicitní věta OPAČNĚ
+  // (James vůči dospělým), ať appka dostane oba směry, ne jen jeden.
+  if (ids.has("james") && (ids.has("eva") || ids.has("jakob"))) {
+    const adultAnchors = ["eva", "jakob"].filter(id => ids.has(id)).map(name);
+    bits.push(`${name("james")} is a school-age CHILD, clearly much shorter than ${adultAnchors.join(" and ")} — his head reaches only to about their chest/upper ribs, nowhere near their shoulders`);
+  }
   const anyAdult = ["jan", "jana", "eva", "jakob"].some(id => ids.has(id));
   const anyChild = ["nicolas", "valentyna", "james", "bella"].some(id => ids.has(id));
   if (anyAdult && anyChild) bits.push("all the adults are much taller than the children");
   // 🩺 2026-08-06 (4): upřesnil uživatel přímo — "do pasu Váji a lehce nad
   // kolena Nicoláska" (ne "koleno až bok", to bylo appčino vlastní odhadnuté
   // přirovnání, ne reálný údaj).
+  // 🩺 2026-08-06 (5): nahlášeno "stále je gigantický" i po předchozí opravě
+  // — textová relace sama nestačila. Zesíleno na explicitní kontrast +
+  // varování před obvyklou chybou (ilustrace psy běžně kreslí většího kvůli
+  // "roztomilosti") a instrukci radši ho podkreslit, než překreslit.
   if (ids.has("archie") && ids.has("valentyna")) {
-    bits.push(`${name("archie")} stands about as tall as ${name("valentyna")}'s WAIST when on all fours — a stocky medium dog, clearly smaller than any of the children standing upright`);
+    bits.push(`${name("archie")} is SMALL — standing on all fours his shoulder reaches only to ${name("valentyna")}'s WAIST, not her chest, not her shoulders. He must look noticeably smaller than every child in the picture; this is the single most commonly drawn-too-big detail in this whole image, so err on the side of drawing him SMALLER than feels natural`);
   }
   if (ids.has("archie") && ids.has("nicolas")) {
-    bits.push(`${name("archie")} stands just slightly ABOVE ${name("nicolas")}'s KNEE when on all fours`);
+    bits.push(`${name("archie")}'s shoulder reaches only just ABOVE ${name("nicolas")}'s KNEE, nowhere near his thigh or hip`);
   }
   return bits.length ? bits.join("; ") + "." : "";
 }

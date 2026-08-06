@@ -1343,6 +1343,13 @@ export function canonicalHeightsEntry(characters: Character[]): string | null {
     const anchors = ["james", "nicolas"].filter(id => ids.has(id)).map(name);
     if (anchors.length) bits.push(`${name("bella")} is about half a head taller than ${anchors.join(" and ")}`);
   }
+  // 🩺 2026-08-06 (5): nahlášeno na výškovém listu (lib/portraits.ts, zrcadlí
+  // se sem) — "James se neúměrně zvětšil" vedle dospělých. Dřívější vztah šel
+  // jen jedním směrem (Bella vůči Jamesovi); přidán i opačný směr.
+  if (ids.has("james") && (ids.has("eva") || ids.has("jakob"))) {
+    const adultAnchors = ["eva", "jakob"].filter(id => ids.has(id)).map(name);
+    bits.push(`${name("james")} is a school-age CHILD, clearly much shorter than ${adultAnchors.join(" and ")} — his head reaches only to about their chest/upper ribs, nowhere near their shoulders`);
+  }
 
   // Dospělí: přesné cm
   for (const id of ["jan", "jana", "eva", "jakob"] as const) {
