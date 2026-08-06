@@ -207,7 +207,9 @@ export async function loadPortraitRefs(characters: Character[]): Promise<Referen
 // promptu (appka fotku při každém nezávislém kreslení reinterpretuje znovu).
 // Zároveň drobná úprava popisu: Valentýnka hnědé→hnědo-zelené (hazel) oči,
 // Eva hnědé→hnědo-blond vlasy (uživatelovo přání "zamknout tyto podoby").
-const FAMILY_SCALE_VERSION = 6;
+// v7 (2026-08-06, 4): Archieho relační věta upřesněna na skutečná data
+// ("do pasu Váji, lehce nad kolena Nicoláska", ne appčin odhad "koleno-bok").
+const FAMILY_SCALE_VERSION = 7;
 // Duplikát CANONICAL_HEIGHT_CM z claude.ts (import by vytáhl celý claude.ts
 // do knihovny portrétů) — mění se JEN spolu s tamní tabulkou, viz komentář tam.
 // archie: 40cm — reálná výška při běžném postoji (upřesnil uživatel
@@ -417,7 +419,13 @@ export async function familyScaleSheetUrl(): Promise<string | null> {
 // pohádky — kotva teď kreslí ze stejného zdroje = "zamčená" podoba).
 // Zároveň drobná úprava popisu: Valentýnka hnědé→hnědo-zelené (hazel) oči,
 // Eva hnědé→hnědo-blond vlasy.
-const GROUP_ANCHOR_VERSION = 5;
+// v6 (2026-08-06, 4): uživatel nahlásil vymyšlenou dívku navíc (hnědé vlasy,
+// žluté šaty) stojící v mezeře mezi oběma rodinami na v5 obrázku — appčina
+// kontrola ji přehlédla DVAKRÁT v řadě (viz komentář u sceneDesc níž).
+// Posílena instrukce (explicitní "spočítej hlavy naposledy" + QA cíleně
+// hlídá mezeru mezi shluky) + Archieho relační věta upřesněna na "do pasu
+// Váji, lehce nad kolena Nicoláska" (uživatelova reálná data).
+const GROUP_ANCHOR_VERSION = 6;
 
 function groupAnchorLabel(): string {
   return (
@@ -481,8 +489,14 @@ function heightsRelationalEntry(cast: Character[]): string {
   const anyAdult = ["jan", "jana", "eva", "jakob"].some(id => ids.has(id));
   const anyChild = ["nicolas", "valentyna", "james", "bella"].some(id => ids.has(id));
   if (anyAdult && anyChild) bits.push("all the adults are much taller than the children");
+  // 🩺 2026-08-06 (4): upřesnil uživatel přímo — "do pasu Váji a lehce nad
+  // kolena Nicoláska" (ne "koleno až bok", to bylo appčino vlastní odhadnuté
+  // přirovnání, ne reálný údaj).
   if (ids.has("archie") && ids.has("valentyna")) {
-    bits.push(`${name("archie")} stands roughly as tall as ${name("valentyna")}'s knee to hip when on all fours — a stocky medium dog, clearly smaller than any of the children standing upright`);
+    bits.push(`${name("archie")} stands about as tall as ${name("valentyna")}'s WAIST when on all fours — a stocky medium dog, clearly smaller than any of the children standing upright`);
+  }
+  if (ids.has("archie") && ids.has("nicolas")) {
+    bits.push(`${name("archie")} stands just slightly ABOVE ${name("nicolas")}'s KNEE when on all fours`);
   }
   return bits.length ? bits.join("; ") + "." : "";
 }
@@ -543,6 +557,14 @@ function groupAnchorPrompt(cast: Character[], setting: string): string {
     // vyjmenovaného seznamu appka jen řekla "přesně N lidí", bez toho, ať si
     // model VÝSLOVNĚ spočítá, koho vlastně kreslí.
     `The cast is EXACTLY these ${cast.length} individuals (${peopleCount} people + ${cast.length - peopleCount} dog) and NO ONE else — count them as you draw: ${numbered}. Do NOT invent, add, or duplicate any additional sibling, friend, cousin, pet, or background child/adult — if you are tempted to add anyone not on this numbered list, leave that space empty instead. Each of the ${peopleCount} people above must be a CLEARLY DIFFERENT, DISTINCT individual — no two people (especially the children) may share the same face, hairstyle silhouette, or look like copies of one another; their described hair color, hairstyle and outfit are what tells them apart, follow those exactly per name.`,
+    // 🩺 2026-08-06 (4): stejná chyba se vrátila v jiné podobě — appčina
+    // vlastní kontrola dvakrát v řadě přehlédla neohlášenou DÍVKU NAVÍC
+    // (hnědé vlasy, žluté šaty) stojící v mezeře mezi oběma rodinami; ani
+    // jeden ze 2 pokusů to nenahlásil jako nález, i když jiné (falešné)
+    // nálezy hlásily hojně (nahlášeno uživatelem přímo na hotovém obrázku).
+    // Explicitní "spočítej hlavy naposledy" instrukce navíc, cílená přesně
+    // na mezeru mezi shluky, kde k tomu došlo.
+    `BEFORE YOU FINISH, do one final headcount check: count every human head in the image, left to right. The total must be EXACTLY ${peopleCount} — not ${peopleCount + 1}, not ${peopleCount - 1}. Pay special attention to the empty space BETWEEN the two family clusters — that gap must stay EMPTY, nobody (no extra child, no extra adult, in any outfit or hair color) may stand there or anywhere else outside the ${numbered} you were given.`,
     STYLE_SUFFIX,
   ].filter(Boolean).join(" ");
 }
@@ -565,7 +587,13 @@ async function drawGroupAnchorCandidate(cast: Character[], setting: string): Pro
   // 🩺 sceneDesc jde do appčiny vizuální kontroly (verifySceneImage) — bez
   // výslovného počtu appka nepoznala, že model přidal 9. postavu navíc
   // (viz komentář u groupAnchorPrompt), obrázek prošel bez povšimnutí.
-  const sceneDesc = `A family-portrait style illustration with EXACTLY ${peopleCount} people${dogCount ? ` and ${dogCount} dog` : ""} — ${cast.map(c => c.name).join(", ")} — together, ${setting}. COUNT the people (and the dog, separately) in the image: if the people-count or dog-count is off, or if any two people (especially children) look like duplicates of each other, that is a MAJOR violation.`;
+  // 🩺 2026-08-06 (4): tahle kontrola vymyšlené dítě přehlédla DVAKRÁT v řadě
+  // (appka pak "nejlepší ze 2 pokusů" i tak uložila, protože jiné, SKUTEČNÉ
+  // nálezy v obou pokusech ukázaly méně chyb jinde) — nahlášeno uživatelem
+  // přímo na hotovém obrázku ("přibyla holčička ve žlutých šatech... to je
+  // kdo?"). Posíleno na explicitní instrukci počítat hlavy JEDNU PO DRUHÉ a
+  // jmenovitě volá pozornost na mezeru mezi oběma rodinnými shluky.
+  const sceneDesc = `A family-portrait style illustration with EXACTLY ${peopleCount} people${dogCount ? ` and ${dogCount} dog` : ""} — ${cast.map(c => c.name).join(", ")} — together, ${setting}. COUNT the people (and the dog, separately) in the image ONE HEAD AT A TIME, left to right, and match each to a name on this list: ${cast.map(c => c.name).join(", ")}. If the people-count or dog-count is off, or if any two people (especially children) look like duplicates of each other, or if there is ANY person standing in the image — including in the gap between the two family clusters — who does not match one of these names, that is a MAJOR violation on rule 1, even if every named person is also correctly present.`;
   const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
   let img = await generateBackgroundImage(prompt, photoRefs, "16:9");
   let v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
