@@ -15,6 +15,10 @@
 // se vedlejším efektem znovu nepokusí dokreslit chybějící sólo portréty).
 // GET /api/portraits?scale=1 — zajistí i celorodinný výškový list
 // (getFamilyScaleSheet) a vrátí jeho URL; ?scale=redraw ho namaluje znovu.
+// GET /api/portraits?goodnight=id1,id2 — zajistí (nebo namaluje) závěrečný
+// "dobrou noc" obrázek titulky NA MÍRU danému obsazení (getGoodnightScene) —
+// appka volá živě z čtečky s ID postav TÉTO konkrétní pohádky. &force=1
+// přeskočí cache a namaluje znovu.
 
 import { NextRequest, NextResponse } from "next/server";
 import { loadCharacters } from "@/lib/characters";
@@ -23,6 +27,7 @@ import {
   getFamilyGroupAnchor, familyGroupAnchorUrl,
   generateFamilyGroupAnchorCandidates, promoteFamilyGroupAnchorCandidate,
   getFamilyScaleSheet, familyScaleSheetUrl,
+  getGoodnightScene, goodnightSceneUrl,
 } from "@/lib/portraits";
 
 export const runtime = "nodejs";
@@ -32,6 +37,17 @@ export async function GET(req: NextRequest) {
   const redraw = req.nextUrl.searchParams.get("redraw") || "";
   const anchorParam = req.nextUrl.searchParams.get("anchor") || "";
   const scaleParam = req.nextUrl.searchParams.get("scale") || "";
+  const goodnightParam = req.nextUrl.searchParams.get("goodnight") || "";
+
+  if (goodnightParam) {
+    const ids = goodnightParam.split(",").map(s => s.trim()).filter(Boolean);
+    const force = req.nextUrl.searchParams.get("force") === "1";
+    const existingUrl = force ? null : await goodnightSceneUrl(ids);
+    const goodnight = existingUrl
+      ? { url: existingUrl, drawn: false }
+      : await getGoodnightScene(ids, force).then(async r => ({ url: r ? await goodnightSceneUrl(ids) : null, drawn: !!r }));
+    return NextResponse.json({ goodnight }, { headers: { "Cache-Control": "no-store" } });
+  }
 
   if (scaleParam) {
     // 🩺 2026-08-06: getFamilyScaleSheet() dřív neuměla přijmout force vůbec

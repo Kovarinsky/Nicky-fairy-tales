@@ -395,6 +395,11 @@ export default function Home() {
   const [showCredits, setShowCredits] = useState(false);
   const goodnightCacheRef = useRef<{ key: string; url: string } | null>(null);
   const goodnightAudioRef = useRef<HTMLAudioElement | null>(null);
+  // 🌙 Závěrečný obrázek titulky NA MÍRU obsazení TÉTO pohádky (lib/portraits.ts
+  // getGoodnightScene) místo natvrdo uloženého /bg-credits.png — viz useEffect
+  // na showCredits níž. null, dokud se nedotáhne (appka zatím ukazuje statický
+  // fallback obrázek).
+  const [goodnightImgUrl, setGoodnightImgUrl] = useState<string | null>(null);
   const [regenAudio, setRegenAudio] = useState(false);
   const [ctrlsOpen, setCtrlsOpen] = useState(false);
   const [forcedLs, setForcedLs] = useState(false);
@@ -1454,6 +1459,31 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showCredits]);
 
+  // 🌙 Závěrečný obrázek titulky NA MÍRU obsazení TÉTO pohádky (místo natvrdo
+  // uloženého /bg-credits.png) — appka zjistí, kdo v pohádce OPRAVDU
+  // vystupuje (storyCharIds), a přes lib/portraits.ts getGoodnightScene
+  // zajistí/namaluje obrázek přesně pro tuhle množinu (cachovaný napříč
+  // budoucími pohádkami se stejným obsazením). Dokud se nedotáhne (nebo
+  // appka nemá ani jednu vestavěnou postavu — jen vlastní), zůstává null a
+  // appka ukazuje statický fallback (viz onError u <img> níž).
+  useEffect(() => {
+    if (!showCredits) { setGoodnightImgUrl(null); return; }
+    const ids = storyCharIds();
+    if (!ids.length) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/portraits?goodnight=${ids.join(",")}`, {
+          signal: AbortSignal.timeout(60_000),
+        });
+        const data = await safeJson<{ goodnight?: { url?: string | null } }>(res);
+        if (!cancelled && res.ok && data.goodnight?.url) setGoodnightImgUrl(data.goodnight.url);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCredits]);
+
   // Clear inline nav positioning when leaving the reader (form layout uses CSS flow)
   useEffect(() => {
     if (viewMode === "reader") return;
@@ -1925,6 +1955,24 @@ export default function Home() {
       ...chars.filter(c => ids.includes(c.id)).map(c => (uiLang === "en" && c.nameEn ? c.nameEn : c.name)),
       ...customChars.filter(c => selectedCustomIds.includes(c.id)).map(c => c.name),
     ];
+  }
+  // 🌙 Stejná logika jako storyCharNames výš, ale ID JEN vestavěných postav
+  // (pro getGoodnightScene, lib/portraits.ts — vlastní postavy nemají
+  // zamčený portrét, viz CLAUDE.md bod 3, appka je do závěrečného obrázku
+  // proto nezahrnuje).
+  function storyCharIds(): string[] {
+    const ids = readerCharIdsRef.current?.length ? readerCharIdsRef.current : selectedIds;
+    const text = scenes.map(s => s.narration || "").join(" ").toLowerCase();
+    const appears = (...names: Array<string | undefined>) => {
+      if (!text) return true;
+      return names.some(n => {
+        if (!n) return false;
+        const stem = n.trim().toLowerCase().slice(0, Math.max(3, n.trim().length - 2));
+        return stem.length >= 3 && text.includes(stem);
+      });
+    };
+    const named = chars.filter(c => ids.includes(c.id) && appears(c.name, c.nameEn)).map(c => c.id);
+    return named.length > 0 ? named : chars.filter(c => ids.includes(c.id)).map(c => c.id);
   }
   // Jazyk dobré noci = jazyk vypravěče s pevným jazykem, jinak jazyk prostředí
   function goodnightLang(): string {
@@ -5994,7 +6042,7 @@ export default function Home() {
       {showCredits && (
         <div className="credits-overlay" onClick={() => setShowCredits(false)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/bg-credits.png" alt="" aria-hidden="true" className="credits-bg-img"
+          <img src={goodnightImgUrl || "/bg-credits.png"} alt="" aria-hidden="true" className="credits-bg-img"
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
           <div className="credits-scroll">
             <div className="credits-content">

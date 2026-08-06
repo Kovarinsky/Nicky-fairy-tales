@@ -12,7 +12,7 @@
 import { put, head } from "@vercel/blob";
 import { blobToken } from "./blob-token";
 import { generateBackgroundImage, verifySceneImage, STYLE_SUFFIX, type ImageResult } from "./gemini";
-import { loadReferenceImages, loadCharacters, type ReferenceImage } from "./characters";
+import { loadReferenceImages, loadCharacters, charactersByIds, type ReferenceImage } from "./characters";
 import type { Character } from "./types";
 
 // v3: portréty procházejí KONTROLOU (dřív jediná cesta bez QA — vadný portrét
@@ -868,6 +868,115 @@ export async function familyGroupAnchorUrl(): Promise<string | null> {
   if (!token) return null;
   try {
     const h = await head(`portraits/family-anchor-v${GROUP_ANCHOR_VERSION}.img`, { token });
+    return h.url;
+  } catch {
+    return null;
+  }
+}
+
+// ── 🌙 Závěrečný obrázek titulky ("dobrou noc") — NA MÍRU obsazení TÉTO
+// pohádky ─────────────────────────────────────────────────────────────────
+// Uživatel: "NA konci chci melodii vice milou detskou, a jiný obrázek - S
+// N + V (hlavnimi postavami co si uzivatel vybere)." Appka dřív ukazovala
+// VŽDY stejný natvrdo uložený obrázek (public/bg-credits.png — Nicolásek +
+// Valentýnka v posteli), bez ohledu na to, kdo v KONKRÉTNÍ pohádce vlastně
+// vystupoval. Tahle funkce je obdoba skupinové kotvy (getFamilyGroupAnchor),
+// jen pro LIBOVOLNOU podmnožinu vestavěných postav — appka cache podle
+// setříděné množiny ID, takže běžné obsazení (typicky Nicolásek+Valentýnka)
+// se namaluje jednou a pak už jen znovupoužije napříč VŠEMI budoucími
+// pohádkami se stejným obsazením; vzácnější kombinace se zaplatí jen jednou
+// při prvním výskytu. Vlastní (uživatelem zadané) postavy appka do tohohle
+// obrázku NEKRESLÍ (nemají zamčený portrét, viz CLAUDE.md bod 3) — když
+// zbydou 0 vestavěných postav, appka spadne zpět na statický obrázek.
+const GOODNIGHT_SCENE_VERSION = 1;
+
+function goodnightSceneCacheKey(ids: string[]): string {
+  return [...ids].sort().join("-");
+}
+
+function goodnightScenePrompt(cast: Character[]): string {
+  const pets = petIds();
+  const kids = cast.filter(c => !pets.has(c.id));
+  return [
+    `A single cozy storybook illustration of ${cast.map(c => c.name).join(" and ")} all cuddled up together, fast asleep in one big comfy bed at night — soft moonlight streaming through a bedroom window, a warm little nightlight glowing, plush toys on a shelf, a patchwork quilt with little stars and moons.`,
+    `Exact appearances (copy faithfully): ${cast.map(c => c.description).join(" | ")}.`,
+    kids.length > 1
+      ? `Everyone peacefully asleep, eyes closed, gentle sleepy smiles, snuggled close together under the same quilt.`
+      : `Peacefully asleep, eyes closed, a gentle sleepy smile, snuggled under the quilt.`,
+    pets.size && cast.some(c => pets.has(c.id)) ? `The dog is curled up asleep at the foot of the bed, not under the quilt.` : "",
+    `The cast is EXACTLY these ${cast.length}: ${cast.map(c => c.name).join(", ")} — no one else, do not invent or add any extra person, sibling, friend or pet.`,
+    `Portrait orientation, warm dim nighttime lighting, deep blues and soft gold — a tender, sweet goodnight scene, not scary or dark in mood.`,
+    STYLE_SUFFIX,
+  ].filter(Boolean).join(" ");
+}
+
+/** Namaluje/vrátí (z cache) závěrečný "dobrou noc" obrázek přesně pro
+ *  obsazení `ids` (vestavěné postavy, setříděno = cache klíč). `force=true`
+ *  přeskočí cache a namaluje znovu. Vrací null, když appka nemá ani jednu
+ *  platnou vestavěnou postavu (appka pak spadne zpět na statický obrázek). */
+export async function getGoodnightScene(ids: string[], force = false): Promise<ReferenceImage | null> {
+  const cast = charactersByIds(ids);
+  if (cast.length === 0) return null;
+  const cacheKeySuffix = goodnightSceneCacheKey(cast.map(c => c.id));
+  const key = `goodnight-v${GOODNIGHT_SCENE_VERSION}-${cacheKeySuffix}`;
+  const cached = !force && memCache.get(key);
+  if (cached) return cached;
+  const token = blobToken();
+  if (!token) return null;
+  const pathName = `portraits/${key}.img`;
+
+  if (!force) try {
+    const h = await head(pathName, { token });
+    const r = await fetch(h.url, { cache: "force-cache" });
+    if (r.ok) {
+      const buf = Buffer.from(await r.arrayBuffer());
+      const ref: ReferenceImage = { data: buf.toString("base64"), mimeType: h.contentType || "image/webp" };
+      memCache.set(key, ref);
+      return ref;
+    }
+  } catch {}
+
+  try {
+    console.log(`[portraits] drawing GOODNIGHT scene (${cast.map(c => c.id).join("+")})…`);
+    const photoRefs = await loadPortraitRefs(cast);
+    const prompt = goodnightScenePrompt(cast);
+    const combinedDesc = cast.map(c => c.description).join(" | ");
+    const sceneDesc = `A goodnight bedtime illustration with EXACTLY these ${cast.length} asleep in bed: ${cast.map(c => c.name).join(", ")}. No one else present.`;
+    const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
+    let img = await generateBackgroundImage(prompt, photoRefs, "9:16");
+    let v = await verifySceneImage(apiKey, img, combinedDesc, sceneDesc, photoRefs);
+    let best = { img, badRules: v && !v.ok ? v.badRules : 0, problems: v?.problems || "" };
+    if (v && !v.ok) {
+      const img2 = await generateBackgroundImage(
+        `${prompt} ⚠ CORRECTION: the previous attempt violated: ${v.problems.slice(0, 300)}. Follow every description EXACTLY.`,
+        photoRefs, "9:16"
+      );
+      const v2 = await verifySceneImage(apiKey, img2, combinedDesc, sceneDesc, photoRefs);
+      if (v2 && (v2.ok || v2.badRules < best.badRules)) best = { img: img2, badRules: v2.ok ? 0 : v2.badRules, problems: v2.problems };
+    }
+    await put(pathName, best.img.buffer, {
+      access: "public", contentType: best.img.mimeType, token,
+      addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 31536000,
+    });
+    const ref: ReferenceImage = { data: best.img.buffer.toString("base64"), mimeType: best.img.mimeType };
+    memCache.set(key, ref);
+    return ref;
+  } catch (e) {
+    console.warn(`[portraits] goodnight scene failed: ${e instanceof Error ? e.message : e}`);
+    return null; // appka spadne zpět na statický /bg-credits.png
+  }
+}
+
+/** Veřejná URL závěrečného "dobrou noc" obrázku pro dané obsazení, null
+ *  když ještě není namalovaný. */
+export async function goodnightSceneUrl(ids: string[]): Promise<string | null> {
+  const cast = charactersByIds(ids);
+  if (cast.length === 0) return null;
+  const token = blobToken();
+  if (!token) return null;
+  try {
+    const key = `goodnight-v${GOODNIGHT_SCENE_VERSION}-${goodnightSceneCacheKey(cast.map(c => c.id))}`;
+    const h = await head(`portraits/${key}.img`, { token });
     return h.url;
   } catch {
     return null;
