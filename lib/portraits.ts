@@ -505,8 +505,14 @@ function heightsRelationalEntry(cast: Character[]): string {
   if (ids.has("nicolas") && ids.has("james")) {
     bits.push(`${name("james")} is a little taller than ${name("nicolas")} — the top of ${name("nicolas")}'s head reaches only to ${name("james")}'s forehead, NOT his ears or eyes, and definitely not above his head`);
   }
+  // 🩺 2026-08-06 (10): živý kandidát (top-of-head-waistband Archie test)
+  // vyšel s Vájou nečekaně MALOU vůči Nicoláskovi — uživatel: "zase je
+  // miniaturní Vája, zvětši ji na úroveň Nicolasových ramen, bez toho aby
+  // hýbal Archiem". Archieho text se NEMĚNÍ (jen tenhle). Přidán konkrétní
+  // oděvní orientační bod (límec/rameno trička) po vzoru Archieho pasu +
+  // výslovné varování proti podkreslení (zrcadlí Archieho "too big" varování).
   if (ids.has("valentyna") && ids.has("nicolas")) {
-    bits.push(`${name("valentyna")} is smaller — the top of her head reaches all the way UP to ${name("nicolas")}'s SHOULDERS (not his chest, not his waist), roughly 85-90% of his height. She is a toddler but visibly close to his height, only a bit shorter, not dramatically smaller`);
+    bits.push(`${name("valentyna")} is smaller — the top of her head reaches all the way UP to ${name("nicolas")}'s SHOULDERS, level with his shirt collar/shoulder seam — NOT his chest, NOT his waist, NOT his elbow — roughly 85-90% of his height. She is a toddler but visibly close to his height, only a bit shorter, not dramatically smaller. If she looks like she only reaches his chest or elbow, she has been drawn too SMALL and must be enlarged`);
   }
   if (ids.has("bella")) {
     const anchors = ["james", "nicolas"].filter(id => ids.has(id)).map(name);
