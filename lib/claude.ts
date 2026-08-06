@@ -1306,7 +1306,13 @@ const CANONICAL_HEIGHT_CM: Record<string, number> = {
   jan: 185,
 };
 
-function canonicalHeightsEntry(characters: Character[]): string | null {
+// 🩺 2026-08-06: exportováno, ať stejnou relační logiku (appka poučena, že
+// samotné cm číslo model nezmění v geometrii, ale slovní vztah "sahá mu po
+// ramena" ano) může použít i lib/portraits.ts pro skupinovou kotvu/výškový
+// list — ty dřív posílaly JEN holá cm čísla bez vztahových vět, a živý test
+// ukázal přesně tenhle důsledek (Valentýnka vyšla vizuálně moc malá,
+// Nicolásek vyšel větší než James, i když čísla pod obrázkem byla správná).
+export function canonicalHeightsEntry(characters: Character[]): string | null {
   const ids = new Set(characters.map(c => c.id));
   const name = (id: string): string => {
     const c = characters.find(x => x.id === id);
