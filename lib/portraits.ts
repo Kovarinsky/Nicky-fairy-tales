@@ -544,11 +544,21 @@ function heightsRelationalEntry(cast: Character[]): string {
   // "výška Archieho uší bude na úrovni Nicoláskova pasu" — nový PRIMÁRNÍ
   // ukotvující bod je teď Nicolásek (ne Vája), a je to uši, ne temeno hlavy.
   // Pořád jen kandidátní test, kanonická v8/v9 nedotčená.
+  // 🩺 2026-08-06 (9) EXPERIMENT — živý výsledek (8) vyšel pořád moc velký
+  // (uši sahaly spíš k hrudi/žebrům, ne k pasu) — uživatel to potvrdil a
+  // vyjasnil (AskUserQuestion): CHTĚNÝ stav je "menší pes — pas u OBOU"
+  // (Váje i Nicoláskovi stejně, ne dva různé nesouměřitelné body). Abstraktní
+  // tělní popis evidentně nestačí, tak přidán KONKRÉTNÍ oděvní orientační
+  // bod (pas kalhot/šatů), který model může vizuálně sledovat.
+  // 🩺 2026-08-06 (9b): uživatel upřesnil PŘESNĚ CO měří — "vrchol hlavy
+  // Archieho, ne jeho záda" (TOP OF HEAD/skull, ne ramena/kohoutek jako
+  // dřív, a ne "uši" — uši nastražené vzhůru by mohly měřit výš než
+  // samotná lebka a appka by tím dostala nejednoznačnou instrukci).
   if (ids.has("archie") && ids.has("nicolas")) {
-    bits.push(`${name("archie")} is now even smaller — the height of his EARS (his highest point, standing on all fours) is level with ${name("nicolas")}'s WAIST, not his chest or ribs and not his hip; his back/shoulder is well below that, only a little above ${name("nicolas")}'s knee`);
+    bits.push(`${name("archie")} is small — the TOP OF HIS HEAD (the skull/crown, his highest point standing on all fours — NOT his ears if they stick up higher, and NOT his back/shoulder which is much lower) must line up with the WAISTBAND of ${name("nicolas")}'s shorts, not any higher — if the top of his head reaches above that waistband line (up toward the ribs or chest), he has been drawn too big and must be shrunk further; his back/shoulder sits well below the waistband, closer to knee height`);
   }
   if (ids.has("archie") && ids.has("valentyna")) {
-    bits.push(`compared to ${name("valentyna")}, ${name("archie")}'s ears reach only to about her lower ribs/hip — a clearly small dog next to her too, not a knee-high or ankle-high toy dog, but still small`);
+    bits.push(`the same rule applies next to ${name("valentyna")}: the top of his head (not his ears, not his back) lines up with the waist seam of her dress, not higher — he is a small dog, clearly no taller than a child's waist even next to the smaller child, not a knee-high toy dog but genuinely small`);
   }
   return bits.length ? bits.join("; ") + "." : "";
 }
