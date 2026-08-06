@@ -39,6 +39,38 @@ import { bgSceneById } from "./backgrounds";
 const STORY_BG_VERSION = 2;
 const memCache = new Map<string, ImageResult>();
 
+// 🌤️ v3.1 (mockup, oprava "dusk/magical mood carryover") — lib/backgrounds.ts
+// BG_SCENES jsou appčiny HOTOVÉ domovské dekorace: KAŽDÝ z 9 promptů má
+// natvrdo zapečenou silnou náladu/denní dobu (soumrak, noc, západ slunce) —
+// dává smysl pro hezký úvodní obrázek appky, ale je to ŠPATNÝ základ pro
+// přebarvování (recolorBackground), protože ta zapečená nálada/barevné
+// ladění část obrázku "prosvítá" i po přebarvení na jinou (např. slunečnou
+// denní) náladu. Živý test (Krtečkovská pohádka, slunečná louka) i
+// uživatelské hlášení potvrdily zbytkový soumrakový nádech.
+// Řešení: STRUKTURÁLNÍ základ (co appka přebarvuje) má VLASTNÍ, na náladě
+// NEZÁVISLÝ set promptů — STEJNÁ kompozice/motiv jako dané franšízové téma,
+// ale záměrně plochá, jasná, poledního denního světla bez barevného ladění —
+// "prázdné plátno", které recolorBackground barví SVOBODNĚ podle KONKRÉTNÍ
+// pohádky, místo aby soupeřilo s už existující náladou základu.
+const THEME_BASE_STYLE =
+  "Walt Disney animated style, painterly storybook illustration, portrait-free landscape composition. " +
+  "FLAT, NEUTRAL, bright clear midday daylight — no sunset/dusk/night/twilight tones, no strong color grading or mood lighting of any kind; " +
+  "this is a structural base that a later step will recolor to a specific mood, so keep the lighting as neutral and unbiased as possible. " +
+  "No people, no animals, no creatures — pure scenery/backdrop only. " +
+  "Absolutely no text, letters, words, signs, labels or writing of any kind anywhere in the image.";
+
+const THEME_BASE_PROMPTS: Record<string, string> = {
+  night: `A quiet storybook village on rolling hills, seen in plain daylight. ${THEME_BASE_STYLE}`,
+  forest: `A deep forest clearing, tall friendly old trees, mushrooms and ferns on the forest floor. ${THEME_BASE_STYLE}`,
+  mountains: `Fairy-tale mountains with frosted pine trees and a small wooden cottage in a distant valley. ${THEME_BASE_STYLE}`,
+  space: `Outer space with a friendly ringed planet, colorful smaller planets and stars, evenly lit. ${THEME_BASE_STYLE}`,
+  dino: `A prehistoric jungle valley with giant ferns and palm leaves, a calm distant volcano, a winding river. ${THEME_BASE_STYLE}`,
+  bay: `A cozy seaside bay, a small lighthouse on a cliff, gentle waves, distant sailboats. ${THEME_BASE_STYLE}`,
+  road: `A winding empty racetrack road through green hills, colorful pennant flags on poles. ${THEME_BASE_STYLE}`,
+  cartoon: `A cheerful vintage funfair: a carousel, a ferris wheel, a striped circus tent. ${THEME_BASE_STYLE}`,
+  fantasy: `A magical fairy-tale castle on a floating island, small waterfalls falling off the island, glowing crystals. ${THEME_BASE_STYLE}`,
+};
+
 // ── 🎨 v3 (mockup, na žádost "zkus sdílené pozadí, nebo jeho části, které
 // budou přebarvené") — TÉMATICKÝ STRUKTURÁLNÍ ZÁKLAD: appka namaluje JEDNU
 // scenérii NA CELÉ FRANŠÍZOVÉ TÉMA (les/hory/moře…, viz lib/backgrounds.ts,
@@ -49,7 +81,7 @@ const memCache = new Map<string, ImageResult>();
 // dřív platila za NOVOU scenérii ke KAŽDÉMU jinak formulovanému settingu
 // (byť konceptově stejnému tématu) — teď platí strukturální investici JEN
 // JEDNOU NA TÉMA a sdílí ji napříč VŠEMI budoucími náladami/pohádkami.
-const THEME_BASE_VERSION = 1;
+const THEME_BASE_VERSION = 2; // v2: neutrální poledne místo appčiny náladové dekorace (viz THEME_BASE_PROMPTS výš)
 
 function themeBasePathFor(themeId: string): string {
   return `backgrounds/theme-base-${themeId}-v${THEME_BASE_VERSION}.img`;
@@ -60,7 +92,8 @@ function themeBasePathFor(themeId: string): string {
  *  NIKDY neukazuje přímo, jen jako podklad pro recolorBackground níž. */
 export async function getThemeBaseBackground(themeId: string, force = false): Promise<ImageResult | null> {
   const scene = bgSceneById(themeId);
-  if (!scene) return null;
+  const basePrompt = THEME_BASE_PROMPTS[themeId];
+  if (!scene || !basePrompt) return null;
   const cacheKey = `theme-base-${themeId}-v${THEME_BASE_VERSION}`;
   const cached = !force && memCache.get(cacheKey);
   if (cached) return cached;
@@ -80,8 +113,8 @@ export async function getThemeBaseBackground(themeId: string, force = false): Pr
   } catch {}
 
   try {
-    console.log(`[story-bg] 🎨 drawing THEME BASE (structural, sdílený napříč pohádkami) for "${themeId}"…`);
-    const img = await generateBackgroundImage(scene.prompt, [], "16:9");
+    console.log(`[story-bg] 🎨 drawing THEME BASE (structural, neutrální poledne, sdílený napříč pohádkami) for "${themeId}"…`);
+    const img = await generateBackgroundImage(basePrompt, [], "16:9");
     await put(pathName, img.buffer, {
       access: "public",
       contentType: img.mimeType,
