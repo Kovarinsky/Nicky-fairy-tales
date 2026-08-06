@@ -59,8 +59,10 @@ export interface JobStatus {
   imgSpent?: number;
   /** 🩺 2026-08-06: reálné tokeny psaní scénáře (napříč všemi pokusy/řetězy
    *  téhle pohádky) místo paušálu COST_USD_PER_STORY_WRITING — viz
-   *  actualStoryCostCredits, lib/pricing.ts. */
-  writeTokens?: { input: number; output: number };
+   *  actualStoryCostCredits, lib/pricing.ts. cacheCreation/cacheRead jsou
+   *  odděleně, protože mají JINOU sazbu než obyčejný input (1,25×/0,1×) —
+   *  system prompt psaní jede s cache_control: ephemeral (lib/claude.ts). */
+  writeTokens?: { input: number; output: number; cacheCreation: number; cacheRead: number };
   /** Délka rozepsaného textu při minulém běhu — restart s delším partial = zdravé navázání */
   partialLen?: number;
   /** Restarty psaní BEZ pokroku v partial.json — jen ty znamenají zaseknutí */
@@ -477,7 +479,14 @@ export async function runJob(id: string, body: Record<string, unknown>) {
           // stejnou pohádku) — appka teď zná REÁLNOU cenu psaní, ne paušál.
           const prevIn = st.writeTokens?.input ?? 0;
           const prevOut = st.writeTokens?.output ?? 0;
-          st.writeTokens = { input: prevIn + usage.inputTokens, output: prevOut + usage.outputTokens };
+          const prevCacheC = st.writeTokens?.cacheCreation ?? 0;
+          const prevCacheR = st.writeTokens?.cacheRead ?? 0;
+          st.writeTokens = {
+            input: prevIn + usage.inputTokens,
+            output: prevOut + usage.outputTokens,
+            cacheCreation: prevCacheC + usage.cacheCreationTokens,
+            cacheRead: prevCacheR + usage.cacheReadTokens,
+          };
         });
       } finally {
         clearTimeout(writingKick);

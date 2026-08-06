@@ -43,6 +43,17 @@ export const COST_USD_PER_MTOK_INPUT = claudeIntroPricingActive ? 2.0 : 3.0;
 /** USD za 1M output tokenů (zahrnuje thinking tokeny, appka thinking
  *  nepoužívá — viz callAnthropicApi). */
 export const COST_USD_PER_MTOK_OUTPUT = claudeIntroPricingActive ? 10.0 : 15.0;
+/** 🩺 2026-08-06 (2): psaní scénáře posílá system prompt s cache_control:
+ *  ephemeral (buildSystemPrompt, ~4k tokenů, neměnný napříč pohádkami se
+ *  stejným jazykem) — `input_tokens` v odpovědi je proto jen NEKEŠOVANÝ
+ *  zbytek promptu, ne jeho celková velikost. cache_creation (zápis, 1. volání
+ *  po vypršení 5min TTL) a cache_read (čtení, každé další volání v tom
+ *  okně) mají VLASTNÍ sazbu — 1,25× a 0,1× ceny běžného inputu — jinak by
+ *  actualStoryCostCredits cenu psaní systematicky podhodnocovala u
+ *  KAŽDÉHO volání, co trefí cache (typicky víc než polovina — fronta
+ *  pohádek, restarty, navázání po resume). */
+export const COST_USD_PER_MTOK_CACHE_WRITE = COST_USD_PER_MTOK_INPUT * 1.25;
+export const COST_USD_PER_MTOK_CACHE_READ = COST_USD_PER_MTOK_INPUT * 0.1;
 
 /** Marže appky nad reálné náklady. */
 export const MARGIN_MULTIPLIER = 1.5;
@@ -81,11 +92,13 @@ export function estimateStoryCostCredits(body: { sceneCount?: unknown; twoEnding
  *  (staré cachované joby) appka spadne zpátky na paušál. */
 export function actualStoryCostCredits(
   usage: { images1k: number; images4k: number; voiceChars: number },
-  writeTokens?: { input: number; output: number }
+  writeTokens?: { input: number; output: number; cacheCreation?: number; cacheRead?: number }
 ): number {
   const writingCostUsd = writeTokens
     ? (writeTokens.input / 1_000_000) * COST_USD_PER_MTOK_INPUT +
-      (writeTokens.output / 1_000_000) * COST_USD_PER_MTOK_OUTPUT
+      (writeTokens.output / 1_000_000) * COST_USD_PER_MTOK_OUTPUT +
+      ((writeTokens.cacheCreation ?? 0) / 1_000_000) * COST_USD_PER_MTOK_CACHE_WRITE +
+      ((writeTokens.cacheRead ?? 0) / 1_000_000) * COST_USD_PER_MTOK_CACHE_READ
     : COST_USD_PER_STORY_WRITING;
   const usd =
     writingCostUsd +

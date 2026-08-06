@@ -705,7 +705,12 @@ async function callAnthropicApi(
   // finální output_tokens v message_delta — appka je dřív jen ignorovala.
   // Stejný vzor jako onDelta/onRetry: volitelný callback, žádný stávající
   // volající se nemusí měnit.
-  onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void
+  // 🩺 2026-08-06 (2): rozšířeno o cache_creation/cache_read tokeny —
+  // buildSystemPrompt() se posílá s cache_control: ephemeral (viz volání
+  // v generateStory), takže `input_tokens` v odpovědi je JEN nekešovaný
+  // zbytek, ne celková velikost promptu; bez týhle trojice appka cenu psaní
+  // systematicky podhodnocovala u každého volání, co trefilo cache.
+  onUsage?: (usage: { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number }) => void
 ): Promise<string> {
   const apiKey = sanitizeApiKey(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) throw new Error("Chybí ANTHROPIC_API_KEY.");
@@ -773,6 +778,8 @@ async function callAnthropicApi(
     let stopReason: string | undefined;
     let inputTokens = 0;
     let outputTokens = 0;
+    let cacheCreationTokens = 0;
+    let cacheReadTokens = 0;
     try {
       for (;;) {
         const { done, value } = await reader.read();
@@ -788,7 +795,7 @@ async function callAnthropicApi(
             type?: string;
             delta?: { type?: string; text?: string; stop_reason?: string };
             error?: { message?: string };
-            message?: { usage?: { input_tokens?: number; output_tokens?: number } };
+            message?: { usage?: { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number } };
             usage?: { input_tokens?: number; output_tokens?: number };
           };
           try { ev = JSON.parse(payload); } catch { continue; }
@@ -797,12 +804,17 @@ async function callAnthropicApi(
             out += ev.delta.text;
             onDelta?.(out.length, out);
           }
-          // message_start nese input_tokens (a malý počáteční output_tokens);
+          // message_start nese input_tokens (a malý počáteční output_tokens)
+          // PLUS cache_creation_input_tokens/cache_read_input_tokens, když
+          // request poslal cache_control — bez nich by input_tokens sám
+          // ukazoval jen nekešovaný ZBYTEK promptu, ne skutečnou cenu.
           // message_delta pak PRŮBĚŽNĚ aktualizuje finální output_tokens —
           // poslední hodnota před koncem streamu je ta skutečná.
           if (ev.type === "message_start" && ev.message?.usage) {
             inputTokens = ev.message.usage.input_tokens ?? inputTokens;
             outputTokens = ev.message.usage.output_tokens ?? outputTokens;
+            cacheCreationTokens = ev.message.usage.cache_creation_input_tokens ?? cacheCreationTokens;
+            cacheReadTokens = ev.message.usage.cache_read_input_tokens ?? cacheReadTokens;
           }
           if (ev.type === "message_delta") {
             if (ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
@@ -830,7 +842,7 @@ async function callAnthropicApi(
     // se to nikde nekontrolovalo, appka tichý ořez prostě přijala jako hotový
     // text (viz „Enrich" u bohatého zadání, uříznuté u „A Habsburg…")
     if (stopReason === "max_tokens") console.warn(`[Claude] odpověď uřízlá limitem max_tokens (${out.length} znaků)`);
-    if (inputTokens || outputTokens) onUsage?.({ inputTokens, outputTokens });
+    if (inputTokens || outputTokens) onUsage?.({ inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens });
     return out;
   }
   throw lastErr || new Error("Anthropic: no response");
@@ -1114,7 +1126,7 @@ export async function generateStory(
   onLog?: (msg: string) => void,
   // 🩺 2026-08-06: reálná cena psaní místo paušálu — job-runner sečte
   // vstupní/výstupní tokeny napříč pokusy (resume/redraw = víc volání)
-  onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void
+  onUsage?: (usage: { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number }) => void
 ): Promise<StoryScript> {
   const model = MODEL.trim();
   const parts: AnthropicPart[] = [];
