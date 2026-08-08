@@ -1,6 +1,27 @@
-export const APP_VERSION = "4.99.79";
+export const APP_VERSION = "4.99.80";
 
 // Changelog (newest first)
+// 4.99.80 - 🔒 ZÁMEK ODSTÍNŮ VLASŮ PRO CELOU RODINU + OPRAVA JANA A ARCHIEHO:
+// uživatel nahlásil "táta Jan zase vypadá jinak", i když je "ukotvený" —
+// kořenová příčina: appčina vlastní kontrola (verifySceneImage, gemini.ts
+// pravidlo 3) tolerovala posun vlasové barvy UVNITŘ stejné široké rodiny
+// (hnědá→hnědá) jako MINOR, i když to u reálné postavy, kterou rodina zná
+// nazpaměť, vypadá jako jiný člověk. Všech 8 lidských postav dostalo
+// POJMENOVANÝ odstín (espresso-hnědá/kaštanová/karamelová/bronde/
+// golden-blond) + vzájemné srovnání ("Jan tmavší než James", "Vája o
+// odstín světlejší než Nicolásek" — reference/characters.json), pravidlo 3
+// dostalo výjimku "NAMED SHADE LOCKS" — posun mimo pojmenovaný zámek je
+// teď MAJOR i v rámci stejné barevné rodiny. Jan navíc dostal třetí
+// referenční fotku (jan-face3.jpg, jasně ukazuje skutečnou vysokou
+// ustupující hranici vlasů) + text posílen na konkrétní míru (~40 % holého
+// čela) — uživatel potvrdil tenhle směr přímo na fotce. Archie dostal 3
+// další čerstvé fotky (archie-3/4/5.jpg) + text/kontrola (pravidlo 7c)
+// teď výslovně říká, že jeho velikost/objem je KONSTANTNÍ bez ohledu na
+// pózu/vzdálenost od kamery — appka dřív u sedícího/blízkého psa kontrolu
+// velikosti úplně přeskakovala, proto vycházel "gigantický" v některých
+// scénách. Celá knihovna přemalována (PORTRAIT_VERSION→5, kotva→10,
+// výškový list→11) — živě ověřeno na preview, uživatel schválil ("Je to
+// super") před sloučením do main.
 // 4.99.79 - 🔀 MERGE s main: appka měla dvě paralelně diverzní větve (main
 // samostatně dostal genderované SFX varianty — sfx-X-f.mp3/sfx-X-m.mp3
 // místo jednoho neutrálního hlasu, crash diagnostiku/recovery, opravu
