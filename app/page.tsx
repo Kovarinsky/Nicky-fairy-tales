@@ -364,6 +364,14 @@ export default function Home() {
 
   // Generation state
   const [loading, setLoading] = useState(false);
+  // 🩺 2026-08-09: nahlášeno "napíše to, že pohádka je ready, a pak se
+  // donahrává" — appka mlčela o tom, PROČ znovu generuje pohádku z historie
+  // (viz replayStory větev 3: IndexedDB cache pro ni chybí/expirovala — buď
+  // limit 20 pohádek na zařízení, nebo jiné zařízení/adresa appky, kde
+  // vznikla). Tenhle flag appce dovolí ukázat jiný, PRAVDIVÝ text na
+  // titulce ("tahle pohádka byla na zařízení smazaná...") místo obyčejného
+  // "Připravuji pohádku…", které vypadá jako běžné čekání na první vytvoření.
+  const [reopenRegenerating, setReopenRegenerating] = useState(false);
   const [doneCount, setDoneCount] = useState(0);
   const [stalled, setStalled] = useState(false);
   const lastProgressRef = useRef(0);
@@ -4331,6 +4339,7 @@ export default function Home() {
     // 1. Instant restore from in-memory ref (bg generation continues uninterrupted)
     const memCached = renderedMapRef.current.get(entry.id);
     if (memCached && memCached.length > 0) {
+      setReopenRegenerating(false);
       showCached(memCached);
       return;
     }
@@ -4348,6 +4357,7 @@ export default function Home() {
       const needImages = entry.choice ? entry.choice.altFrom : restored.length;
       if (restored.slice(0, needImages).every(s => !isPlaceholderImg(s.imageUrl))) {
         renderedMapRef.current.set(entry.id, restored);
+        setReopenRegenerating(false);
         showCached(restored);
         return;
       }
@@ -4362,6 +4372,11 @@ export default function Home() {
       setHistoryOpen(false);
       return;
     }
+    // 🩺 Místní kopie (IndexedDB) pro tuhle pohádku chybí/expirovala — appka
+    // musí obrázky+hlas vygenerovat ZNOVU od nuly, i když appka pohádku už
+    // jednou dokončila. Titulka o tom teď řekne pravdu (viz reopenRegenerating
+    // níž), místo aby mlčky vypadala jako běžné čekání na první vytvoření.
+    setReopenRegenerating(true);
     setError(""); setLoading(true);
     setHistoryOpen(false);
     setScenes([]); setTitle(""); setPage(0);
@@ -4372,6 +4387,7 @@ export default function Home() {
       const finalScenes = await generateMedia(entry.title, entry.heroDescription, entry.scenes, [], selectedVoiceId, false, entry.id, partial);
       renderedMapRef.current.set(entry.id, finalScenes);
       cacheStory(entry.id, finalScenes).catch(() => {});
+      setReopenRegenerating(false);
       // 🩺 Appka právě dokreslila chybějící obrázky SAMA (přímo přes /api/scene),
       // ne přes serverový job — ten o tom neví a jeho záznam (jobId === entry.id)
       // by jinak navždy zůstal „generating" na svém posledním stavu, appka by
@@ -4395,6 +4411,7 @@ export default function Home() {
       // loading se resetuje VŽDY (i pro odloženou/zastíněnou pohádku) — jinak
       // by zůstalo natrvalo zamčené a další ✕ replay by se už nikdy nespustil
       setLoading(false);
+      setReopenRegenerating(false);
     }
   }
 
@@ -5614,7 +5631,8 @@ export default function Home() {
                       </button>
                     ) : (
                       <div className="title-card-tap">
-                        <span className="placeholder-spinner placeholder-spinner-sm" />{t.titleCardPreparing}
+                        <span className="placeholder-spinner placeholder-spinner-sm" />
+                        {reopenRegenerating ? t.titleCardReopenRegenerating : t.titleCardPreparing}
                       </div>
                     )}
                   </div>
