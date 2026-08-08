@@ -964,31 +964,48 @@ button:disabled {
   aspect-ratio: auto;
 }
 
-/* 🎤 2026-08-08: dřív neprůhledný bílý pruh POD obrázkem (až 34dvh) — appka
-   titulek teď PŘEKRÝVÁ přes spodek ilustrace (tmavý přechod, jako titulní
-   karta), ať obrázek zůstane celý vidět místo aby mu text ukrajoval výšku.
-   Karaoke zvýrazňování (word-read/word-active/word-pending, viz níž) navíc
-   potřebuje tmavé pozadí, aby oranžové zvýraznění čitelně vyniklo. */
+/* 🎤 2026-08-08 (2): CD styl (design-bundle-v7 ReaderScreen) — žádný box/
+   přechod za textem, jen JEMNÝ spodní stín přes obrázek (jako .bottomFade
+   v CD) a text přímo na ilustraci s vrstveným stínem pro čitelnost. Dřív tu
+   appka měla tmavý gradientový box (viz historie), uživatel chtěl přesně
+   CD vzhled — text "plave" na obrázku, žádné pozadí za slovy. */
 .reader-mode .page-body {
   position: relative;
   flex: 0 0 auto;
   max-height: 42%;
   overflow-y: auto;
-  margin-top: -3.4rem;
-  background: linear-gradient(180deg,
-    rgba(15, 10, 35, 0) 0%,
-    rgba(15, 10, 35, 0.55) 28%,
-    rgba(15, 10, 35, 0.88) 100%
-  );
-  padding: 2.6rem 1rem 0.9rem;
-  color: #fff;
+  margin-top: -5.4rem;
+  padding: 4.4rem 1.3rem 1rem;
+  color: #fdf3d7;
   z-index: 2;
+  pointer-events: none;
+}
+.reader-mode .page-body::before {
+  /* Jemný spodní přechod PŘES OBRÁZEK, ne za textem — stejná role jako
+     .bottomFade v CD (150px, jen náznak ztmavení, ne plný box). */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(16, 8, 36, 0) 0%, rgba(16, 8, 36, 0.4) 55%, rgba(16, 8, 36, 0.55) 100%);
+  z-index: -1;
+  pointer-events: none;
+}
+.reader-mode .page-clip,
+.reader-mode .page-edit {
+  pointer-events: auto;
 }
 
 .reader-mode .page-text {
-  font-size: 0.98rem;
-  line-height: 1.6;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-alegreya), Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.38;
+  text-align: center;
+  text-wrap: pretty;
+  text-shadow:
+    0 1px 2px rgba(14, 7, 32, 0.9),
+    0 2px 10px rgba(14, 7, 32, 0.85),
+    0 0 24px rgba(14, 7, 32, 0.7);
 }
 
 /* Controls: hidden; tap → panel pinned to the BOTTOM of the screen */
@@ -1550,31 +1567,35 @@ button:disabled {
 
 .page-edit:active { background: rgba(124, 77, 255, 0.45); }
 
+/* 🎤 2026-08-08 (2): CD styl (design-bundle-v7 ReaderScreen.module.css
+   .captionText) — serifový Alegreya, tučný, vystředěný, žádné pozadí za
+   textem, jen vrstvený stín pro čitelnost na jakémkoli obrázku. */
 .page-text {
-  font-size: 1.18rem;
-  line-height: 1.75;
-  font-weight: 600;
-  /* 🎤 2026-08-08: dřív var(--text) (tmavé písmo pro bílý box) — .page-body
-     je teď tmavý překryv přes obrázek v obou motivech (světlý i tmavý), text
-     proto zůstává vždy světlý, ne podle tématu appky. */
-  color: #fff;
+  font-family: var(--font-alegreya), Georgia, serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1.38;
+  text-align: center;
+  color: #fdf3d7;
+  text-shadow:
+    0 1px 2px rgba(14, 7, 32, 0.9),
+    0 2px 10px rgba(14, 7, 32, 0.85),
+    0 0 24px rgba(14, 7, 32, 0.7);
 }
 
-/* 🎤 KARAOKE zvýrazňování — tři stavy slova (viz page.tsx currentWordIdx):
-   PŘEČTENO (ztlumené), PRÁVĚ ČTENÉ (oranžová pilulka jako appčina brand
-   barva), JEŠTĚ NEPŘEČTENO (plná bílá, čeká na přehrání). word-idle = audio
-   se ještě nepřehrává (appka neukazuje žádný pokrok, jen normální text). */
-.word-idle { color: inherit; }
-.word-read { color: rgba(255, 255, 255, 0.5); transition: color 0.15s ease; }
-.word-pending { color: rgba(255, 255, 255, 0.82); transition: color 0.15s ease; }
+/* 🎤 KARAOKE zvýrazňování — CD paleta (design-bundle-v7 .wordRead/.wordActive/
+   .wordPending): PŘEČTENO/PŘED PŘEHRÁNÍM = plná krémová, PRÁVĚ ČTENÉ = zlatá
+   se zářivým stínem (ŽÁDNÁ pilulka/pozadí — appka to dřív měla jako
+   oranžovou pilulku, uživatel chtěl přesně CD vzhled), JEŠTĚ NEPŘEČTENO =
+   ztlumená krémová. word-idle (audio se ještě nepřehrává) čte se stejně
+   jako word-read — v CD před spuštěním appka celý text ukazuje plně čitelný,
+   ne ztlumeně. */
+.word-idle, .word-read { color: #fdf3d7; transition: color 0.15s ease; }
+.word-pending { color: rgba(253, 243, 215, 0.4); transition: color 0.15s ease; }
 .word-active {
-  color: #fff;
-  background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
-  border-radius: 0.3em;
-  padding: 0.02em 0.22em;
-  margin: 0 -0.22em;
-  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.45);
-  transition: background 0.15s ease;
+  color: #fcd34d;
+  text-shadow: 0 0 14px rgba(252, 211, 77, 0.8);
+  transition: color 0.15s ease;
 }
 
 /* ── Unified control bar ── */

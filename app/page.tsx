@@ -3544,54 +3544,15 @@ export default function Home() {
     return () => { dead = true; };
   }, [titleCardOpen, cardBg]);
 
-  // Výběr světa pozadí: velké tlačítko otevře rolovací nabídku (jako 📜 pohádky)
-  const [bgPickerOpen, setBgPickerOpen] = useState(false);
-  // 🔍 Náhled pozadí PODRŽENÍM: po 350 ms se ukáže malá karta s ilustrací,
-  // která se pak plynule roztáhne na celý displej; puštění náhled zavře,
-  // obyčejné ťuknutí svět vybírá (klik po podržení se potlačí)
-  const [bgHold, setBgHold] = useState<{ id: string; url: string | null; full: boolean } | null>(null);
-  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdFullTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdFiredRef = useRef(false);
-
-  function beginBgHold(sceneId: string) {
-    holdFiredRef.current = false;
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-    holdTimerRef.current = setTimeout(async () => {
-      holdFiredRef.current = true;
-      setBgHold({ id: sceneId, url: bgUrlCacheRef.current[sceneId] ?? null, full: false });
-      holdFullTimerRef.current = setTimeout(
-        () => setBgHold(p => (p && p.id === sceneId ? { ...p, full: true } : p)),
-        700
-      );
-      if (!bgUrlCacheRef.current[sceneId]) {
-        try {
-          const r = await fetch(`/api/bg-image?scene=${sceneId}`, { signal: AbortSignal.timeout(110_000) });
-          const d = r.ok ? ((await r.json()) as { url?: string }) : null;
-          if (d?.url) {
-            bgUrlCacheRef.current[sceneId] = d.url;
-            setBgHold(p => (p && p.id === sceneId ? { ...p, url: d.url! } : p));
-          }
-        } catch {}
-      }
-    }, 350);
-  }
-
-  function endBgHold() {
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-    if (holdFullTimerRef.current) clearTimeout(holdFullTimerRef.current);
-    setBgHold(null);
-  }
+  // 🖼️ 2026-08-09: dřív tu bylo DRUHÉ tlačítko/panel na výběr pozadí appky
+  // (bgPickerOpen + náhled podržením bgHold/beginBgHold/endBgHold) — přesná
+  // duplicita HomeScreen "Svět pozadí aplikace". Odstraněno, viz komentář
+  // u JSX níž. pickBg zůstává — appka ho pořád používá jako onSelectBackground
+  // pro HomeScreen (jediné zbylé místo výběru).
   function pickBg(id: string) {
     setBgChoice(id);
     try { localStorage.setItem(BG_KEY, id); } catch {}
-    setBgPickerOpen(false);
   }
-  const bgLabel = bgChoice === "auto"
-    ? `🎨 ${t.bgAuto}`
-    : bgChoice === "custom"
-    ? (uiLang === "en" ? "🖼️ Custom" : "🖼️ Vlastní")
-    : `${bgSceneById(bgChoice)!.emoji} ${uiLang === "en" ? bgSceneById(bgChoice)!.nameEn : bgSceneById(bgChoice)!.name}`;
 
   // 📝 Velký editor přání — ťuknutí do pole otevře okno přes displej,
   // kde je vidět celý text (dlouhé osnovy z 🪄 Rozvinout).
@@ -4609,9 +4570,13 @@ export default function Home() {
 
       {!readerMode && (
       <>
+      {/* 🖼️ 2026-08-09: dřív tu byl DRUHÝ výběr pozadí appky (bg-cycle-btn +
+          panel), duplicitní k tomu na homepage (HomeScreen "Svět pozadí
+          aplikace") — nahlášeno "dubluje se nám výběr pozadí appky".
+          Odstraněno — appka má jen jeden, homepage bgChoice/pickBg je
+          sdílený stav (localStorage BG_KEY), takže volba z homepage platí
+          i tady beze změny. */}
       <div className="lang-switch">
-        <button type="button" className={`lang-btn bg-cycle-btn${bgPickerOpen ? " lang-on" : ""}`}
-          onClick={() => setBgPickerOpen(p => !p)} title={t.bgTitle}>{bgLabel} ▾</button>
         <button type="button" className={`lang-toggle ${uiLang === "en" ? "lang-en" : ""}`}
           onClick={() => switchLang(uiLang === "cs" ? "en" : "cs")} aria-label="Jazyk / Language">
           <span className="lang-thumb" aria-hidden="true" />
@@ -4635,45 +4600,6 @@ export default function Home() {
           </span>
         </button>
       </div>
-      {bgPickerOpen && (
-        <div className="bg-picker-panel">
-          <div className="panel-title-row">
-            <p className="panel-title">🖼️ {t.bgTitle}</p>
-            <button type="button" className="panel-close" aria-label={t.cancel}
-              onClick={() => setBgPickerOpen(false)}>✕</button>
-          </div>
-          <div className="folk-list bg-picker">
-            {[{ id: "auto", emoji: "🎨", label: `${t.bgAuto} — ${t.bgAutoHint}`, preview: activeBg },
-              ...BG_SCENES.map(s => ({ id: s.id, emoji: s.emoji, label: uiLang === "en" ? s.nameEn : s.name, preview: s.id }))].map(row => (
-              <button type="button" key={row.id}
-                className={`folk-item bg-item ${bgChoice === row.id ? "folk-on" : ""}`}
-                onClick={() => {
-                  if (holdFiredRef.current) { holdFiredRef.current = false; return; }
-                  pickBg(row.id);
-                }}
-                onPointerDown={() => beginBgHold(row.preview)}
-                onPointerUp={endBgHold}
-                onPointerLeave={endBgHold}
-                onPointerCancel={endBgHold}
-                onContextMenu={e => e.preventDefault()}>
-                <span className="folk-emoji">{row.emoji}</span>
-                <span className="folk-name">{row.label}</span>
-              </button>
-            ))}
-          </div>
-          <p className="gen-step-hint">{t.bgHoldHint}</p>
-          <button type="button" className="panel-ok" onClick={() => setBgPickerOpen(false)}>✓ {t.okBtn}</button>
-        </div>
-      )}
-
-      {/* 🔍 Náhled pozadí při podržení: malá karta → plynule celý displej */}
-      {bgHold && (
-        <div className={`bg-hold-overlay${bgHold.full ? " bg-hold-full" : ""}`}>
-          {bgHold.url
-            ? <img src={bgHold.url} alt="" className="bg-hold-img" />
-            : <div className="bg-hold-img bg-hold-loading">🎨</div>}
-        </div>
-      )}
       <h1>📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"} <span className="version-badge">v{APP_VERSION}</span></h1>
       <p className="subtitle">{t.subtitle}</p>
 
