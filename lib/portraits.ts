@@ -35,7 +35,21 @@ import type { Character } from "./types";
 // 2026-08-06 (6): srdíčko na hrudi ZASE ZRUŠENO (uživatel si to rozmyslel:
 // "sundej Archiemu srdíčko z hrudi") — zpět na obyčejný bílý flek. Poslední
 // doladění velikosti dolů ("lehce ho zmenši, aby byl Valentýnce po pás").
-const PORTRAIT_VERSION = 4;
+// v5 (2026-08-08): CELÁ rodina dostala pojmenovaný zámek odstínu vlasů
+// (espresso-hnědá/kaštanová/karamelová/bronde/golden-blond + vzájemné
+// srovnání "tmavší než"/"světlejší než" — viz reference/characters.json) —
+// řeší nahlášené "Jan zase vypadá jinak", kde appčina vlastní kontrola
+// tolerovala posun uvnitř barevné rodiny jako MINOR (gemini.ts pravidlo 3
+// dostalo výjimku pro tyhle pojmenované zámky). Jan navíc dostal třetí
+// referenční fotku (jan-face3.jpg, čerstvá, jasně ukazuje skutečnou vysokou
+// ustupující hranici vlasů) a text posílen na konkrétní míru (~40 % holého
+// čela) — uživatel potvrdil tenhle směr přímo na fotce. Archie dostal 3
+// další čerstvé fotky (archie-3/4/5.jpg) + text výslovně říká, že jeho
+// velikost/objem se NEMĚNÍ podle pózy nebo vzdálenosti od kamery (řeší
+// "gigantický" vzhled v scénách, kde sedí blízko kamery). Tohle je záměrně
+// PLNÝ bump (ne cílený ?redraw=), protože se mění popis skoro celé
+// devítičlenné knihovny najednou, ne jedné postavy.
+const PORTRAIT_VERSION = 5;
 const memCache = new Map<string, ReferenceImage>();
 
 const PORTRAIT_STYLE =
@@ -234,7 +248,10 @@ export async function loadPortraitRefs(characters: Character[]): Promise<Referen
 // všemi 9 (mezera mezi rodinami místo přeskoku na nový řádek) + přidány
 // vodorovné referenční linky/pravítko po straně, ať jde výška vyčíst přímo
 // z obrázku, ne jen z tištěného cm popisku pod postavou.
-const FAMILY_SCALE_VERSION = 10;
+// v11 (2026-08-08): list se musí překreslit ze ZNOVU namalovaných portrétů
+// (PORTRAIT_VERSION→5, jmenovaný zámek odstínů + Janova/Archieho nová fotka
+// — viz komentář tam).
+const FAMILY_SCALE_VERSION = 11;
 // Duplikát CANONICAL_HEIGHT_CM z claude.ts (import by vytáhl celý claude.ts
 // do knihovny portrétů) — mění se JEN spolu s tamní tabulkou, viz komentář tam.
 // archie: 40cm — reálná výška při běžném postoji (upřesnil uživatel
@@ -474,7 +491,10 @@ export async function familyScaleSheetUrl(): Promise<string | null> {
 // výšky), James zřetelně vyšší než Nicolásek. Tahle verze POVYŠUJE přesně
 // ten schválený kandidátní obrázek (promoteFamilyGroupAnchorCandidate) —
 // žádné nové (placené) kreslení, jen kopie už schválených bajtů.
-const GROUP_ANCHOR_VERSION = 9;
+// v10 (2026-08-08): kotva se musí překreslit ze ZNOVU namalovaných portrétů
+// (PORTRAIT_VERSION→5) — jmenovaný zámek odstínů vlasů pro celou rodinu +
+// Janova/Archieho nová referenční fotka, viz komentář u PORTRAIT_VERSION.
+const GROUP_ANCHOR_VERSION = 10;
 
 function groupAnchorLabel(): string {
   return (
