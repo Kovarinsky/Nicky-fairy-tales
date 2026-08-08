@@ -141,12 +141,20 @@ export interface StoryChoiceMeta {
   options: [string, string];
 }
 
+/** 🎤 Slovo + jeho začátek/konec v sekundách uvnitř namluveného audia —
+ *  appka to používá pro SKUTEČNÉ karaoke zvýrazňování textu při čtení
+ *  (ElevenLabs `/with-timestamps`, viz lib/elevenlabs.ts). Chybí u Gemini
+ *  hlasů (žádné časování) — čtečka pak spadne na odhad podle délky audia. */
+export interface WordTiming { word: string; start: number; end: number; }
+
 /** Scéna obohacená o vygenerovaná média */
 export interface RenderedScene extends Scene {
   /** Cesta/URL k obrázku (nebo data URL) */
   imageUrl?: string;
   /** Cesta/URL k audio souboru */
   audioUrl?: string;
+  /** Skutečné slovní časování NAMLUVENÉHO audia výš (chybí = odhad v UI) */
+  wordTimings?: WordTiming[];
 }
 
 /** Kompletní vyrenderovaná pohádka */

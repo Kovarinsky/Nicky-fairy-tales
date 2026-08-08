@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import type { StoryScript, RenderedScene, Scene, StoryChoiceMeta } from "@/lib/types";
+import type { StoryScript, RenderedScene, Scene, StoryChoiceMeta, WordTiming } from "@/lib/types";
 import { AmbientPlayer } from "@/lib/ambient";
 import { cacheStory, getCachedStory, evictOldStories } from "@/lib/scene-cache";
 import { APP_VERSION } from "@/lib/version";
@@ -390,6 +390,11 @@ export default function Home() {
   // handleAudioEnded) — ať přechod mezi scénami není ostrý střih.
   const [pageLeaving, setPageLeaving] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  // 🎤 KARAOKE: index aktuálně čteného slova v current.narration. Skutečné
+  // ElevenLabs časování (current.wordTimings) když appka ho má, jinak ODHAD
+  // rovnoměrně rozpočítaný podle délky audia (Gemini hlasy žádné časování
+  // neposílají) — viz onTimeUpdate na <audio> níž.
+  const [currentWordIdx, setCurrentWordIdx] = useState(-1);
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [musicOn, setMusicOn] = useState(true); // hudba/zvuky zapnuté ve výchozím stavu (na výslovné přání)
   const [showCredits, setShowCredits] = useState(false);
@@ -1173,6 +1178,10 @@ export default function Home() {
     ambientRef.current?.setScene(scenes[page]?.soundscape);
   }, [page, bookReady, scenes]);
 
+  // 🎤 KARAOKE: nové slovo na nové stránce začíná od nuly (appka nechce
+  // zvýrazněné konce PŘEDCHOZÍHO textu bleskově naskočit na začátku dalšího).
+  useEffect(() => { setCurrentWordIdx(-1); }, [page]);
+
   // 🔊 Jednorázový zvukový efekt podle děje TÉTO scény (vlny/hrom/chrápání) —
   // jednou na stránku (ref hlídá, ať se nespustí znovu při každém re-renderu)
   const sfxFiredRef = useRef<string | null>(null);
@@ -1198,6 +1207,13 @@ export default function Home() {
   // pro obálku titulky (ukáže se hned, jak je hotová), NE pro povolení
   // začít číst (to čeká na CELOU pohádku, viz storyFullyReady).
   const scene1Ready = !!(scenes[0]?.imageUrl && !isPlaceholderImg(scenes[0].imageUrl) && scenes[0]?.audioUrl);
+  // 🏷️ Info box na titulce: počet stran + ODHAD času čtení (appka namlouvá
+  // líně, viz job-runner.ts — skutečná délka audia tu ještě není známá pro
+  // všechny scény) — z počtu slov v naraci / ~130 slov za minutu, což je
+  // appčino typické tempo klidného vyprávění (eleven_flash_v2_5, cs i en).
+  // Vždy zaokrouhleno nahoru, minimálně 1 minuta, ať appka nikdy neukáže "0 min".
+  const titleCardWordCount = scenes.reduce((sum, s) => sum + (s.narration ? s.narration.trim().split(/\s+/).filter(Boolean).length : 0), 0);
+  const titleCardReadMinutes = Math.max(1, Math.round(titleCardWordCount / 130));
   // 🚦 Číst appka smí začít, až je HOTOVÁ CELÁ pohádka (všechny obrázky i
   // hlasy) — dřív stačila jen scéna 1 a zbytek se dokresloval na pozadí ZA
   // čtenářem, což bylo rušivé (viditelné dokreslování uprostřed čtení).
@@ -2097,7 +2113,7 @@ export default function Home() {
           language: uiLang,
         }),
       });
-      const d = await safeJson<{ audioUrl?: string; error?: string }>(res);
+      const d = await safeJson<{ audioUrl?: string; error?: string; wordTimings?: WordTiming[] }>(res);
       if (!res.ok || !d.audioUrl) {
         setAudioErr(`${t.audioFailed}${d.error ? ` (${String(d.error).slice(0, 180)})` : ""}`);
         return;
@@ -2107,7 +2123,7 @@ export default function Home() {
       setScenes(prev => {
         const next = [...prev];
         if (!next[i] || next[i].audioUrl) return prev;
-        next[i] = { ...next[i], audioUrl: d.audioUrl };
+        next[i] = { ...next[i], audioUrl: d.audioUrl, wordTimings: d.wordTimings };
         const eid = readerEntryIdRef.current;
         if (eid) {
           renderedMapRef.current.set(eid, next);
@@ -2137,7 +2153,7 @@ export default function Home() {
   async function fillMissingAudio(
     id: string,
     entryScenes: Scene[],
-    media: Array<{ imageUrl?: string; audioUrl?: string }>,
+    media: Array<{ imageUrl?: string; audioUrl?: string; wordTimings?: WordTiming[] }>,
     onProgress?: (done: number, total: number) => void,
     voiceIdOverride?: string
   ): Promise<void> {
@@ -2173,9 +2189,9 @@ export default function Home() {
                 language: uiLang,
               }),
             });
-            const d = await safeJson<{ audioUrl?: string }>(res);
+            const d = await safeJson<{ audioUrl?: string; wordTimings?: WordTiming[] }>(res);
             if (res.ok && d.audioUrl) {
-              media[i] = { ...(media[i] || {}), audioUrl: d.audioUrl };
+              media[i] = { ...(media[i] || {}), audioUrl: d.audioUrl, wordTimings: d.wordTimings };
               break;
             }
           } catch {}
@@ -2287,11 +2303,11 @@ export default function Home() {
             voiceId: newVoiceId,
           }),
         });
-        const data = await safeJson<{ audioUrl?: string; error?: string }>(res);
+        const data = await safeJson<{ audioUrl?: string; error?: string; wordTimings?: WordTiming[] }>(res);
         if (!res.ok || !data.audioUrl) return;
         setScenes(prev => {
           const next = [...prev];
-          next[i] = { ...next[i], audioUrl: data.audioUrl };
+          next[i] = { ...next[i], audioUrl: data.audioUrl, wordTimings: data.wordTimings };
           return next;
         });
       } catch {}
@@ -2601,14 +2617,14 @@ export default function Home() {
           language: uiLang,
         }),
       });
-      const d = await safeJson<{ audioUrl?: string }>(res);
+      const d = await safeJson<{ audioUrl?: string; wordTimings?: WordTiming[] }>(res);
       if (res.ok && d.audioUrl) {
         setScenes(prev => {
           // Stejná pojistka jako v repairSceneImage výš — mezitím se appka
           // mohla přepnout jinam a scéna na indexu i už neexistuje.
           if (!prev[i]) return prev;
           const n = [...prev];
-          n[i] = { ...n[i], audioUrl: d.audioUrl };
+          n[i] = { ...n[i], audioUrl: d.audioUrl, wordTimings: d.wordTimings };
           const eid = readerEntryIdRef.current;
           if (eid) {
             renderedMapRef.current.set(eid, n);
@@ -2666,7 +2682,7 @@ export default function Home() {
   const jobTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   // Progressive download (per job): finished scenes stream in DURING generation,
   // so the final "open" is instant and gen-cards show real thumbnails
-  const jobMediaRef = useRef<Map<string, { scenes: Map<number, { imageUrl?: string; audioUrl?: string }>; fetching: Set<number>; audioFetching: Set<number> }>>(new Map());
+  const jobMediaRef = useRef<Map<string, { scenes: Map<number, { imageUrl?: string; audioUrl?: string; wordTimings?: WordTiming[] }>; fetching: Set<number>; audioFetching: Set<number> }>>(new Map());
   // Per-job scene buffer for the gen-card thumbnails
   const jobBuffersRef = useRef<Map<string, RenderedScene[]>>(new Map());
   // Stall watch (per job): when the server function dies on the 5-min limit, kick /continue
@@ -2949,11 +2965,11 @@ export default function Home() {
         }),
       }).then(async res => {
         jm!.audioFetching.delete(i);
-        const d = await safeJson<{ audioUrl?: string }>(res);
+        const d = await safeJson<{ audioUrl?: string; wordTimings?: WordTiming[] }>(res);
         if (!res.ok || !d.audioUrl) return;
-        jm!.scenes.set(i, { ...jm!.scenes.get(i), audioUrl: d.audioUrl });
+        jm!.scenes.set(i, { ...jm!.scenes.get(i), audioUrl: d.audioUrl, wordTimings: d.wordTimings });
         const b = jobBuffersRef.current.get(jobId);
-        if (b && b[i]) b[i] = { ...b[i], audioUrl: d.audioUrl };
+        if (b && b[i]) b[i] = { ...b[i], audioUrl: d.audioUrl, wordTimings: d.wordTimings };
       }).catch(() => { jm!.audioFetching.delete(i); });
     }
   }
@@ -5585,24 +5601,39 @@ export default function Home() {
                   <div className="title-card-bg" style={{ backgroundImage: `url(${cardBgUrl})` }} />
                 ) : null}
                 <div className="title-card-scrim" />
+                {/* 🏷️ 2026-08-08: dřív velké tlačítko uprostřed přes půl
+                    obrázku — přesunuto do jednoho kompaktního info-boxu DOLE
+                    (jako v CD), ať je vidět celá ilustrace. Box nese název +
+                    počet stran/odhad času čtení + kolečkové ▶ tlačítko na
+                    ~1/3 dřívější velikosti, animované pulzujícími prstenci
+                    místo pouhého škálování celé pilulky. */}
                 <div className="title-card-content">
                   {!scene1Ready && <div className="title-card-emoji">📖</div>}
-                  <div className="title-card-title">{title}</div>
-                  {/* 🚦 "Ťukni pro spuštění" se ukáže až pro CELOU hotovou
-                      pohádku (storyFullyReady: obrázky I hlas), ne jen pro
-                      hotovou scénu 1 — appka nikdy nespustí nedokreslenou
-                      pohádku, zbytek už se nedokresluje viditelně za čtenářem.
-                      🟠 Dřív jen drobný tichý text — teď skutečné velké
-                      oranžové tlačítko uprostřed, ať je jasné, že se dá
-                      ťuknout (celá karta je klikatelná i tak, tohle je jen
-                      viditelná afordance). */}
-                  {storyFullyReady ? (
-                    <div className="title-card-tap title-card-tap-ready">▶ {t.titleCardTap}</div>
-                  ) : (
-                    <div className="title-card-tap">
-                      <span className="placeholder-spinner placeholder-spinner-sm" />{t.titleCardPreparing}
+                  <div className="title-card-infobox">
+                    <div className="title-card-title">{title}</div>
+                    <div className="title-card-meta">
+                      <span>{t.titleCardPages(scenes.length)}</span>
+                      <span className="title-card-meta-dot">·</span>
+                      <span>{t.titleCardMinutes(titleCardReadMinutes)}</span>
                     </div>
-                  )}
+                    {/* 🚦 "Ťukni pro spuštění" se ukáže až pro CELOU hotovou
+                        pohádku (storyFullyReady: obrázky I hlas), ne jen pro
+                        hotovou scénu 1 — appka nikdy nespustí nedokreslenou
+                        pohádku, zbytek už se nedokresluje viditelně za čtenářem.
+                        Celá karta je klikatelná i tak, tlačítko je jen
+                        viditelná afordance (žádný vlastní onClick). */}
+                    {storyFullyReady ? (
+                      <button type="button" className="title-card-play" aria-label={t.titleCardTap} title={t.titleCardTap}>
+                        <span className="title-card-play-ring" />
+                        <span className="title-card-play-ring title-card-play-ring-b" />
+                        <span className="title-card-play-icon">▶</span>
+                      </button>
+                    ) : (
+                      <div className="title-card-tap">
+                        <span className="placeholder-spinner placeholder-spinner-sm" />{t.titleCardPreparing}
+                      </div>
+                    )}
+                  </div>
                   {/* 🆘 Pojistka proti věčnému čekání — appka NIKDY nenabízí
                       "číst i tak" (výslovné přání), jen po 45 s dá možnost
                       odejít 🏠 Domů, kdyby se nějaká scéna fakt nikdy
@@ -5651,7 +5682,26 @@ export default function Home() {
 
             <div className="page-body" ref={pageBodyRef}>
               <div className="page-clip" ref={pageClipRef}>
-                <p className="page-text">{current.narration}</p>
+                {/* 🎤 KARAOKE: text jako řada slovních <span>, obarvených podle
+                    currentWordIdx (přečteno/právě čtené/ještě nepřečteno) —
+                    stejná trojice tříd jako CD ReaderScreen (wordRead/
+                    wordActive/wordPending), ale řízená SKUTEČNÝM ElevenLabs
+                    časováním (current.wordTimings), ne fake časovačem. Beze
+                    změny mezerování oproti prostému textu (mezera je součástí
+                    každého spanu), takže ticker scroll (pageClipRef/rollTick)
+                    funguje beze změny. */}
+                <p className="page-text page-text-karaoke">
+                  {current.narration.trim().split(/\s+/).filter(Boolean).map((w, i) => (
+                    <span key={i} className={
+                      !isPlaying ? "word-idle"
+                        : i < currentWordIdx ? "word-read"
+                        : i === currentWordIdx ? "word-active"
+                        : "word-pending"
+                    }>
+                      {w}{" "}
+                    </span>
+                  ))}
+                </p>
               </div>
               {/* ✏️ Ruční úprava textu — jako u běžné pohádky, i u zkopírované */}
               <button type="button" className="page-edit" aria-label={t.editTextBtn} title={t.editTextBtn}
@@ -5783,7 +5833,31 @@ export default function Home() {
 
           {current.audioUrl && (
             <audio ref={audioRef} key={current.audioUrl} src={current.audioUrl}
-              onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={handleAudioEnded} />
+              onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={handleAudioEnded}
+              // 🎤 KARAOKE sync — skutečné ElevenLabs slovní časování, když ho
+              // appka má (current.wordTimings); jinak rovnoměrný ODHAD podle
+              // délky audia (Gemini hlasy, viz app/api/scene/route.ts). Appka
+              // záměrně NEpoužívá binární vyhledávání — appka má max. pár
+              // desítek slov na stránku, lineární průchod je zanedbatelný a
+              // je čitelnější.
+              onTimeUpdate={() => {
+                const el = audioRef.current;
+                if (!el) return;
+                const t = el.currentTime;
+                const timings = current.wordTimings;
+                if (timings && timings.length) {
+                  let idx = timings.findIndex(w => t < w.end);
+                  if (idx === -1) idx = timings.length - 1;
+                  setCurrentWordIdx(prev => (prev === idx ? prev : idx));
+                  return;
+                }
+                const dur = el.duration;
+                if (!dur || !Number.isFinite(dur)) return;
+                const words = current.narration.trim().split(/\s+/).filter(Boolean);
+                if (!words.length) return;
+                const idx = Math.min(words.length - 1, Math.floor((t / dur) * words.length));
+                setCurrentWordIdx(prev => (prev === idx ? prev : idx));
+              }} />
           )}
         </div>
       )}

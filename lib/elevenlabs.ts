@@ -1,4 +1,4 @@
-import type { Scene } from "./types";
+import type { Scene, WordTiming } from "./types";
 import { readJson } from "./job-runner";
 
 // Strip non-printable chars -- belt-and-suspenders before setting HTTP headers
@@ -91,6 +91,22 @@ export async function getCloneTuning(voiceId: string): Promise<VoiceTuning | und
   return Array.isArray(clones) ? clones.find(c => c.id === voiceId)?.settings : undefined;
 }
 
+function voiceSettingsFor(tuning?: VoiceTuning) {
+  // Živější přednes: nižší stability = větší intonační rozsah (citoslovce,
+  // zvířecí zvuky), style dodá dramatičnost, speaker_boost drží barvu hlasu.
+  // Ladění bez nasazování: env ELEVEN_STABILITY / ELEVEN_STYLE /
+  // ELEVEN_SIMILARITY (0–1) a ELEVEN_SPEED (0.7–1.2) ve Vercelu
+  return {
+    stability: tuning?.stability ?? envNum("ELEVEN_STABILITY", 0.42),
+    similarity_boost: tuning?.similarityBoost ?? envNum("ELEVEN_SIMILARITY", 0.8),
+    style: tuning?.style ?? envNum("ELEVEN_STYLE", 0.35),
+    use_speaker_boost: true,
+    ...(process.env.ELEVEN_SPEED
+      ? { speed: Math.min(1.2, Math.max(0.7, parseFloat(process.env.ELEVEN_SPEED) || 1)) }
+      : {}),
+  };
+}
+
 export async function narrateScene(scene: Scene, overrideVoiceId?: string, tuning?: VoiceTuning, heroDescription?: string): Promise<Buffer> {
   const apiKey = sanitizeApiKey(process.env.ELEVENLABS_API_KEY);
   if (!apiKey) throw new Error("Chybi ELEVENLABS_API_KEY.");
@@ -117,19 +133,7 @@ export async function narrateScene(scene: Scene, overrideVoiceId?: string, tunin
         text: applyDynamicHints(applyCzechPronunciations(sanitizeText(scene.narration)), heroDescription),
         model_id: modelId,
         output_format: "mp3_44100_128",
-        // Živější přednes: nižší stability = větší intonační rozsah (citoslovce,
-        // zvířecí zvuky), style dodá dramatičnost, speaker_boost drží barvu hlasu.
-        // Ladění bez nasazování: env ELEVEN_STABILITY / ELEVEN_STYLE /
-        // ELEVEN_SIMILARITY (0–1) a ELEVEN_SPEED (0.7–1.2) ve Vercelu
-        voice_settings: {
-          stability: tuning?.stability ?? envNum("ELEVEN_STABILITY", 0.42),
-          similarity_boost: tuning?.similarityBoost ?? envNum("ELEVEN_SIMILARITY", 0.8),
-          style: tuning?.style ?? envNum("ELEVEN_STYLE", 0.35),
-          use_speaker_boost: true,
-          ...(process.env.ELEVEN_SPEED
-            ? { speed: Math.min(1.2, Math.max(0.7, parseFloat(process.env.ELEVEN_SPEED) || 1)) }
-            : {}),
-        },
+        voice_settings: voiceSettingsFor(tuning),
       }),
       signal: AbortSignal.timeout(60_000),
     }
@@ -141,4 +145,76 @@ export async function narrateScene(scene: Scene, overrideVoiceId?: string, tunin
   }
 
   return Buffer.from(await res.arrayBuffer());
+}
+
+/** ElevenLabs vrací zarovnání na úrovni ZNAKŮ (character_start/end_times_seconds
+ *  souběžně s polem znaků) — appka si z nich sama poskládá SLOVA (rozdělená
+ *  mezerami), protože přehrávač zvýrazňuje celá slova, ne jednotlivá písmena. */
+function wordsFromAlignment(alignment: { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] }): WordTiming[] {
+  const { characters, character_start_times_seconds: starts, character_end_times_seconds: ends } = alignment;
+  const words: WordTiming[] = [];
+  let cur = "", curStart = -1, curEnd = -1;
+  for (let i = 0; i < characters.length; i++) {
+    const ch = characters[i];
+    if (/\s/.test(ch)) {
+      if (cur) { words.push({ word: cur, start: curStart, end: curEnd }); cur = ""; curStart = -1; }
+      continue;
+    }
+    if (curStart < 0) curStart = starts[i];
+    curEnd = ends[i];
+    cur += ch;
+  }
+  if (cur) words.push({ word: cur, start: curStart, end: curEnd });
+  return words;
+}
+
+/** Stejné namluvení jako narrateScene, ale přes `/with-timestamps` endpoint —
+ *  appka navíc dostane SKUTEČNÉ časování každého slova (ne jen hotové audio),
+ *  potřebné pro karaoke zvýrazňování textu v čtečce. Používá appka JEN při
+ *  líném namlouvání v reálném čase čtení (viz app/api/scene/route.ts,
+ *  audioOnly větev) — generování pohádky samotné časování nepotřebuje.
+ *  ElevenLabs za timestamps neúčtuje nic navíc (stejná cena jako narrateScene). */
+export async function narrateSceneTimed(scene: Scene, overrideVoiceId?: string, tuning?: VoiceTuning, heroDescription?: string): Promise<{ buffer: Buffer; mimeType: string; wordTimings: WordTiming[] }> {
+  const apiKey = sanitizeApiKey(process.env.ELEVENLABS_API_KEY);
+  if (!apiKey) throw new Error("Chybi ELEVENLABS_API_KEY.");
+
+  const voiceId = sanitizeApiKey(overrideVoiceId || process.env.ELEVENLABS_VOICE_ID);
+  if (!voiceId) throw new Error("Chybi ELEVENLABS_VOICE_ID.");
+
+  const modelId = sanitizeApiKey(process.env.ELEVENLABS_MODEL_ID) || "eleven_flash_v2_5";
+
+  const res = await fetch(
+    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/with-timestamps`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "xi-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        text: applyDynamicHints(applyCzechPronunciations(sanitizeText(scene.narration)), heroDescription),
+        model_id: modelId,
+        output_format: "mp3_44100_128",
+        voice_settings: voiceSettingsFor(tuning),
+      }),
+      signal: AbortSignal.timeout(60_000),
+    }
+  );
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`ElevenLabs ${res.status}: ${errText.slice(0, 300)}`);
+  }
+
+  const data = await res.json() as {
+    audio_base64: string;
+    alignment?: { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] };
+  };
+  const buffer = Buffer.from(data.audio_base64, "base64");
+  // Chybějící alignment (appka to zatím nikdy neviděla, ale API kontrakt ho
+  // označuje volitelný) → appka vrátí audio bez časování, klient si poradí
+  // vlastním ODHADEM (viz page.tsx, stejný fallback jako pro Gemini hlasy).
+  const wordTimings = data.alignment ? wordsFromAlignment(data.alignment) : [];
+  return { buffer, mimeType: "audio/mpeg", wordTimings };
 }

@@ -236,6 +236,10 @@ export const UI = {
     sceneAlt: (n: number) => `Scéna ${n}`,
     titleCardTap: "ťukni pro spuštění",
     titleCardPreparing: "Připravuji pohádku…",
+    // 🏷️ Info box na titulce (počet stran + odhad času čtení) — čeština má
+    // 3 tvary skloňování podle čísla (1 / 2-4 / 5+), viz volání níž.
+    titleCardPages: (n: number) => `${n} ${n === 1 ? "strana" : n >= 2 && n <= 4 ? "strany" : "stran"}`,
+    titleCardMinutes: (n: number) => `~${n} ${n === 1 ? "minuta" : n >= 2 && n <= 4 ? "minuty" : "minut"} čtení`,
     iosFullscreenHint: "📲 Na iPhonu/iPadu appka neumí spustit celou obrazovku sama v obyčejném prohlížeči (omezení Safari) — pro pohádku přes celý displej si appku přidej na Plochu: tlačítko Sdílet 􀈂 → „Přidat na plochu“.",
     play: "Přehrát",
     pause: "Pauza",
@@ -491,6 +495,8 @@ export const UI = {
     sceneAlt: (n: number) => `Scene ${n}`,
     titleCardTap: "tap to start",
     titleCardPreparing: "Preparing the story…",
+    titleCardPages: (n: number) => `${n} page${n === 1 ? "" : "s"}`,
+    titleCardMinutes: (n: number) => `~${n} min read`,
     iosFullscreenHint: "📲 On iPhone/iPad the app can't switch itself to full screen in the regular browser (a Safari limitation) — for a full-screen story, add the app to your Home Screen: Share 􀈂 → \"Add to Home Screen\".",
     play: "Play",
     pause: "Pause",
