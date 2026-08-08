@@ -236,7 +236,7 @@ export default function HomeScreen({
                 to vypadalo jako statický, uzavřený výběr). */}
             <button type="button" className={styles.bgSheetNav} style={{ left: -6 }}
               onClick={() => scrollBgSheet(-1)} aria-label="Předchozí světy">
-              <ChevronDown style={{ transform: "rotate(90deg)" }} />
+              <ChevronSide dir="l" />
             </button>
             <div
               ref={bgSheetRef}
@@ -270,7 +270,7 @@ export default function HomeScreen({
             </div>
             <button type="button" className={styles.bgSheetNav} style={{ right: -6 }}
               onClick={() => scrollBgSheet(1)} aria-label="Další světy">
-              <ChevronDown style={{ transform: "rotate(-90deg)" }} />
+              <ChevronSide dir="r" />
             </button>
           </div>
           {bgAddOpen && (
@@ -420,6 +420,17 @@ function ChevronDown({ style }: { style?: React.CSSProperties } = {}) {
   return (
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.75, ...style }}>
       <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+// 🖱️ 2026-08-09: šipka u výběru světa se "hýbala dolů" — příčina: appka dřív
+// natáčela ChevronDown (dolů) o ±90° přes CSS transform, ale SVG rotace se
+// dělá kolem (0,0) ne kolem středu ikony, takže se vizuálně vychýlila mimo
+// tlačítko. Vlastní PŘÍMÁ ikona vlevo/vpravo (bez rotace) tohle nemá jak udělat.
+function ChevronSide({ dir }: { dir: "l" | "r" }) {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+      <path d={dir === "l" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7"} />
     </svg>
   );
 }

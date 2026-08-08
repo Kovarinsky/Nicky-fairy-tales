@@ -1167,24 +1167,20 @@ button:disabled {
     padding: 0.3rem 0.3rem 0;
   }
 
-  /* Text: single-line ticker, teď PŘEKRYVEM přes spodek obrázku (viz base
-     .reader-mode .page-body výš) — kratší přesah než v portrétu, ticker je
-     jen jeden řádek. */
+  /* 🎤 2026-08-09 (2): appka dřív jela v landscape jednořádkový TICKER
+     (white-space: nowrap + vodorovné rolování) — uživatel chtěl přesně CD
+     chování: appka ukazuje jen JEDNU VĚTU (viz karaokeCurrentSentence,
+     page.tsx), ta se přirozeně vejde na 1-2 krátké řádky bez rolování,
+     stejně jako v portrétu. Ticker mechanismus (pageClipRef/rollTick,
+     page.tsx) zůstává v kódu jako záložní chování pro výjimečně dlouhou
+     větu na úzké obrazovce, ale běžně se už neuplatní (žádný overflow). */
   .reader-mode .page-body {
     height: auto;
-    max-height: none;
+    max-height: 40%;
     margin-top: -2.5rem;
-    /* vnitřní okraje — text nejede od kraje ke kraji rámečku */
-    padding: 1.6rem 1.35rem 0.55rem;
-    overflow: hidden;
+    padding: 1.8rem 1.5rem 0.6rem;
   }
-  .reader-mode .page-clip {
-    overflow: hidden;
-    /* měkké vyjíždění textu na okrajích rámečku */
-    mask-image: linear-gradient(90deg, transparent 0, #000 1.1rem, #000 calc(100% - 1.1rem), transparent 100%);
-    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 1.1rem, #000 calc(100% - 1.1rem), transparent 100%);
-  }
-  /* Tenký titulkový pruh na šířku — tlačítko úpravy zmenšeno a mimo mlhu okraje */
+  /* Tenký titulkový pruh na šířku — tlačítko úpravy zmenšeno */
   .reader-mode .page-edit {
     top: 2px;
     right: 2px;
@@ -1195,13 +1191,8 @@ button:disabled {
     background: rgba(255, 255, 255, 0.2);
   }
   .reader-mode .page-text {
-    white-space: nowrap;
-    display: inline-block;
-    /* větší vnitřní odsazení než šířka vyblednutí (1.1rem) — začátek
-       i konec věty jsou při rolování plně čitelné, ne v mlze okraje */
-    padding: 0 1.35rem;
-    font-size: 0.95rem;
-    line-height: 1.35;
+    font-size: 1.05rem;
+    line-height: 1.32;
   }
 
 }

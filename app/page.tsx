@@ -1182,6 +1182,39 @@ export default function Home() {
   // zvýrazněné konce PŘEDCHOZÍHO textu bleskově naskočit na začátku dalšího).
   useEffect(() => { setCurrentWordIdx(-1); }, [page]);
 
+  // 🎤 2026-08-09: nahlášeno "text je pozadu za hlasem" — příčina: appka
+  // dřív počítala aktuální slovo JEN v onTimeUpdate na <audio>, což ve
+  // většině prohlížečů spolehlivě hasí jen ~4× za sekundu (throttlováno),
+  // takže zvýraznění znatelně zaostávalo za skutečně slyšeným slovem.
+  // rAF smyčka čte audioRef.currentTime KAŽDÝ snímek (~60×/s) po celou
+  // dobu přehrávání — mnohem těsnější souběh se skutečným zvukem.
+  useEffect(() => {
+    if (!isPlaying) return;
+    let raf = 0;
+    const tick = () => {
+      const el = audioRef.current;
+      const scene = scenes[page];
+      if (el && scene) {
+        const t = el.currentTime;
+        const timings = scene.wordTimings;
+        if (timings && timings.length) {
+          let idx = timings.findIndex(w => t < w.end);
+          if (idx === -1) idx = timings.length - 1;
+          setCurrentWordIdx(prev => (prev === idx ? prev : idx));
+        } else if (el.duration && Number.isFinite(el.duration)) {
+          const words = (scene.narration || "").trim().split(/\s+/).filter(Boolean);
+          if (words.length) {
+            const idx = Math.min(words.length - 1, Math.floor((t / el.duration) * words.length));
+            setCurrentWordIdx(prev => (prev === idx ? prev : idx));
+          }
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isPlaying, page, scenes]);
+
   // 🔊 Jednorázový zvukový efekt podle děje TÉTO scény (vlny/hrom/chrápání) —
   // jednou na stránku (ref hlídá, ať se nespustí znovu při každém re-renderu)
   const sfxFiredRef = useRef<string | null>(null);
@@ -4518,6 +4551,31 @@ export default function Home() {
   const hasPrev = prevVisible !== null;
   const totalScenes = scenes.length;
 
+  // 🎤 2026-08-09: appka dřív ukazovala CELÝ text stránky najednou (klidně
+  // i 3-4 věty), což vždy potřebovalo scroll/ticker na příliš dlouhý řádek
+  // — uživatel chtěl přesně CD chování (design-bundle-v7 ReaderScreen):
+  // ukazuje se JEN aktuálně čtená VĚTA, přirozeně se vejde na 1-2 krátké
+  // řádky. Věty se dělí podle interpunkce (.!?…), currentWordIdx je
+  // GLOBÁLNÍ index napříč celou narrací stránky (viz rAF smyčka níž) —
+  // tady se přepočítá na (index věty, lokální index slova uvnitř věty).
+  const karaokeSentences = (current?.narration ?? "").match(/[^.!?…]+[.!?…]*\s*/g)?.map(s => s.trim()).filter(Boolean)
+    ?? [(current?.narration ?? "").trim()].filter(Boolean);
+  const karaokeWordCounts = karaokeSentences.map(s => s.split(/\s+/).filter(Boolean).length);
+  let karaokeSentenceIdx = 0, karaokeWordsBefore = 0;
+  {
+    let acc = 0;
+    for (let i = 0; i < karaokeWordCounts.length; i++) {
+      if (currentWordIdx < acc + karaokeWordCounts[i] || i === karaokeWordCounts.length - 1) {
+        karaokeSentenceIdx = i;
+        karaokeWordsBefore = acc;
+        break;
+      }
+      acc += karaokeWordCounts[i];
+    }
+  }
+  const karaokeLocalWordIdx = currentWordIdx - karaokeWordsBefore;
+  const karaokeCurrentSentence = karaokeSentences[karaokeSentenceIdx] || current?.narration || "";
+
   // 🚧 Dočasně (než se generování obrázků zoptimalizuje): appka NIKDY
   // neukáže dead-end "obrázek se nepovedl" s ručním tlačítkem — místo toho
   // tiše zkouší dál na pozadí (rostoucí prodleva, strop 30 s), dokud se to
@@ -5608,20 +5666,19 @@ export default function Home() {
 
             <div className="page-body" ref={pageBodyRef}>
               <div className="page-clip" ref={pageClipRef}>
-                {/* 🎤 KARAOKE: text jako řada slovních <span>, obarvených podle
-                    currentWordIdx (přečteno/právě čtené/ještě nepřečteno) —
-                    stejná trojice tříd jako CD ReaderScreen (wordRead/
-                    wordActive/wordPending), ale řízená SKUTEČNÝM ElevenLabs
-                    časováním (current.wordTimings), ne fake časovačem. Beze
-                    změny mezerování oproti prostému textu (mezera je součástí
-                    každého spanu), takže ticker scroll (pageClipRef/rollTick)
-                    funguje beze změny. */}
+                {/* 🎤 KARAOKE: appka teď ukazuje JEN aktuálně čtenou VĚTU
+                    (karaokeCurrentSentence), ne celý text stránky — přesně
+                    CD chování, přirozeně se vejde na 1-2 řádky bez tickeru.
+                    Slova obarvená podle karaokeLocalWordIdx (přečteno/právě
+                    čtené/ještě nepřečteno) — stejná trojice tříd jako CD
+                    ReaderScreen (wordRead/wordActive/wordPending), řízená
+                    SKUTEČNÝM ElevenLabs časováním (current.wordTimings). */}
                 <p className="page-text page-text-karaoke">
-                  {current.narration.trim().split(/\s+/).filter(Boolean).map((w, i) => (
+                  {karaokeCurrentSentence.split(/\s+/).filter(Boolean).map((w, i) => (
                     <span key={i} className={
                       !isPlaying ? "word-idle"
-                        : i < currentWordIdx ? "word-read"
-                        : i === currentWordIdx ? "word-active"
+                        : i < karaokeLocalWordIdx ? "word-read"
+                        : i === karaokeLocalWordIdx ? "word-active"
                         : "word-pending"
                     }>
                       {w}{" "}
@@ -5759,31 +5816,7 @@ export default function Home() {
 
           {current.audioUrl && (
             <audio ref={audioRef} key={current.audioUrl} src={current.audioUrl}
-              onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={handleAudioEnded}
-              // 🎤 KARAOKE sync — skutečné ElevenLabs slovní časování, když ho
-              // appka má (current.wordTimings); jinak rovnoměrný ODHAD podle
-              // délky audia (Gemini hlasy, viz app/api/scene/route.ts). Appka
-              // záměrně NEpoužívá binární vyhledávání — appka má max. pár
-              // desítek slov na stránku, lineární průchod je zanedbatelný a
-              // je čitelnější.
-              onTimeUpdate={() => {
-                const el = audioRef.current;
-                if (!el) return;
-                const t = el.currentTime;
-                const timings = current.wordTimings;
-                if (timings && timings.length) {
-                  let idx = timings.findIndex(w => t < w.end);
-                  if (idx === -1) idx = timings.length - 1;
-                  setCurrentWordIdx(prev => (prev === idx ? prev : idx));
-                  return;
-                }
-                const dur = el.duration;
-                if (!dur || !Number.isFinite(dur)) return;
-                const words = current.narration.trim().split(/\s+/).filter(Boolean);
-                if (!words.length) return;
-                const idx = Math.min(words.length - 1, Math.floor((t / dur) * words.length));
-                setCurrentWordIdx(prev => (prev === idx ? prev : idx));
-              }} />
+              onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={handleAudioEnded} />
           )}
         </div>
       )}
