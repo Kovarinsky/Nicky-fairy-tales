@@ -26,6 +26,14 @@ export interface AccountRecord {
   email?: string;
   /** 📊 Počet doopravdy dokončených pohádek — pro developerský přehled */
   storiesCompleted?: number;
+  /** 🛠️ Vývojářský účet (dnes jen Jan) — appka mu nekontroluje ani neúčtuje
+   *  kredity (viz /api/job/start, chargeForCompletedStory), ať může appku
+   *  volně testovat bez ručního dobíjení. Zatím jediný signál role/práv na
+   *  účtu (viz CLAUDE.md bod 4 — širší admin/user split je rozhodnutý, ale
+   *  ještě neimplementovaný; tohle pole už mu z části pomáhá). NIKDY se
+   *  nesmí dát nastavit z klienta (/api/account/sync bere jen `data`, ne
+   *  kořenová pole záznamu) — jde nastavit jen ručně/serverovým skriptem. */
+  isAdmin?: boolean;
 }
 
 /** Nový účet dostává na vyzkoušení tento počet kreditů zdarma. Pod novým
@@ -49,11 +57,14 @@ export async function adjustCredits(username: string, delta: number): Promise<nu
 }
 
 /** Odečet za dokončenou pohádku + zvýšení počítadla pro dev přehled —
- *  v JEDNOM čtení/zápisu (ne dva samostatné adjustCredits+počítadlo volání). */
+ *  v JEDNOM čtení/zápisu (ne dva samostatné adjustCredits+počítadlo volání).
+ *  🛠️ isAdmin účet: počítadlo dokončených pohádek se pořád vede (dev přehled),
+ *  ale kredity se NEODEČÍTAJÍ — souměří s /api/job/start, který mu odhad
+ *  ceny předem vůbec nekontroluje. */
 export async function chargeForCompletedStory(username: string, cost: number): Promise<void> {
   const acc = await readAccount(username);
   if (!acc) return;
-  acc.credits = Math.max(0, (acc.credits ?? 0) - cost);
+  if (!acc.isAdmin) acc.credits = Math.max(0, (acc.credits ?? 0) - cost);
   acc.storiesCompleted = (acc.storiesCompleted ?? 0) + 1;
   acc.updatedAt = Date.now();
   await writeAccount(acc);
