@@ -2819,6 +2819,22 @@ button:disabled {
   color: #cbd5e1;
 }
 
+/* ⏳ Pohádka čeká ve frontě, appka zrovna dokresluje jinou (viz
+   queuedRegenIds, replayStory) — vlastní řádek, ne v .history-badges (delší
+   text, potřebuje celou šířku, ne stísněný vedle krátkých odznaků). */
+.badge-queued {
+  display: block;
+  width: fit-content;
+  margin: 0.2rem 0;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fcd34d;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 .badge-size {
   background: rgba(245, 158, 11, 0.15);
   border: 1px solid rgba(245, 158, 11, 0.4);

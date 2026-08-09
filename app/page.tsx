@@ -442,6 +442,17 @@ export default function Home() {
   // History
   const [storyHistory, setStoryHistory] = useState<HistoryEntry[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // 🩺 2026-08-10: "otevřu víc pohádek z historie najednou, nahrává se jen
+  // jedna, chceme vidět stav i ostatních" — appka měla jen JEDNU lokální
+  // regenerační dráhu (loading/bgStatus), druhé ťuknutí za běhu první tiše
+  // NIC neudělalo (viz replayStory větev 3 níž). Skutečná souběžná
+  // regenerace (víc rozdělaných najednou, každá s vlastním průběhem) je
+  // větší přestavba na úrovni serverJobs — tohle je bezpečnější mezikrok:
+  // druhé/třetí ťuknutí se zařadí do FRONTY (regenQueueRef) a spustí samo,
+  // jakmile první doběhne, + položka v historii dostane viditelný "ve
+  // frontě" odznak, ať uživatel vidí, že se na jeho ťuknutí nezapomnělo.
+  const [queuedRegenIds, setQueuedRegenIds] = useState<Set<string>>(new Set());
+  const regenQueueRef = useRef<HistoryEntry[]>([]);
   // 🩺 2026-08-10: "offline" odznak byl NAPEVNO ZAPSANÝ TEXT na KAŽDÉ položce
   // — appka nikdy nekontrolovala, jestli je pohádka doopravdy stažená v
   // IndexedDB, jen to tvrdila. Uživatel: "tlačítko offline nefunguje" — po
@@ -957,7 +968,15 @@ export default function Home() {
   // uživatel mezitím rozjel DALŠÍ pohádku s jiným světem, všechny rozdělané
   // joby dostaly do historie to samé (poslední vybrané) téma/postavy/přání.
   type ServerJob = { jobId: string; phase: "writing" | "generating" | "done" | "error"; done: number; total: number; title?: string; error?: string; stalled?: boolean; imgError?: string; restarts?: number; stuckRestarts?: number; lastError?: string; log?: JobLogEntry[]; createdAt?: number; voiceDone?: number; voiceTotal?: number; themeId?: string; topic?: string; selectedIds?: string[] };
-  const MAX_ACTIVE_JOBS = 3;
+  // 🩺 2026-08-10: 3→2 — každý job navíc uvnitř kreslí až 5 scén souběžně
+  // (job-runner.ts), takže dřívější strop 3 dovolil až 3×5=15 SOUČASNÝCH
+  // Gemini volání z jednoho klíče. To se skládá s pozorovaným vysokým počtem
+  // 429 TooManyRequests v AI Studio dashboardu (analýza 2026-08-10) — appka
+  // má na 429 vestavěný retry-s-čekáním, takže kolize s rate limitem appku
+  // reálně ZDRŽÍ i PRODRAŽÍ (čekání + částečně redraw), ne jen "zpomalí
+  // frontu". Nižší strop souběžnosti (max 10 současných volání) by měl v
+  // průměru vyjít RYCHLEJI i LEVNĚJI, ne jako kompromis.
+  const MAX_ACTIVE_JOBS = 2;
   // 📋 Otevřený deník běhu jobu (overlay) — entries se berou živě z pollů
   // (jobId → entries živě z pollů; entries → snapshot z hotové pohádky v historii)
   const [logView, setLogView] = useState<{ title: string; jobId?: string; entries?: JobLogEntry[] } | null>(null);
@@ -4407,9 +4426,15 @@ export default function Home() {
       partial = restored;
     }
 
-    // 3. Cache miss/partial — regeneration only when nothing else is running
+    // 3. Cache miss/partial — regeneration only when nothing else is running.
+    // Druhé/další ťuknutí za běhu se ZAŘADÍ DO FRONTY místo tichého zahození
+    // (viz komentář u queuedRegenIds výš) — spustí se samo po dokončení
+    // aktuální regenerace, položka v historii mezitím ukazuje "⏳ ve frontě".
     if (loading || bgStatus !== "idle") {
-      // Background gen in progress — can't regenerate now; user sees the toast when it's done
+      if (!regenQueueRef.current.some(e => e.id === entry.id) && readerEntryIdRef.current !== entry.id) {
+        regenQueueRef.current = [...regenQueueRef.current, entry];
+        setQueuedRegenIds(new Set(regenQueueRef.current.map(e => e.id)));
+      }
       setHistoryOpen(false);
       return;
     }
@@ -4453,6 +4478,16 @@ export default function Home() {
       // by zůstalo natrvalo zamčené a další ✕ replay by se už nikdy nespustil
       setLoading(false);
       setReopenRegenerating(false);
+      // 🩺 Fronta (viz komentář u queuedRegenIds výš): další čekající pohádka
+      // se spustí SAMA, jakmile je tahle hotová — jeden krok stačí, případné
+      // DALŠÍ položky ve frontě si poradí samy rekurzivně přes tenhle stejný
+      // finally, až doběhne tahle.
+      const next = regenQueueRef.current[0];
+      if (next) {
+        regenQueueRef.current = regenQueueRef.current.slice(1);
+        setQueuedRegenIds(new Set(regenQueueRef.current.map(e => e.id)));
+        replayStory(next).catch(() => {});
+      }
     }
   }
 
@@ -5932,6 +5967,12 @@ export default function Home() {
                       <span className="history-title-clip">
                         <span className={`history-title${entry.title.length > 24 ? " title-roll" : ""}`}>{entry.title}</span>
                       </span>
+                      {/* 🩺 2026-08-10: viditelný stav, když appka zrovna dokresluje
+                          JINOU pohádku a tahle čeká ve frontě (viz queuedRegenIds
+                          výš) — "chceme vidět aktuální stav nahrávání i ostatních". */}
+                      {queuedRegenIds.has(entry.id) && (
+                        <span className="history-badge badge-queued">⏳ ve frontě — čeká, až appka dokreslí předchozí</span>
+                      )}
                       {/* 🩺 Info odznaky (offline/velikost/scény/čas) odděleny od
                           AKČNÍCH tlačítek (pokračování/poslat) — dřív byly
                           namačkané v jedné řadě vedle sebe, špatně se od sebe
