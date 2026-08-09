@@ -842,7 +842,21 @@ export async function generateSceneImage(
             v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt, refImages, deadline);
             if (!v0) console.warn(`[Gemini QA] scene ${scene.index}: kontrola opakovaně selhala — obrázek přijat NEOVĚŘENÝ`);
           }
-          if (v0 && !v0.ok && deadline !== undefined && Date.now() > deadline) {
+          // 🪶 ODLEHČENÁ KONTROLA U 1–2 JMENOVANÝCH LIDÍ VE SCÉNĚ (ECONOMY-PLAN.md,
+          // matice technik: „Odlehčené QA u 1-2 lidí scén" — appka tyhle scény i
+          // dnes zvládá spolehlivě, nejméně proměnných k zaměnění). Jediný nález
+          // MODERATE (barva doplňku, jedna drobnost) na takové scéně typicky NENÍ
+          // hoden placené opravy (editace stojí stejně jako čerstvá generace, viz
+          // komentář u genCounter.img1k v editSceneImage níž) — na rozdíl od MAJOR
+          // (rozbitý styl, cizí podoba, špatný počet lidí), kde se opravuje pořád,
+          // bez ohledu na velikost obsazení. Scény s 3+ lidmi zůstávají na PLNÉ
+          // přísnosti (MODERATE i MAJOR se opravují) — tam je prostoru na záměnu
+          // identit/proporcí podstatně víc, riziko tolerance vyšší.
+          const sceneCastCount = (sceneCastList(scene.imagePrompt) || "").split(",").map(s => s.trim()).filter(Boolean).length;
+          const lenientScene = sceneCastCount > 0 && sceneCastCount <= 2;
+          if (v0 && !v0.ok && lenientScene && !v0.findings.some(f => f.severity === "MAJOR")) {
+            console.log(`[Gemini QA] scene ${scene.index}: jen MODERATE nález na ${sceneCastCount}-osobové scéně → odlehčený režim, tolerováno bez opravy (${v0.problems})`);
+          } else if (v0 && !v0.ok && deadline !== undefined && Date.now() > deadline) {
             console.warn(`[Gemini QA] scene ${scene.index}: REJECTED [${v0.badRules} rules] (${v0.problems}) but DEADLINE passed → accepted as-is, no redraw`);
           } else if (v0 && !v0.ok) {
             let best = { img, badRules: v0.badRules, problems: v0.problems };

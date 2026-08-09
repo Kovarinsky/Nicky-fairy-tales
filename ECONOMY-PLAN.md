@@ -1,3 +1,16 @@
+> **2026-08-09 update:** od sepsání tohohle dokumentu appka mezitím dávno
+> implementovala Fáze 1–3 (portrétová kartotéka, skupinová kotva
+> `getFamilyGroupAnchor`, výškový list, cast-based seskupování do archů) —
+> viz `lib/version.ts` 4.99.53–4.99.80. Z matice technik (bod 4) je od
+> 4.99.81 implementované i „Odlehčené QA u 1-2 lidí scén" (`lib/gemini.ts`,
+> `generateSceneImage`) + nová volitelná pojistka `MONTHLY_SPEND_CAP_USD`
+> (`lib/usage.ts`, `/api/job/start`), co appku sama zastaví PŘED Googleiným
+> měsíčním stropem navyšování zůstatku — obojí mimo rozsah téhle dokumentu,
+> ale reakce na stejný cíl. **Fáze 4B (znovupoužití pozadí + editace místo
+> čerstvé kresby) zůstává NEimplementovaná** — pořád čeká na tvoje
+> rozhodnutí, jak agresivně do toho jít (mění to vizuální identitu appky,
+> viz bod 3/6 níž).
+
 # Cena/kvalita/rychlost — cílený research a plán (2026-08-06)
 
 Zadání (2026-08-05 večer): appka má trvale dosahovat

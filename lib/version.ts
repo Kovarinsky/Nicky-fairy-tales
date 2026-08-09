@@ -1,6 +1,35 @@
-export const APP_VERSION = "4.99.80";
+export const APP_VERSION = "4.99.81";
 
 // Changelog (newest first)
+// 4.99.81 - 💰 ROZPOČTOVÉ POJISTKY (na žádost po Googlein e-mailu "Dosáhli jste
+// měsíčního limitu automatického navyšování zůstatku", GCP účet
+// 01B33D-DEEC68-5E789A): appka do teď neměla ŽÁDNÝ mechanismus, který by ji
+// zastavil PŘED tím, než na Googlein strop narazí — jen kreditní systém PER
+// ÚČET, který nic nehlídá o CELKOVÉ útratě za měsíc. Dvě samostatné opravy:
+// (1) NOVÁ VOLITELNÁ POJISTKA: /api/job/start teď před spuštěním nové
+// pohádky umí zkontrolovat appčinu VLASTNÍ (Gemini-only) útratu od začátku
+// kalendářního měsíce (monthToDateGeminiUsd, nové lib/usage.ts — ownUsage
+// vytažena z app/api/usage/route.ts, aby ji mohly sdílet oba endpointy beze
+// změny chování přehledu) proti volitelnému env MONTHLY_SPEND_CAP_USD ve
+// Vercelu. Env nenastaven = appka jede přesně jako dřív (fail-open); jakmile
+// se vlastní měření z Blobu nedá zjistit (výpadek), job se PUSTÍ DÁL ze
+// stejného důvodu — appka nesmí kvůli chybě vlastního měření odmítat
+// placené pohádky. Nastavit strop je na uživateli (doporučená hodnota:
+// o pár desítek % níž, než je Googlein skutečný měsíční limit navyšování,
+// ať appka zastaví PŘED ním, ne až po něm).
+// (2) ECONOMY-PLAN.md, matice technik „Odlehčené QA u 1-2 lidí scén"
+// (dosud NEimplementováno, i když zbytek Fáze 1-4A dokumentu appka mezitím
+// dávno má — portréty, skupinová kotva, výškový list, cast-based sheet
+// grouping): generateSceneImage (lib/gemini.ts) teď u scén s max 2
+// jmenovanými lidmi (sceneCastList) toleruje samotný MODERATE nález bez
+// placené opravy — takové scény appka i dnes kreslí spolehlivě, riziko
+// tolerance je nízké. Scény se 3+ lidmi zůstávají na plné přísnosti beze
+// změny (víc prostoru na záměnu identit/proporcí). MAJOR nález se opravuje
+// VŽDY, bez ohledu na velikost obsazení — tahle úprava nikdy netoleruje
+// rozbitý styl, cizí podobu nebo špatný počet lidí. Očekávaný dopad podle
+// ECONOMY-PLAN.md: -15 až -25 % ceny NA TĚCH KONKRÉTNÍCH scénách (méně
+// EDIT volání, ne méně QA kontrol samotných — appka pořád kontroluje
+// každý obrázek, jen se u drobností na jednoduchých scénách nepřekresluje).
 // 4.99.80 - 🔒 ZÁMEK ODSTÍNŮ VLASŮ PRO CELOU RODINU + OPRAVA JANA A ARCHIEHO:
 // uživatel nahlásil "táta Jan zase vypadá jinak", i když je "ukotvený" —
 // kořenová příčina: appčina vlastní kontrola (verifySceneImage, gemini.ts
