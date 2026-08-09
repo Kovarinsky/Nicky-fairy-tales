@@ -98,8 +98,19 @@ async function elevenLabsCredits(): Promise<
 
 export async function GET(req: NextRequest) {
   const days = Math.min(Math.max(Number(req.nextUrl.searchParams.get("days")) || 30, 1), 365);
+  // 🔐 Rozpad po jednotlivých pohádkách (?stories=1) je citlivější než holý
+  // souhrn (ukazuje zařízení/časování) — na rozdíl od zbytku endpointu (viz
+  // CLAUDE.md bod 4, dosud bez autentizace) tohle vyžaduje ADMIN_PASSWORD,
+  // stejný mechanismus jako /api/admin/accounts.
+  const wantStories = req.nextUrl.searchParams.get("stories") === "1";
+  if (wantStories) {
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (!adminPassword || req.headers.get("x-admin-password") !== adminPassword) {
+      return NextResponse.json({ error: "Neplatné heslo." }, { status: 401 });
+    }
+  }
   const [claude, elevenlabs, czkRate, own] = await Promise.all([
-    claudeCost(days), elevenLabsCredits(), usdToCzkRate(), ownUsage(days),
+    claudeCost(days), elevenLabsCredits(), usdToCzkRate(), ownUsage(days, wantStories),
   ]);
   return NextResponse.json({ claude, elevenlabs, czkRate, own }, { headers: { "Cache-Control": "no-store" } });
 }

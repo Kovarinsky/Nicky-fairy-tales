@@ -18,7 +18,10 @@ export type OwnUsage = {
   images: number; sheets: number; chars: number; usd: number; days: number;
   stories: number; devices: number; prepAvgSec: number; prepMinSec: number;
   prepMaxSec: number; prepLastSec: number; prepCount: number;
+  storyRecords?: StoryRecord[];
 };
+
+export type StoryRecord = { ts: number; images: number; chars: number; sheets: number; usd: number; prepSec: number | null; device: string | null };
 
 // Vlastní počítadlo Gemini + hlasu: sečte záznamy
 // usage/u<ts>-i<1K obrázky>-c<znaky>[-s<4K archy>][-t1][-d<zařízení>].json
@@ -28,7 +31,11 @@ export type OwnUsage = {
 // dodavatel/jiný účet) se vrací zvlášť v `chars`, ne přičtený do `usd`.
 // To je záměr: monthToDateGeminiUsd níž potřebuje číslo srovnatelné
 // PŘÍMO s Googleovým měsíčním stropem, ne směs dvou různých účtů.
-export async function ownUsage(days: number): Promise<OwnUsage | { error: string }> {
+// 🩺 2026-08-10: appka dřív uměla jen SOUHRN — na dotaz "kolik stály
+// poslední pohádky" nešlo odpovědět. `wantStoryRecords` sesbírá i
+// jednotlivé záznamy CELÝCH pohádek (-t1), ať jde ukázat rozpad po
+// jedné (viz GET /api/usage?stories=1) — appka jinak chová se beze změny.
+export async function ownUsage(days: number, wantStoryRecords = false): Promise<OwnUsage | { error: string }> {
   if (!blobToken()) return { error: "blob-not-configured" };
   const cutoff = Date.now() - days * 86_400_000;
   const pruneBefore = Date.now() - 90 * 86_400_000;
@@ -40,6 +47,7 @@ export async function ownUsage(days: number): Promise<OwnUsage | { error: string
   let prepSum = 0, prepCount = 0, prepMin = Infinity, prepMax = 0, prepLastTs = 0, prepLast = 0;
   const devices = new Set<string>();
   const stale: string[] = [];
+  const storyRecords: StoryRecord[] = [];
   try {
     let cursor: string | undefined;
     do {
@@ -50,12 +58,16 @@ export async function ownUsage(days: number): Promise<OwnUsage | { error: string
         const ts = Number(m[1]);
         if (ts < pruneBefore) { stale.push(b.url); continue; }
         if (ts >= cutoff) {
-          images += Number(m[2]);
-          chars += Number(m[3]);
-          sheets += m[4] ? Number(m[4]) : 0;
+          const recImages = Number(m[2]);
+          const recChars = Number(m[3]);
+          const recSheets = m[4] ? Number(m[4]) : 0;
+          images += recImages;
+          chars += recChars;
+          sheets += recSheets;
           // Pohádka = záznam s -t1; starší formát (před značkou): záznam
           // s obrázky i hlasem najednou byl vždy celý job
-          if (m[5] || (Number(m[2]) > 0 && Number(m[3]) > 0)) stories += 1;
+          const isStory = !!m[5] || (recImages > 0 && recChars > 0);
+          if (isStory) stories += 1;
           if (m[6]) {
             const sec = Number(m[6]);
             prepSum += sec; prepCount += 1;
@@ -63,11 +75,20 @@ export async function ownUsage(days: number): Promise<OwnUsage | { error: string
             if (ts > prepLastTs) { prepLastTs = ts; prepLast = sec; }
           }
           if (m[7]) devices.add(m[7].toLowerCase());
+          if (wantStoryRecords && isStory) {
+            storyRecords.push({
+              ts, images: recImages, chars: recChars, sheets: recSheets,
+              usd: Math.round((recImages * price + recSheets * SHEET_PRICE_4K) * 100) / 100,
+              prepSec: m[6] ? Number(m[6]) : null,
+              device: m[7] ? m[7].toLowerCase() : null,
+            });
+          }
         }
       }
       cursor = page.cursor;
     } while (cursor);
     if (stale.length) del(stale, { token: blobToken() }).catch(() => {});
+    storyRecords.sort((a, b) => b.ts - a.ts);
     return {
       images, sheets, chars,
       usd: Math.round((images * price + sheets * SHEET_PRICE_4K) * 100) / 100,
@@ -77,6 +98,7 @@ export async function ownUsage(days: number): Promise<OwnUsage | { error: string
       prepMaxSec: prepMax,
       prepLastSec: prepLast,
       prepCount,
+      ...(wantStoryRecords ? { storyRecords } : {}),
     };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "fetch failed" };
