@@ -405,6 +405,17 @@ export default function Home() {
   const [currentWordIdx, setCurrentWordIdx] = useState(-1);
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [musicOn, setMusicOn] = useState(true); // hudba/zvuky zapnuté ve výchozím stavu (na výslovné přání)
+  // 🎤 2026-08-09: "Titulky je možné v ovládacím panelu vypnout" — appka dřív
+  // karaoke text neuměla schovat vůbec. Zapnuté ve výchozím stavu, uložené
+  // na zařízení (stejný vzor jako musicOn/forcedLs), aby appka pamatovala
+  // volbu i po zavření.
+  const [subtitlesOn, setSubtitlesOn] = useState(true);
+  useEffect(() => {
+    try { const v = localStorage.getItem("nicky-subtitles-on"); if (v !== null) setSubtitlesOn(v !== "0"); } catch {}
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("nicky-subtitles-on", subtitlesOn ? "1" : "0"); } catch {}
+  }, [subtitlesOn]);
   const [showCredits, setShowCredits] = useState(false);
   const goodnightCacheRef = useRef<{ key: string; url: string } | null>(null);
   const goodnightAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -1723,18 +1734,10 @@ export default function Home() {
       el.style.marginLeft = "";
       el.style.marginRight = "";
     }
-    // Nav arrows integrated INTO the image: vertically centered on it,
-    // constrained to its displayed width
-    const nav = navRef.current;
-    const book = bookRef.current;
-    if (nav && imgEl && book) {
-      const br = book.getBoundingClientRect();
-      const ir = imgEl.getBoundingClientRect();
-      nav.style.top = `${Math.round(ir.top - br.top + ir.height / 2)}px`;
-      nav.style.left = `${Math.round(ir.left - br.left)}px`;
-      nav.style.width = `${Math.round(ir.width)}px`;
-      nav.style.right = "auto";
-    }
+    // 🎛️ 2026-08-09: .book-nav teď je kompaktní CD pilulka (ne tenký pruh na
+    // šířku obrázku) — plave vystředěná dole nad obrázkem, polohu drží čistě
+    // CSS (.reader-mode .book-nav, left:50%/transform), žádné inline top/left/
+    // width tady už není potřeba (dřív zarovnávalo pruh na šířku obrázku).
     el.scrollTop = 0;
     el.scrollLeft = 0;
     // Landscape: roluje vnitřní .page-clip (bílý rámeček stojí, text jede)
@@ -5682,33 +5685,37 @@ export default function Home() {
               </div>
             )}
 
-            <div className="page-body" ref={pageBodyRef}>
-              <div className="page-clip" ref={pageClipRef}>
-                {/* 🎤 KARAOKE: appka teď ukazuje JEN aktuálně čtenou VĚTU
-                    (karaokeCurrentSentence), ne celý text stránky — přesně
-                    CD chování, přirozeně se vejde na 1-2 řádky bez tickeru.
-                    Slova obarvená podle karaokeLocalWordIdx (přečteno/právě
-                    čtené/ještě nepřečteno) — stejná trojice tříd jako CD
-                    ReaderScreen (wordRead/wordActive/wordPending), řízená
-                    SKUTEČNÝM ElevenLabs časováním (current.wordTimings). */}
-                <p className="page-text page-text-karaoke">
-                  {karaokeCurrentSentence.split(/\s+/).filter(Boolean).map((w, i) => (
-                    <span key={i} className={
-                      !isPlaying ? "word-idle"
-                        : i < karaokeLocalWordIdx ? "word-read"
-                        : i === karaokeLocalWordIdx ? "word-active"
-                        : "word-pending"
-                    }>
-                      {w}{" "}
-                    </span>
-                  ))}
-                </p>
+            {/* 🎤 2026-08-09: "titulky je možné v ovládacím panelu vypnout" —
+                appka teď celý karaoke blok skryje, když subtitlesOn === false. */}
+            {subtitlesOn && (
+              <div className="page-body" ref={pageBodyRef}>
+                <div className="page-clip" ref={pageClipRef}>
+                  {/* 🎤 KARAOKE: appka teď ukazuje JEN aktuálně čtenou VĚTU
+                      (karaokeCurrentSentence), ne celý text stránky — přesně
+                      CD chování, přirozeně se vejde na 1-2 řádky bez tickeru.
+                      Slova obarvená podle karaokeLocalWordIdx (přečteno/právě
+                      čtené/ještě nepřečteno) — stejná trojice tříd jako CD
+                      ReaderScreen (wordRead/wordActive/wordPending), řízená
+                      SKUTEČNÝM ElevenLabs časováním (current.wordTimings). */}
+                  <p className="page-text page-text-karaoke">
+                    {karaokeCurrentSentence.split(/\s+/).filter(Boolean).map((w, i) => (
+                      <span key={i} className={
+                        !isPlaying ? "word-idle"
+                          : i < karaokeLocalWordIdx ? "word-read"
+                          : i === karaokeLocalWordIdx ? "word-active"
+                          : "word-pending"
+                      }>
+                        {w}{" "}
+                      </span>
+                    ))}
+                  </p>
+                </div>
+                {/* ✏️ Ruční úprava textu — jako u běžné pohádky, i u zkopírované */}
+                <button type="button" className="page-edit" aria-label={t.editTextBtn} title={t.editTextBtn}
+                  disabled={loading}
+                  onClick={e => { e.stopPropagation(); audioRef.current?.pause(); openPageEditor(page); }}>✏️</button>
               </div>
-              {/* ✏️ Ruční úprava textu — jako u běžné pohádky, i u zkopírované */}
-              <button type="button" className="page-edit" aria-label={t.editTextBtn} title={t.editTextBtn}
-                disabled={loading}
-                onClick={e => { e.stopPropagation(); audioRef.current?.pause(); openPageEditor(page); }}>✏️</button>
-            </div>
+            )}
 
             {/* 🔇 Hlas selhal (kredit/výpadek) — viditelná hláška místo věčného ⏳ */}
             {readerMode && audioErr && !current.audioUrl && !isPlaceholderImg(current.imageUrl) && (
@@ -5722,22 +5729,18 @@ export default function Home() {
               </div>
             )}
 
-            {/* 5 tlačítek: řada na šířku obrázku (portrét) / sloupec na výšku
-                obrázku (fullscreen). Hlas se nastavuje v hlavním menu,
-                auto-přechod scén je zapnutý vždy. */}
+            {/* 🎛️ 2026-08-09: "ovládací panel chceme jak byl navržený v CD" —
+                play/prev/next se přesunuly do plovoucí pilulky (.book-nav
+                níž, přesně jako design-bundle-v7 ReaderScreen .controls),
+                tenhle řádek teď drží jen VEDLEJŠÍ přepínače (4 tlačítka). */}
             <div className="book-controls" onClick={e => e.stopPropagation()}>
-              <button type="button" className={`ctrl-cell ctrl-cell-primary${!current.audioUrl || regenAudio ? " ctrl-cell-loading" : ""}`}
-                onClick={togglePlay} disabled={!current.audioUrl || regenAudio}>
-                <span className={`ctrl-ico${!current.audioUrl && !regenAudio ? " ctrl-ico-spin" : ""}`}>
-                  {!current.audioUrl && !regenAudio ? "⏳" : isPlaying ? "⏸" : "▶"}
-                </span>
-                <span className="ctrl-txt">{!current.audioUrl && !regenAudio ? t.voiceLoading : isPlaying ? t.pause : t.play}</span>
+              {/* 🎤 Titulky — nový přepínač vedle hudby/otočení/domů (viz
+                  subtitlesOn výš). */}
+              <button type="button" className={`ctrl-cell${subtitlesOn ? " ctrl-cell-on" : ""}`}
+                onClick={() => setSubtitlesOn(p => !p)}>
+                <span className="ctrl-ico">{subtitlesOn ? "💬" : "🚫"}</span>
+                <span className="ctrl-txt">{t.subtitlesLabel}</span>
               </button>
-
-              <div className="ctrl-cell ctrl-cell-info">
-                <span className="ctrl-ico">📖</span>
-                <span className="ctrl-txt">{pagePos + 1} / {visiblePages.length}{storyChoice && branch === null ? "+" : ""}</span>
-              </div>
 
               {/* 🎵 Hudba/zvuky — dřív šlo přepnout jen ve formuláři PŘED
                   vytvořením pohádky; při otevření uložené pohádky z historie
@@ -5764,34 +5767,43 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Nav arrows + dots outside the card — no overflow clipping.
-              ✅ Funkční i při otevřené titulce — čtenář si tak může před
-              samotným spuštěním prolistovat stránky a ověřit, že se pohádka
-              správně nahrála (titulka na pozadí ukazuje NÁHLED aktuální
-              stránky, viz scenes[page] u .title-card-bg výš). */}
-          <div className="book-nav" ref={navRef}>
-            {/* 🔙 Na první stránce vede šipka zpět na titulní obrazovku (jinak
-                by na první scéně nešlo nikam couvnout — je to jediná stránka
-                bez skutečné "předchozí" scény). */}
-            <button type="button" className="ctrl-btn ctrl-nav"
-              onClick={() => {
-                if (prevVisible !== null) { goToPage(prevVisible); return; }
-                if (pagePos === 0) {
-                  audioRef.current?.pause();
-                  setIsPlaying(false);
-                  titleCardOpenRef.current = true;
-                  setTitleCardOpen(true);
-                }
-              }}
-              disabled={!hasPrev && pagePos !== 0} aria-label={t.prev}>←</button>
-            <div className="page-dots">
-              {visiblePages.map((i, pos) => (
-                <button key={i} type="button"
-                  className={`dot ${i === page ? "dot-active" : ""} ${scenes[i]?.audioUrl ? "dot-ready" : ""}`}
-                  onClick={() => goToPage(i)} aria-label={`Strana ${pos + 1}`} />
-              ))}
+          {/* 🎛️ 2026-08-09: CD styl (design-bundle-v7 ReaderScreen .controls) —
+              plovoucí pilulka s ‹ ▶/⏸ › nahoře a posuvníkem stránky dole,
+              místo dřívějších samostatných teček. Nav arrows outside the
+              card — no overflow clipping. ✅ Funkční i při otevřené titulce —
+              čtenář si tak může před samotným spuštěním prolistovat stránky
+              a ověřit, že se pohádka správně nahrála (titulka na pozadí
+              ukazuje NÁHLED aktuální stránky, viz scenes[page] u
+              .title-card-bg výš). */}
+          <div className="book-nav" ref={navRef} onClick={e => e.stopPropagation()}>
+            <div className="nav-transport">
+              {/* 🔙 Na první stránce vede šipka zpět na titulní obrazovku (jinak
+                  by na první scéně nešlo nikam couvnout — je to jediná stránka
+                  bez skutečné "předchozí" scény). */}
+              <button type="button" className="ctrl-btn ctrl-nav"
+                onClick={() => {
+                  if (prevVisible !== null) { goToPage(prevVisible); return; }
+                  if (pagePos === 0) {
+                    audioRef.current?.pause();
+                    setIsPlaying(false);
+                    titleCardOpenRef.current = true;
+                    setTitleCardOpen(true);
+                  }
+                }}
+                disabled={!hasPrev && pagePos !== 0} aria-label={t.prev}>‹</button>
+              <button type="button" className={`nav-play-btn${!current.audioUrl || regenAudio ? " nav-play-loading" : ""}`}
+                onClick={togglePlay} disabled={!current.audioUrl || regenAudio}
+                aria-label={!current.audioUrl && !regenAudio ? t.voiceLoading : isPlaying ? t.pause : t.play}>
+                {!current.audioUrl && !regenAudio ? <span className="placeholder-spinner placeholder-spinner-sm" /> : isPlaying ? "⏸" : "▶"}
+              </button>
+              <button type="button" className="ctrl-btn ctrl-nav" onClick={() => nextVisible !== null && goToPage(nextVisible)} disabled={!hasNext} aria-label={t.next}>›</button>
             </div>
-            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => nextVisible !== null && goToPage(nextVisible)} disabled={!hasNext} aria-label={t.next}>→</button>
+            <div className="nav-scrub-row">
+              <input type="range" className="nav-range" min={0} max={Math.max(0, visiblePages.length - 1)} value={pagePos}
+                onChange={e => { const i = visiblePages[+e.target.value]; if (i !== undefined) goToPage(i); }}
+                aria-label={t.scrubLabel} />
+              <span className="nav-page-label">{pagePos + 1} / {visiblePages.length}{storyChoice && branch === null ? "+" : ""}</span>
+            </div>
           </div>
 
           {/* 🔀 Návrat k rozbočce — vyzkoušet druhou variantu konce */}
