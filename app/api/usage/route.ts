@@ -18,11 +18,13 @@ const IMAGE_PRICES: Record<string, number> = {
 };
 const SHEET_PRICE_4K = 0.151;
 
+type StoryRecord = { ts: number; images: number; chars: number; sheets: number; usd: number; prepSec: number | null; device: string | null };
+
 // Vlastní počítadlo Gemini + hlasu: sečte záznamy
 // usage/u<ts>-i<1K obrázky>-c<znaky>[-s<4K archy>][-t1][-d<zařízení>].json
 // (data jsou v názvu souboru — stačí výpis, nic se nestahuje; -t1 značí
 // záznam celé pohádky). Záznamy starší 90 dní se rovnou promažou.
-async function ownUsage(days: number): Promise<{ images: number; sheets: number; chars: number; usd: number; days: number; stories: number; devices: number; prepAvgSec: number; prepMinSec: number; prepMaxSec: number; prepLastSec: number; prepCount: number } | { error: string }> {
+async function ownUsage(days: number, wantStoryRecords = false): Promise<{ images: number; sheets: number; chars: number; usd: number; days: number; stories: number; devices: number; prepAvgSec: number; prepMinSec: number; prepMaxSec: number; prepLastSec: number; prepCount: number; storyRecords?: StoryRecord[] } | { error: string }> {
   if (!blobToken()) return { error: "blob-not-configured" };
   const cutoff = Date.now() - days * 86_400_000;
   const pruneBefore = Date.now() - 90 * 86_400_000;
@@ -34,6 +36,11 @@ async function ownUsage(days: number): Promise<{ images: number; sheets: number;
   let prepSum = 0, prepCount = 0, prepMin = Infinity, prepMax = 0, prepLastTs = 0, prepLast = 0;
   const devices = new Set<string>();
   const stale: string[] = [];
+  // 🩺 2026-08-10: appka dřív uměla jen SOUHRN — na dotaz "kolik stály
+  // poslední 4 pohádky" nešlo odpovědět. `wantStoryRecords` sesbírá i
+  // jednotlivé záznamy CELÝCH pohádek (-t1), ať jde ukázat rozpad po
+  // jedné — jen pro admina (viz GET níž), appka jinak chová se beze změny.
+  const storyRecords: StoryRecord[] = [];
   try {
     let cursor: string | undefined;
     do {
@@ -44,12 +51,16 @@ async function ownUsage(days: number): Promise<{ images: number; sheets: number;
         const ts = Number(m[1]);
         if (ts < pruneBefore) { stale.push(b.url); continue; }
         if (ts >= cutoff) {
-          images += Number(m[2]);
-          chars += Number(m[3]);
-          sheets += m[4] ? Number(m[4]) : 0;
+          const recImages = Number(m[2]);
+          const recChars = Number(m[3]);
+          const recSheets = m[4] ? Number(m[4]) : 0;
+          images += recImages;
+          chars += recChars;
+          sheets += recSheets;
           // Pohádka = záznam s -t1; starší formát (před značkou): záznam
           // s obrázky i hlasem najednou byl vždy celý job
-          if (m[5] || (Number(m[2]) > 0 && Number(m[3]) > 0)) stories += 1;
+          const isStory = !!m[5] || (recImages > 0 && recChars > 0);
+          if (isStory) stories += 1;
           if (m[6]) {
             const sec = Number(m[6]);
             prepSum += sec; prepCount += 1;
@@ -57,11 +68,20 @@ async function ownUsage(days: number): Promise<{ images: number; sheets: number;
             if (ts > prepLastTs) { prepLastTs = ts; prepLast = sec; }
           }
           if (m[7]) devices.add(m[7].toLowerCase());
+          if (wantStoryRecords && isStory) {
+            storyRecords.push({
+              ts, images: recImages, chars: recChars, sheets: recSheets,
+              usd: Math.round((recImages * price + recSheets * SHEET_PRICE_4K) * 100) / 100,
+              prepSec: m[6] ? Number(m[6]) : null,
+              device: m[7] ? m[7].toLowerCase() : null,
+            });
+          }
         }
       }
       cursor = page.cursor;
     } while (cursor);
     if (stale.length) del(stale, { token: blobToken() }).catch(() => {});
+    storyRecords.sort((a, b) => b.ts - a.ts);
     return {
       images, sheets, chars,
       usd: Math.round((images * price + sheets * SHEET_PRICE_4K) * 100) / 100,
@@ -71,6 +91,7 @@ async function ownUsage(days: number): Promise<{ images: number; sheets: number;
       prepMaxSec: prepMax,
       prepLastSec: prepLast,
       prepCount,
+      ...(wantStoryRecords ? { storyRecords } : {}),
     };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "fetch failed" };
@@ -162,8 +183,19 @@ async function elevenLabsCredits(): Promise<
 
 export async function GET(req: NextRequest) {
   const days = Math.min(Math.max(Number(req.nextUrl.searchParams.get("days")) || 30, 1), 365);
+  // 🔐 Rozpad po jednotlivých pohádkách (?stories=1) je citlivější než holý
+  // souhrn (ukazuje zařízení/časování) — na rozdíl od zbytku endpointu (viz
+  // CLAUDE.md bod 4, dosud bez autentizace) tohle vyžaduje ADMIN_PASSWORD,
+  // stejný mechanismus jako /api/admin/accounts.
+  const wantStories = req.nextUrl.searchParams.get("stories") === "1";
+  if (wantStories) {
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (!adminPassword || req.headers.get("x-admin-password") !== adminPassword) {
+      return NextResponse.json({ error: "Neplatné heslo." }, { status: 401 });
+    }
+  }
   const [claude, elevenlabs, czkRate, own] = await Promise.all([
-    claudeCost(days), elevenLabsCredits(), usdToCzkRate(), ownUsage(days),
+    claudeCost(days), elevenLabsCredits(), usdToCzkRate(), ownUsage(days, wantStories),
   ]);
   return NextResponse.json({ claude, elevenlabs, czkRate, own }, { headers: { "Cache-Control": "no-store" } });
 }
