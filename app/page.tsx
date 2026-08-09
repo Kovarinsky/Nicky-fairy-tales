@@ -526,14 +526,25 @@ export default function Home() {
   const [devAccounts, setDevAccounts] = useState<DevAccount[] | null>(null);
   const [devBusy, setDevBusy] = useState(false);
   const [devErr, setDevErr] = useState("");
+  // 🩺 2026-08-10: "chci vidět detailní průběžnou analýzu nákladů/jednotlivých
+  // pohádek" — appka uměla jen souhrn (usage.own výš); rozpad po pohádce
+  // (GET /api/usage?stories=1, stejné heslo jako účty) se teď táhne
+  // souběžně s devAccounts, ať je vidět obojí najednou po odemknutí.
+  interface DevStoryRecord { ts: number; images: number; chars: number; sheets: number; usd: number; prepSec: number | null; device: string | null }
+  const [devStories, setDevStories] = useState<DevStoryRecord[] | null>(null);
   async function devLoad() {
     if (!devPw) return;
     setDevBusy(true); setDevErr("");
     try {
-      const res = await fetch("/api/admin/accounts", { headers: { "X-Admin-Password": devPw } });
-      const d = await safeJson<{ accounts?: DevAccount[]; error?: string }>(res);
-      if (!res.ok) { setDevErr(d.error || "Chyba."); return; }
+      const [accRes, usageRes] = await Promise.all([
+        fetch("/api/admin/accounts", { headers: { "X-Admin-Password": devPw } }),
+        fetch("/api/usage?days=60&stories=1", { headers: { "X-Admin-Password": devPw } }),
+      ]);
+      const d = await safeJson<{ accounts?: DevAccount[]; error?: string }>(accRes);
+      if (!accRes.ok) { setDevErr(d.error || "Chyba."); return; }
       setDevAccounts(d.accounts || []);
+      const u = await safeJson<{ own?: { storyRecords?: DevStoryRecord[] } }>(usageRes);
+      if (usageRes.ok) setDevStories(u.own?.storyRecords || []);
     } catch {
       setDevErr("Nepodařilo se načíst — zkuste to znovu.");
     } finally {
@@ -6119,6 +6130,35 @@ export default function Home() {
                           </tbody>
                         </table>
                       </div>
+                      {/* 🩺 2026-08-10: rozpad Gemini útraty po jednotlivé pohádce (60 dní) —
+                          "detailní průběžná analýza nákladů jednotlivých pohádek a celku".
+                          Cena tady je JEN obrázky/archy (viz lib/usage.ts komentář) — hlas
+                          (znaky) appka do Kč zatím NEpočítá, ukazuje se jen orientačně. */}
+                      {devStories && devStories.length > 0 && (
+                        <div className="dev-table-wrap" style={{ marginTop: "0.6rem" }}>
+                          <p className="gen-step-hint">
+                            💰 Posledních {devStories.length} pohádek (60 dní) · celkem{" "}
+                            {Math.round(devStories.reduce((s, r) => s + r.usd, 0) * (usage?.czkRate ?? 23)).toLocaleString("cs-CZ")} Kč (jen obrázky)
+                          </p>
+                          <table className="dev-table">
+                            <thead>
+                              <tr><th>Kdy</th><th>🎨</th><th>🎙️ zn.</th><th>Kč</th><th>⏱</th><th>Zařízení</th></tr>
+                            </thead>
+                            <tbody>
+                              {devStories.slice(0, 30).map(r => (
+                                <tr key={r.ts}>
+                                  <td>{new Date(r.ts).toLocaleString("cs-CZ", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</td>
+                                  <td>{r.images}</td>
+                                  <td>{r.chars.toLocaleString("cs-CZ")}</td>
+                                  <td>{Math.round(r.usd * (usage?.czkRate ?? 23))}</td>
+                                  <td>{r.prepSec ? fmtDur(r.prepSec) : "—"}</td>
+                                  <td>{r.device || "—"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </>
                   )}
                 {debugJobs.length > 0 && (
