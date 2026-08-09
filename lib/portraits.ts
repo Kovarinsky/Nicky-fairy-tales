@@ -185,6 +185,86 @@ export async function getCharacterPortrait(c: Character, force = false): Promise
   }
 }
 
+/** Vygeneruje N kandidátních variant portrétu JEDNÉ postavy (na žádost
+ *  "chci aby se víc podobal mě, připrav 3 varianty, z kterých vybereme
+ *  finální podobu") — stejný vzor jako generateFamilyGroupAnchorCandidates
+ *  pro skupinovou kotvu, jen pro jednotlivce s RŮZNÝMI popisy místo
+ *  různých prostředí. Uloží na DOČASNÉ cesty (candidates/), appka žádnou
+ *  nepoužívá jako referenci, dokud se ručně nepromuje. */
+export async function generateCharacterPortraitCandidates(
+  baseChar: Character,
+  variants: Array<{ label: string; description: string }>
+): Promise<Array<{ index: number; label: string; url: string | null; ok: boolean; problems?: string }>> {
+  const token = blobToken();
+  if (!token) return [];
+  const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
+  const photoRefs = loadReferenceImages([baseChar]);
+  const out: Array<{ index: number; label: string; url: string | null; ok: boolean; problems?: string }> = [];
+  for (let i = 0; i < variants.length; i++) {
+    const variant = variants[i];
+    const c: Character = { ...baseChar, description: variant.description };
+    console.log(`[portraits] drawing portrait CANDIDATE ${i + 1}/${variants.length} for ${baseChar.id} (${variant.label})…`);
+    try {
+      const sceneDesc = `A full-body standing storybook portrait of ${c.name}. Only ${c.name} present — exactly one person/animal.`;
+      let img = await generateBackgroundImage(portraitPrompt(c), photoRefs);
+      let v = await verifySceneImage(apiKey, img, c.description, sceneDesc, photoRefs);
+      let problems = v?.problems || "";
+      if (v && !v.ok) {
+        const img2 = await generateBackgroundImage(
+          `${portraitPrompt(c)} ⚠ CORRECTION: the previous attempt violated: ${v.problems.slice(0, 300)}. Follow the description EXACTLY.`,
+          photoRefs
+        );
+        const v2 = await verifySceneImage(apiKey, img2, c.description, sceneDesc, photoRefs);
+        if (v2 && (v2.ok || v2.badRules < v.badRules)) { img = img2; problems = v2.problems; }
+      }
+      const pathName = `portraits/candidates/${baseChar.id}-${i + 1}.img`;
+      const { url } = await put(pathName, img.buffer, {
+        access: "public",
+        contentType: img.mimeType,
+        token,
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        cacheControlMaxAge: 3600, // dočasné — kandidáti, ne finální portrét
+      });
+      out.push({ index: i + 1, label: variant.label, url, ok: true, problems: problems || undefined });
+    } catch (e) {
+      out.push({ index: i + 1, label: variant.label, url: null, ok: false, problems: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  return out;
+}
+
+/** Povýší už vygenerovaného kandidáta (viz generateCharacterPortraitCandidates)
+ *  na FINÁLNÍ portrét postavy — zkopíruje jeho bajty na cestu, kterou appka
+ *  skutečně čte (portraits/<id>-v<PORTRAIT_VERSION>.img), BEZ nového
+ *  (placeného) generování. Popis v reference/characters.json je NUTNÉ
+ *  ručně upravit na text vybrané varianty ZVLÁŠŤ — tahle funkce jen
+ *  přesune obrázek, netýká se popisu. */
+export async function promoteCharacterPortraitCandidate(charId: string, index: number): Promise<string | null> {
+  const token = blobToken();
+  if (!token) return null;
+  try {
+    const h = await head(`portraits/candidates/${charId}-${index}.img`, { token });
+    const r = await fetch(h.url, { cache: "no-store" });
+    if (!r.ok) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    const key = `${charId}-v${PORTRAIT_VERSION}`;
+    const { url } = await put(`portraits/${key}.img`, buf, {
+      access: "public",
+      contentType: h.contentType || "image/webp",
+      token,
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      cacheControlMaxAge: 31536000,
+    });
+    memCache.delete(key);
+    return url;
+  } catch (e) {
+    console.warn(`[portraits] promote portrait candidate ${charId}-${index} failed: ${e instanceof Error ? e.message : e}`);
+    return null;
+  }
+}
+
 /**
  * Referenční obrázky pro kreslení scén: malované portréty místo syrových fotek.
  * Když portrét (zatím) není k dispozici, postava dostane své fotky jako dřív.
