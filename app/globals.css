@@ -4029,12 +4029,25 @@ textarea.ta-accent:focus {
   border-collapse: collapse;
   font-size: 0.78rem;
   white-space: nowrap;
+  /* 🩺 2026-08-10: nikdy neměla vlastní barvu textu, spoléhala na dědění —
+     v kontextu, kam appka teď přidala DRUHOU tabulku (rozpad po pohádkách),
+     to vyšlo prakticky neviditelné (tmavý/průhledný text na tmavém pozadí).
+     Explicitní světlá barva, ať je čitelná bez ohledu na okolní kontext. */
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .dev-table th, .dev-table td {
   padding: 0.25rem 0.5rem;
   text-align: left;
   border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+
+.dev-table th {
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 /* ── Usage overview (💰 Spotřeba) ── */
