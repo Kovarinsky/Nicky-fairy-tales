@@ -6,10 +6,20 @@
 > `generateSceneImage`) + nová volitelná pojistka `MONTHLY_SPEND_CAP_USD`
 > (`lib/usage.ts`, `/api/job/start`), co appku sama zastaví PŘED Googleiným
 > měsíčním stropem navyšování zůstatku — obojí mimo rozsah téhle dokumentu,
-> ale reakce na stejný cíl. **Fáze 4B (znovupoužití pozadí + editace místo
-> čerstvé kresby) zůstává NEimplementovaná** — pořád čeká na tvoje
-> rozhodnutí, jak agresivně do toho jít (mění to vizuální identitu appky,
-> viz bod 3/6 níž).
+> ale reakce na stejný cíl.
+>
+> **2026-08-10 rozhodnutí:** uživatel odpověděl na otevřenou otázku bodu 6
+> — "využít scénu znovu ano, ale POUZE bez ztráty kvality." Fáze 4B je tedy
+> schválená ve SMĚRU, ale s TVRDOU podmínkou (kvalita nesmí klesnout) —
+> na rozdíl od původního zadání ("1 Kč/stránka i za cenu vizuální identity")
+> se teď priorita obrací: kvalita > cena. Než se cokoliv implementuje,
+> potřeba (1) doresearchovat, jak reálně docílit znovupoužití BEZ ztráty
+> kvality (viz zadaný Gemini Deep Research prompt níž — konzistence
+> postav/scén napříč AI-generovanými ilustracemi je aktivní výzkumná
+> oblast, appka zatím zkoumala jen editSceneImage cestu, ne širší paletu
+> technik), (2) prototyp na 1-2 testovacích pohádkách, (3) uživatelovo
+> ruční schválení kvality PŘED nasazením (žádná automatizovaná metrika
+> kvalitu nerozhodne sama).
 
 # Cena/kvalita/rychlost — cílený research a plán (2026-08-06)
 
