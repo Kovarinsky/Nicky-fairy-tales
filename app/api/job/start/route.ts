@@ -30,13 +30,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Pro vytvoření pohádky se prosím přihlaste." }, { status: 401 });
     }
     {
-      const cost = estimateStoryCostCredits(body);
       const acc = await readAccount(username);
-      if (!acc || (acc.credits ?? 0) < cost) {
-        return NextResponse.json(
-          { error: `Nedostatek kreditů (odhad ${cost}, máte ${acc?.credits ?? 0}). Dobijte kredit v účtu.` },
-          { status: 402 }
-        );
+      if (!acc) {
+        return NextResponse.json({ error: "Účet nenalezen." }, { status: 402 });
+      }
+      // 🛠️ Vývojářský účet (isAdmin) kredity vůbec nekontroluje ani neplatí —
+      // viz lib/accounts.ts chargeForCompletedStory, souměřené s tímhle místem.
+      if (!acc.isAdmin) {
+        const cost = estimateStoryCostCredits(body);
+        if ((acc.credits ?? 0) < cost) {
+          return NextResponse.json(
+            { error: `Nedostatek kreditů (odhad ${cost}, máte ${acc.credits ?? 0}). Dobijte kredit v účtu.` },
+            { status: 402 }
+          );
+        }
       }
       body.username = username; // ← job-runner podle něj po dokončení odečte kredit
     }

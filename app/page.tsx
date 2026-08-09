@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import type { StoryScript, RenderedScene, Scene, StoryChoiceMeta } from "@/lib/types";
+import type { StoryScript, RenderedScene, Scene, StoryChoiceMeta, WordTiming } from "@/lib/types";
 import { AmbientPlayer } from "@/lib/ambient";
 import { cacheStory, getCachedStory, evictOldStories } from "@/lib/scene-cache";
 import { APP_VERSION } from "@/lib/version";
@@ -364,6 +364,14 @@ export default function Home() {
 
   // Generation state
   const [loading, setLoading] = useState(false);
+  // 🩺 2026-08-09: nahlášeno "napíše to, že pohádka je ready, a pak se
+  // donahrává" — appka mlčela o tom, PROČ znovu generuje pohádku z historie
+  // (viz replayStory větev 3: IndexedDB cache pro ni chybí/expirovala — buď
+  // limit 20 pohádek na zařízení, nebo jiné zařízení/adresa appky, kde
+  // vznikla). Tenhle flag appce dovolí ukázat jiný, PRAVDIVÝ text na
+  // titulce ("tahle pohádka byla na zařízení smazaná...") místo obyčejného
+  // "Připravuji pohádku…", které vypadá jako běžné čekání na první vytvoření.
+  const [reopenRegenerating, setReopenRegenerating] = useState(false);
   const [doneCount, setDoneCount] = useState(0);
   const [stalled, setStalled] = useState(false);
   const lastProgressRef = useRef(0);
@@ -390,8 +398,24 @@ export default function Home() {
   // handleAudioEnded) — ať přechod mezi scénami není ostrý střih.
   const [pageLeaving, setPageLeaving] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  // 🎤 KARAOKE: index aktuálně čteného slova v current.narration. Skutečné
+  // ElevenLabs časování (current.wordTimings) když appka ho má, jinak ODHAD
+  // rovnoměrně rozpočítaný podle délky audia (Gemini hlasy žádné časování
+  // neposílají) — viz onTimeUpdate na <audio> níž.
+  const [currentWordIdx, setCurrentWordIdx] = useState(-1);
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [musicOn, setMusicOn] = useState(true); // hudba/zvuky zapnuté ve výchozím stavu (na výslovné přání)
+  // 🎤 2026-08-09: "Titulky je možné v ovládacím panelu vypnout" — appka dřív
+  // karaoke text neuměla schovat vůbec. Zapnuté ve výchozím stavu, uložené
+  // na zařízení (stejný vzor jako musicOn/forcedLs), aby appka pamatovala
+  // volbu i po zavření.
+  const [subtitlesOn, setSubtitlesOn] = useState(true);
+  useEffect(() => {
+    try { const v = localStorage.getItem("nicky-subtitles-on"); if (v !== null) setSubtitlesOn(v !== "0"); } catch {}
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("nicky-subtitles-on", subtitlesOn ? "1" : "0"); } catch {}
+  }, [subtitlesOn]);
   const [showCredits, setShowCredits] = useState(false);
   const goodnightCacheRef = useRef<{ key: string; url: string } | null>(null);
   const goodnightAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -1173,6 +1197,43 @@ export default function Home() {
     ambientRef.current?.setScene(scenes[page]?.soundscape);
   }, [page, bookReady, scenes]);
 
+  // 🎤 KARAOKE: nové slovo na nové stránce začíná od nuly (appka nechce
+  // zvýrazněné konce PŘEDCHOZÍHO textu bleskově naskočit na začátku dalšího).
+  useEffect(() => { setCurrentWordIdx(-1); }, [page]);
+
+  // 🎤 2026-08-09: nahlášeno "text je pozadu za hlasem" — příčina: appka
+  // dřív počítala aktuální slovo JEN v onTimeUpdate na <audio>, což ve
+  // většině prohlížečů spolehlivě hasí jen ~4× za sekundu (throttlováno),
+  // takže zvýraznění znatelně zaostávalo za skutečně slyšeným slovem.
+  // rAF smyčka čte audioRef.currentTime KAŽDÝ snímek (~60×/s) po celou
+  // dobu přehrávání — mnohem těsnější souběh se skutečným zvukem.
+  useEffect(() => {
+    if (!isPlaying) return;
+    let raf = 0;
+    const tick = () => {
+      const el = audioRef.current;
+      const scene = scenes[page];
+      if (el && scene) {
+        const t = el.currentTime;
+        const timings = scene.wordTimings;
+        if (timings && timings.length) {
+          let idx = timings.findIndex(w => t < w.end);
+          if (idx === -1) idx = timings.length - 1;
+          setCurrentWordIdx(prev => (prev === idx ? prev : idx));
+        } else if (el.duration && Number.isFinite(el.duration)) {
+          const words = (scene.narration || "").trim().split(/\s+/).filter(Boolean);
+          if (words.length) {
+            const idx = Math.min(words.length - 1, Math.floor((t / el.duration) * words.length));
+            setCurrentWordIdx(prev => (prev === idx ? prev : idx));
+          }
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isPlaying, page, scenes]);
+
   // 🔊 Jednorázový zvukový efekt podle děje TÉTO scény (vlny/hrom/chrápání) —
   // jednou na stránku (ref hlídá, ať se nespustí znovu při každém re-renderu)
   const sfxFiredRef = useRef<string | null>(null);
@@ -1198,6 +1259,13 @@ export default function Home() {
   // pro obálku titulky (ukáže se hned, jak je hotová), NE pro povolení
   // začít číst (to čeká na CELOU pohádku, viz storyFullyReady).
   const scene1Ready = !!(scenes[0]?.imageUrl && !isPlaceholderImg(scenes[0].imageUrl) && scenes[0]?.audioUrl);
+  // 🏷️ Info box na titulce: počet stran + ODHAD času čtení (appka namlouvá
+  // líně, viz job-runner.ts — skutečná délka audia tu ještě není známá pro
+  // všechny scény) — z počtu slov v naraci / ~130 slov za minutu, což je
+  // appčino typické tempo klidného vyprávění (eleven_flash_v2_5, cs i en).
+  // Vždy zaokrouhleno nahoru, minimálně 1 minuta, ať appka nikdy neukáže "0 min".
+  const titleCardWordCount = scenes.reduce((sum, s) => sum + (s.narration ? s.narration.trim().split(/\s+/).filter(Boolean).length : 0), 0);
+  const titleCardReadMinutes = Math.max(1, Math.round(titleCardWordCount / 130));
   // 🚦 Číst appka smí začít, až je HOTOVÁ CELÁ pohádka (všechny obrázky i
   // hlasy) — dřív stačila jen scéna 1 a zbytek se dokresloval na pozadí ZA
   // čtenářem, což bylo rušivé (viditelné dokreslování uprostřed čtení).
@@ -1666,18 +1734,10 @@ export default function Home() {
       el.style.marginLeft = "";
       el.style.marginRight = "";
     }
-    // Nav arrows integrated INTO the image: vertically centered on it,
-    // constrained to its displayed width
-    const nav = navRef.current;
-    const book = bookRef.current;
-    if (nav && imgEl && book) {
-      const br = book.getBoundingClientRect();
-      const ir = imgEl.getBoundingClientRect();
-      nav.style.top = `${Math.round(ir.top - br.top + ir.height / 2)}px`;
-      nav.style.left = `${Math.round(ir.left - br.left)}px`;
-      nav.style.width = `${Math.round(ir.width)}px`;
-      nav.style.right = "auto";
-    }
+    // 🎛️ 2026-08-09: .book-nav teď je kompaktní CD pilulka (ne tenký pruh na
+    // šířku obrázku) — plave vystředěná dole nad obrázkem, polohu drží čistě
+    // CSS (.reader-mode .book-nav, left:50%/transform), žádné inline top/left/
+    // width tady už není potřeba (dřív zarovnávalo pruh na šířku obrázku).
     el.scrollTop = 0;
     el.scrollLeft = 0;
     // Landscape: roluje vnitřní .page-clip (bílý rámeček stojí, text jede)
@@ -2097,7 +2157,7 @@ export default function Home() {
           language: uiLang,
         }),
       });
-      const d = await safeJson<{ audioUrl?: string; error?: string }>(res);
+      const d = await safeJson<{ audioUrl?: string; error?: string; wordTimings?: WordTiming[] }>(res);
       if (!res.ok || !d.audioUrl) {
         setAudioErr(`${t.audioFailed}${d.error ? ` (${String(d.error).slice(0, 180)})` : ""}`);
         return;
@@ -2107,7 +2167,7 @@ export default function Home() {
       setScenes(prev => {
         const next = [...prev];
         if (!next[i] || next[i].audioUrl) return prev;
-        next[i] = { ...next[i], audioUrl: d.audioUrl };
+        next[i] = { ...next[i], audioUrl: d.audioUrl, wordTimings: d.wordTimings };
         const eid = readerEntryIdRef.current;
         if (eid) {
           renderedMapRef.current.set(eid, next);
@@ -2137,7 +2197,7 @@ export default function Home() {
   async function fillMissingAudio(
     id: string,
     entryScenes: Scene[],
-    media: Array<{ imageUrl?: string; audioUrl?: string }>,
+    media: Array<{ imageUrl?: string; audioUrl?: string; wordTimings?: WordTiming[] }>,
     onProgress?: (done: number, total: number) => void,
     voiceIdOverride?: string
   ): Promise<void> {
@@ -2173,9 +2233,9 @@ export default function Home() {
                 language: uiLang,
               }),
             });
-            const d = await safeJson<{ audioUrl?: string }>(res);
+            const d = await safeJson<{ audioUrl?: string; wordTimings?: WordTiming[] }>(res);
             if (res.ok && d.audioUrl) {
-              media[i] = { ...(media[i] || {}), audioUrl: d.audioUrl };
+              media[i] = { ...(media[i] || {}), audioUrl: d.audioUrl, wordTimings: d.wordTimings };
               break;
             }
           } catch {}
@@ -2287,11 +2347,11 @@ export default function Home() {
             voiceId: newVoiceId,
           }),
         });
-        const data = await safeJson<{ audioUrl?: string; error?: string }>(res);
+        const data = await safeJson<{ audioUrl?: string; error?: string; wordTimings?: WordTiming[] }>(res);
         if (!res.ok || !data.audioUrl) return;
         setScenes(prev => {
           const next = [...prev];
-          next[i] = { ...next[i], audioUrl: data.audioUrl };
+          next[i] = { ...next[i], audioUrl: data.audioUrl, wordTimings: data.wordTimings };
           return next;
         });
       } catch {}
@@ -2601,14 +2661,14 @@ export default function Home() {
           language: uiLang,
         }),
       });
-      const d = await safeJson<{ audioUrl?: string }>(res);
+      const d = await safeJson<{ audioUrl?: string; wordTimings?: WordTiming[] }>(res);
       if (res.ok && d.audioUrl) {
         setScenes(prev => {
           // Stejná pojistka jako v repairSceneImage výš — mezitím se appka
           // mohla přepnout jinam a scéna na indexu i už neexistuje.
           if (!prev[i]) return prev;
           const n = [...prev];
-          n[i] = { ...n[i], audioUrl: d.audioUrl };
+          n[i] = { ...n[i], audioUrl: d.audioUrl, wordTimings: d.wordTimings };
           const eid = readerEntryIdRef.current;
           if (eid) {
             renderedMapRef.current.set(eid, n);
@@ -2666,7 +2726,7 @@ export default function Home() {
   const jobTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   // Progressive download (per job): finished scenes stream in DURING generation,
   // so the final "open" is instant and gen-cards show real thumbnails
-  const jobMediaRef = useRef<Map<string, { scenes: Map<number, { imageUrl?: string; audioUrl?: string }>; fetching: Set<number>; audioFetching: Set<number> }>>(new Map());
+  const jobMediaRef = useRef<Map<string, { scenes: Map<number, { imageUrl?: string; audioUrl?: string; wordTimings?: WordTiming[] }>; fetching: Set<number>; audioFetching: Set<number> }>>(new Map());
   // Per-job scene buffer for the gen-card thumbnails
   const jobBuffersRef = useRef<Map<string, RenderedScene[]>>(new Map());
   // Stall watch (per job): when the server function dies on the 5-min limit, kick /continue
@@ -2949,11 +3009,11 @@ export default function Home() {
         }),
       }).then(async res => {
         jm!.audioFetching.delete(i);
-        const d = await safeJson<{ audioUrl?: string }>(res);
+        const d = await safeJson<{ audioUrl?: string; wordTimings?: WordTiming[] }>(res);
         if (!res.ok || !d.audioUrl) return;
-        jm!.scenes.set(i, { ...jm!.scenes.get(i), audioUrl: d.audioUrl });
+        jm!.scenes.set(i, { ...jm!.scenes.get(i), audioUrl: d.audioUrl, wordTimings: d.wordTimings });
         const b = jobBuffersRef.current.get(jobId);
-        if (b && b[i]) b[i] = { ...b[i], audioUrl: d.audioUrl };
+        if (b && b[i]) b[i] = { ...b[i], audioUrl: d.audioUrl, wordTimings: d.wordTimings };
       }).catch(() => { jm!.audioFetching.delete(i); });
     }
   }
@@ -3528,54 +3588,15 @@ export default function Home() {
     return () => { dead = true; };
   }, [titleCardOpen, cardBg]);
 
-  // Výběr světa pozadí: velké tlačítko otevře rolovací nabídku (jako 📜 pohádky)
-  const [bgPickerOpen, setBgPickerOpen] = useState(false);
-  // 🔍 Náhled pozadí PODRŽENÍM: po 350 ms se ukáže malá karta s ilustrací,
-  // která se pak plynule roztáhne na celý displej; puštění náhled zavře,
-  // obyčejné ťuknutí svět vybírá (klik po podržení se potlačí)
-  const [bgHold, setBgHold] = useState<{ id: string; url: string | null; full: boolean } | null>(null);
-  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdFullTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdFiredRef = useRef(false);
-
-  function beginBgHold(sceneId: string) {
-    holdFiredRef.current = false;
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-    holdTimerRef.current = setTimeout(async () => {
-      holdFiredRef.current = true;
-      setBgHold({ id: sceneId, url: bgUrlCacheRef.current[sceneId] ?? null, full: false });
-      holdFullTimerRef.current = setTimeout(
-        () => setBgHold(p => (p && p.id === sceneId ? { ...p, full: true } : p)),
-        700
-      );
-      if (!bgUrlCacheRef.current[sceneId]) {
-        try {
-          const r = await fetch(`/api/bg-image?scene=${sceneId}`, { signal: AbortSignal.timeout(110_000) });
-          const d = r.ok ? ((await r.json()) as { url?: string }) : null;
-          if (d?.url) {
-            bgUrlCacheRef.current[sceneId] = d.url;
-            setBgHold(p => (p && p.id === sceneId ? { ...p, url: d.url! } : p));
-          }
-        } catch {}
-      }
-    }, 350);
-  }
-
-  function endBgHold() {
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-    if (holdFullTimerRef.current) clearTimeout(holdFullTimerRef.current);
-    setBgHold(null);
-  }
+  // 🖼️ 2026-08-09: dřív tu bylo DRUHÉ tlačítko/panel na výběr pozadí appky
+  // (bgPickerOpen + náhled podržením bgHold/beginBgHold/endBgHold) — přesná
+  // duplicita HomeScreen "Svět pozadí aplikace". Odstraněno, viz komentář
+  // u JSX níž. pickBg zůstává — appka ho pořád používá jako onSelectBackground
+  // pro HomeScreen (jediné zbylé místo výběru).
   function pickBg(id: string) {
     setBgChoice(id);
     try { localStorage.setItem(BG_KEY, id); } catch {}
-    setBgPickerOpen(false);
   }
-  const bgLabel = bgChoice === "auto"
-    ? `🎨 ${t.bgAuto}`
-    : bgChoice === "custom"
-    ? (uiLang === "en" ? "🖼️ Custom" : "🖼️ Vlastní")
-    : `${bgSceneById(bgChoice)!.emoji} ${uiLang === "en" ? bgSceneById(bgChoice)!.nameEn : bgSceneById(bgChoice)!.name}`;
 
   // 📝 Velký editor přání — ťuknutí do pole otevře okno přes displej,
   // kde je vidět celý text (dlouhé osnovy z 🪄 Rozvinout).
@@ -4321,6 +4342,7 @@ export default function Home() {
     // 1. Instant restore from in-memory ref (bg generation continues uninterrupted)
     const memCached = renderedMapRef.current.get(entry.id);
     if (memCached && memCached.length > 0) {
+      setReopenRegenerating(false);
       showCached(memCached);
       return;
     }
@@ -4338,6 +4360,7 @@ export default function Home() {
       const needImages = entry.choice ? entry.choice.altFrom : restored.length;
       if (restored.slice(0, needImages).every(s => !isPlaceholderImg(s.imageUrl))) {
         renderedMapRef.current.set(entry.id, restored);
+        setReopenRegenerating(false);
         showCached(restored);
         return;
       }
@@ -4352,6 +4375,11 @@ export default function Home() {
       setHistoryOpen(false);
       return;
     }
+    // 🩺 Místní kopie (IndexedDB) pro tuhle pohádku chybí/expirovala — appka
+    // musí obrázky+hlas vygenerovat ZNOVU od nuly, i když appka pohádku už
+    // jednou dokončila. Titulka o tom teď řekne pravdu (viz reopenRegenerating
+    // níž), místo aby mlčky vypadala jako běžné čekání na první vytvoření.
+    setReopenRegenerating(true);
     setError(""); setLoading(true);
     setHistoryOpen(false);
     setScenes([]); setTitle(""); setPage(0);
@@ -4362,6 +4390,7 @@ export default function Home() {
       const finalScenes = await generateMedia(entry.title, entry.heroDescription, entry.scenes, [], selectedVoiceId, false, entry.id, partial);
       renderedMapRef.current.set(entry.id, finalScenes);
       cacheStory(entry.id, finalScenes).catch(() => {});
+      setReopenRegenerating(false);
       // 🩺 Appka právě dokreslila chybějící obrázky SAMA (přímo přes /api/scene),
       // ne přes serverový job — ten o tom neví a jeho záznam (jobId === entry.id)
       // by jinak navždy zůstal „generating" na svém posledním stavu, appka by
@@ -4385,6 +4414,7 @@ export default function Home() {
       // loading se resetuje VŽDY (i pro odloženou/zastíněnou pohádku) — jinak
       // by zůstalo natrvalo zamčené a další ✕ replay by se už nikdy nespustil
       setLoading(false);
+      setReopenRegenerating(false);
     }
   }
 
@@ -4541,6 +4571,31 @@ export default function Home() {
   const hasPrev = prevVisible !== null;
   const totalScenes = scenes.length;
 
+  // 🎤 2026-08-09: appka dřív ukazovala CELÝ text stránky najednou (klidně
+  // i 3-4 věty), což vždy potřebovalo scroll/ticker na příliš dlouhý řádek
+  // — uživatel chtěl přesně CD chování (design-bundle-v7 ReaderScreen):
+  // ukazuje se JEN aktuálně čtená VĚTA, přirozeně se vejde na 1-2 krátké
+  // řádky. Věty se dělí podle interpunkce (.!?…), currentWordIdx je
+  // GLOBÁLNÍ index napříč celou narrací stránky (viz rAF smyčka níž) —
+  // tady se přepočítá na (index věty, lokální index slova uvnitř věty).
+  const karaokeSentences = (current?.narration ?? "").match(/[^.!?…]+[.!?…]*\s*/g)?.map(s => s.trim()).filter(Boolean)
+    ?? [(current?.narration ?? "").trim()].filter(Boolean);
+  const karaokeWordCounts = karaokeSentences.map(s => s.split(/\s+/).filter(Boolean).length);
+  let karaokeSentenceIdx = 0, karaokeWordsBefore = 0;
+  {
+    let acc = 0;
+    for (let i = 0; i < karaokeWordCounts.length; i++) {
+      if (currentWordIdx < acc + karaokeWordCounts[i] || i === karaokeWordCounts.length - 1) {
+        karaokeSentenceIdx = i;
+        karaokeWordsBefore = acc;
+        break;
+      }
+      acc += karaokeWordCounts[i];
+    }
+  }
+  const karaokeLocalWordIdx = currentWordIdx - karaokeWordsBefore;
+  const karaokeCurrentSentence = karaokeSentences[karaokeSentenceIdx] || current?.narration || "";
+
   // 🚧 Dočasně (než se generování obrázků zoptimalizuje): appka NIKDY
   // neukáže dead-end "obrázek se nepovedl" s ručním tlačítkem — místo toho
   // tiše zkouší dál na pozadí (rostoucí prodleva, strop 30 s), dokud se to
@@ -4593,9 +4648,13 @@ export default function Home() {
 
       {!readerMode && (
       <>
+      {/* 🖼️ 2026-08-09: dřív tu byl DRUHÝ výběr pozadí appky (bg-cycle-btn +
+          panel), duplicitní k tomu na homepage (HomeScreen "Svět pozadí
+          aplikace") — nahlášeno "dubluje se nám výběr pozadí appky".
+          Odstraněno — appka má jen jeden, homepage bgChoice/pickBg je
+          sdílený stav (localStorage BG_KEY), takže volba z homepage platí
+          i tady beze změny. */}
       <div className="lang-switch">
-        <button type="button" className={`lang-btn bg-cycle-btn${bgPickerOpen ? " lang-on" : ""}`}
-          onClick={() => setBgPickerOpen(p => !p)} title={t.bgTitle}>{bgLabel} ▾</button>
         <button type="button" className={`lang-toggle ${uiLang === "en" ? "lang-en" : ""}`}
           onClick={() => switchLang(uiLang === "cs" ? "en" : "cs")} aria-label="Jazyk / Language">
           <span className="lang-thumb" aria-hidden="true" />
@@ -4619,45 +4678,6 @@ export default function Home() {
           </span>
         </button>
       </div>
-      {bgPickerOpen && (
-        <div className="bg-picker-panel">
-          <div className="panel-title-row">
-            <p className="panel-title">🖼️ {t.bgTitle}</p>
-            <button type="button" className="panel-close" aria-label={t.cancel}
-              onClick={() => setBgPickerOpen(false)}>✕</button>
-          </div>
-          <div className="folk-list bg-picker">
-            {[{ id: "auto", emoji: "🎨", label: `${t.bgAuto} — ${t.bgAutoHint}`, preview: activeBg },
-              ...BG_SCENES.map(s => ({ id: s.id, emoji: s.emoji, label: uiLang === "en" ? s.nameEn : s.name, preview: s.id }))].map(row => (
-              <button type="button" key={row.id}
-                className={`folk-item bg-item ${bgChoice === row.id ? "folk-on" : ""}`}
-                onClick={() => {
-                  if (holdFiredRef.current) { holdFiredRef.current = false; return; }
-                  pickBg(row.id);
-                }}
-                onPointerDown={() => beginBgHold(row.preview)}
-                onPointerUp={endBgHold}
-                onPointerLeave={endBgHold}
-                onPointerCancel={endBgHold}
-                onContextMenu={e => e.preventDefault()}>
-                <span className="folk-emoji">{row.emoji}</span>
-                <span className="folk-name">{row.label}</span>
-              </button>
-            ))}
-          </div>
-          <p className="gen-step-hint">{t.bgHoldHint}</p>
-          <button type="button" className="panel-ok" onClick={() => setBgPickerOpen(false)}>✓ {t.okBtn}</button>
-        </div>
-      )}
-
-      {/* 🔍 Náhled pozadí při podržení: malá karta → plynule celý displej */}
-      {bgHold && (
-        <div className={`bg-hold-overlay${bgHold.full ? " bg-hold-full" : ""}`}>
-          {bgHold.url
-            ? <img src={bgHold.url} alt="" className="bg-hold-img" />
-            : <div className="bg-hold-img bg-hold-loading">🎨</div>}
-        </div>
-      )}
       <h1>📖 {uiLang === "cs" ? "Nickyho pohádky" : "Nicky's Fairy Tales"} <span className="version-badge">v{APP_VERSION}</span></h1>
       <p className="subtitle">{t.subtitle}</p>
 
@@ -5585,24 +5605,40 @@ export default function Home() {
                   <div className="title-card-bg" style={{ backgroundImage: `url(${cardBgUrl})` }} />
                 ) : null}
                 <div className="title-card-scrim" />
+                {/* 🏷️ 2026-08-08: dřív velké tlačítko uprostřed přes půl
+                    obrázku — přesunuto do jednoho kompaktního info-boxu DOLE
+                    (jako v CD), ať je vidět celá ilustrace. Box nese název +
+                    počet stran/odhad času čtení + kolečkové ▶ tlačítko na
+                    ~1/3 dřívější velikosti, animované pulzujícími prstenci
+                    místo pouhého škálování celé pilulky. */}
                 <div className="title-card-content">
                   {!scene1Ready && <div className="title-card-emoji">📖</div>}
-                  <div className="title-card-title">{title}</div>
-                  {/* 🚦 "Ťukni pro spuštění" se ukáže až pro CELOU hotovou
-                      pohádku (storyFullyReady: obrázky I hlas), ne jen pro
-                      hotovou scénu 1 — appka nikdy nespustí nedokreslenou
-                      pohádku, zbytek už se nedokresluje viditelně za čtenářem.
-                      🟠 Dřív jen drobný tichý text — teď skutečné velké
-                      oranžové tlačítko uprostřed, ať je jasné, že se dá
-                      ťuknout (celá karta je klikatelná i tak, tohle je jen
-                      viditelná afordance). */}
-                  {storyFullyReady ? (
-                    <div className="title-card-tap title-card-tap-ready">▶ {t.titleCardTap}</div>
-                  ) : (
-                    <div className="title-card-tap">
-                      <span className="placeholder-spinner placeholder-spinner-sm" />{t.titleCardPreparing}
+                  <div className="title-card-infobox">
+                    <div className="title-card-title">{title}</div>
+                    <div className="title-card-meta">
+                      <span>{t.titleCardPages(scenes.length)}</span>
+                      <span className="title-card-meta-dot">·</span>
+                      <span>{t.titleCardMinutes(titleCardReadMinutes)}</span>
                     </div>
-                  )}
+                    {/* 🚦 "Ťukni pro spuštění" se ukáže až pro CELOU hotovou
+                        pohádku (storyFullyReady: obrázky I hlas), ne jen pro
+                        hotovou scénu 1 — appka nikdy nespustí nedokreslenou
+                        pohádku, zbytek už se nedokresluje viditelně za čtenářem.
+                        Celá karta je klikatelná i tak, tlačítko je jen
+                        viditelná afordance (žádný vlastní onClick). */}
+                    {storyFullyReady ? (
+                      <button type="button" className="title-card-play" aria-label={t.titleCardTap} title={t.titleCardTap}>
+                        <span className="title-card-play-ring" />
+                        <span className="title-card-play-ring title-card-play-ring-b" />
+                        <span className="title-card-play-icon">▶</span>
+                      </button>
+                    ) : (
+                      <div className="title-card-tap">
+                        <span className="placeholder-spinner placeholder-spinner-sm" />
+                        {reopenRegenerating ? t.titleCardReopenRegenerating : t.titleCardPreparing}
+                      </div>
+                    )}
+                  </div>
                   {/* 🆘 Pojistka proti věčnému čekání — appka NIKDY nenabízí
                       "číst i tak" (výslovné přání), jen po 45 s dá možnost
                       odejít 🏠 Domů, kdyby se nějaká scéna fakt nikdy
@@ -5649,15 +5685,37 @@ export default function Home() {
               </div>
             )}
 
-            <div className="page-body" ref={pageBodyRef}>
-              <div className="page-clip" ref={pageClipRef}>
-                <p className="page-text">{current.narration}</p>
+            {/* 🎤 2026-08-09: "titulky je možné v ovládacím panelu vypnout" —
+                appka teď celý karaoke blok skryje, když subtitlesOn === false. */}
+            {subtitlesOn && (
+              <div className="page-body" ref={pageBodyRef}>
+                <div className="page-clip" ref={pageClipRef}>
+                  {/* 🎤 KARAOKE: appka teď ukazuje JEN aktuálně čtenou VĚTU
+                      (karaokeCurrentSentence), ne celý text stránky — přesně
+                      CD chování, přirozeně se vejde na 1-2 řádky bez tickeru.
+                      Slova obarvená podle karaokeLocalWordIdx (přečteno/právě
+                      čtené/ještě nepřečteno) — stejná trojice tříd jako CD
+                      ReaderScreen (wordRead/wordActive/wordPending), řízená
+                      SKUTEČNÝM ElevenLabs časováním (current.wordTimings). */}
+                  <p className="page-text page-text-karaoke">
+                    {karaokeCurrentSentence.split(/\s+/).filter(Boolean).map((w, i) => (
+                      <span key={i} className={
+                        !isPlaying ? "word-idle"
+                          : i < karaokeLocalWordIdx ? "word-read"
+                          : i === karaokeLocalWordIdx ? "word-active"
+                          : "word-pending"
+                      }>
+                        {w}{" "}
+                      </span>
+                    ))}
+                  </p>
+                </div>
+                {/* ✏️ Ruční úprava textu — jako u běžné pohádky, i u zkopírované */}
+                <button type="button" className="page-edit" aria-label={t.editTextBtn} title={t.editTextBtn}
+                  disabled={loading}
+                  onClick={e => { e.stopPropagation(); audioRef.current?.pause(); openPageEditor(page); }}>✏️</button>
               </div>
-              {/* ✏️ Ruční úprava textu — jako u běžné pohádky, i u zkopírované */}
-              <button type="button" className="page-edit" aria-label={t.editTextBtn} title={t.editTextBtn}
-                disabled={loading}
-                onClick={e => { e.stopPropagation(); audioRef.current?.pause(); openPageEditor(page); }}>✏️</button>
-            </div>
+            )}
 
             {/* 🔇 Hlas selhal (kredit/výpadek) — viditelná hláška místo věčného ⏳ */}
             {readerMode && audioErr && !current.audioUrl && !isPlaceholderImg(current.imageUrl) && (
@@ -5671,22 +5729,18 @@ export default function Home() {
               </div>
             )}
 
-            {/* 5 tlačítek: řada na šířku obrázku (portrét) / sloupec na výšku
-                obrázku (fullscreen). Hlas se nastavuje v hlavním menu,
-                auto-přechod scén je zapnutý vždy. */}
+            {/* 🎛️ 2026-08-09: "ovládací panel chceme jak byl navržený v CD" —
+                play/prev/next se přesunuly do plovoucí pilulky (.book-nav
+                níž, přesně jako design-bundle-v7 ReaderScreen .controls),
+                tenhle řádek teď drží jen VEDLEJŠÍ přepínače (4 tlačítka). */}
             <div className="book-controls" onClick={e => e.stopPropagation()}>
-              <button type="button" className={`ctrl-cell ctrl-cell-primary${!current.audioUrl || regenAudio ? " ctrl-cell-loading" : ""}`}
-                onClick={togglePlay} disabled={!current.audioUrl || regenAudio}>
-                <span className={`ctrl-ico${!current.audioUrl && !regenAudio ? " ctrl-ico-spin" : ""}`}>
-                  {!current.audioUrl && !regenAudio ? "⏳" : isPlaying ? "⏸" : "▶"}
-                </span>
-                <span className="ctrl-txt">{!current.audioUrl && !regenAudio ? t.voiceLoading : isPlaying ? t.pause : t.play}</span>
+              {/* 🎤 Titulky — nový přepínač vedle hudby/otočení/domů (viz
+                  subtitlesOn výš). */}
+              <button type="button" className={`ctrl-cell${subtitlesOn ? " ctrl-cell-on" : ""}`}
+                onClick={() => setSubtitlesOn(p => !p)}>
+                <span className="ctrl-ico">{subtitlesOn ? "💬" : "🚫"}</span>
+                <span className="ctrl-txt">{t.subtitlesLabel}</span>
               </button>
-
-              <div className="ctrl-cell ctrl-cell-info">
-                <span className="ctrl-ico">📖</span>
-                <span className="ctrl-txt">{pagePos + 1} / {visiblePages.length}{storyChoice && branch === null ? "+" : ""}</span>
-              </div>
 
               {/* 🎵 Hudba/zvuky — dřív šlo přepnout jen ve formuláři PŘED
                   vytvořením pohádky; při otevření uložené pohádky z historie
@@ -5713,34 +5767,43 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Nav arrows + dots outside the card — no overflow clipping.
-              ✅ Funkční i při otevřené titulce — čtenář si tak může před
-              samotným spuštěním prolistovat stránky a ověřit, že se pohádka
-              správně nahrála (titulka na pozadí ukazuje NÁHLED aktuální
-              stránky, viz scenes[page] u .title-card-bg výš). */}
-          <div className="book-nav" ref={navRef}>
-            {/* 🔙 Na první stránce vede šipka zpět na titulní obrazovku (jinak
-                by na první scéně nešlo nikam couvnout — je to jediná stránka
-                bez skutečné "předchozí" scény). */}
-            <button type="button" className="ctrl-btn ctrl-nav"
-              onClick={() => {
-                if (prevVisible !== null) { goToPage(prevVisible); return; }
-                if (pagePos === 0) {
-                  audioRef.current?.pause();
-                  setIsPlaying(false);
-                  titleCardOpenRef.current = true;
-                  setTitleCardOpen(true);
-                }
-              }}
-              disabled={!hasPrev && pagePos !== 0} aria-label={t.prev}>←</button>
-            <div className="page-dots">
-              {visiblePages.map((i, pos) => (
-                <button key={i} type="button"
-                  className={`dot ${i === page ? "dot-active" : ""} ${scenes[i]?.audioUrl ? "dot-ready" : ""}`}
-                  onClick={() => goToPage(i)} aria-label={`Strana ${pos + 1}`} />
-              ))}
+          {/* 🎛️ 2026-08-09: CD styl (design-bundle-v7 ReaderScreen .controls) —
+              plovoucí pilulka s ‹ ▶/⏸ › nahoře a posuvníkem stránky dole,
+              místo dřívějších samostatných teček. Nav arrows outside the
+              card — no overflow clipping. ✅ Funkční i při otevřené titulce —
+              čtenář si tak může před samotným spuštěním prolistovat stránky
+              a ověřit, že se pohádka správně nahrála (titulka na pozadí
+              ukazuje NÁHLED aktuální stránky, viz scenes[page] u
+              .title-card-bg výš). */}
+          <div className="book-nav" ref={navRef} onClick={e => e.stopPropagation()}>
+            <div className="nav-transport">
+              {/* 🔙 Na první stránce vede šipka zpět na titulní obrazovku (jinak
+                  by na první scéně nešlo nikam couvnout — je to jediná stránka
+                  bez skutečné "předchozí" scény). */}
+              <button type="button" className="ctrl-btn ctrl-nav"
+                onClick={() => {
+                  if (prevVisible !== null) { goToPage(prevVisible); return; }
+                  if (pagePos === 0) {
+                    audioRef.current?.pause();
+                    setIsPlaying(false);
+                    titleCardOpenRef.current = true;
+                    setTitleCardOpen(true);
+                  }
+                }}
+                disabled={!hasPrev && pagePos !== 0} aria-label={t.prev}>‹</button>
+              <button type="button" className={`nav-play-btn${!current.audioUrl || regenAudio ? " nav-play-loading" : ""}`}
+                onClick={togglePlay} disabled={!current.audioUrl || regenAudio}
+                aria-label={!current.audioUrl && !regenAudio ? t.voiceLoading : isPlaying ? t.pause : t.play}>
+                {!current.audioUrl && !regenAudio ? <span className="placeholder-spinner placeholder-spinner-sm" /> : isPlaying ? "⏸" : "▶"}
+              </button>
+              <button type="button" className="ctrl-btn ctrl-nav" onClick={() => nextVisible !== null && goToPage(nextVisible)} disabled={!hasNext} aria-label={t.next}>›</button>
             </div>
-            <button type="button" className="ctrl-btn ctrl-nav" onClick={() => nextVisible !== null && goToPage(nextVisible)} disabled={!hasNext} aria-label={t.next}>→</button>
+            <div className="nav-scrub-row">
+              <input type="range" className="nav-range" min={0} max={Math.max(0, visiblePages.length - 1)} value={pagePos}
+                onChange={e => { const i = visiblePages[+e.target.value]; if (i !== undefined) goToPage(i); }}
+                aria-label={t.scrubLabel} />
+              <span className="nav-page-label">{pagePos + 1} / {visiblePages.length}{storyChoice && branch === null ? "+" : ""}</span>
+            </div>
           </div>
 
           {/* 🔀 Návrat k rozbočce — vyzkoušet druhou variantu konce */}

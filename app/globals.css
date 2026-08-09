@@ -964,23 +964,54 @@ button:disabled {
   aspect-ratio: auto;
 }
 
-/* Text box directly UNDER the image on a white background */
+/* 🎤 2026-08-08 (2): CD styl (design-bundle-v7 ReaderScreen) — žádný box/
+   přechod za textem, jen JEMNÝ spodní stín přes obrázek (jako .bottomFade
+   v CD) a text přímo na ilustraci s vrstveným stínem pro čitelnost. Dřív tu
+   appka měla tmavý gradientový box (viz historie), uživatel chtěl přesně
+   CD vzhled — text "plave" na obrázku, žádné pozadí za slovy. */
 .reader-mode .page-body {
+  position: relative;
   flex: 0 0 auto;
-  max-height: 34dvh;
+  max-height: 42%;
   overflow-y: auto;
-  background: rgba(248, 247, 255, 0.96);
-  padding: 0.8rem 0.95rem 0.9rem;
+  margin-top: -5.4rem;
+  padding: 4.4rem 1.3rem 1rem;
+  color: #fdf3d7;
+  z-index: 2;
+  pointer-events: none;
+}
+.reader-mode .page-body::before {
+  /* Jemný spodní přechod PŘES OBRÁZEK, ne za textem — stejná role jako
+     .bottomFade v CD (150px, jen náznak ztmavení, ne plný box). */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(16, 8, 36, 0) 0%, rgba(16, 8, 36, 0.4) 55%, rgba(16, 8, 36, 0.55) 100%);
+  z-index: -1;
+  pointer-events: none;
+}
+.reader-mode .page-clip,
+.reader-mode .page-edit {
+  pointer-events: auto;
 }
 
 .reader-mode .page-text {
-  font-size: 0.98rem;
-  line-height: 1.6;
+  font-family: var(--font-alegreya), Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.38;
+  text-align: center;
+  text-wrap: pretty;
+  text-shadow:
+    0 1px 2px rgba(14, 7, 32, 0.9),
+    0 2px 10px rgba(14, 7, 32, 0.85),
+    0 0 24px rgba(14, 7, 32, 0.7);
 }
 
 /* Controls: hidden; tap → panel pinned to the BOTTOM of the screen */
-/* Reader (portrét): jedna řada 5 tlačítek na spodní hraně, na šířku obrázku.
-   Panel VYJÍŽDÍ zpoza spodní hrany (ťuknutí) a po 5 s zase ZAJEDE. */
+/* Reader (portrét): jedna řada 4 tlačítek (titulky/hudba/otočit/domů) na
+   spodní hraně, na šířku obrázku — play/prev/next žijí zvlášť v .book-nav
+   (CD pilulka). Panel VYJÍŽDÍ zpoza spodní hrany (ťuknutí) a po 5 s zase ZAJEDE. */
 .reader-mode .book-controls {
   position: absolute;
   left: 0.45rem;
@@ -989,7 +1020,7 @@ button:disabled {
   margin: 0;
   z-index: 6;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.4rem;
   padding: 0.45rem 0.5rem;
   border-radius: 16px 16px 0 0;
@@ -1038,16 +1069,20 @@ button:disabled {
   color: rgba(255, 255, 255, 0.9);
 }
 
-/* Nav arrows float mid-height over the image; hidden by default,
-   shown only together with the control panel (tap) */
+/* 🎛️ 2026-08-09: CD pilulka (prev/▶/next + posuvník) plave vystředěná NAD
+   spodkem obrázku — dřív tu byl jen tenký proužek ←tečky→ svisle uprostřed
+   obrázku, teď je .book-nav celá kompaktní pilulka (viz vzhled níž), tak se
+   přesunula ke spodní hraně jako v design-bundle-v7 ReaderScreen .controls.
+   Hidden by default, shown only together with the control panel (tap). */
 .reader-mode .book-nav {
   position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  transform: translateY(-50%);
-  justify-content: space-between;
-  padding: 0 0.45rem;
+  left: 50%;
+  bottom: 0.9rem;
+  top: auto;
+  right: auto;
+  transform: translateX(-50%);
+  justify-content: center;
+  padding: 0;
   pointer-events: none;
   z-index: 4;
   display: none;
@@ -1058,12 +1093,13 @@ button:disabled {
   opacity: 0.85;
 }
 
-.reader-mode .ctrls-open .book-nav {
-  display: flex;
+.reader-mode .book-nav .nav-range,
+.reader-mode .book-nav .nav-play-btn {
+  pointer-events: auto;
 }
 
-.reader-mode .page-dots {
-  display: none;
+.reader-mode .ctrls-open .book-nav {
+  display: flex;
 }
 
 /* Landscape / widescreen: maximize the picture —
@@ -1089,7 +1125,7 @@ button:disabled {
     aspect-ratio: auto;
     align-self: auto;
   }
-  /* Landscape (fullscreen): sloupec 5 tlačítek na výšku obrázku; panel
+  /* Landscape (fullscreen): sloupec 4 tlačítek na výšku obrázku; panel
      VYJÍŽDÍ zpoza pravé hrany a zase ZAJEDE */
   .reader-mode .book-controls {
     position: absolute;
@@ -1099,7 +1135,7 @@ button:disabled {
     top: 0.45rem;
     bottom: 3.4rem; /* nad bílým pruhem titulků */
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(5, 1fr);
+    grid-template-rows: repeat(4, 1fr);
     gap: 0.35rem;
     width: 116px;
     padding: 0.4rem;
@@ -1112,12 +1148,10 @@ button:disabled {
   .reader-mode .ctrls-open .book-controls {
     transform: translateX(0);
   }
-  /* Šipky navigace: panel se v landscape/fullscreen přesunul na PRAVÝ okraj
-     jako svislý sloupec (116px, viz .book-controls výše) — šipka doprava se
-     proto musí posunout stranou, jinak by se s panelem překrývala. */
-  .reader-mode .book-nav {
-    right: 132px;
-  }
+  /* CD pilulka zůstává vystředěná dole i na šířku (viz base .reader-mode
+     .book-nav) — svislý sloupec 4 vedlejších tlačítek (116px, viz
+     .book-controls výš) žije na PRAVÉM okraji, takže se s vystředěnou
+     pilulkou dole nepřekrývá, žádný extra offset navíc netřeba. */
   .reader-mode .ctrl-cell {
     min-height: 0;
     font-size: 0.7rem;
@@ -1137,20 +1171,20 @@ button:disabled {
     padding: 0.3rem 0.3rem 0;
   }
 
-  /* Text: single-line ticker at the bottom */
+  /* 🎤 2026-08-09 (2): appka dřív jela v landscape jednořádkový TICKER
+     (white-space: nowrap + vodorovné rolování) — uživatel chtěl přesně CD
+     chování: appka ukazuje jen JEDNU VĚTU (viz karaokeCurrentSentence,
+     page.tsx), ta se přirozeně vejde na 1-2 krátké řádky bez rolování,
+     stejně jako v portrétu. Ticker mechanismus (pageClipRef/rollTick,
+     page.tsx) zůstává v kódu jako záložní chování pro výjimečně dlouhou
+     větu na úzké obrazovce, ale běžně se už neuplatní (žádný overflow). */
   .reader-mode .page-body {
     height: auto;
-    /* vnitřní okraje — text nejede od kraje ke kraji bílého rámečku */
-    padding: 0.45rem 1.35rem 0.55rem;
-    overflow: hidden;
+    max-height: 40%;
+    margin-top: -2.5rem;
+    padding: 1.8rem 1.5rem 0.6rem;
   }
-  .reader-mode .page-clip {
-    overflow: hidden;
-    /* měkké vyjíždění textu na okrajích rámečku */
-    mask-image: linear-gradient(90deg, transparent 0, #000 1.1rem, #000 calc(100% - 1.1rem), transparent 100%);
-    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 1.1rem, #000 calc(100% - 1.1rem), transparent 100%);
-  }
-  /* Tenký titulkový pruh na šířku — tlačítko úpravy zmenšeno a mimo mlhu okraje */
+  /* Tenký titulkový pruh na šířku — tlačítko úpravy zmenšeno */
   .reader-mode .page-edit {
     top: 2px;
     right: 2px;
@@ -1158,16 +1192,11 @@ button:disabled {
     height: 24px;
     line-height: 24px;
     font-size: 0.7rem;
-    background: rgba(30, 27, 75, 0.16);
+    background: rgba(255, 255, 255, 0.2);
   }
   .reader-mode .page-text {
-    white-space: nowrap;
-    display: inline-block;
-    /* větší vnitřní odsazení než šířka vyblednutí (1.1rem) — začátek
-       i konec věty jsou při rolování plně čitelné, ne v mlze okraje */
-    padding: 0 1.35rem;
-    font-size: 0.95rem;
-    line-height: 1.35;
+    font-size: 1.05rem;
+    line-height: 1.32;
   }
 
 }
@@ -1300,28 +1329,66 @@ button:disabled {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 0.9rem;
-  padding: 2rem;
+  /* 🏷️ 2026-08-08: dřív "center" (obsah uprostřed karty přes půl obrázku) —
+     teď "flex-end" tlačí info-box na SPODEK, ať je vidět celá ilustrace nad
+     ním, jako v CD návrhu. */
+  justify-content: flex-end;
+  gap: 0.7rem;
+  padding: 1.5rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom, 0px));
   text-align: center;
 }
 
 .title-card-emoji {
   font-size: 3.2rem;
   filter: drop-shadow(0 4px 18px rgba(124, 77, 255, 0.5));
+  /* Emoji (appka ještě nemá scénu 1) drží se NAD info-boxem, ne v něm —
+     dostane zbylý prostor nahoře díky content justify-content:flex-end. */
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+/* 📦 Kompaktní info-box dole s názvem, meta řádkem (strany/čas) a ▶
+   tlačítkem — sklo efekt (blur), ať čitelně sedí na jakémkoli obrázku. */
+.title-card-infobox {
+  width: 100%;
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 1.1rem 1.3rem 1.3rem;
+  border-radius: 1.4rem;
+  background: rgba(20, 12, 42, 0.55);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.35);
 }
 
 .title-card-title {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: #fff;
-  line-height: 1.35;
+  line-height: 1.32;
   text-shadow: 0 2px 16px rgba(0, 0, 0, 0.4);
   max-width: 26ch;
 }
 
+/* 🏷️ Počet stran + odhad času čtení — appčino první "co mě čeká" info na
+   titulce, dřív appka žádné neukazovala. */
+.title-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.68);
+  letter-spacing: 0.01em;
+}
+.title-card-meta-dot { opacity: 0.6; }
+
 .title-card-tap {
-  margin-top: 0.4rem;
+  margin-top: 0.2rem;
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -1330,28 +1397,48 @@ button:disabled {
   color: rgba(255, 255, 255, 0.6);
 }
 
-/* 🟠 Skutečné tlačítko, ne jen drobný podtext — pohádka je hotová, ať je
-   jasné, kam ťuknout. Šířka poloviční (ne přes celou kartu) — celá karta
-   je stejně klikatelná, tohle je jen viditelná afordance uprostřed. */
-.title-card-tap-ready {
-  margin-top: 0.9rem;
-  width: 50%;
-  min-width: 11rem;
+/* 🟠 2026-08-08: dřív pilulka přes 50% šířky karty ("▶ ťukni pro spuštění")
+   — teď kolečkové tlačítko na ~1/3 té dřívější velikosti, uvnitř info-boxu.
+   Animace: dva pulzující prstence (jako "someone is calling" efekt) místo
+   pouhého škálování celého tlačítka — čitelnější "hraj" afordance na malé
+   ploše. Celá karta zůstává klikatelná (žádný vlastní onClick na tlačítku). */
+.title-card-play {
+  position: relative;
+  width: 3.6rem;
+  height: 3.6rem;
+  margin-top: 0.5rem;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.55);
+  display: flex;
+  align-items: center;
   justify-content: center;
-  padding: 1rem 1rem;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
-  box-shadow: 0 4px 24px rgba(245, 158, 11, 0.5);
-  color: #fff;
-  font-size: 1.15rem;
-  font-weight: 900;
-  letter-spacing: 0.01em;
-  animation: titleTapPulse 1.8s ease-in-out infinite;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-@keyframes titleTapPulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 4px 24px rgba(245, 158, 11, 0.5); }
-  50% { transform: scale(1.045); box-shadow: 0 6px 32px rgba(245, 158, 11, 0.7); }
+.title-card-play-icon {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  font-size: 1.3rem;
+  /* ▶ glyf opticky sedí trochu vlevo od středu — mírný posun doprava */
+  transform: translateX(0.1rem);
+}
+
+.title-card-play-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(249, 115, 22, 0.65);
+  animation: titlePlayRing 2s ease-out infinite;
+}
+.title-card-play-ring-b { animation-delay: 1s; }
+
+@keyframes titlePlayRing {
+  0% { transform: scale(1); opacity: 0.75; }
+  100% { transform: scale(1.7); opacity: 0; }
 }
 
 /* 🆘 Ruční únik z titulky, kdyby se nějaká scéna nikdy nedokreslila —
@@ -1464,20 +1551,52 @@ button:disabled {
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: rgba(30, 27, 75, 0.12);
+  /* 🎤 2026-08-08: .page-body je teď tmavý překryv přes obrázek (ne bílý
+     box) — tlačítko potřebuje světlý, ne tmavý podklad, aby zůstalo vidět. */
+  background: rgba(255, 255, 255, 0.18);
   color: inherit;
   font-size: 0.85rem;
   line-height: 30px;
   cursor: pointer;
 }
 
-.page-edit:active { background: rgba(124, 77, 255, 0.35); }
+.page-edit:active { background: rgba(124, 77, 255, 0.45); }
 
+/* 🎤 2026-08-08 (2): CD styl (design-bundle-v7 ReaderScreen.module.css
+   .captionText) — serifový Alegreya, tučný, vystředěný, žádné pozadí za
+   textem, jen vrstvený stín pro čitelnost na jakémkoli obrázku.
+   2026-08-09: uživatel — "ať text neběží přes celý řádek, jen v boxu, jak
+   titulky v kině" — appka VĚTU (viz karaokeCurrentSentence, page.tsx) teď
+   navíc zalomí do užšího vystředěného sloupce (ne přes celou šířku
+   obrázku), ať to čte jako 2-3 krátké řádky, ne jeden široký. */
 .page-text {
-  font-size: 1.18rem;
-  line-height: 1.75;
-  font-weight: 600;
-  color: var(--text);
+  font-family: var(--font-alegreya), Georgia, serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1.38;
+  max-width: 26ch;
+  margin: 0 auto;
+  text-align: center;
+  color: #fdf3d7;
+  text-shadow:
+    0 1px 2px rgba(14, 7, 32, 0.9),
+    0 2px 10px rgba(14, 7, 32, 0.85),
+    0 0 24px rgba(14, 7, 32, 0.7);
+}
+
+/* 🎤 KARAOKE zvýrazňování — CD paleta (design-bundle-v7 .wordRead/.wordActive/
+   .wordPending): PŘEČTENO/PŘED PŘEHRÁNÍM = plná krémová, PRÁVĚ ČTENÉ = zlatá
+   se zářivým stínem (ŽÁDNÁ pilulka/pozadí — appka to dřív měla jako
+   oranžovou pilulku, uživatel chtěl přesně CD vzhled), JEŠTĚ NEPŘEČTENO =
+   ztlumená krémová. word-idle (audio se ještě nepřehrává) čte se stejně
+   jako word-read — v CD před spuštěním appka celý text ukazuje plně čitelný,
+   ne ztlumeně. */
+.word-idle, .word-read { color: #fdf3d7; transition: color 0.15s ease; }
+.word-pending { color: rgba(253, 243, 215, 0.4); transition: color 0.15s ease; }
+.word-active {
+  color: #fcd34d;
+  text-shadow: 0 0 14px rgba(252, 211, 77, 0.8);
+  transition: color 0.15s ease;
 }
 
 /* ── Unified control bar ── */
@@ -1610,121 +1729,96 @@ button:disabled {
   box-shadow: none;
 }
 
-/* Big play/pause button */
-.ctrl-play {
-  width: 62px;
-  height: 62px;
-  font-size: 1.55rem;
-  background: linear-gradient(135deg, var(--purple) 0%, var(--purple-dark) 100%);
-  color: #fff;
-  box-shadow: 0 4px 18px rgba(124, 77, 255, 0.45);
-}
-
-.ctrl-play:hover:not(:disabled) {
-  filter: brightness(1.12);
-  box-shadow: 0 6px 24px rgba(124, 77, 255, 0.55);
-  transform: translateY(-1px);
-}
-
-.ctrl-play:active:not(:disabled) {
-  transform: scale(0.95) translateY(0);
-}
-
-.ctrl-play.ctrl-loading {
-  background: rgba(124, 77, 255, 0.35);
-  box-shadow: none;
-  animation: pulse 1.8s ease-in-out infinite;
-}
-
-/* Page counter */
-.ctrl-counter {
-  font-size: 0.95rem;
-  font-weight: 800;
-  color: var(--text-muted);
-  min-width: 3rem;
-  text-align: center;
-  user-select: none;
-}
-
-/* Auto-advance toggle */
-.ctrl-auto {
-  width: 38px;
-  height: 38px;
-  font-size: 1rem;
-  background: transparent;
-  color: var(--text-muted);
-  box-shadow: none;
-  opacity: 0.55;
-  border-radius: 999px;
-  border: 1.5px solid var(--border);
-}
-
-.ctrl-auto:hover:not(:disabled) {
-  background: var(--purple-light);
-  opacity: 1;
-  filter: none;
-  transform: none;
-  box-shadow: none;
-}
-
-.ctrl-auto.ctrl-auto-on {
-  opacity: 1;
-  background: var(--purple-light);
-  border-color: var(--purple);
-  color: var(--purple-dark);
-}
-
-/* ── Progress dots (inside book-card, light background) ── */
-/* Nav row: ← [dots] → — lives outside .book-card to avoid overflow:hidden clipping */
+/* ── CD ovládací pilulka (design-bundle-v7 ReaderScreen .controls) ──
+   2026-08-09: nahrazuje dřívější tenký proužek ←tečky→. Teď jedna kompaktní
+   tmavá pilulka se dvěma řadami: nahoře ‹ ▶/⏸ › (.nav-transport), dole
+   posuvník stránky (.nav-scrub-row). Přesné hodnoty (barvy/rozměry) 1:1
+   podle designu — .book-nav = CD .controls. Lives outside .book-card's
+   image wrapper to avoid overflow:hidden clipping. */
 .book-nav {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.35rem 0.5rem 0.75rem;
-  gap: 0.5rem;
+  gap: 0.6rem;
+  padding: 0.85rem 1.3rem 0.7rem;
+  margin: 0.5rem auto 0.75rem;
+  border-radius: 32px;
+  background: rgba(30, 16, 58, 0.65);
+  border: 1.5px solid rgba(253, 224, 138, 0.4);
+  backdrop-filter: blur(12px);
+  width: fit-content;
+  max-width: 280px;
+  box-sizing: border-box;
 }
 
+.nav-transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+}
+
+/* Prev/next uvnitř pilulky — přebírá .ctrl-nav základ, jen zmenšené na CD
+   kolečko (44px) a s bílým obrysem místo fialového stínu */
 .book-nav .ctrl-nav {
   flex-shrink: 0;
-}
-
-.page-dots {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.45rem;
-  flex: 1;
-  flex-wrap: wrap;
-}
-
-.dot {
-  width: 10px;
-  height: 10px;
+  width: 44px;
+  height: 44px;
+  font-size: 1.1rem;
   border-radius: 50%;
-  background: rgba(124, 77, 255, 0.2);
-  border: none;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  border: 2.5px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 3px 9px rgba(20, 8, 40, 0.4), inset 0 2px 5px rgba(255, 255, 255, 0.4);
+  color: #fff;
+}
+
+/* ▶/⏸ — hlavní kolečko uprostřed přepravní řady */
+.nav-play-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
   padding: 0;
-  box-shadow: none;
+  border: 2.5px solid rgba(255, 255, 255, 0.92);
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  box-shadow: 0 4px 24px rgba(20, 8, 40, 0.35), inset 0 2px 6px rgba(255, 255, 255, 0.4);
+  color: #fff;
+  font-size: 1.5rem;
   cursor: pointer;
-  transition: background 0.2s, transform 0.2s;
-  transform: none;
+  transition: transform 0.12s ease;
 }
 
-.dot.dot-ready {
-  background: rgba(124, 77, 255, 0.38);
+.nav-play-btn:active { transform: scale(0.94); }
+.nav-play-btn:disabled,
+.nav-play-btn.nav-play-loading {
+  opacity: 0.55;
+  cursor: default;
 }
 
-.dot.dot-active {
-  background: var(--purple);
-  transform: scale(1.35);
-  box-shadow: 0 0 6px rgba(124, 77, 255, 0.5);
+.nav-scrub-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
 }
 
-.dot:hover:not(:disabled) {
-  background: rgba(124, 77, 255, 0.6);
-  filter: none;
-  transform: scale(1.2);
-  box-shadow: none;
+.nav-range {
+  flex: 1;
+  height: 20px;
+  margin: 0;
+  accent-color: #f59e0b;
+  cursor: pointer;
+}
+
+.nav-page-label {
+  flex: none;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: rgba(253, 243, 215, 0.9);
+  white-space: nowrap;
 }
 
 /* ── Vlastní postava – panel ── */
@@ -3918,14 +4012,11 @@ textarea.ta-accent:focus {
   .page-text { font-size: 0.97rem; line-height: 1.68; }
 
   .book-controls { padding: 0.55rem 0.65rem 0.65rem; gap: 0.28rem; }
-  .ctrl-nav { width: 46px; height: 46px; font-size: 1.15rem; }
-  .ctrl-play { width: 52px; height: 52px; font-size: 1.3rem; }
-  .ctrl-auto, .ctrl-mute, .ctrl-home { width: 32px; height: 32px; font-size: 0.85rem; }
-  .ctrl-counter { font-size: 0.8rem; min-width: 2rem; }
 
-  .book-nav { padding: 0.25rem 0.65rem 0.5rem; }
-  .page-dots { gap: 0.28rem; }
-  .dot { width: 7px; height: 7px; }
+  .book-nav { padding: 0.7rem 1rem 0.6rem; gap: 0.5rem; }
+  .book-nav .ctrl-nav { width: 40px; height: 40px; font-size: 1rem; }
+  .nav-play-btn { width: 54px; height: 54px; font-size: 1.3rem; }
+  .nav-page-label { font-size: 0.75rem; }
 }
 
 /* ── 🛠️ Dev přehled (uvnitř Spotřeba, jen pro admina) ── */

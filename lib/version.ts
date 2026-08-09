@@ -1,6 +1,28 @@
-export const APP_VERSION = "4.99.80";
+export const APP_VERSION = "4.99.81";
 
 // Changelog (newest first)
+// 4.99.81 - 🎛️ CD OVLÁDACÍ PANEL + KINOTITULKOVÝ KARAOKE BOX + PŘEPÍNAČ TITULEK: dokončeno
+// zadání "Pushni to pls na main... Ovládací panel chceme jak byl navržený v CD, zvládneš?".
+// .book-nav přestavěn z tenkého proužku ←tečky→ uprostřed obrázku na kompaktní tmavou
+// pilulku (design-bundle-v7 ReaderScreen .controls 1:1: rgba(30,16,58,.65) pozadí, zlatý
+// okraj, blur) se dvěma řadami — nahoře ‹ ▶/⏸ › (.nav-transport), dole posuvník stránky
+// (.nav-scrub-row) — vystředěná NAD spodkem obrázku. .book-controls zúžen z 5 na 4 tlačítka
+// (play/prev/next se přesunuly do pilulky), zbyly jen vedlejší přepínače (titulky/hudba/
+// otočit/domů). Karaoke text dostal `max-width: 26ch` (kinotitulky, ne přes celý řádek) +
+// nový přepínač 🎤 titulek v ovládacím panelu (subtitlesOn, persist do localStorage) — celý
+// karaoke blok jde skrýt/zobrazit za čtení. Odstraněna mrtvá CSS (.ctrl-play/.ctrl-counter/
+// .ctrl-auto/.page-dots/.dot) + odpovídající JS pozicování .book-nav (dřív JS ručně počítal
+// top/left/width podle obrázku, teď je pilulka vystředěná čistě přes CSS).
+// ŽIVĚ OVĚŘENO na preview (2× reálná 3str. testovací pohádka, Playwright): titulní karta
+// (kompaktní info-box + kolečkové ▶), přehrávání se skutečným word-level zvýrazňováním
+// (real ElevenLabs/Gemini časování), přepínač titulek zapnuto/vypnuto, celý panel v obou
+// stavech vypadá přesně podle CD designu. Landscape mód strukturálně zkontrolován (stejné
+// třídy, opravená mřížka 4 tlačítek), ale NE živě odscreenshotováno (Playwright fullscreen
+// pád) — čeká na Janovo ověření na telefonu.
+// 🛠️ VÝVOJÁŘSKÝ ÚČET (isAdmin): na dotaz "u mě jako developera (účet jan) se dobíjení řešit
+// nemusí?" přidáno `AccountRecord.isAdmin` (lib/accounts.ts) — isAdmin účet přeskočí kreditní
+// kontrolu v /api/job/start a chargeForCompletedStory mu kredity neodečítá. Nastavuje se jen
+// přes nové POST /api/admin/accounts (stejná ADMIN_PASSWORD ochrana jako GET), nikdy z klienta.
 // 4.99.80 - 🔒 ZÁMEK ODSTÍNŮ VLASŮ PRO CELOU RODINU + OPRAVA JANA A ARCHIEHO:
 // uživatel nahlásil "táta Jan zase vypadá jinak", i když je "ukotvený" —
 // kořenová příčina: appčina vlastní kontrola (verifySceneImage, gemini.ts

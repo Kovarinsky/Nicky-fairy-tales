@@ -179,6 +179,8 @@ export const UI = {
     pagesLabel: "Počet stránek",
     pagesTime: (min: number) => `🕐 cca ${min} min čtení (1 stránka ≈ půl minuty)`,
     musicLabel: "Hudba",
+    subtitlesLabel: "Titulky",
+    scrubLabel: "Stránka pohádky",
     musicOn: "🎵 Zapnuta",
     musicOff: "🔇 Vypnuta",
     createBtn: "✨ Vytvořit pohádku",
@@ -236,6 +238,17 @@ export const UI = {
     sceneAlt: (n: number) => `Scéna ${n}`,
     titleCardTap: "ťukni pro spuštění",
     titleCardPreparing: "Připravuji pohádku…",
+    // 🩺 2026-08-09: appka dřív mlčela o TOM, proč se otevření z historie
+    // občas znovu celé generuje (místní kopie na tomhle zařízení chybí/
+    // expirovala) — vypadalo to jako appka lže "pohádka je hotová", pak si
+    // to rozmyslí. Tenhle text appka ukáže MÍSTO obyčejného
+    // titleCardPreparing, jen v tomhle konkrétním případě (viz
+    // reopenRegenerating, page.tsx).
+    titleCardReopenRegenerating: "Tahle pohádka byla na zařízení smazaná — appka ji znovu připravuje…",
+    // 🏷️ Info box na titulce (počet stran + odhad času čtení) — čeština má
+    // 3 tvary skloňování podle čísla (1 / 2-4 / 5+), viz volání níž.
+    titleCardPages: (n: number) => `${n} ${n === 1 ? "strana" : n >= 2 && n <= 4 ? "strany" : "stran"}`,
+    titleCardMinutes: (n: number) => `~${n} ${n === 1 ? "minuta" : n >= 2 && n <= 4 ? "minuty" : "minut"} čtení`,
     iosFullscreenHint: "📲 Na iPhonu/iPadu appka neumí spustit celou obrazovku sama v obyčejném prohlížeči (omezení Safari) — pro pohádku přes celý displej si appku přidej na Plochu: tlačítko Sdílet 􀈂 → „Přidat na plochu“.",
     play: "Přehrát",
     pause: "Pauza",
@@ -434,6 +447,8 @@ export const UI = {
     pagesLabel: "Number of pages",
     pagesTime: (min: number) => `🕐 about ${min} min of reading (1 page ≈ half a minute)`,
     musicLabel: "Music",
+    subtitlesLabel: "Subtitles",
+    scrubLabel: "Story page",
     musicOn: "🎵 On",
     musicOff: "🔇 Off",
     createBtn: "✨ Create a fairy tale",
@@ -491,6 +506,9 @@ export const UI = {
     sceneAlt: (n: number) => `Scene ${n}`,
     titleCardTap: "tap to start",
     titleCardPreparing: "Preparing the story…",
+    titleCardReopenRegenerating: "This story's local copy was cleared from this device — preparing it again…",
+    titleCardPages: (n: number) => `${n} page${n === 1 ? "" : "s"}`,
+    titleCardMinutes: (n: number) => `~${n} min read`,
     iosFullscreenHint: "📲 On iPhone/iPad the app can't switch itself to full screen in the regular browser (a Safari limitation) — for a full-screen story, add the app to your Home Screen: Share 􀈂 → \"Add to Home Screen\".",
     play: "Play",
     pause: "Pause",

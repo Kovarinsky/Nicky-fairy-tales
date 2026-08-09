@@ -82,6 +82,16 @@ export default function HomeScreen({
 
   const [bgSheetOpen, setBgSheetOpen] = useState(false);
   const [bgAddOpen, setBgAddOpen] = useState(false);
+  // 🖱️ 2026-08-09: nahlášeno "mezi světy nejde rollovat, není vidět možnost
+  // přidat vlastní pozadí" — kolečko myši/scrollbar sice appka řešila dřív
+  // (onWheel remap), ale appka na tom pořád stavěla jen na jednom gestu
+  // (kolečko/dotykový swipe). Viditelné šipky fungují VŽDY, nezávisle na
+  // vstupním zařízení, a hlavně dávají najevo, že lišta NENÍ statická —
+  // "VLASTNÍ" dlaždice je poslední v řadě, šipka doprava ji spolehlivě odkryje.
+  const bgSheetRef = useRef<HTMLDivElement>(null);
+  function scrollBgSheet(dir: 1 | -1) {
+    bgSheetRef.current?.scrollBy({ left: dir * 160, behavior: "smooth" });
+  }
   const [flow, setFlow] = useState<"idle" | "waiting" | "running" | "done">("idle");
   const [flowResult, setFlowResult] = useState<string | null>(null);
   const [flowError, setFlowError] = useState<string | null>(null);
@@ -219,33 +229,48 @@ export default function HomeScreen({
       {bgSheetOpen && (
         <>
           <div className={styles.sheetScrim} onClick={() => setBgSheetOpen(false)} />
-          <div
-            className={styles.bgSheet}
-            onWheel={(e) => {
-              // 🖱️ 2026-08-05: nahlášeno "mezi světy nejde listovat" — ověřeno
-              // živě (Playwright): scrollbar je schválně skrytý a čistě svislé
-              // kolečko myši (bez trackpadu/dotykové obrazovky) samo o sobě
-              // vodorovný overflow-x:auto nerolovalo, ani click-drag nefungoval
-              // — na PC s obyčejnou myší nebyla ŽÁDNÁ cesta k dlaždicím za
-              // okrajem (dotykem/trackpadem to fungovalo nativně). Svislý
-              // scroll delta se teď přemapuje na vodorovný posun.
-              if (e.deltaY === 0) return;
-              e.currentTarget.scrollLeft += e.deltaY;
-            }}
-          >
-            {/* 🏷️ Dřív byl u dlaždice jen kroužek s obrázkem — jméno světa
-                šlo poznat jen z aria-label (screen reader), vizuálně nebylo
-                jasné, co se vlastně vybírá. Teď je pod kroužkem i čitelný
-                popisek písmem appky (Nunito). */}
-            {backgroundOptions.map((b) => (
-              <button key={b.id} className={styles.bgOption} onClick={() => pickBg(b.id)} aria-label={b.name}>
-                <span className={activeBgId === b.id ? styles.bgOptionThumbActive : styles.bgOptionThumb} style={{ backgroundImage: `url(${b.image})` }} />
-                <span className={styles.bgOptionLabel}>{b.name}</span>
+          <div className={styles.bgSheetWrap}>
+            {/* 🖱️ 2026-08-09: viditelné šipky vedle scrollovací lišty — fungují
+                nezávisle na tom, jestli appka dostane kolečko/swipe/drag, a
+                zároveň VIZUÁLNĚ ukazují, že za okrajem je další obsah (dřív
+                to vypadalo jako statický, uzavřený výběr). */}
+            <button type="button" className={styles.bgSheetNav} style={{ left: -6 }}
+              onClick={() => scrollBgSheet(-1)} aria-label="Předchozí světy">
+              <ChevronSide dir="l" />
+            </button>
+            <div
+              ref={bgSheetRef}
+              className={styles.bgSheet}
+              onWheel={(e) => {
+                // 🖱️ 2026-08-05: nahlášeno "mezi světy nejde listovat" — ověřeno
+                // živě (Playwright): scrollbar je schválně skrytý a čistě svislé
+                // kolečko myši (bez trackpadu/dotykové obrazovky) samo o sobě
+                // vodorovný overflow-x:auto nerolovalo, ani click-drag nefungoval
+                // — na PC s obyčejnou myší nebyla ŽÁDNÁ cesta k dlaždicím za
+                // okrajem (dotykem/trackpadem to fungovalo nativně). Svislý
+                // scroll delta se teď přemapuje na vodorovný posun.
+                if (e.deltaY === 0) return;
+                e.currentTarget.scrollLeft += e.deltaY;
+              }}
+            >
+              {/* 🏷️ Dřív byl u dlaždice jen kroužek s obrázkem — jméno světa
+                  šlo poznat jen z aria-label (screen reader), vizuálně nebylo
+                  jasné, co se vlastně vybírá. Teď je pod kroužkem i čitelný
+                  popisek písmem appky (Nunito). */}
+              {backgroundOptions.map((b) => (
+                <button key={b.id} className={styles.bgOption} onClick={() => pickBg(b.id)} aria-label={b.name}>
+                  <span className={activeBgId === b.id ? styles.bgOptionThumbActive : styles.bgOptionThumb} style={{ backgroundImage: `url(${b.image})` }} />
+                  <span className={styles.bgOptionLabel}>{b.name}</span>
+                </button>
+              ))}
+              <button className={activeBgId === "custom" ? styles.bgCustomTileActive : styles.bgCustomTile} onClick={() => setBgAddOpen(true)} aria-label="Vlastní pozadí z fotky">
+                <PlusIcon />
+                <span>VLASTNÍ</span>
               </button>
-            ))}
-            <button className={activeBgId === "custom" ? styles.bgCustomTileActive : styles.bgCustomTile} onClick={() => setBgAddOpen(true)} aria-label="Vlastní pozadí z fotky">
-              <PlusIcon />
-              <span>VLASTNÍ</span>
+            </div>
+            <button type="button" className={styles.bgSheetNav} style={{ right: -6 }}
+              onClick={() => scrollBgSheet(1)} aria-label="Další světy">
+              <ChevronSide dir="r" />
             </button>
           </div>
           {bgAddOpen && (
@@ -391,10 +416,21 @@ const SPARK_POS: [string, string, string, number, number][] = [
   ["53%", "86%", "4px", 1.3, 2.4], ["73%", "84%", "4px", 0.8, 2.2], ["91%", "64%", "4px", 0.2, 2.8],
 ];
 
-function ChevronDown() {
+function ChevronDown({ style }: { style?: React.CSSProperties } = {}) {
   return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.75 }}>
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.75, ...style }}>
       <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+// 🖱️ 2026-08-09: šipka u výběru světa se "hýbala dolů" — příčina: appka dřív
+// natáčela ChevronDown (dolů) o ±90° přes CSS transform, ale SVG rotace se
+// dělá kolem (0,0) ne kolem středu ikony, takže se vizuálně vychýlila mimo
+// tlačítko. Vlastní PŘÍMÁ ikona vlevo/vpravo (bez rotace) tohle nemá jak udělat.
+function ChevronSide({ dir }: { dir: "l" | "r" }) {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+      <path d={dir === "l" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7"} />
     </svg>
   );
 }

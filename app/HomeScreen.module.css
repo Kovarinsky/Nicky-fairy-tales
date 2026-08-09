@@ -282,12 +282,21 @@
   inset: 0;
   z-index: 20;
 }
-.bgSheet {
+/* 🖱️ 2026-08-09: .bgSheet dřív neslo vlastní pozici (top/left/right) přímo
+   — teď to nese obalující .bgSheetWrap, ať šipky (.bgSheetNav) mají stabilní
+   kotvu na stejných hranách, nezávisle na scroll pozici uvnitř .bgSheet. */
+.bgSheetWrap {
   position: absolute;
   top: 88px;
   left: 16px;
   right: 16px;
   z-index: 21;
+  display: flex;
+  align-items: center;
+}
+.bgSheet {
+  flex: 1;
+  min-width: 0;
   display: flex;
   gap: 8px;
   padding: 8px;
@@ -303,6 +312,25 @@
 .bgSheet::-webkit-scrollbar {
   display: none;
 }
+.bgSheetNav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 22;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(253, 224, 138, 0.5);
+  background: rgba(24, 12, 48, 0.92);
+  color: #fde68a;
+  box-shadow: 0 3px 10px rgba(6, 2, 18, 0.5);
+  cursor: pointer;
+}
+.bgSheetNav:active { transform: translateY(-50%) scale(0.92); }
 .bgOption,
 .bgCustomTile,
 .bgCustomTileActive {

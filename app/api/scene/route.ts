@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateSceneImage, genCounter } from "@/lib/gemini";
-import { narrateScene, prepareNarrationText, getCloneTuning } from "@/lib/elevenlabs";
+import { narrateScene, narrateSceneTimed, prepareNarrationText, getCloneTuning } from "@/lib/elevenlabs";
 import { narrateWithGemini, defaultAutoVoiceId } from "@/lib/gemini-tts";
 import { charactersByIds, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefEntries, refsForText } from "@/lib/portraits";
 import { writeUsageRecord } from "@/lib/job-runner";
-import type { Scene } from "@/lib/types";
+import type { Scene, WordTiming } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -41,15 +41,32 @@ export async function POST(req: NextRequest) {
     };
 
     if (audioOnly) {
-      // Líný hlas: namluvení jedné stránky až při čtení (a přepnutí hlasu)
-      const audio = await narrate().catch((e: Error) => {
-        throw new Error(`[TTS] ${e.message}`);
-      });
+      // 🎤 Líný hlas: namluvení jedné stránky až při čtení (a přepnutí hlasu).
+      // Tohle je taky JEDINÉ místo, kde appka reálně potřebuje slovní
+      // časování pro karaoke — appka ho proto žádá jen tady, ne při
+      // generování pohádky. Gemini hlasy (voiceId "gemini:…") žádné
+      // časování neumí — appka nechá wordTimings prázdné a čtečka spadne na
+      // odhad podle délky audia (viz page.tsx).
+      let audio: { buffer: Buffer; mimeType: string };
+      let wordTimings: WordTiming[] = [];
+      if (voiceId?.startsWith("gemini:")) {
+        audio = await narrateWithGemini(prepareNarrationText(scene.narration, heroDescription), voiceId.slice(7)).catch((e: Error) => {
+          throw new Error(`[TTS] ${e.message}`);
+        });
+      } else {
+        const tuning = voiceTuningOverride || (voiceId ? await getCloneTuning(voiceId) : undefined);
+        const timed = await narrateSceneTimed(scene, voiceId, tuning, heroDescription).catch((e: Error) => {
+          throw new Error(`[TTS] ${e.message}`);
+        });
+        audio = { buffer: timed.buffer, mimeType: timed.mimeType };
+        wordTimings = timed.wordTimings;
+      }
       // Spotřeba hlasu se účtuje tady (generování pohádky už hlas nevyrábí)
       writeUsageRecord(0, scene.narration.length, typeof body.deviceId === "string" ? body.deviceId : undefined)
         .catch(() => {});
       return NextResponse.json({
         audioUrl: `data:${audio.mimeType};base64,${audio.buffer.toString("base64")}`,
+        ...(wordTimings.length ? { wordTimings } : {}),
       });
     }
 
