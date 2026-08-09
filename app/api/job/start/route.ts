@@ -11,6 +11,7 @@ import { waitUntil } from "@vercel/functions";
 import { blobToken } from "@/lib/blob-token";
 import { runJob, putJson, estimateStoryCostCredits } from "@/lib/job-runner";
 import { SESSION_COOKIE, verifySessionToken, readAccount } from "@/lib/accounts";
+import { monthToDateGeminiUsd } from "@/lib/usage";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -46,6 +47,33 @@ export async function POST(req: NextRequest) {
         }
       }
       body.username = username; // ← job-runner podle něj po dokončení odečte kredit
+    }
+    // 🛑 MĚSÍČNÍ SPEND-CAP POJISTKA (2026-08-09): appka narazila na Googlein
+    // strop automatického navyšování zůstatku ("Dosáhli jste měsíčního
+    // limitu…", GCP účet 01B33D-DEEC68-5E789A) — appka do teď neměla ŽÁDNOU
+    // vlastní pojistku, jen kreditní systém PER ÚČET, který negarantuje nic
+    // o CELKOVÉ útratě napříč všemi účty za měsíc. Volitelné (env nenastaven
+    // = beze změny chování, appka jede jako dřív): MONTHLY_SPEND_CAP_USD ve
+    // Vercelu nastaví strop v USD pro appčinu VLASTNÍ (Gemini-only, viz
+    // lib/usage.ts) útratu od začátku kalendářního měsíce. Fail-open: když
+    // se vlastní útrata nedá zjistit (výpadek Blobu), job se PUSTÍ dál —
+    // appka nesmí kvůli chybě vlastního měření odmítat placené pohádky.
+    {
+      const capUsd = Number(process.env.MONTHLY_SPEND_CAP_USD);
+      if (Number.isFinite(capUsd) && capUsd > 0) {
+        const spentUsd = await monthToDateGeminiUsd();
+        if (spentUsd !== null && spentUsd >= capUsd) {
+          console.warn(`[job/start] MONTHLY_SPEND_CAP_USD dosažen: utraceno $${spentUsd.toFixed(2)} / strop $${capUsd.toFixed(2)}`);
+          return NextResponse.json(
+            {
+              error: `Appka tento měsíc dosáhla nastaveného rozpočtového stropu za ilustrace ($${spentUsd.toFixed(2)} / $${capUsd.toFixed(2)}). ` +
+                `Nové pohádky se dočasně negenerují, ať appka nenarazí na Googlein měsíční limit navyšování zůstatku. ` +
+                `Strop lze zvednout přes MONTHLY_SPEND_CAP_USD ve Vercelu.`,
+            },
+            { status: 429 }
+          );
+        }
+      }
     }
     const id = crypto.randomUUID();
     // Úvodní zápis stavu SYNCHRONNĚ — když Blob nefunguje (plné úložiště,
