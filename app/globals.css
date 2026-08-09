@@ -923,59 +923,58 @@ button:disabled {
   margin-bottom: 0.4rem;
 }
 
-/* ── Immersive reader: portrait = centered stack image → text → panel,
-     controls hidden until tap ── */
+/* ── Immersive reader (2026-08-10 přestavba): obrázek je TRVALE fullscreen
+   pozadí přes celou kartu (přesně jako design-bundle-v7 ReaderScreen
+   .screen/.bg — position:absolute;inset:0), text a ovládání jsou tenké
+   překryvy NAD ním, ne samostatné bloky v toku, co obrázek zmenšovaly.
+   Uživatel: "obraz chceme fullscreen celou dobu pohádky, ne aby se měnil
+   v průběhu slidu" — dřív byl obrázek jen 16:9 box uprostřed karty se
+   zbylým tmavým prostorem nahoře/dole, teď vyplní CELOU výšku karty. */
 .reader-mode .book-card {
   flex: 1;
   min-height: 0;
   position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
   animation: none;
   background: #14092e;
   cursor: pointer;
 }
 
-/* Portrait: uniform 16:9 frame directly above the text box — every scene
-   the same size; non-16:9 images are gently cropped to fill the frame */
 .reader-mode .page-image {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  flex: 0 1 auto;
-  min-height: 0;
-  height: auto;
-  aspect-ratio: 16 / 9;
+  height: 100%;
   object-fit: cover;
   background: #14092e;
 }
 
-/* v3.78 zabalil obrázek do .page-image-wrap (kvůli 🖌 tlačítku) — ve flex
-   sloupci karty musí roli obrázku hrát OBAL, jinak rám přeteče přes displej
-   a text s ovládáním skončí pod obrazovkou */
+/* v3.78 zabalil obrázek do .page-image-wrap (kvůli 🖌 tlačítku) — obal teď
+   nese fullscreen roli místo dřívějšího 16:9 rámu */
 .reader-mode .page-image-wrap {
-  width: 100%;
-  flex: 0 1 auto;
-  min-height: 0;
-  aspect-ratio: 16 / 9;
+  position: absolute;
+  inset: 0;
 }
 .reader-mode .page-image-wrap .page-image {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  aspect-ratio: auto;
 }
 
-/* 🎤 2026-08-08 (2): CD styl (design-bundle-v7 ReaderScreen) — žádný box/
-   přechod za textem, jen JEMNÝ spodní stín přes obrázek (jako .bottomFade
-   v CD) a text přímo na ilustraci s vrstveným stínem pro čitelnost. Dřív tu
-   appka měla tmavý gradientový box (viz historie), uživatel chtěl přesně
-   CD vzhled — text "plave" na obrázku, žádné pozadí za slovy. */
+/* 🎤 CD styl (design-bundle-v7 ReaderScreen .caption) — žádný box/přechod
+   za textem, jen JEMNÝ spodní stín přes obrázek (.bottomFade) a text
+   přímo na ilustraci s vrstveným stínem pro čitelnost. Teď PLOVOUCÍ
+   překryv (position:absolute) nad fullscreen obrázkem — dřív byl v
+   normálním toku POD obrázkem (negativní margin jen předstíral překryv),
+   což obrázku bralo výšku a "posouvalo" ho podle délky textu. */
 .reader-mode .page-body {
-  position: relative;
-  flex: 0 0 auto;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4.4rem;
   max-height: 42%;
   overflow-y: auto;
-  margin-top: -5.4rem;
-  padding: 4.4rem 1.3rem 1rem;
+  padding: 2.2rem 1.3rem 0.6rem;
   color: #fdf3d7;
   z-index: 2;
   pointer-events: none;
@@ -985,8 +984,8 @@ button:disabled {
      .bottomFade v CD (150px, jen náznak ztmavení, ne plný box). */
   content: "";
   position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(16, 8, 36, 0) 0%, rgba(16, 8, 36, 0.4) 55%, rgba(16, 8, 36, 0.55) 100%);
+  left: 0; right: 0; bottom: -4.4rem; top: -2rem;
+  background: linear-gradient(180deg, rgba(16, 8, 36, 0) 0%, rgba(16, 8, 36, 0.4) 55%, rgba(16, 8, 36, 0.65) 100%);
   z-index: -1;
   pointer-events: none;
 }
@@ -1008,46 +1007,47 @@ button:disabled {
     0 0 24px rgba(14, 7, 32, 0.7);
 }
 
-/* Controls: hidden; tap → panel pinned to the BOTTOM of the screen */
-/* Reader (portrét): jedna řada 4 tlačítek (titulky/hudba/otočit/domů) na
-   spodní hraně, na šířku obrázku — play/prev/next žijí zvlášť v .book-nav
-   (CD pilulka). Panel VYJÍŽDÍ zpoza spodní hrany (ťuknutí) a po 5 s zase ZAJEDE. */
+/* 🩺 2026-08-10: uživatel — "přehrávač blokuje text, dál ho odlaď, není
+   stabilní... nevidím v něm možnost vypnout titulky" — kořenová příčina
+   dvou stížností najednou: (1) .book-nav sedělo vystředěné dole PŘES
+   karaoke text, (2) celý panel byl schovaný do ťuknutí (ctrls-open) a
+   auto-schovávací časovač uměl zavřít panel PŘESNĚ mezi ťuknutím na ⏸ a
+   jeho doručením, takže tap dopadl na obrázek pod ním (jen znovu
+   otevřel/zavřel panel) místo na tlačítko — odtud "dám pauzu a stále
+   hraje". Oboje řešeno stejně jako CD reference (.panelFade je tam vždy
+   viditelné, ne tap-to-reveal): panel je teď TRVALE vidět, jen menší a
+   poloprůhledný, ať nezabírá pozornost, ale je vždy tam, kde ho čekáte. */
 .reader-mode .book-controls {
   position: absolute;
-  left: 0.45rem;
-  right: 0.45rem;
-  bottom: 0;
+  left: auto;
+  right: 0.5rem;
+  top: 0.5rem;
+  bottom: auto;
   margin: 0;
   z-index: 6;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 0.4rem;
-  padding: 0.45rem 0.5rem;
-  border-radius: 16px 16px 0 0;
+  gap: 0.3rem;
+  padding: 0.35rem;
+  border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-bottom: none;
-  background: rgba(18, 12, 42, 0.92);
+  background: rgba(18, 12, 42, 0.7);
   backdrop-filter: blur(8px);
-  box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.45);
-  transform: translateY(calc(100% + 4px));
-  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-  pointer-events: none;
-}
-
-.reader-mode .ctrls-open .book-controls {
-  transform: translateY(0);
-  pointer-events: auto;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
 }
 
 .reader-mode .ctrl-cell {
-  min-height: 56px;
-  font-size: 0.72rem;
-  border-radius: 12px;
+  min-height: 44px;
+  min-width: 44px;
+  font-size: 0.6rem;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.16);
   color: #fff;
   box-shadow: none;
 }
+.reader-mode .ctrl-cell .ctrl-ico { font-size: 1.05rem; }
+.reader-mode .ctrl-cell .ctrl-txt { display: none; }
 
 .reader-mode .ctrl-cell-primary {
   background: linear-gradient(135deg, #7c4dff 0%, #5c35cc 100%);
@@ -1069,95 +1069,60 @@ button:disabled {
   color: rgba(255, 255, 255, 0.9);
 }
 
-/* 🎛️ 2026-08-09: CD pilulka (prev/▶/next + posuvník) plave vystředěná NAD
-   spodkem obrázku — dřív tu byl jen tenký proužek ←tečky→ svisle uprostřed
-   obrázku, teď je .book-nav celá kompaktní pilulka (viz vzhled níž), tak se
-   přesunula ke spodní hraně jako v design-bundle-v7 ReaderScreen .controls.
-   Hidden by default, shown only together with the control panel (tap). */
+/* 🎛️ 2026-08-10: CD pilulka (prev/▶/next + posuvník) — přesunuta do
+   PRAVÉHO DOLNÍHO ROHU (dřív vystředěná dole PŘES karaoke text, uživatel:
+   "přehrávač dej do pravého dolního rohu - blokuje text"). Karaoke text
+   (.page-body) končí nad ní (bottom: 4.4rem), takže se už nepřekrývají.
+   TRVALE viditelná (ne tap-to-reveal, viz komentář u .book-controls výš)
+   a zmenšená, ať v rohu nepůsobí objemně. */
 .reader-mode .book-nav {
   position: absolute;
-  left: 50%;
-  bottom: 0.9rem;
+  left: auto;
+  right: 0.5rem;
+  bottom: 0.5rem;
   top: auto;
-  right: auto;
-  transform: translateX(-50%);
+  transform: none;
   justify-content: center;
-  padding: 0;
-  pointer-events: none;
+  padding: 0.55rem 0.75rem 0.5rem;
   z-index: 4;
-  display: none;
+  display: flex;
+  transform-origin: bottom right;
+  scale: 0.82;
 }
 
 .reader-mode .book-nav .ctrl-nav {
-  pointer-events: auto;
-  opacity: 0.85;
-}
-
-.reader-mode .book-nav .nav-range,
-.reader-mode .book-nav .nav-play-btn {
-  pointer-events: auto;
-}
-
-.reader-mode .ctrls-open .book-nav {
-  display: flex;
+  opacity: 0.9;
 }
 
 /* Landscape / widescreen: maximize the picture —
    no title, one-line rolling ticker, arrows only with the panel */
 @media (orientation: landscape) {
-  /* Uniform 16:9 frame: every scene renders at the same (max) size;
-     non-16:9 images are gently cropped to fit instead of shrinking */
-  .reader-mode .page-image,
-  .reader-mode .page-image-wrap {
-    flex: 1 1 0;
-    min-height: 0;
-    aspect-ratio: 16 / 9;
-    width: auto;
-    max-width: 100%;
-    align-self: center;
-    object-fit: cover;
-  }
-  /* obrázek uvnitř obalu jen vyplní jeho 16:9 rám */
-  .reader-mode .page-image-wrap .page-image {
-    flex: none;
-    width: 100%;
-    height: 100%;
-    aspect-ratio: auto;
-    align-self: auto;
-  }
-  /* Landscape (fullscreen): sloupec 4 tlačítek na výšku obrázku; panel
-     VYJÍŽDÍ zpoza pravé hrany a zase ZAJEDE */
+  /* 2026-08-10: obrázek je od základu (viz base .reader-mode .page-image
+     výš) position:absolute;inset:0;object-fit:cover — vyplní CELOU kartu
+     v jakémkoli poměru stran, žádný zvláštní 16:9 rám tu už landscape
+     nepotřebuje (dřív tu appka měla samostatný box, co obrázek zmenšoval
+     na výšku obrazovky místo skutečného fullscreen). */
+  /* Landscape (fullscreen): stejný trvale viditelný roh-panel jako portrét
+     (viz base .reader-mode .book-controls/.book-nav výš), jen o trochu
+     menší mezery, ať se vejde do nižší výšky obrazovky na šířku. */
   .reader-mode .book-controls {
-    position: absolute;
-    margin: 0;
-    left: auto;
-    right: 0;
-    top: 0.45rem;
-    bottom: 3.4rem; /* nad bílým pruhem titulků */
-    grid-template-columns: 1fr;
-    grid-template-rows: repeat(4, 1fr);
-    gap: 0.35rem;
-    width: 116px;
-    padding: 0.4rem;
-    border-radius: 16px 0 0 16px;
-    border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow: -6px 0 28px rgba(0, 0, 0, 0.45);
-    transform: translateX(calc(100% + 4px));
+    top: 0.4rem;
+    right: 0.4rem;
+    gap: 0.25rem;
+    padding: 0.3rem;
   }
-  .reader-mode .ctrls-open .book-controls {
-    transform: translateX(0);
+  .reader-mode .book-nav {
+    right: 0.4rem;
+    bottom: 0.4rem;
+    scale: 0.72;
   }
-  /* CD pilulka zůstává vystředěná dole i na šířku (viz base .reader-mode
-     .book-nav) — svislý sloupec 4 vedlejších tlačítek (116px, viz
-     .book-controls výš) žije na PRAVÉM okraji, takže se s vystředěnou
-     pilulkou dole nepřekrývá, žádný extra offset navíc netřeba. */
   .reader-mode .ctrl-cell {
-    min-height: 0;
-    font-size: 0.7rem;
+    min-height: 38px;
+    min-width: 38px;
+    font-size: 0.6rem;
   }
-  .reader-mode .ctrl-ico {
-    font-size: 1.15rem;
+  .reader-mode .ctrl-cell .ctrl-ico {
+    font-size: 0.95rem;
   }
 
   /* Title hidden — image gets the space */
@@ -2843,6 +2808,15 @@ button:disabled {
   background: rgba(16, 185, 129, 0.2);
   border: 1px solid rgba(16, 185, 129, 0.5);
   color: #6ee7b7;
+}
+
+/* 🩺 2026-08-10: dřív appka ukazovala "offline" VŽDY, bez ohledu na
+   skutečný stav IndexedDB — teď je pravdivá, takže potřebuje i druhý
+   (neutrální) stav pro pohádky, co se při otevření budou muset dotáhnout. */
+.badge-online {
+  background: rgba(148, 163, 184, 0.18);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  color: #cbd5e1;
 }
 
 .badge-size {
