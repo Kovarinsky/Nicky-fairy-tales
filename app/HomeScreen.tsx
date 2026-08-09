@@ -234,7 +234,15 @@ export default function HomeScreen({
                 nezávisle na tom, jestli appka dostane kolečko/swipe/drag, a
                 zároveň VIZUÁLNĚ ukazují, že za okrajem je další obsah (dřív
                 to vypadalo jako statický, uzavřený výběr). */}
+            {/* 🩺 2026-08-10: "šipka vpravo se stále hýbe při posunu vpravo" —
+                tlačítko standardně PŘEBÍRÁ FOKUS při doteku a mobilní
+                prohlížeč umí sám doscrollovat/posunout stránku, ať je
+                fokusovaný prvek vidět (i když je už vidět) — na tenhle druh
+                jitteru je nejčastější příčina přesně tohle. onMouseDown/
+                onTouchStart s preventDefault zabrání tlačítku fokus vůbec
+                převzít, jen provede onClick akci. */}
             <button type="button" className={styles.bgSheetNav} style={{ left: -6 }}
+              onMouseDown={e => e.preventDefault()} onTouchStart={e => e.preventDefault()}
               onClick={() => scrollBgSheet(-1)} aria-label="Předchozí světy">
               <ChevronSide dir="l" />
             </button>
@@ -269,6 +277,7 @@ export default function HomeScreen({
               </button>
             </div>
             <button type="button" className={styles.bgSheetNav} style={{ right: -6 }}
+              onMouseDown={e => e.preventDefault()} onTouchStart={e => e.preventDefault()}
               onClick={() => scrollBgSheet(1)} aria-label="Další světy">
               <ChevronSide dir="r" />
             </button>

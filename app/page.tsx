@@ -85,7 +85,7 @@ const VOICE_CONSENT_KEY = "nicky-voice-consent-v1";
 interface CloneTuning { stability: number; similarityBoost: number; style: number }
 // Stejné defaulty jako v lib/elevenlabs.ts (ELEVEN_STABILITY/SIMILARITY/STYLE env)
 const DEFAULT_CLONE_TUNING: CloneTuning = { stability: 0.42, similarityBoost: 0.8, style: 0.35 };
-const HISTORY_MAX = 20; // offline zásoba: posledních 20 pohádek v telefonu
+const HISTORY_MAX = 10; // 2026-08-10: zmenšeno z 20 na přání — 10 pohádek, ale SKUTEČNĚ celé v zařízení (viz offlineReadyIds výš, dřív odznak lhal)
 const SETTINGS_KEY = "nicky-settings";
 const DRAFT_KEY = "nicky-story-draft";
 const TOPIC_DRAFT_KEY = "nicky-topic-draft"; // rozepsané zadání přežije reload i přepnutí jinam
@@ -442,6 +442,28 @@ export default function Home() {
   // History
   const [storyHistory, setStoryHistory] = useState<HistoryEntry[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // 🩺 2026-08-10: "offline" odznak byl NAPEVNO ZAPSANÝ TEXT na KAŽDÉ položce
+  // — appka nikdy nekontrolovala, jestli je pohádka doopravdy stažená v
+  // IndexedDB, jen to tvrdila. Uživatel: "tlačítko offline nefunguje" — po
+  // reloadu/na jiném zařízení tak odznak lhal a pohádka se musela znovu
+  // celá stáhnout/dokreslit, i když appka slibovala "offline". Skutečný
+  // stav se teď dopočítává (getCachedStory) a odznak ukazuje pravdu.
+  const [offlineReadyIds, setOfflineReadyIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const ready = new Set<string>();
+      for (const entry of storyHistory) {
+        const cached = await getCachedStory(entry.id).catch(() => null);
+        const needImages = entry.choice ? entry.choice.altFrom : entry.scenes.length;
+        const complete = !!cached && cached.length >= needImages &&
+          cached.slice(0, needImages).every(s => s.imageUrl && !isPlaceholderImg(s.imageUrl) && s.audioUrl);
+        if (complete) ready.add(entry.id);
+      }
+      if (!cancelled) setOfflineReadyIds(ready);
+    })();
+    return () => { cancelled = true; };
+  }, [storyHistory]);
 
   // Usage overview (real spend via /api/usage)
   type UsageData = {
@@ -1925,6 +1947,14 @@ export default function Home() {
 
   // 🎧 Media Session: hardwarové mediální klávesy (▶⏸⏮⏭ na klávesnici,
   // sluchátkách i zámčené obrazovce) ovládají vyprávění a listování
+  // 🩺 2026-08-10: CHYBĚL dependency array — efekt se tak REGISTROVAL A
+  // ODREGISTROVAL PŘI KAŽDÉM RENDERU appky, a karaoke smyčka (60×/s) teď
+  // renderuje appku neustále BĚHEM PŘEHRÁVÁNÍ. Na některých mobilech tohle
+  // rychlé znovu-nastavování "play" handleru zmátlo systémovou MediaSession
+  // (appka po ⏸ hned zase hrála dál — "dám pauzu a stále hraje"). Efekt teď
+  // běží jen při skutečné změně stránky/titulku, ne při každém přehrávaném
+  // slově — a appka navíc drží ms.playbackState v souladu se skutečností,
+  // ať i zamčená obrazovka/sluchátka ukazují správnou ikonu ▶/⏸.
   useEffect(() => {
     if (viewMode !== "reader" || !("mediaSession" in navigator)) return;
     const ms = navigator.mediaSession;
@@ -1948,7 +1978,15 @@ export default function Home() {
         ms.setActionHandler("previoustrack", null);
       } catch {}
     };
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, title, pagePos, visiblePages.length, uiLang, nextVisible, prevVisible]);
+
+  // playbackState v souladu se skutečností — samostatný, levný efekt (jen
+  // string přiřazení), ať se nemíchá do reference-heavy efektu výš
+  useEffect(() => {
+    if (viewMode !== "reader" || !("mediaSession" in navigator)) return;
+    try { navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused"; } catch {}
+  }, [viewMode, isPlaying]);
 
   function handleAudioEnded() {
     setIsPlaying(false);
@@ -5899,7 +5937,9 @@ export default function Home() {
                           namačkané v jedné řadě vedle sebe, špatně se od sebe
                           rozeznávaly a hůř se na ně mířilo. */}
                       <div className="history-badges">
-                        <span className="history-badge badge-offline">📥 offline</span>
+                        {offlineReadyIds.has(entry.id)
+                          ? <span className="history-badge badge-offline">📥 offline</span>
+                          : <span className="history-badge badge-online">☁️ online</span>}
                         <span className="history-badge badge-size">{estimateStorySize(entry.scenes.length)}</span>
                         <span className="history-badge badge-scenes">{t.scenesBadge(entry.scenes.length)}</span>
                         {entry.prepSec !== undefined && (
@@ -5913,8 +5953,9 @@ export default function Home() {
                         )}
                       </div>
                       <div className="history-actions">
-                        <span className="history-action action-sequel" role="button"
-                          onClick={e => startSequel(e, entry)}>✨ {t.sequelBtn}</span>
+                        {/* 🩺 2026-08-10: "v posledních pohádkách dej pryč pokračování a
+                            nech je tl. Poslat" — ✨ Pokračování odstraněno, zůstává jen
+                            📤 Poslat (startSequel zůstává dostupné jinudy, jen ne tady). */}
                         <span className="history-action action-share" role="button"
                           onClick={e => shareStory(e, entry)}>
                           {shareBusyId === entry.id
