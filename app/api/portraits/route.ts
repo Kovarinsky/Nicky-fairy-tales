@@ -21,11 +21,12 @@
 // přeskočí cache a namaluje znovu.
 
 import { NextRequest, NextResponse } from "next/server";
-import { loadCharacters } from "@/lib/characters";
+import { loadCharacters, charactersByIds } from "@/lib/characters";
 import {
   getCharacterPortrait, portraitUrl,
   getFamilyGroupAnchor, familyGroupAnchorUrl,
   generateFamilyGroupAnchorCandidates, promoteFamilyGroupAnchorCandidate,
+  generateCharacterPortraitCandidates, promoteCharacterPortraitCandidate,
   getFamilyScaleSheet, familyScaleSheetUrl,
   getGoodnightScene, goodnightSceneUrl,
 } from "@/lib/portraits";
@@ -33,11 +34,53 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+// 🎨 2026-08-10: "táta Jan se mi ještě nelíbí, chci aby se víc podobal mě —
+// připrav 3 varianty" — 3 popisné varianty odvozené z nové fotky
+// (jan-face4.jpg, horská bouda) proti dosavadnímu textu v characters.json.
+// Jen data pro ?portraitCandidates=jan — žádnou z nich appka nepoužívá,
+// dokud se ručně nepromuje (viz generateCharacterPortraitCandidates výš).
+const PORTRAIT_VARIANTS: Record<string, Array<{ label: string; description: string }>> = {
+  jan: [
+    {
+      label: "A — upřesněný pramen (widow's peak) místo rovné hranice",
+      description: "Jan: adult man with a NOTICEABLY HIGH, RECEDED HAIRLINE — hair recedes MORE at the temples on both sides, leaving a distinct central point/peak of hair (a soft widow's peak) at the front-center of the scalp, NOT a straight uniform line across the whole forehead. Short medium-brown hair (not jet-black), slightly tousled/textured, not perfectly neat. Thin, straight, NOT bushy eyebrows. Deep-set warm dark-brown eyes with visible fine character lines/creases at the outer corners, a slight furrow between the brows even at rest. A straight, moderate-width nose. A LEAN, NARROW, slightly angular jawline and chin — NOT a wide or heavy/strong jaw. Visible smile lines (nasolabial folds) framing the mouth. Clean-shaven, NO beard, moustache or stubble. Fair light skin with a light tan, warm smile, navy-blue polo shirt with white horizontal stripes, navy shorts, white sneakers, tall lean-athletic build.",
+    },
+    {
+      label: "B — jako A, ale s lehkým strniskem (na všech fotkách viditelné)",
+      description: "Jan: adult man with a NOTICEABLY HIGH, RECEDED HAIRLINE — hair recedes MORE at the temples on both sides, leaving a distinct central point/peak of hair (a soft widow's peak) at the front-center of the scalp, NOT a straight uniform line across the whole forehead. Short medium-brown hair (not jet-black), slightly tousled/textured, not perfectly neat. Thin, straight, NOT bushy eyebrows. Deep-set warm dark-brown eyes with visible fine character lines/creases at the outer corners, a slight furrow between the brows even at rest. A straight, moderate-width nose. A LEAN, NARROW, slightly angular jawline and chin — NOT a wide or heavy/strong jaw, framed by a SHORT LIGHT STUBBLE BEARD (a few days' growth, not a full beard, not clean-shaven) — this stubble is a KEY recognizable feature, always present. Visible smile lines (nasolabial folds) framing the mouth. Fair light skin with a light tan, warm smile, navy-blue polo shirt with white horizontal stripes, navy shorts, white sneakers, tall lean-athletic build.",
+    },
+    {
+      label: "C — kompletně přepsáno přímo z nové fotky (horská bouda)",
+      description: "Jan: a fit, athletic adult man in his 40s. RECEDING HAIRLINE with a soft widow's-peak point at the center-front and bare skin visible higher up at both temples — short, slightly messy medium-brown hair (a few strands falling loosely over the forehead), not neat/combed. SHORT LIGHT STUBBLE BEARD covering the jaw and upper lip (a few days' growth, always present, never clean-shaven). Deep-set brown eyes under a slight, natural brow furrow (an alert, focused expression even when smiling), thin straight eyebrows, a straight moderate nose, and a lean angular jaw. Fair skin with a light outdoor tan. Big genuine smile showing teeth, faint smile-lines around the mouth. Navy-blue polo shirt with white horizontal stripes, navy shorts, white sneakers, tall lean-athletic build with visible toned shoulders/arms.",
+    },
+  ],
+};
+
 export async function GET(req: NextRequest) {
   const redraw = req.nextUrl.searchParams.get("redraw") || "";
   const anchorParam = req.nextUrl.searchParams.get("anchor") || "";
   const scaleParam = req.nextUrl.searchParams.get("scale") || "";
   const goodnightParam = req.nextUrl.searchParams.get("goodnight") || "";
+  const portraitCandidatesParam = req.nextUrl.searchParams.get("portraitCandidates") || "";
+  const promotePortraitParam = req.nextUrl.searchParams.get("promotePortrait") || "";
+
+  if (portraitCandidatesParam) {
+    const variants = PORTRAIT_VARIANTS[portraitCandidatesParam];
+    const [baseChar] = charactersByIds([portraitCandidatesParam]);
+    if (!variants || !baseChar) {
+      return NextResponse.json({ error: `Žádné varianty definované pro "${portraitCandidatesParam}".` }, { status: 400 });
+    }
+    const candidates = await generateCharacterPortraitCandidates(baseChar, variants);
+    return NextResponse.json(
+      { candidates, hint: "?promotePortrait=<id>&pick=<index> povýší vybraného kandidáta na finální portrét (popis v characters.json je nutné upravit ručně na text té varianty)" },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  }
+  if (promotePortraitParam) {
+    const pick = Number(req.nextUrl.searchParams.get("pick"));
+    const url = pick ? await promoteCharacterPortraitCandidate(promotePortraitParam, pick) : null;
+    return NextResponse.json({ promoted: !!url, url }, { headers: { "Cache-Control": "no-store" } });
+  }
 
   if (goodnightParam) {
     const ids = goodnightParam.split(",").map(s => s.trim()).filter(Boolean);
