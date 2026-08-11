@@ -314,8 +314,20 @@
 }
 .bgSheetNav {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  /* 🩺 2026-08-11 (2): PRAVÁ kořenová příčina — .bgSheetWrap je flex
+     (display:flex;align-items:center) a .bgSheetNav/.bgSheet jsou jeho
+     flex-item DĚTI, i když .bgSheetNav je position:absolute (mimo tok).
+     Prohlížeč u absolutně pozicovaného flex-itemu počítá "static position"
+     (kam by prvek padl, kdyby nebyl absolutní) PODLE align-items:center —
+     a při focus/scroll uvnitř .bgSheet (sourozence) prohlížeč přepočítal
+     tenhle static-position základ jinak, takže top:50%+translateY(-50%)
+     (počítané relativně k NĚMU, ne čistě k .bgSheetWrap) vyšlo pokaždé
+     jinak — proto se šipka hýbala PŘESNĚ při prvním kliknutí/scrollu.
+     top:0;bottom:0;margin:auto 0 na FIXNÍ výšce (26px) centruje robustně
+     bez závislosti na static-position/flex-alignment vůbec. */
+  top: 0;
+  bottom: 0;
+  margin: auto 0;
   z-index: 22;
   display: flex;
   align-items: center;
@@ -330,7 +342,7 @@
   box-shadow: 0 3px 10px rgba(6, 2, 18, 0.5);
   cursor: pointer;
 }
-.bgSheetNav:active { transform: translateY(-50%) scale(0.92); }
+.bgSheetNav:active { transform: scale(0.92); }
 .bgOption,
 .bgCustomTile,
 .bgCustomTileActive {
@@ -366,6 +378,17 @@
   text-align: center;
   color: rgba(253, 243, 215, 0.9);
   overflow-wrap: break-word;
+  /* 🩺 2026-08-11: KOŘENOVÁ PŘÍČINA "šipka se stále hýbe" — ne ikona/fokus
+     (to už bylo opraveno dřív), ale tohle: krátké názvy (Noc, Moře) se
+     vejdou na 1 řádek, delší (Vesmír, Džungle) se zalomí na 2 — bez pevné
+     výšky tak CELÝ pás (.bgSheet) měnil výšku podle toho, JAKÉ dlaždice
+     byly zrovna odscrollované do zorného pole, a šipky (position:absolute;
+     top:50%, viz .bgSheetNav) se vertikálně centrovaly podle NOVÉ výšky —
+     odtud skok přesně při prvním kliknutí na šipku (odscrolování odhalilo
+     dvouřádkový název). Pevná výška na 2 řádky VŽDY (i pro krátké názvy)
+     drží výšku pásu konstantní bez ohledu na scroll pozici.
+     9px × 1.15 line-height × 2 řádky = 20.7px. */
+  height: 20.7px;
 }
 .bgOptionThumb {
   border: 1px solid rgba(253, 224, 138, 0.22);
