@@ -6,7 +6,7 @@
 
 import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, peekEarlyScene, enforceCanonicalAppearance, inventedCharacterNames, type StoryExtras } from "@/lib/claude";
-import { generateSceneImage, generateSceneSheet, genCounter, isDailyQuotaError, isCreditsDepletedError, isSpendCapError, sceneCastList } from "@/lib/gemini";
+import { generateSceneImage, generateSceneSheet, getGenCounter, runWithGenCounter, isDailyQuotaError, isCreditsDepletedError, isSpendCapError, sceneCastList } from "@/lib/gemini";
 import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefEntries, refsForText, refsForPanels, getFamilyScaleSheet, familyScaleSheetApplies, getFamilyGroupAnchor } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
@@ -124,7 +124,18 @@ async function fetchUrlText(url: string): Promise<string> {
   }
 }
 
+// 🩺 2026-08-11: runJob se volá jak z /api/job/start, tak (samo-řetězeně)
+// z /api/job/continue — když appka generuje 2 pohádky souběžně (podporováno,
+// viz MAX_ACTIVE_JOBS na klientovi), Vercel Fluid Compute je může obsloužit
+// na STEJNÉ teplé instanci. runWithGenCounter (lib/gemini.ts) dá TOMUTO
+// běhu vlastní izolované počítadlo obrázků, ať se náklady dvou souběžných
+// pohádek nemíchají do nákladového logu (živý test 6+12 stran zapsal oběma
+// identické `images:10`, i když měly 6 a 11 hotových scén).
 export async function runJob(id: string, body: Record<string, unknown>) {
+  return runWithGenCounter(() => runJobImpl(id, body));
+}
+
+async function runJobImpl(id: string, body: Record<string, unknown>) {
   const statusPath = `jobs/${id}/status.json`;
 
   // Navázání: existující stav (napsaný příběh + hotové scény) se přeskočí.
@@ -214,10 +225,24 @@ export async function runJob(id: string, body: Record<string, unknown>) {
   // rozpočet na scénu; ≤10 scén je beze změny (280s už ověřeně stíhá).
   const requestedScenes = Math.max(1, Math.min(MAX_SCENES, Number(body.sceneCount) || 10));
   const effectiveScenes = body.twoEndings ? Math.ceil(requestedScenes * 1.3) : requestedScenes;
+  // 🩺 2026-08-11: odhad castSize UŽ TADY (přesný výpočet běží mnohem později,
+  // z charactersForNames/rawCustomForNames) — potřeba dřív, protože bez archů
+  // (sheet mode, viz SHEET_SKIP_CAST_SIZE níž v souboru — drž stejnou hodnotu
+  // 7 na obou místech) se KAŽDÁ scéna kreslí sólo (pomalejší). Živý test
+  // (12 scén, castSize 7) doběhl na 360s strop s jen 11/12 hotovými — appka
+  // v takovém případě potřebuje víc času, ne stejný rozpočet jako pohádka,
+  // co archy použít MŮŽE. Odhad z request body (ne z charactersForNames,
+  // co ještě neexistuje) — prázdný výběr = celá rodinná knihovna, stejné
+  // pravidlo jako charactersForNames níž.
+  const earlyIds: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
+  const earlyCastSize = (earlyIds.length ? earlyIds.length : loadCharacters().length)
+    + (Array.isArray(body.customCharacters) ? (body.customCharacters as unknown[]).length : 0);
+  const noSheetMode = earlyCastSize >= 7; // drž v souladu se SHEET_SKIP_CAST_SIZE níž
   const HARD_DEADLINE_MS =
-    effectiveScenes <= 10 ? 280_000 :  // 4:40 — ověřeno živě, stíhá
-    effectiveScenes <= 15 ? 360_000 :  // 6:00
-    480_000;                            // 8:00 — 16-20 (MAX_SCENES) scén
+    (effectiveScenes <= 10 ? 280_000 :  // 4:40 — ověřeno živě, stíhá
+    effectiveScenes <= 15 ? 360_000 :   // 6:00
+    480_000)                            // 8:00 — 16-20 (MAX_SCENES) scén
+    + (noSheetMode ? 90_000 : 0);       // +1:30 — bez archů kreslí KAŽDOU scénu sólo
   const hardDeadlineAt = st.createdAt + HARD_DEADLINE_MS;
   const overallTimeUp = () => Date.now() > hardDeadlineAt;
   // 🩺 2026-08-05: diagnostika k nevysvětlené nesrovnalosti — živý test (15
@@ -548,9 +573,9 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // účtují zvlášť). Namlouvání appka spouští líně až KLIENTSKY po
     // dokončení jobu (fillMissingAudio, app/page.tsx), ale text scénáře —
     // a tedy přesný počet znaků, co půjde do ElevenLabs — appka zná už teď.
-    const genAtStart = { ...genCounter };
-    const madeImages = () => Math.max(0, genCounter.img1k - genAtStart.img1k);
-    const madeSheets = () => Math.max(0, genCounter.img4k - genAtStart.img4k);
+    const genAtStart = { ...getGenCounter() };
+    const madeImages = () => Math.max(0, getGenCounter().img1k - genAtStart.img1k);
+    const madeSheets = () => Math.max(0, getGenCounter().img4k - genAtStart.img4k);
     const voiceChars = scenesScript.reduce((sum, s) => sum + (s.narration?.length || 0), 0);
 
     // ── 2) Scenes (Gemini) with the consistency anchor ──
@@ -755,21 +780,32 @@ export async function runJob(id: string, body: Record<string, unknown>) {
     // běžely v defaultu) appka mlčela a nešlo to ověřit jinak než odhadem
     // z chování. Tohle ukáže castSize napřímo, pokaždé.
     logEv(`🧬 castSize=${castSize} (charactersForNames=${charactersForNames.length}, rawCustomForNames=${rawCustomForNames?.length ?? 0}, body.characterIds=${JSON.stringify(body.characterIds)})`);
-    // 🩺 stejný test: u castSize 4+ archy prošly v 0-8 % případů napříč
-    // 5 dávkami — přeskočit je úplně je dražší (víc sólo obrázků), ale
-    // mnohem rychlejší a spolehlivější než 250s skoro bez užitku.
-    const SHEET_SKIP_CAST_SIZE = 4;
+    // 🩺 stejný test (2026-08-05): u castSize 4+ archy V TEHDEJŠÍM (volnějším,
+    // max 3 lidi/panel) nastavení prošly jen v 0-8 % případů napříč 5 dávkami
+    // — přeskočit je úplně bylo dražší (víc sólo obrázků), ale mnohem
+    // rychlejší a spolehlivější než 250s skoro bez užitku.
+    // 🩺 2026-08-11: prah zvednut na 7 (z 4) — ALE jen se souběžnou změnou
+    // níž (castMidTier teď pokrývá 3-6, ne jen 3): pro castSize 4-6 appka
+    // NEPOUŽÍVÁ ten dřívější neúspěšný 3-lidi/panel default, ale rovnou ten
+    // přísnější 2×2/max-2-lidi režim, co byl vyhrazený jen pro castSize=3.
+    // Skutečná rodina má běžně 5-9 postav (děti+rodiče+pes) — s prahem 4 se
+    // archy prakticky NIKDY nepoužily (živý test 2026-08-11, 5 i 7 postav
+    // obě spadly do sólo, 2,35 Kč/str. a 1,5 Kč/str. — 1,5-2,3× nad cílem
+    // ECONOMY-PLAN ~1 Kč/str.). Sleduj debug-logy (🗂️ vs 🎨 poměr prošlých
+    // panelů) — pokud i přísnější varianta u 4-6 zůstane pod ~30% úspěšností,
+    // vrať SHEET_SKIP_CAST_SIZE zpátky na 4.
+    const SHEET_SKIP_CAST_SIZE = 7;
     const sheetMode = (process.env.IMAGE_SHEET_MODE || "3x3").toLowerCase();
     if (st.sheetGaveUp) logEv("🗂️ archová fáze už dřív vzdala (žádný nový panel) → rovnou sólo");
-    else if (castSize >= SHEET_SKIP_CAST_SIZE) logEv(`🧪 ${castSize} postav v pohádce (≥${SHEET_SKIP_CAST_SIZE}) — archy přeskočeny, rovnou sólo (viz test 2026-08-05)`);
-    else if (castSize === 3) logEv(`🧪 ${castSize} postavy v pohádce — mezistupeň: archy 2×2, max 2 lidi/panel (přísnější než obvykle)`);
-    // 🩺 2026-08-05: mezistupeň mezi "archy jako obvykle" (≤2) a "přeskočit
-    // úplně" (≥4) — u castSize přesně 3 zůstávají archy zapnuté, ale s
-    // přísnějším 2×2 (víc pixelů/panel, snazší posoudit výšku/barvu očí) a
-    // max 2 lidmi/panel (dřívější nálezy byly skoro vždy o poměru MEZI 2+
-    // lidmi v jednom panelu) — snaha zachránit část úspory místo rovnou
-    // padnout na dražší sólo.
-    const castMidTier = castSize === 3;
+    else if (castSize >= SHEET_SKIP_CAST_SIZE) logEv(`🧪 ${castSize} postav v pohádce (≥${SHEET_SKIP_CAST_SIZE}) — archy přeskočeny, rovnou sólo (viz test 2026-08-05, prah zvednut 2026-08-11)`);
+    else if (castSize >= 3) logEv(`🧪 ${castSize} postav v pohádce — mezistupeň: archy 2×2, max 2 lidi/panel (přísnější než obvykle, rozšířeno z castSize=3 na 3-${SHEET_SKIP_CAST_SIZE - 1} dne 2026-08-11)`);
+    // 🩺 2026-08-05, rozšířeno 2026-08-11: mezistupeň mezi "archy jako
+    // obvykle" (≤2) a "přeskočit úplně" (≥7) — u castSize 3-6 zůstávají
+    // archy zapnuté, ale s přísnějším 2×2 (víc pixelů/panel, snazší posoudit
+    // výšku/barvu očí) a max 2 lidmi/panel (dřívější nálezy byly skoro vždy
+    // o poměru MEZI 2+ lidmi v jednom panelu) — snaha zachránit část úspory
+    // místo rovnou padnout na dražší sólo. Dřív jen castSize===3.
+    const castMidTier = castSize >= 3 && castSize < SHEET_SKIP_CAST_SIZE;
     if (sheetMode !== "off" && !quotaExhausted && !st.sheetGaveUp && castSize < SHEET_SKIP_CAST_SIZE && st.sceneUrls![0]) {
       const maxCells = castMidTier ? 4 : sheetMode === "2x2" ? 4 : 9;
       // ⚡ Archy jedné vlny běží PARALELNĚ (15 stránek = archy 9+5 najednou —

@@ -1,4 +1,5 @@
 import { request } from "https";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { Scene } from "./types";
 import type { ReferenceImage } from "./characters";
 
@@ -43,7 +44,27 @@ export interface ImageResult {
 // 💰 Počítadlo SKUTEČNĚ vygenerovaných obrázků (včetně QA překreslení a
 // portrétů) pro přesné účtování: 1K sólo vs. 4K archy se platí jinak.
 // Volající si před prací vezme snímek a po práci zapíše rozdíl.
-export const genCounter = { img1k: 0, img4k: 0 };
+// 🩺 2026-08-11: bývalo to plochá modulová proměnná — na Vercel Fluid Compute
+// (viz Knowledge Updates: sdílí teplé instance mezi SOUBĚŽNÝMI requesty)
+// se tak při 2 pohádkách generovaných zároveň (appka to sama umožňuje,
+// MAX_ACTIVE_JOBS=2) míchaly obrázky JEDNÉ pohádky do účtu DRUHÉ — živý
+// test (6str. + 12str. najednou) zapsal do usage logu identické `images:10`
+// pro obě, ačkoli měly 6 a 12 (resp. 11 dokreslených) scén. AsyncLocalStorage
+// dá každému běhu job-runneru (runWithGenCounter) VLASTNÍ počítadlo, co
+// žije jen v jeho vlastním async řetězu — souběžné requesty na stejné teplé
+// instanci se už nepletou, žádná změna signatur volání napříč gemini.ts.
+const genCounterStore = new AsyncLocalStorage<{ img1k: number; img4k: number }>();
+// Fallback pro volání MIMO runWithGenCounter (staré skripty/testy) — sdílený
+// jako dřív, ať appka nepadá, jen v tomhle případě není žádná izolace.
+const fallbackGenCounter = { img1k: 0, img4k: 0 };
+export function getGenCounter(): { img1k: number; img4k: number } {
+  return genCounterStore.getStore() ?? fallbackGenCounter;
+}
+/** Obal na CELÝ běh jednoho jobu/requestu — every Gemini image call uvnitř
+ *  fn() (i přes await/Promise.all) uvidí stejné, izolované počítadlo. */
+export function runWithGenCounter<T>(fn: () => Promise<T>): Promise<T> {
+  return genCounterStore.run({ img1k: 0, img4k: 0 }, fn);
+}
 
 // Gemini vrací obrázky jako PNG (~1,5 MB na scénu) — 15stránková pohádka
 // pak má 25 MB+. WebP v plném rozlišení knížky je ~5× menší bez viditelné
@@ -221,7 +242,7 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
             for (const part of cand.content?.parts || []) {
               if (part.inlineData?.data) {
                 // 💰 skutečně vygenerovaný (placený) obrázek
-                if (imageSize === "4K") genCounter.img4k += 1; else genCounter.img1k += 1;
+                if (imageSize === "4K") getGenCounter().img4k += 1; else getGenCounter().img1k += 1;
                 resolve({ buffer: Buffer.from(part.inlineData.data, "base64"), mimeType: part.inlineData.mimeType || "image/png" });
                 return;
               }
@@ -662,7 +683,7 @@ async function editSceneImage(
   for (const cand of data.candidates || []) {
     for (const part of cand.content?.parts || []) {
       if (part.inlineData?.data) {
-        genCounter.img1k += 1; // 💰 editace je placená generace jako každá jiná
+        getGenCounter().img1k += 1; // 💰 editace je placená generace jako každá jiná
         return { buffer: Buffer.from(part.inlineData.data, "base64"), mimeType: part.inlineData.mimeType || "image/png" };
       }
     }
