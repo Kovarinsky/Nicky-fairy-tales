@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateSceneImage, genCounter } from "@/lib/gemini";
+import { generateSceneImage, getGenCounter, runWithGenCounter } from "@/lib/gemini";
 import { narrateScene, narrateSceneTimed, prepareNarrationText, getCloneTuning } from "@/lib/elevenlabs";
 import { narrateWithGemini, defaultAutoVoiceId } from "@/lib/gemini-tts";
 import { charactersByIds, type ReferenceImage } from "@/lib/characters";
@@ -10,7 +10,15 @@ import type { Scene, WordTiming } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
+// 🩺 2026-08-11: izolace nákladového počítadla per-request (viz komentář
+// u runWithGenCounter, lib/gemini.ts) — dvě souběžná volání téhle route
+// (líná dokreslovací větev) na stejné teplé Vercel instanci by si jinak
+// mohly míchat spotřebu do usage logu druhé scény.
 export async function POST(req: NextRequest) {
+  return runWithGenCounter(() => handlePost(req));
+}
+
+async function handlePost(req: NextRequest) {
   try {
     const body = await req.json();
     const scene = body.scene as Scene;
@@ -96,7 +104,7 @@ export async function POST(req: NextRequest) {
     let audioDebug = "";
     // noAudio: hlas se vyrábí líně až při čtení — scéna generuje jen obrázek
     const noAudio = body.noAudio === true;
-    const genAtStart = { ...genCounter };
+    const genAtStart = { ...getGenCounter() };
     const [imageResult, audio] = await Promise.all([
       generateSceneImage(scene, heroDescription, refImages).catch((e: Error) => {
         imageDebug = e.message;
@@ -118,9 +126,9 @@ export async function POST(req: NextRequest) {
       // Spotřeba: obrázky kreslené mimo serverovou frontu (líná větev B,
       // oprava scény, lokální pipeline) — skutečný počet generování vč. QA
       writeUsageRecord(
-        Math.max(1, genCounter.img1k - genAtStart.img1k), 0,
+        Math.max(1, getGenCounter().img1k - genAtStart.img1k), 0,
         typeof body.deviceId === "string" ? body.deviceId : undefined,
-        Math.max(0, genCounter.img4k - genAtStart.img4k)
+        Math.max(0, getGenCounter().img4k - genAtStart.img4k)
       ).catch(() => {});
       imageUrl = `data:${imageResult.mimeType};base64,${imageResult.buffer.toString("base64")}`;
     } else {
