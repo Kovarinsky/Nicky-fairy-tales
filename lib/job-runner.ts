@@ -57,6 +57,17 @@ export interface JobStatus {
   chains?: number;
   /** 💰 Obrázky vygenerované za VŠECHNY běhy jobu (rozpočtová pojistka) */
   imgSpent?: number;
+  /** 🩺 2026-08-11: kumulativní 1K/4K počty ZVLÁŠŤ, napříč VŠEMI řetězy —
+   *  potřeba pro finální writeUsageRecord (nákladový log), protože genCounter
+   *  (lib/gemini.ts) je teď per-request izolovaný (AsyncLocalStorage, viz
+   *  runWithGenCounter) a KAŽDÝ řetěz startuje s vlastním počítadlem od nuly.
+   *  Bez tohohle by finální usage záznam vícekolové pohádky (self-continue
+   *  přes 5min limit) počítal jen obrázky z POSLEDNÍHO řetězu, ne z celé
+   *  pohádky (živý test: 12str. pohádka, 6 hotových scén, ale usage log
+   *  ukázal jen 3 — přesně obrázky z 2. řetězu). st.imgSpent (nahoře) tohle
+   *  neřeší, protože sčítá 1K+4K dohromady bez rozlišení typu. */
+  spent1k?: number;
+  spent4k?: number;
   /** 🩺 2026-08-06: reálné tokeny psaní scénáře (napříč všemi pokusy/řetězy
    *  téhle pohádky) místo paušálu COST_USD_PER_STORY_WRITING — viz
    *  actualStoryCostCredits, lib/pricing.ts. cacheCreation/cacheRead jsou
@@ -660,6 +671,13 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     const IMG_BUDGET = total * 4 + 12;
     const spentBase = st.imgSpent ?? 0; // z minulých běhů (řetězy)
     const spentNow = () => spentBase + madeImages() + madeSheets();
+    // 🩺 2026-08-11: odděleně od spentBase (ten míchá 1K+4K) — viz komentář
+    // u spent1k/spent4k v JobStatus výš. totalImages1k/4k() = kumulativní
+    // počet PŘES VŠECHNY řetězy téhle pohádky, pro finální usage log.
+    const spent1kBase = st.spent1k ?? 0;
+    const spent4kBase = st.spent4k ?? 0;
+    const totalImages1k = () => spent1kBase + madeImages();
+    const totalImages4k = () => spent4kBase + madeSheets();
     const budgetBlown = () => spentNow() > IMG_BUDGET;
     if (budgetBlown()) {
       st.phase = "error";
@@ -672,6 +690,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     async function doScene(i: number): Promise<void> {
       if (st.sceneUrls![i] || quotaExhausted || budgetBlown()) return; // hotová / kvóta / rozpočet
       st.imgSpent = spentNow();
+      st.spent1k = totalImages1k(); st.spent4k = totalImages4k();
       const scene = scenesScript[i];
       const tScene = Date.now();
       const sceneRefs = refsFor(`${scene.imagePrompt} ${scene.narration}`);
@@ -865,6 +884,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
         if (groups.length === 0) break;
         const before = Object.keys(st.sceneUrls!).length;
         st.imgSpent = spentNow();
+        st.spent1k = totalImages1k(); st.spent4k = totalImages4k();
         logEv(`🗂️ kreslím ${groups.length > 1 ? `${groups.length} archy paralelně` : "arch"} (${groups.map(g => g.length).join("+")} scén)`);
         await write(); // heartbeat před dlouhým generováním
         const roundReports: string[] = [];
@@ -952,6 +972,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     }
 
     st.imgSpent = spentNow(); // 💰 útrata běhu do stavu (řetězy ji sčítají)
+    st.spent1k = totalImages1k(); st.spent4k = totalImages4k(); // 🩺 viz komentář u JobStatus.spent1k
 
     // 💰 Rozpočet vyčerpán a scény chybí → jasná chyba místo dalších běhů
     if (budgetBlown() && Object.keys(st.sceneUrls!).length < total) {
@@ -959,7 +980,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       st.error = `Ochrana rozpočtu: pohádka už vygenerovala ${st.imgSpent} obrázků (limit ${IMG_BUDGET} pro ${total} stránek, hotovo ${Object.keys(st.sceneUrls!).length}/${total}) — zrušte ji ✕ a zadejte znovu, případně s méně stránkami.`;
       logEv(`⛔ STOP: rozpočet obrázků vyčerpán (${st.imgSpent}/${IMG_BUDGET})`);
       await write();
-      await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true);
+      await writeUsageRecord(totalImages1k(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true);
       return;
     }
 
@@ -990,7 +1011,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       // "samo se to ráno spraví", i když šlo o placení, ne o čas.
       logEv(`⛔ STOP: ${spendCapped ? "měsíční rozpočtový strop" : creditsDepleted ? "vyčerpaný kredit" : "denní kvóta"} Gemini vyčerpaná (${Object.keys(st.sceneUrls!).length}/${total})`);
       await write();
-      await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true);
+      await writeUsageRecord(totalImages1k(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true);
       return;
     }
 
@@ -1017,7 +1038,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       st.creditsCharged = true;
     }
     await write();
-    await writeUsageRecord(madeImages(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, madeSheets(), true,
+    await writeUsageRecord(totalImages1k(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true,
       (st.finishedAt - st.createdAt) / 1000); // ⏱ trvání přípravy do panelu Spotřeba
   } catch (e) {
     st.phase = "error";
