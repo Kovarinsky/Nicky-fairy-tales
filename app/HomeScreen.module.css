@@ -314,8 +314,20 @@
 }
 .bgSheetNav {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  /* 🩺 2026-08-11 (2): PRAVÁ kořenová příčina — .bgSheetWrap je flex
+     (display:flex;align-items:center) a .bgSheetNav/.bgSheet jsou jeho
+     flex-item DĚTI, i když .bgSheetNav je position:absolute (mimo tok).
+     Prohlížeč u absolutně pozicovaného flex-itemu počítá "static position"
+     (kam by prvek padl, kdyby nebyl absolutní) PODLE align-items:center —
+     a při focus/scroll uvnitř .bgSheet (sourozence) prohlížeč přepočítal
+     tenhle static-position základ jinak, takže top:50%+translateY(-50%)
+     (počítané relativně k NĚMU, ne čistě k .bgSheetWrap) vyšlo pokaždé
+     jinak — proto se šipka hýbala PŘESNĚ při prvním kliknutí/scrollu.
+     top:0;bottom:0;margin:auto 0 na FIXNÍ výšce (26px) centruje robustně
+     bez závislosti na static-position/flex-alignment vůbec. */
+  top: 0;
+  bottom: 0;
+  margin: auto 0;
   z-index: 22;
   display: flex;
   align-items: center;
@@ -330,7 +342,7 @@
   box-shadow: 0 3px 10px rgba(6, 2, 18, 0.5);
   cursor: pointer;
 }
-.bgSheetNav:active { transform: translateY(-50%) scale(0.92); }
+.bgSheetNav:active { transform: scale(0.92); }
 .bgOption,
 .bgCustomTile,
 .bgCustomTileActive {
