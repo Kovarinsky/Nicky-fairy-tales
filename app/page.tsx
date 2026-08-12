@@ -1726,13 +1726,18 @@ export default function Home() {
     ambientRef.current?.duck(isPlaying);
   }, [isPlaying]);
 
-  // Ovládací panel se v readeru objeví jen ťuknutím a po 5 s sám zmizí —
-  // nesmí zakrývat obrázek během čtení
+  // Ovládací panel se v readeru objeví ťuknutím/pauzou a po 5 s SÁM zmizí —
+  // ale JEN když pohádka zrovna hraje (nesmí zakrývat obrázek během čtení).
+  // 🩺 2026-08-12: dřív se schovával i při PAUZE (guard nekontroloval
+  // isPlaying) — uživatel dal pauzu, panel se objevil a za 5 s zase zmizel,
+  // i když se nic nepřehrávalo — "objeví se jen po zmáčknutí pauzy [a
+  // zůstane tam]" bylo přesně tohle. Při pauze zůstává trvale, dokud se
+  // znovu nespustí ▶.
   useEffect(() => {
-    if (!ctrlsOpen || viewMode !== "reader") return;
+    if (!ctrlsOpen || viewMode !== "reader" || !isPlaying) return;
     const timer = setTimeout(() => setCtrlsOpen(false), 5000);
     return () => clearTimeout(timer);
-  }, [ctrlsOpen, viewMode]);
+  }, [ctrlsOpen, viewMode, isPlaying]);
 
   // Wake Lock: při otevřené čtečce displej nezhasíná / nespoří (pohádka
   // běží dlouhé minuty bez dotyku). Po návratu do appky se zámek obnoví.
@@ -2478,6 +2483,7 @@ export default function Home() {
     const a = audioRef.current; if (!a) return;
     if (isPlaying) {
       a.pause();
+      setCtrlsOpen(true);                // ⏸ vždy odkryje panel, zůstává dokud zas nespustíš ▶
     } else {
       a.play().catch(() => {});
       setCtrlsOpen(false);              // hide the panel when narration starts
@@ -5930,7 +5936,9 @@ export default function Home() {
 
           {current.audioUrl && (
             <audio ref={audioRef} key={current.audioUrl} src={current.audioUrl}
-              onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={handleAudioEnded} />
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => { setIsPlaying(false); setCtrlsOpen(true); }} // 🩺 nativní pauza (OS/sluchátka/uzamčená obrazovka), ne jen ⏸ tlačítko — panel se odkryje vždy
+              onEnded={handleAudioEnded} />
           )}
         </div>
       )}
