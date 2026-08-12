@@ -797,8 +797,22 @@ function buildAppearanceLock(heroDescription: string): { open: string; close: st
       `7) RESPECT ESTABLISHED RELATIONSHIPS: only draw a romantic/spousal embrace (arms around the waist, a couple's close side-by-side pose) between characters the story establishes as partners — everyone else (siblings, friends, other relatives) gets warm but NON-romantic contact: a hand on a shoulder, holding hands as family, standing side by side. Never let two adults who are NOT the established couple end up posed like a couple.`,
       `8) DIRECTION OF ADAPTATION: when animals, creatures or any OTHER characters NOT listed above also appear in this scene, THEY must be drawn to fit this story's established art style and world — the characters listed above NEVER shift their proportions, body size, art style, or color palette to match the newcomers. A named character listed above looks EXACTLY as identical whether alone or surrounded by ten invented animal characters.`,
       `9) ABSENCE IS ALSO LOCKED: if the description above does NOT mention a feature (no beard/moustache mentioned, no glasses mentioned, no hat mentioned), draw the character WITHOUT it — never add facial hair, glasses, or accessories the description doesn't state, and never remove ones it does state. Facial hair in particular is a common slip: a clean-shaven face stated or implied above must stay clean-shaven in every single scene, never stubble, never a beard.`,
+      // 🩺 2026-08-12: repeatedly reported drift on one specific canonical
+      // character (an adult with an explicitly stated RECEDING HAIRLINE) —
+      // every other rule above locks WHICH details must match, but none of
+      // them named the failure MODE: when a description states something
+      // atypical for that kind of person (not a full head of hair, not a
+      // usual marking/color), an independently-drawn scene keeps quietly
+      // "correcting" it back toward the more common/expected look, even
+      // though hair color/style/clothing stay perfectly matched — the
+      // atypical detail alone regresses to average. This mirrors a fix
+      // already applied to portrait painting (see portraitPrompt,
+      // lib/portraits.ts) but that only covers the ONE portrait image, not
+      // every independent scene draw after it — generalized here so it
+      // protects any character, not just the ones already special-cased.
+      `10) DO NOT REGRESS ATYPICAL FEATURES TOWARD THE GENERIC/EXPECTED LOOK: when a description above states something UNUSUAL for that kind of person or animal — thinning or receding hair instead of a full hairline, an off-standard marking or coloring instead of the typical one, an asymmetric or unusual detail — that is a DELIBERATE, PERMANENT trait, not a one-off note. Draw it EXACTLY as stated in EVERY single scene, even under the natural pull to draw a more "normal"/average-looking version of that face or creature. If a character's hair, marking or build looks noticeably more typical/generic here than the description states, it has been drawn WRONG and must be corrected to match, no matter how small the deviation seems.`,
     ].join(" "),
-    close: `⚠ CONSISTENCY REMINDER: match hair, eyes, clothing, age, body size, relative heights, cast size and relationships EXACTLY as stated above — do NOT alter any detail, do NOT add anyone not named.`,
+    close: `⚠ CONSISTENCY REMINDER: match hair, eyes, clothing, age, body size, relative heights, cast size and relationships EXACTLY as stated above — do NOT alter any detail, do NOT add anyone not named, and do NOT soften any unusual/atypical stated feature back toward a more generic look.`,
   };
 }
 

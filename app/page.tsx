@@ -426,6 +426,16 @@ export default function Home() {
   const [goodnightImgUrl, setGoodnightImgUrl] = useState<string | null>(null);
   const [regenAudio, setRegenAudio] = useState(false);
   const [ctrlsOpen, setCtrlsOpen] = useState(false);
+  // 🩺 2026-08-12: goToPage (níž) VŽDY zavolá audioRef.current?.pause() jako
+  // úklid před přepnutím na jinou stránku — u AUTO-ADVANCE (konec scény →
+  // hned pokračuje další, isAutoAdvanceRef) je to jen milisekundový
+  // mezikrok, ne skutečná uživatelova pauza, ale nativní onPause (níž) ho
+  // nedokáže rozlišit od opravdového ⏸ a panel by se kvůli tomu ukazoval
+  // znovu PO KAŽDÉM SLIDU (nahlášeno uživatelem). Tenhle ref nastaví
+  // goToPage těsně před pauzou právě u auto-advance přechodu — onPause si
+  // ho jednorázově "spotřebuje" a ukrytí panelu nenaruší; ruční ‹/›/▶ tap
+  // (mimo auto-advance) naopak beze změny panel odkryje, jak má.
+  const suppressNextPauseRevealRef = useRef(false);
   const [forcedLs, setForcedLs] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const ambientRef = useRef<AmbientPlayer | null>(null);
@@ -1949,6 +1959,10 @@ export default function Home() {
     // (jen u pohádky, jejíž generování stále běží; jinak by blokla větev B)
     if (n > 0 && !scenesRef.current[n]?.imageUrl
         && serverJobsRef.current.some(jb => jb.jobId === readerEntryIdRef.current && jb.phase === "generating")) return;
+    // 🩺 viz suppressNextPauseRevealRef výš — jen u AUTO-ADVANCE (isAutoAdvanceRef
+    // už je true, nastaveno volajícím PŘED touhle voláním) potlačit reveal,
+    // co by jinak vyvolala nativní onPause z pause() o řádek níž.
+    if (isAutoAdvanceRef.current) suppressNextPauseRevealRef.current = true;
     audioRef.current?.pause();
     setIsPlaying(false);
     setPage(n);
@@ -5887,6 +5901,16 @@ export default function Home() {
                 {!current.audioUrl && !regenAudio ? <span className="placeholder-spinner placeholder-spinner-sm" /> : isPlaying ? "⏸" : "▶"}
               </button>
               <button type="button" className="ctrl-btn ctrl-nav" onClick={() => nextVisible !== null && goToPage(nextVisible)} disabled={!hasNext} aria-label={t.next}>›</button>
+              {/* 🎤 2026-08-12: titulky-přepínač přímo na ovladači (dřív jen
+                  v .book-controls vpravo nahoře — uživatel ho chtěl i/hlavně
+                  tady, ať nemusí hledat druhý panel). Menší/tlumenější než
+                  ‹▶› (stejný stav subtitlesOn jako ta druhá kopie výš — appka
+                  je záměrně nechává OBĚ, žádná duplicitní logika navíc). */}
+              <button type="button" className={`nav-mini-btn${subtitlesOn ? " nav-mini-btn-on" : ""}`}
+                onClick={() => setSubtitlesOn(p => !p)}
+                aria-label={t.subtitlesLabel} title={t.subtitlesLabel}>
+                {subtitlesOn ? "💬" : "🚫"}
+              </button>
             </div>
             <div className="nav-scrub-row">
               <input type="range" className="nav-range" min={0} max={Math.max(0, visiblePages.length - 1)} value={pagePos}
@@ -5936,8 +5960,23 @@ export default function Home() {
 
           {current.audioUrl && (
             <audio ref={audioRef} key={current.audioUrl} src={current.audioUrl}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => { setIsPlaying(false); setCtrlsOpen(true); }} // 🩺 nativní pauza (OS/sluchátka/uzamčená obrazovka), ne jen ⏸ tlačítko — panel se odkryje vždy
+              onPlay={() => {
+                setIsPlaying(true);
+                // 🩺 pojistka k suppressNextPauseRevealRef výš: pause() na už
+                // pauznutém/doznělém audiu (typicky auto-advance po "ended")
+                // nemusí vůbec vyvolat 'pause' event, co by flag spotřeboval —
+                // bez tohohle by zůstal "zaseknutý" true a potlačil i příští
+                // SKUTEČNOU pauzu. Reálné přehrávání = jistota, že se to k
+                // ničemu už nevztahuje.
+                suppressNextPauseRevealRef.current = false;
+              }}
+              onPause={() => {
+                setIsPlaying(false);
+                // 🩺 auto-advance mezikrok (viz suppressNextPauseRevealRef) — spotřebovat
+                // a NEODKRÝVAT, jinak se panel objeví po každém slidu (nahlášeno)
+                if (suppressNextPauseRevealRef.current) { suppressNextPauseRevealRef.current = false; return; }
+                setCtrlsOpen(true); // 🩺 jinak nativní pauza (OS/sluchátka/uzamčená obrazovka), ne jen ⏸ tlačítko — panel se odkryje vždy
+              }}
               onEnded={handleAudioEnded} />
           )}
         </div>
