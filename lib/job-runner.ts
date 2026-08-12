@@ -7,7 +7,7 @@
 import { put, head } from "@vercel/blob";
 import { generateStory, extractPdfBrief, EXTRA_STORY_LANGS, peekEarlyScene, enforceCanonicalAppearance, inventedCharacterNames, type StoryExtras } from "@/lib/claude";
 import { generateSceneImage, generateSceneSheet, getGenCounter, runWithGenCounter, isDailyQuotaError, isCreditsDepletedError, isSpendCapError, sceneCastList } from "@/lib/gemini";
-import { charactersByIds, loadCharacters, type ReferenceImage } from "@/lib/characters";
+import { charactersByIds, loadCharacters, charactersNamedInHeroDescription, type ReferenceImage } from "@/lib/characters";
 import { loadPortraitRefEntries, refsForText, refsForPanels, getFamilyScaleSheet, familyScaleSheetApplies, getFamilyGroupAnchor } from "@/lib/portraits";
 import { themeById } from "@/lib/themes";
 import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/types";
@@ -236,6 +236,23 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
   // rozpočet na scénu; ≤10 scén je beze změny (280s už ověřeně stíhá).
   const requestedScenes = Math.max(1, Math.min(MAX_SCENES, Number(body.sceneCount) || 10));
   const effectiveScenes = body.twoEndings ? Math.ceil(requestedScenes * 1.3) : requestedScenes;
+  // 🩺 2026-08-12: „pokračování" (previousStory) cituje jména KNIHOVNÍCH
+  // postav jako "kanonické, zkopíruj doslova" (buildUserPrompt, claude.ts),
+  // klidně i takových, co uživatel pro TUTO pohádku vůbec nezaškrtl —
+  // viz charactersNamedInHeroDescription (lib/characters.ts) pro plné
+  // odůvodnění a nahlášený bug ("James/Bella… vypadají úplně jinak než v
+  // knihovně"). Appka je proto přidá zpátky do referenčního obsazení všude,
+  // kde se dnes používá jen `body.characterIds` — dostanou tak svůj SKUTEČNÝ
+  // zamčený portrét i doslovné zařazení mezi kanonické postavy pro Clauda.
+  const prevHeroDescription =
+    typeof (body.previousStory as { heroDescription?: unknown } | undefined)?.heroDescription === "string"
+      ? String((body.previousStory as { heroDescription: string }).heroDescription)
+      : "";
+  const carryoverIds: string[] = prevHeroDescription
+    ? charactersNamedInHeroDescription(prevHeroDescription).map((c) => c.id)
+    : [];
+  const withCarryover = (ids: string[]): string[] =>
+    carryoverIds.length ? Array.from(new Set([...ids, ...carryoverIds])) : ids;
   // 🩺 2026-08-11: odhad castSize UŽ TADY (přesný výpočet běží mnohem později,
   // z charactersForNames/rawCustomForNames) — potřeba dřív, protože bez archů
   // (sheet mode, viz SHEET_SKIP_CAST_SIZE níž v souboru — drž stejnou hodnotu
@@ -245,8 +262,12 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
   // co archy použít MŮŽE. Odhad z request body (ne z charactersForNames,
   // co ještě neexistuje) — prázdný výběr = celá rodinná knihovna, stejné
   // pravidlo jako charactersForNames níž.
-  const earlyIds: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
-  const earlyCastSize = (earlyIds.length ? earlyIds.length : loadCharacters().length)
+  const earlyRawIds: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
+  const earlyIds: string[] = withCarryover(earlyRawIds);
+  // 🩺 castSize odhad drží stejnou "prázdný výběr = celá knihovna" logiku
+  // jako `characters` níž — withCarryover by jinak prázdný výběr proměnil na
+  // "jen carryover postavy" a odhad by byl NIŽŠÍ než skutečnost.
+  const earlyCastSize = (earlyRawIds.length ? earlyIds.length : loadCharacters().length)
     + (Array.isArray(body.customCharacters) ? (body.customCharacters as unknown[]).length : 0);
   const noSheetMode = earlyCastSize >= 7; // drž v souladu se SHEET_SKIP_CAST_SIZE níž
   const HARD_DEADLINE_MS =
@@ -310,7 +331,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
 
   // ⚡ Portréty postav se načítají SOUBĚŽNĚ s psaním (dřív se na ně čekalo
   // až po dopsání — u studeného startu ~3–5 s navíc)
-  const refIds: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
+  const refIds: string[] = withCarryover(Array.isArray(body.characterIds) ? (body.characterIds as string[]) : []);
   const refEntriesPromise = loadPortraitRefEntries(charactersByIds(refIds)).catch(() => [] as Awaited<ReturnType<typeof loadPortraitRefEntries>>);
   // 📏 Celorodinný výškový list — jeden STATICKÝ obrázek (jmény+cm), který
   // drží poměry velikostí postav (textové pravidlo „sahá jí k uším" model
@@ -331,8 +352,12 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       await write();
       const topic = String(body.topic || "").trim();
       const theme = body.themeId ? themeById(String(body.themeId)) : undefined;
-      const ids: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
-      let characters: Character[] = ids.length ? charactersByIds(ids) : loadCharacters();
+      const rawIds: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
+      const ids: string[] = withCarryover(rawIds);
+      // 🩺 prázdný výběr pořád spadne na CELOU knihovnu (superset carryoveru,
+      // žádná regrese) — jen když uživatel NĚCO zaškrtl, carryover se do
+      // toho přimíchá (viz withCarryover výš).
+      let characters: Character[] = rawIds.length ? charactersByIds(ids) : loadCharacters();
       if (characters.length === 0) characters = [{ id: "hero", name: "Hrdina", description: "a young child" }];
 
       const rawCustom = Array.isArray(body.customCharacters) ? (body.customCharacters as StoryExtras["customCharacters"]) : [];
@@ -609,8 +634,12 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     // skřítek). Jakmile appka takovou postavu poprvé úspěšně nakreslí, uloží
     // si tu scénu jako JEJÍ VLASTNÍ kotvu pro všechny další scény, kde se
     // jmenovitě objeví — stejný trik jako `anchor` níže, jen na míru postavě.
-    const idsForNames: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
-    const charactersForNames = idsForNames.length ? charactersByIds(idsForNames) : loadCharacters();
+    const rawIdsForNames: string[] = Array.isArray(body.characterIds) ? (body.characterIds as string[]) : [];
+    const idsForNames: string[] = withCarryover(rawIdsForNames);
+    // 🩺 carryover postavy MUSÍ počítat jako kanonické (charactersForNames) tady
+    // taky — jinak je inventedCharacterNames níž (a tím pádem i castSize) omylem
+    // zařadí mezi VYMYŠLENÉ, přesně bug popsaný u withCarryover/charactersNamedInHeroDescription.
+    const charactersForNames = rawIdsForNames.length ? charactersByIds(idsForNames) : loadCharacters();
     const rawCustomForNames = Array.isArray(body.customCharacters) ? (body.customCharacters as StoryExtras["customCharacters"]) : [];
     const inventedNames = inventedCharacterNames(
       heroDescription,

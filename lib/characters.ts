@@ -32,6 +32,33 @@ export function charactersByIds(ids: string[]): Character[] {
   return all.filter((c) => ids.includes(c.id));
 }
 
+/** 🩺 2026-08-12: „pokračování" pohádky (previousStory) posílá heroDescription
+ *  z MINULÉHO dílu ve formátu "Name: popis | Name: popis | …" a appka jí
+ *  slibuje "copy WORD FOR WORD for every character that reappears" (viz
+ *  buildUserPrompt, lib/claude.ts) — jenže když se v ní objeví jméno
+ *  KNIHOVNÍ postavy, kterou uživatel pro TUTO konkrétní pohádku nezaškrtl
+ *  (characterIds), appka jí posud neposílala žádný referenční portrét ani ji
+ *  nepočítala jako kanonickou — jen text se jménem beze zámku vzhledu.
+ *  Claude (claude.ts) takové jméno navíc neumí odlišit od NOVĚ vymyšlené
+ *  postavy (inventedCharacterNames zná jen `req.characters` TÉTO pohádky),
+ *  takže appka nakreslila "Evu"/"Jamese" atd. se zcela jiným, nově
+ *  vymyšleným vzhledem než ve skutečné kartotéce — nahlášeno uživatelem
+ *  ("v pohádce se objevují postavy Jamese, Belly…, které ale vypadají úplně
+ *  jinak než v knihovně", přestože nebyly zaškrtnuté). job-runner.ts tímhle
+ *  parsuje previousStory.heroDescription a takové jméno přidá zpátky do
+ *  referenčního obsazení (dostane svůj SKUTEČNÝ zamčený portrét) — splní tak
+ *  ten slib i vizuálně, ne jen textově. */
+export function charactersNamedInHeroDescription(heroDescription: string): Character[] {
+  const all = loadCharacters();
+  const names = new Set(
+    heroDescription
+      .split("|")
+      .map((s) => s.trim().split(":")[0]?.trim().toLowerCase())
+      .filter((n): n is string => !!n)
+  );
+  return all.filter((c) => names.has(c.name.toLowerCase()) || (c.nameEn && names.has(c.nameEn.toLowerCase())));
+}
+
 export interface ReferenceImage {
   data: string; // base64
   mimeType: string;
