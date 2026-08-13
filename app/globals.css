@@ -3977,41 +3977,40 @@ textarea.ta-accent:focus {
 
 .credits-scroll {
   width: 100%;
-  max-width: min(92vw, 520px);
-  max-height: min(88dvh, 760px);
-  overflow-y: auto;
-  scrollbar-width: none;
+  max-width: min(92vw, 560px);
+  max-height: calc(100dvh - max(2rem, env(safe-area-inset-top)) - max(2rem, env(safe-area-inset-bottom)));
+  overflow: hidden;
   border: 1px solid rgba(253,224,138,.3);
   border-radius: clamp(22px, 5vw, 36px);
   background: rgba(20, 10, 44, .62);
   box-shadow: 0 22px 65px rgba(3, 1, 12, .55);
   backdrop-filter: blur(14px);
 }
-.credits-scroll::-webkit-scrollbar { display: none; }
-
 .credits-content {
-  min-height: min(82dvh, 680px);
-  padding: clamp(1.4rem, 5vh, 3rem) clamp(1rem, 5vw, 2.5rem) clamp(1.2rem, 4vh, 2rem);
+  height: min(88dvh, 760px);
+  max-height: inherit;
+  padding: clamp(.85rem, 2.8vh, 2rem) clamp(1rem, 4vw, 2.25rem);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.55rem;
+  gap: clamp(.16rem, .75vh, .48rem);
+  justify-content: center;
   text-align: center;
 }
 
 .credits-end {
-  font-size: 2.4rem;
+  font-size: clamp(1.65rem, 4.6vh, 2.4rem);
   font-weight: 900;
   color: #fff;
-  margin-bottom: 0.5rem;
+  margin-bottom: clamp(.1rem, .7vh, .45rem);
   letter-spacing: -0.5px;
 }
 
 .credits-title {
-  font-size: 1.4rem;
+  font-size: clamp(1rem, 2.8vh, 1.4rem);
   font-weight: 800;
   color: #f59e0b;
-  margin-bottom: 1.5rem;
+  margin-bottom: clamp(.15rem, 1.2vh, .8rem);
   font-style: italic;
 }
 
@@ -4021,28 +4020,31 @@ textarea.ta-accent:focus {
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: rgba(255,255,255,0.4);
-  margin-top: 1.5rem;
-  margin-bottom: 0.15rem;
+  margin-top: clamp(.25rem, 1.1vh, .7rem);
+  margin-bottom: .08rem;
 }
 
 .credits-item {
-  font-size: 1.05rem;
+  font-size: clamp(.78rem, 2.2vh, 1.02rem);
   font-weight: 600;
   color: rgba(255,255,255,0.85);
-  line-height: 1.5;
+  line-height: 1.25;
 }
+.credits-heroes { display: flex; flex-wrap: wrap; justify-content: center; gap: .22rem .85rem; max-width: 26rem; }
+.credits-made { display: flex; flex-direction: column; align-items: center; gap: .12rem; }
+.credits-made .credits-section { margin-top: .2rem; }
 
 .credits-goodnight {
-  margin-top: 2.5rem;
-  font-size: 1.25rem;
+  margin-top: clamp(.25rem, 1.2vh, .75rem);
+  font-size: clamp(.92rem, 2.5vh, 1.25rem);
   font-weight: 800;
   color: #ffe082;
   text-shadow: 0 2px 14px rgba(255, 224, 130, 0.35);
 }
 
 .credits-song-btn {
-  margin-top: 1rem; border: 1px solid rgba(245,158,11,.75); border-radius: 999px;
-  padding: .72rem 1.15rem; color: #fff7d6; background: rgba(63,31,92,.82);
+  margin-top: clamp(.15rem, .8vh, .5rem); border: 1px solid rgba(245,158,11,.75); border-radius: 999px;
+  padding: clamp(.5rem, 1.5vh, .72rem) 1.15rem; color: #fff7d6; background: rgba(63,31,92,.82);
   font: inherit; font-weight: 800; cursor: pointer; backdrop-filter: blur(8px);
 }
 .credits-song-btn:disabled { opacity: .65; cursor: wait; }
@@ -4052,24 +4054,39 @@ textarea.ta-accent:focus {
   position: fixed; z-index: 3;
   top: max(.7rem, env(safe-area-inset-top)); right: max(.7rem, env(safe-area-inset-right));
   width: 44px; height: 44px; border-radius: 50%;
-  border: 1px solid rgba(253,224,138,.4); color: #fff7d6;
-  background: rgba(30,16,58,.72); backdrop-filter: blur(10px);
+  border: 2px solid rgba(255,255,255,.92); color: #fff;
+  background: linear-gradient(135deg, #f59e0b, #f97316); backdrop-filter: blur(10px);
+  box-shadow: 0 5px 18px rgba(249,115,22,.48);
+  display: grid; place-items: center; padding: 0;
   font-size: 1.65rem; line-height: 1; cursor: pointer;
 }
 .credits-home-btn {
-  margin-top: .7rem; border: 0; border-radius: 999px; padding: .68rem 1.05rem;
+  margin-top: clamp(.15rem, .8vh, .5rem); border: 0; border-radius: 999px; padding: clamp(.46rem, 1.3vh, .68rem) 1.05rem;
   color: rgba(255,255,255,.84); background: rgba(255,255,255,.1);
   font: inherit; font-size: .82rem; font-weight: 800; cursor: pointer;
 }
 
 @media (orientation: landscape) and (max-height: 620px) {
-  .credits-scroll { max-width: min(78vw, 700px); max-height: calc(100dvh - 1rem); }
-  .credits-content { min-height: 0; padding: .8rem 1.4rem; gap: .24rem; }
-  .credits-end { font-size: 1.65rem; margin-bottom: .1rem; }
-  .credits-title { font-size: 1.1rem; margin-bottom: .25rem; }
-  .credits-section { margin-top: .42rem; }
-  .credits-goodnight { margin-top: .55rem; font-size: 1rem; }
-  .credits-song-btn { margin-top: .35rem; padding: .55rem .9rem; }
+  .credits-scroll { max-width: min(72vw, 720px); max-height: calc(100dvh - 1rem); }
+  .credits-content { height: calc(100dvh - 1rem); min-height: 0; padding: .45rem 1.3rem; gap: .12rem; }
+  .credits-end { font-size: 1.35rem; margin-bottom: 0; }
+  .credits-title { font-size: .92rem; margin-bottom: .08rem; }
+  .credits-section { margin-top: .14rem; font-size: .6rem; }
+  .credits-item { font-size: .74rem; line-height: 1.12; }
+  .credits-goodnight { margin-top: .2rem; font-size: .88rem; }
+  .credits-song-btn { margin-top: .1rem; padding: .42rem .8rem; font-size: .76rem; }
+  .credits-home-btn { margin-top: .08rem; padding: .38rem .72rem; font-size: .7rem; }
+  .credits-song-hint { font-size: .6rem; }
+}
+
+@media (max-height: 560px) and (orientation: portrait) {
+  .credits-content { height: calc(100dvh - 1rem); padding: .5rem .8rem; gap: .1rem; }
+  .credits-end { font-size: 1.4rem; margin-bottom: 0; }
+  .credits-title { font-size: .9rem; margin-bottom: .1rem; }
+  .credits-section { margin-top: .12rem; font-size: .58rem; }
+  .credits-item { font-size: .7rem; }
+  .credits-goodnight { margin-top: .18rem; font-size: .84rem; }
+  .credits-song-btn, .credits-home-btn { margin-top: .08rem; padding-block: .4rem; font-size: .72rem; }
 }
 
 

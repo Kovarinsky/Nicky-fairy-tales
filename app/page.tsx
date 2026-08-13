@@ -5861,16 +5861,6 @@ export default function Home() {
                 <img className="page-image" src={current.imageUrl} alt={t.sceneAlt(page + 1)}
                   ref={pageImgRef}
                   onLoad={() => setRollTick(t => t + 1)} />
-                {/* 🖌 překreslit i HOTOVÝ obrázek (vadný/nekonzistentní) */}
-                {fixingScene === page ? (
-                  <div className="img-redraw-busy"><div className="placeholder-spinner" /></div>
-                ) : (
-                  <button type="button" className="img-redraw" aria-label={t.regenImg} title={t.regenImg}
-                    onClick={async e => {
-                      e.stopPropagation();
-                      if (await appConfirm(t.redrawAsk)) repairSceneImage(page);
-                    }}>🖌</button>
-                )}
               </div>
             ) : current.imageUrl ? (
               // 🚧 Dočasně (než se generování zoptimalizuje): appka NIKDY neukáže
@@ -5913,13 +5903,6 @@ export default function Home() {
                     ))}
                   </p>
                 </div>
-                {/* ✏️ Úprava textu je dostupná jen při pauze; za přehrávání
-                    nesmí rušit dítě ani vést k nechtěnému otevření editoru. */}
-                {!isPlaying && (
-                  <button type="button" className="page-edit" aria-label={t.editTextBtn} title={t.editTextBtn}
-                    disabled={loading}
-                    onClick={e => { e.stopPropagation(); openPageEditor(page); }}>✏️</button>
-                )}
               </div>
             )}
 
@@ -6382,13 +6365,14 @@ export default function Home() {
 
               {/* Bez technologií (know-how) — titulky patří hrdinům */}
               <p className="credits-section">{uiLang === "en" ? "Heroes" : "Hrdinové"}</p>
-              {storyCharNames().map(n => (
-                <p key={n} className="credits-item">{n}</p>
-              ))}
+              <div className="credits-heroes">
+                {storyCharNames().map(n => <span key={n} className="credits-item">{n}</span>)}
+              </div>
 
-              <p className="credits-section">{uiLang === "en" ? "Made with love" : "Vytvořeno s láskou"}</p>
-              <p className="credits-item">{uiLang === "en" ? "for Nicky's Fairy Tales" : "pro Nickyho pohádky"}</p>
-              <p className="credits-item">© {new Date().getFullYear()}</p>
+              <div className="credits-made">
+                <p className="credits-section">{uiLang === "en" ? "Made with love" : "Vytvořeno s láskou"}</p>
+                <p className="credits-item">{uiLang === "en" ? "for Nicky's Fairy Tales" : "pro Nickyho pohádky"} · © {new Date().getFullYear()}</p>
+              </div>
 
               <p className="credits-goodnight">🌙 {goodnightText(goodnightLang())} 🌙</p>
 
