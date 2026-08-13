@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "test:voice": "node scripts/test-voice.mjs",
     "gen:music-lib": "node scripts/generate-music-lib.mjs"
   },

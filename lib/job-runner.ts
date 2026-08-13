@@ -14,6 +14,8 @@ import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/type
 import { blobToken } from "@/lib/blob-token";
 import { chargeForCompletedStory } from "@/lib/accounts";
 import { estimateStoryCostCredits, actualStoryCostCredits } from "@/lib/pricing";
+import { prepareStoryRequestCanon } from "@/lib/story-canon";
+import { materializeStorySounds } from "@/lib/elevenlabs-creative";
 
 // 💳 Kreditní systém: "1 kredit = 1 Kč skutečných nákladů appky + 50% marže"
 // (viz lib/pricing.ts pro sazby a odůvodnění) — nahrazuje starý plochý model
@@ -24,7 +26,7 @@ import { estimateStoryCostCredits, actualStoryCostCredits } from "@/lib/pricing"
 export { estimateStoryCostCredits };
 
 const ANCHOR_LABEL =
-  "CONSISTENCY ANCHOR — an illustration from THIS SAME story. Copy from it EXACTLY: every character's design, clothing, hair, body size and the relative heights between characters, the art style, AND every recurring object. The car keeps the identical body type, shape, colors and details in this scene (a sedan stays a sedan — it never becomes a different car):";
+  "STORY STYLE / SETTING REFERENCE ONLY — reuse its painterly style, palette, lighting, recurring setting and recurring objects. NEVER copy a person's or animal's face, hair, age, body shape, size, markings, clothing or accessories from this image. For every named library character, the AUTHORITATIVE CHARACTER CANON portrait and contract override this image completely:";
 
 export const MAX_SCENES = 20;
 
@@ -39,6 +41,9 @@ export interface JobStatus {
   total?: number;
   done?: number;
   sceneUrls?: Record<number, string>;
+  /** Story-scoped temporary character library: invented name -> JSON blob of
+   * the first approved illustration that established that character. */
+  inventedAnchors?: Record<string, string>;
   error?: string;
   /** Poslední chyba kreslení obrázku (429 kvóta, billing…) — ukazuje se v UI */
   imgError?: string;
@@ -74,6 +79,10 @@ export interface JobStatus {
    *  odděleně, protože mají JINOU sazbu než obyčejný input (1,25×/0,1×) —
    *  system prompt psaní jede s cache_control: ephemeral (lib/claude.ts). */
   writeTokens?: { input: number; output: number; cacheCreation: number; cacheRead: number };
+  /** Preflight konflikty knihovních jmen vyřešené před prvním placeným voláním. */
+  canonPreflight?: { renamed: number; mappings: string[] };
+  /** Stejná ochrana aplikovaná na jména, která si model sám vymyslel ve výstupu. */
+  canonPostflight?: { renamed: number; mappings: string[] };
   /** Délka rozepsaného textu při minulém běhu — restart s delším partial = zdravé navázání */
   partialLen?: number;
   /** Restarty psaní BEZ pokroku v partial.json — jen ty znamenají zaseknutí */
@@ -174,6 +183,12 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
           chains: prev?.chains,
           partialLen: prev?.partialLen,
           stuckRestarts: prev?.stuckRestarts,
+          writeTokens: prev?.writeTokens,
+          canonPreflight: prev?.canonPreflight,
+          canonPostflight: prev?.canonPostflight,
+          imgSpent: prev?.imgSpent,
+          spent1k: prev?.spent1k,
+          spent4k: prev?.spent4k,
           log: prev?.log, // deník přežívá restarty psaní
         };
   // 🩺 Trvalý diagnostický záznam běhu — NEZÁVISLÝ na jobs/<id>/* (ten smaže
@@ -188,14 +203,25 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       total: st.total, done: st.done,
       createdAt: st.createdAt, updatedAt: st.updatedAt, finishedAt: st.finishedAt, wroteAt: st.wroteAt,
       chains: st.chains, restarts: st.restarts, stuckRestarts: st.stuckRestarts,
+      canonPreflight: st.canonPreflight, canonPostflight: st.canonPostflight, writeTokens: st.writeTokens,
+      spent1k: st.spent1k, spent4k: st.spent4k, imgSpent: st.imgSpent,
       log: st.log,
     };
     return putJson(`debug-logs/${id}.json`, record).catch(e => console.error(`[job ${id}] debug archive write failed:`, e));
   };
+  // Heartbeat, early draw a hlavní pipeline mohou zavolat write() souběžně.
+  // Přímé paralelní PUTy se dokončovaly mimo pořadí (v benchmarku status
+  // po 2958 znacích skočil zpět na 1603), takže starší snapshot přepsal
+  // novější. Zápisy statusu se proto serializují v pořadí vzniku.
+  let statusWriteChain: Promise<unknown> = Promise.resolve();
   const write = () => {
     st.updatedAt = Date.now();
     void writeDebugArchive();
-    return putJson(statusPath, st).catch(e => console.error(`[job ${id}] status write failed:`, e));
+    const snapshot = JSON.parse(JSON.stringify(st)) as JobStatus;
+    statusWriteChain = statusWriteChain
+      .then(() => putJson(statusPath, snapshot))
+      .catch(e => console.error(`[job ${id}] status write failed:`, e));
+    return statusWriteChain;
   };
   // 📋 Deník: co se kdy stalo (trvání kroků, chyby) — bez await, zapíše se
   // s nejbližším write(); do konzole jde záznam hned
@@ -236,6 +262,9 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
   // rozpočet na scénu; ≤10 scén je beze změny (280s už ověřeně stíhá).
   const requestedScenes = Math.max(1, Math.min(MAX_SCENES, Number(body.sceneCount) || 10));
   const effectiveScenes = body.twoEndings ? Math.ceil(requestedScenes * 1.3) : requestedScenes;
+  // 🧪 Feature flag prototypu. Je potřeba už před archovou fází, protože
+  // ovlivňuje i sekvenční kotvení vymyšlených postav.
+  const oneSheetStory = /^(1|true|on)$/i.test(process.env.ONE_SHEET_STORY || "");
   // 🩺 2026-08-12: „pokračování" (previousStory) cituje jména KNIHOVNÍCH
   // postav jako "kanonické, zkopíruj doslova" (buildUserPrompt, claude.ts),
   // klidně i takových, co uživatel pro TUTO pohádku vůbec nezaškrtl —
@@ -300,7 +329,12 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
   const selfContinue = async (): Promise<void> => {
     if (selfKicked) return;
     selfKicked = true;
-    const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+    // Preview job musí pokračovat na STEJNÉM preview deploymentu. Dřívější
+    // pořadí preferovalo production URL i ve preview, takže experiment po
+    // self-chainu tiše přeskočil na produkční kód a ztratil feature flagy.
+    const host = process.env.VERCEL_ENV === "production"
+      ? (process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL)
+      : (process.env.VERCEL_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL);
     if (!host) return; // lokální vývoj — pokračování zajistí klient jako dřív
     st.chains = (st.chains ?? 0) + 1;
     if (st.chains > 10) { // pojistka proti nekonečnému řetězu (nikdy nenastává)
@@ -312,11 +346,21 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     logEv(`♻️ předávám štafetu další funkci (řetěz ${st.chains}, běh ${secsSince(runStartedAt)}s)`);
     await write();
     try {
+      // Preview E2E continuation must keep its HTTP function alive; ordinary
+      // Preview waitUntil was observed to stop before the last missing scene.
+      // Only image-phase handoffs use this token/longer wait — a writing kick
+      // near the 300s function ceiling must still return immediately.
+      const previewContinuationToken = process.env.VERCEL_ENV !== "production" && st.scenesScript?.length
+        ? process.env.PROTOTYPE_BENCHMARK_TOKEN
+        : undefined;
       await fetch(`https://${host}/api/job/continue`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(previewContinuationToken ? { "x-prototype-benchmark-token": previewContinuationToken } : {}),
+        },
         body: JSON.stringify({ id, force: true }),
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(previewContinuationToken ? 45_000 : 10_000),
       });
     } catch (e) {
       console.warn(`[job ${id}] self-continue failed:`, e instanceof Error ? e.message : e);
@@ -328,6 +372,15 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
   // souběžně s psaním zbytku — psaní (~2 min) a kotva (~1 min) se překryjí
   let earlyDraw: Promise<{ buffer: Buffer; mimeType: string } | null> | null = null;
   let earlyImg: { buffer: Buffer; mimeType: string } | null = null;
+
+  // Snapshot BEFORE portraits/anchors/early scene start. The previous snapshot
+  // lived after story writing, so a scene drawn concurrently with Claude was
+  // real provider spend but invisible to both budget and failure analytics.
+  const genAtRunStart = { ...getGenCounter() };
+  const spent1kAtRunStart = st.spent1k ?? 0;
+  const spent4kAtRunStart = st.spent4k ?? 0;
+  const madeImagesThisRun = () => Math.max(0, getGenCounter().img1k - genAtRunStart.img1k);
+  const madeSheetsThisRun = () => Math.max(0, getGenCounter().img4k - genAtRunStart.img4k);
 
   // ⚡ Portréty postav se načítají SOUBĚŽNĚ s psaním (dřív se na ně čekalo
   // až po dopsání — u studeného startu ~3–5 s navíc)
@@ -384,7 +437,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
         ? { name: String(rawCustomTheme.name || "Vlastní svět"), prompt: String(rawCustomTheme.prompt).slice(0, 1200) }
         : undefined;
 
-      const storyReq: StoryRequest = {
+      let storyReq: StoryRequest = {
         topic,
         themeName: customTheme?.name ?? theme?.name,
         themePrompt: customTheme?.prompt ?? theme?.prompt,
@@ -431,6 +484,19 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
         pdfBriefText: st.pdfBrief || undefined,
         inspirationUrlText: urlText || undefined,
       };
+
+      // 🔒 Canon preflight musí proběhnout PŘED Claude API. Když osnova
+      // obsahuje jméno nevybrané knihovní postavy, ponechá se role, ale jméno
+      // se deterministicky přejmenuje. Dříve se konflikt zjistil až po ~2 min
+      // psaní a celý scénář se opakovaně zahodil.
+      const canonPreflight = prepareStoryRequestCanon(storyReq, extras);
+      storyReq = canonPreflight.request;
+      if (canonPreflight.renames.length) {
+        const mappings = canonPreflight.renames.map(r => `${r.libraryId}→${r.replacement}`);
+        st.canonPreflight = { renamed: mappings.length, mappings };
+        logEv(`🛡️ canon preflight: ${mappings.length} nevybraných knihovních jmen přejmenováno před psaním (${mappings.join(", ")})`);
+        await write();
+      }
 
       // Navázání psaní po restartu: rozepsaný text z minulého běhu se načte
       // a Claude POKRAČUJE tam, kde funkce umřela (prefill odpovědi) —
@@ -548,6 +614,9 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
             cacheCreation: prevCacheC + usage.cacheCreationTokens,
             cacheRead: prevCacheR + usage.cacheReadTokens,
           };
+        }, renames => {
+          const mappings = renames.map(r => `${r.libraryId}→${r.replacement}`);
+          st.canonPostflight = { renamed: mappings.length, mappings };
         });
       } finally {
         clearTimeout(writingKick);
@@ -590,6 +659,10 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     }
 
     const scenesScript = st.scenesScript!;
+    // 🔊 Běží souběžně s obrázky; resume je idempotentní díky globální cache.
+    // Výsledek se čeká až před finálním stavem done, aby URL zůstaly ve scénáři.
+    const customSoundsPromise = materializeStorySounds(scenesScript, 2)
+      .catch(() => ({ generated: 0, cachedOrGenerated: 0 }));
     const heroDescription = st.heroDescription || "";
     // 🔀 Líná větev B: obrázky druhého konce se NEKRESLÍ při generování —
     // vzniknou až když na něj čtenář na rozcestí opravdu sáhne (klient si je
@@ -609,9 +682,8 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     // účtují zvlášť). Namlouvání appka spouští líně až KLIENTSKY po
     // dokončení jobu (fillMissingAudio, app/page.tsx), ale text scénáře —
     // a tedy přesný počet znaků, co půjde do ElevenLabs — appka zná už teď.
-    const genAtStart = { ...getGenCounter() };
-    const madeImages = () => Math.max(0, getGenCounter().img1k - genAtStart.img1k);
-    const madeSheets = () => Math.max(0, getGenCounter().img4k - genAtStart.img4k);
+    const madeImages = madeImagesThisRun;
+    const madeSheets = madeSheetsThisRun;
     const voiceChars = scenesScript.reduce((sum, s) => sum + (s.narration?.length || 0), 0);
 
     // ── 2) Scenes (Gemini) with the consistency anchor ──
@@ -662,6 +734,19 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       const isLetter = (ch: string) => /[a-záčďéěíňóřšťúůýž]/i.test(ch);
       return !isLetter(low[i - 1] || " ") && !isLetter(low[i + k.length] || " ");
     };
+    // Obnovit dočasnou knihovnu i po předání jobu další serverless funkci.
+    // Dřív byla jen v RAM jedné funkce; po ~5 minutách chain pokračoval s
+    // prázdnou Map a stejnému skřítkovi znovu vymyslel jiný vzhled.
+    for (const [name, url] of Object.entries(st.inventedAnchors || {})) {
+      try {
+        const saved = await fetch(url, { cache: "no-store" }).then(r => (r.ok ? r.json() : null));
+        const m = typeof saved?.imageUrl === "string" ? saved.imageUrl.match(/^data:(image\/[a-z.+-]+);base64,(.+)$/) : null;
+        if (m) inventedRefs.set(name, {
+          data: m[2], mimeType: m[1], name, role: "character-canon",
+          label: `STORY CAST LOCK — ${name}'s approved design from the first appearance in THIS SAME story. Copy this character EXACTLY in every later scene: species, face, body shape, colors, clothing, distinctive features and size relative to the heroes:`,
+        });
+      } catch {}
+    }
     const refsFor = (txt: string): ReferenceImage[] => {
       const own = refsForText(refEntries, txt);
       const invented = inventedNames.filter(n => inventedRefs.has(n) && nameHit(txt, n)).map(n => inventedRefs.get(n)!);
@@ -680,7 +765,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       try {
         const s0 = await fetch(st.sceneUrls[0], { cache: "no-store" }).then(r => (r.ok ? r.json() : null));
         const m = typeof s0?.imageUrl === "string" ? s0.imageUrl.match(/^data:(image\/[a-z.+-]+);base64,(.+)$/) : null;
-        if (m) anchor = { data: m[2], mimeType: m[1], label: ANCHOR_LABEL };
+        if (m) anchor = { data: m[2], mimeType: m[1], label: ANCHOR_LABEL, role: "story-style" };
       } catch {}
     }
 
@@ -745,9 +830,8 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       const url = await putJson(`jobs/${id}/scene-${i}.json`, payload);
       st.sceneUrls![i] = url;
       st.done = Object.keys(st.sceneUrls!).length;
-      await write();
       if (i === 0 && !anchor) {
-        anchor = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: ANCHOR_LABEL };
+        anchor = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: ANCHOR_LABEL, role: "story-style" };
       }
       // 🕵️ První úspěšné nakreslení vymyšlené postavy = její vlastní kotva
       // pro všechny další scény, kde se jmenovitě objeví (viz komentář výše
@@ -757,10 +841,13 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
         if (!inventedRefs.has(name) && nameHit(scene.imagePrompt, name)) {
           inventedRefs.set(name, {
             data: img.buffer.toString("base64"), mimeType: img.mimeType, name,
-            label: `REFERENCE — ${name}'s design as established earlier in THIS story. Match EXACTLY: species/what it's made of, body shape, colors, distinguishing features, size relative to the other characters:`,
+            role: "character-canon",
+            label: `STORY CAST LOCK — ${name}'s approved design from the first appearance in THIS SAME story. Copy this character EXACTLY in every later scene: species, face, body shape, colors, clothing, distinctive features and size relative to the heroes:`,
           });
+          st.inventedAnchors = { ...(st.inventedAnchors || {}), [name]: url };
         }
       }
+      await write();
     }
 
     // ⚡ Scéna 1 z ranného kreslení (běžela souběžně s psaním) — když vyšla,
@@ -775,7 +862,16 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
         });
         st.sceneUrls![0] = url;
         st.done = Object.keys(st.sceneUrls!).length;
-        anchor = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: ANCHOR_LABEL };
+        anchor = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: ANCHOR_LABEL, role: "story-style" };
+        for (const name of inventedNames) {
+          if (!inventedRefs.has(name) && nameHit(scenesScript[0]?.imagePrompt, name)) {
+            inventedRefs.set(name, {
+              data: img.buffer.toString("base64"), mimeType: img.mimeType, name, role: "character-canon",
+              label: `STORY CAST LOCK — ${name}'s approved design from the first appearance in THIS SAME story. Copy this character EXACTLY in every later scene: species, face, body shape, colors, clothing, distinctive features and size relative to the heroes:`,
+            });
+            st.inventedAnchors = { ...(st.inventedAnchors || {}), [name]: url };
+          }
+        }
         await write();
       }
     }
@@ -795,10 +891,15 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     // vymyšlené jméno nejdřív SEKVENČNĚ (ne souběžně) dokreslí jeho
     // nejnižší-indexovou scénu, než vůbec spustí archy/paralelní kreslíře
     // níže — kotva tak vždy vznikne z opravdu prvního výskytu v ději.
-    for (const name of inventedNames) {
-      if (inventedRefs.has(name) || timeUp() || overallTimeUp()) continue;
-      const firstIdx = [...Array(total).keys()].find(i => !st.sceneUrls![i] && nameHit(scenesScript[i].imagePrompt, name));
-      if (firstIdx !== undefined) await doScene(firstIdx);
+    // V one-sheet režimu drží návrh nové postavy jediný společný modelový
+    // výstup. Samostatná kotvící scéna by z 9panelového storyboardu udělala
+    // jen 8 panelů a zničila cílovou ekonomiku 1× hero + 1× 4K.
+    if (!oneSheetStory) {
+      for (const name of inventedNames) {
+        if (inventedRefs.has(name) || timeUp() || overallTimeUp()) continue;
+        const firstIdx = [...Array(total).keys()].find(i => !st.sceneUrls![i] && nameHit(scenesScript[i].imagePrompt, name));
+        if (firstIdx !== undefined) await doScene(firstIdx);
+      }
     }
 
     // 🗂️ Režim archů: zbylé scény po skupinách v JEDNOM obrázku (3×3 ve 4K =
@@ -844,6 +945,9 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     // vrať SHEET_SKIP_CAST_SIZE zpátky na 4.
     const SHEET_SKIP_CAST_SIZE = 7;
     const sheetMode = (process.env.IMAGE_SHEET_MODE || "3x3").toLowerCase();
+    // 🧪 Prototyp 2026-08-13: první/hero scéna zůstává samostatná kotva a až
+    // devět zbývajících scén se pokusí vyrobit v JEDINÉM 4K storyboardu.
+    // Feature flag je defaultně vypnutý; produkční pipeline se beze změny.
     if (st.sheetGaveUp) logEv("🗂️ archová fáze už dřív vzdala (žádný nový panel) → rovnou sólo");
     else if (castSize >= SHEET_SKIP_CAST_SIZE) logEv(`🧪 ${castSize} postav v pohádce (≥${SHEET_SKIP_CAST_SIZE}) — archy přeskočeny, rovnou sólo (viz test 2026-08-05, prah zvednut 2026-08-11)`);
     else if (castSize >= 3) logEv(`🧪 ${castSize} postav v pohádce — mezistupeň: archy 2×2, max 2 lidi/panel (přísnější než obvykle, rozšířeno z castSize=3 na 3-${SHEET_SKIP_CAST_SIZE - 1} dne 2026-08-11)`);
@@ -855,13 +959,14 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     // místo rovnou padnout na dražší sólo. Dřív jen castSize===3.
     const castMidTier = castSize >= 3 && castSize < SHEET_SKIP_CAST_SIZE;
     if (sheetMode !== "off" && !quotaExhausted && !st.sheetGaveUp && castSize < SHEET_SKIP_CAST_SIZE && st.sceneUrls![0]) {
-      const maxCells = castMidTier ? 4 : sheetMode === "2x2" ? 4 : 9;
+      const maxCells = oneSheetStory ? 9 : castMidTier ? 4 : sheetMode === "2x2" ? 4 : 9;
       // ⚡ Archy jedné vlny běží PARALELNĚ (15 stránek = archy 9+5 najednou —
       // 4K arch generuje ~stejně dlouho jako jedna 1K scéna, sériově to byla
       // zbytečná minuta navíc). Max 2 vlny; vlna bez jediného nového panelu
       // ukončuje archovou fázi (pojistka proti smyčce archů).
       let prevRoundReports = ""; // výtky z 1. vlny → 2. vlna kreslí s korekcí
-      for (let round = 1; round <= 2 && !quotaExhausted && !timeUp() && !budgetBlown() && !overallTimeUp(); round++) {
+      const maxSheetRounds = oneSheetStory ? 1 : 2;
+      for (let round = 1; round <= maxSheetRounds && !quotaExhausted && !timeUp() && !budgetBlown() && !overallTimeUp(); round++) {
         const pend = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
         if (pend.length < 2) break;
         // 🎯 Scény se STEJNÝM obsazením seskupit do stejného archu — čím míň
@@ -879,19 +984,21 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
         // různých osob (per-panel popisky referencí `refsForPanels` umí i
         // míchané obsazení). Obojí jde stáhnout envem, kdyby kvalita klesla.
         const maxPanelPeople = castMidTier ? 2 : Number(process.env.IMAGE_SHEET_MAX_PANEL_PEOPLE || 3);
-        const maxSheetPeople = Number(process.env.IMAGE_SHEET_MAX_PEOPLE || 4);
+        const maxSheetPeople = Number(process.env.IMAGE_SHEET_MAX_PEOPLE || (oneSheetStory ? 7 : 4));
         // ⚡ Skutečný počet panelů v JEDNOM archu — dřív šel až na maxCells (9 v
         // 3×3 mřížce). Čím víc panelů v jednom volání, tím víc verifikačních
         // dávek (po 4) a tím déle trvá, než je hotový byť POSLEDNÍ panel toho
         // archu (nahlášeno: „obrázky se načítají dlouho potom co se pohádka
         // načte"). 6 defaultně = max 2 verifikační dávky místo 3, arch pořád
         // stojí stejnou paušální cenu (prázdné buňky = jen klidná scenérie).
-        const maxGroupPanels = Math.min(maxCells, Number(process.env.IMAGE_SHEET_MAX_REAL_PANELS || 6));
+        const maxGroupPanels = Math.min(maxCells, Number(process.env.IMAGE_SHEET_MAX_REAL_PANELS || (oneSheetStory ? 9 : 6)));
         // Řadit podle obsazení, při shodě podle indexu scény — sousední scény
         // se tak drží pohromadě, což bývá i stejné prostředí (jeden arch =
         // jedno místo = model drží kulisu konzistentně sám od sebe)
         const pendGrouped = pend.filter(i => castPeople(castKey(i)) <= maxPanelPeople)
-          .sort((a, b) => castKey(a).localeCompare(castKey(b)) || a - b);
+          // One-sheet storyboard drží děj chronologicky. Běžný režim dál
+          // seskupuje podle castu, jak byl odladěný v produkci.
+          .sort((a, b) => oneSheetStory ? a - b : castKey(a).localeCompare(castKey(b)) || a - b);
         const groups: number[][] = [];
         let cur: number[] = [];
         let curPeople = new Set<string>();
@@ -924,7 +1031,10 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
             // PANEL X" — bez toho model při 3+ postavách v archu míchal/
             // vymýšlel obličeje (nevěděl, který portrét patří ke kterému panelu)
             const panelTexts = group.map(i => `${scenesScript[i].imagePrompt} ${scenesScript[i].narration}`);
-            const groupRefs = [...refsForPanels(refEntries, panelTexts), ...customRefs];
+            const inventedGroupRefs = inventedNames
+              .filter(name => inventedRefs.has(name) && panelTexts.some(text => nameHit(text, name)))
+              .map(name => inventedRefs.get(name)!);
+            const groupRefs = [...refsForPanels(refEntries, panelTexts), ...customRefs, ...inventedGroupRefs];
             // 📏🖼️ Arch kreslí víc scén najednou → poměry výšek se v něm musí
             // držet napříč panely; výškový list i skupinová kotva jsou tu
             // proto vždy (když existují)
@@ -946,8 +1056,24 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
                 });
                 st.sceneUrls![i] = url;
                 st.done = Object.keys(st.sceneUrls!).length;
+                for (const name of inventedNames) {
+                  if (!inventedRefs.has(name) && nameHit(scenesScript[i]?.imagePrompt, name)) {
+                    inventedRefs.set(name, {
+                      data: img.buffer.toString("base64"), mimeType: img.mimeType, name, role: "character-canon",
+                      label: `STORY CAST LOCK — ${name}'s approved design from the first appearance in THIS SAME story. Copy this character EXACTLY in every later scene: species, face, body shape, colors, clothing, distinctive features and size relative to the heroes:`,
+                    });
+                    st.inventedAnchors = { ...(st.inventedAnchors || {}), [name]: url };
+                  }
+                }
                 await write();
-              }
+              },
+              oneSheetStory ? {
+                deadline: sceneDeadline(),
+                lenientSimplePanels: true,
+                maxGridAttempts: 1,
+                maxPanelEdits: 1,
+                allowFixedGridFallback: true,
+              } : { deadline: sceneDeadline() }
             );
             if (report) roundReports.push(report);
             const passed = results.filter(Boolean).length;
@@ -1009,7 +1135,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       st.error = `Ochrana rozpočtu: pohádka už vygenerovala ${st.imgSpent} obrázků (limit ${IMG_BUDGET} pro ${total} stránek, hotovo ${Object.keys(st.sceneUrls!).length}/${total}) — zrušte ji ✕ a zadejte znovu, případně s méně stránkami.`;
       logEv(`⛔ STOP: rozpočet obrázků vyčerpán (${st.imgSpent}/${IMG_BUDGET})`);
       await write();
-      await writeUsageRecord(totalImages1k(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true);
+      await writeUsageRecord(totalImages1k(), 0, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true);
       return;
     }
 
@@ -1019,7 +1145,17 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     // pohádka mohla řetězit donekonečna (viz „Kvarner" — 7 řetězů, 36 min)
     if (!quotaExhausted && Object.keys(st.sceneUrls!).length < total && (timeUp() || overallTimeUp())) {
       if (overallTimeUp()) {
-        logEv(`⏱️ globální strop ${Math.round(HARD_DEADLINE_MS / 1000)}s dosažen (${Object.keys(st.sceneUrls!).length}/${total} scén hotovo) → uzavírám pohádku i s chybějícími scénami (jdou 🖌 opravit ručně)`);
+        // An incomplete story must NEVER be advertised as done. Previously this
+        // fell through to the success block below, deleted the resumable request
+        // on the client, charged the story and opened the reader. The title-card
+        // watchdog then regenerated every missing image serially via /api/scene,
+        // creating the observed 20+ minute, repeatedly billed retry loop.
+        st.phase = "error";
+        st.error = `Příprava překročila časový limit (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo). Nedokončená pohádka nebyla uložena a uživatelský kredit se neodečetl — zkuste ji znovu.`;
+        logEv(`⛔ STOP: globální strop ${Math.round(HARD_DEADLINE_MS / 1000)}s dosažen (${Object.keys(st.sceneUrls!).length}/${total} scén hotovo) — NEÚPLNÝ job se neoznačí jako hotový`);
+        await write();
+        await writeUsageRecord(totalImages1k(), 0, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true);
+        return;
       } else {
         await selfContinue();
         return;
@@ -1040,7 +1176,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       // "samo se to ráno spraví", i když šlo o placení, ne o čas.
       logEv(`⛔ STOP: ${spendCapped ? "měsíční rozpočtový strop" : creditsDepleted ? "vyčerpaný kredit" : "denní kvóta"} Gemini vyčerpaná (${Object.keys(st.sceneUrls!).length}/${total})`);
       await write();
-      await writeUsageRecord(totalImages1k(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true);
+      await writeUsageRecord(totalImages1k(), 0, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true);
       return;
     }
 
@@ -1053,6 +1189,8 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       return;
     }
 
+    const soundResult = await customSoundsPromise;
+    if (soundResult.cachedOrGenerated > 0) logEv(`🔊 zakázkové SFX ${soundResult.generated}/${soundResult.cachedOrGenerated} (zbytek knihovní fallback)`);
     st.phase = "done";
     st.finishedAt = Date.now(); // ⏱ pohádka kompletní
     logEv(`✅ HOTOVO — celkem ${Math.round((st.finishedAt - st.createdAt) / 1000)}s od zadání (psaní ${st.wroteAt ? Math.round((st.wroteAt - st.createdAt) / 1000) : "?"}s, řetězů ${st.chains ?? 0})`);
@@ -1062,19 +1200,30 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     // (jiná pohádka stejné rodiny) se neúčtují znovu, jen co se OPRAVDU
     // nakreslilo v TOMHLE běhu (madeImages/madeSheets).
     if (st.username && !st.creditsCharged) {
-      const cost = actualStoryCostCredits({ images1k: madeImages(), images4k: madeSheets(), voiceChars }, st.writeTokens);
+      // Použít kumulativní počty přes VŠECHNY self-chain invokace. madeImages/
+      // madeSheets obsahují jen aktuální běh a u řetězené pohádky podhodnocovaly
+      // kreditní cenu, zatímco usage log níž už totals používal správně.
+      const cost = actualStoryCostCredits({ images1k: totalImages1k(), images4k: totalImages4k(), voiceChars }, st.writeTokens);
       await chargeForCompletedStory(st.username, cost).catch(() => {});
       st.creditsCharged = true;
     }
     await write();
-    await writeUsageRecord(totalImages1k(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true,
+    // TTS se vyrábí až přes /api/scene, který zapisuje SKUTEČNĚ namluvené
+    // znaky. Kdyby je story record zapsal také, agregát je počítá dvakrát.
+    await writeUsageRecord(totalImages1k(), 0, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true,
       (st.finishedAt - st.createdAt) / 1000); // ⏱ trvání přípravy do panelu Spotřeba
   } catch (e) {
     st.phase = "error";
     st.error = e instanceof Error ? e.message : String(e);
     st.lastError = st.error;
+    // Preserve and meter provider spend even when no story is completed. This
+    // includes the early scene that may have rendered while Claude was writing.
+    st.spent1k = spent1kAtRunStart + madeImagesThisRun();
+    st.spent4k = spent4kAtRunStart + madeSheetsThisRun();
+    st.imgSpent = st.spent1k + st.spent4k;
     logEv(`💥 CHYBA běhu: ${st.error.slice(0, 160)}`);
     await write();
+    await writeUsageRecord(st.spent1k, 0, typeof body.deviceId === "string" ? body.deviceId : undefined, st.spent4k);
   }
 }
 

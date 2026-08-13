@@ -83,6 +83,20 @@ export type SoundEffect =
   // 😴 ostatní
   | "snore";
 
+/** Časovaný zvuk uvnitř jedné scény. `at` je relativní pozice v namluvení
+ *  0..1, takže cue funguje stejně s Gemini i ElevenLabs hlasem. */
+export interface SoundCue {
+  effect: SoundEffect;
+  at: number;
+  /** Pohlaví hlasu pouze pro GENDERED_SFX. */
+  voice?: "m" | "f";
+  /** Volitelný unikátní zvuk navržený scenáristou. Knihovní `effect` zůstává
+   * vždy fallbackem; job materializuje URL maximálně u dvou cue na příběh. */
+  customPrompt?: string;
+  customDurationSec?: number;
+  audioUrl?: string;
+}
+
 /** Jedna scéna = jedna stránka knížky */
 export interface Scene {
   /** Pořadí scény od 1 */
@@ -99,6 +113,9 @@ export interface Scene {
    *  appka podle toho vybere mužskou/ženskou nahrávku (sfx-<klíč>-m/-f.mp3).
    *  Bez efektu u ostatních (negenderovaných) sfx klíčů. */
   sfxVoice?: "m" | "f";
+  /** Nový formát: nejméně dva efekty načasované podle děje. Staré `sfx`
+   *  zůstává kvůli uloženým pohádkám a při přehrání se převede na jeden cue. */
+  sfxCues?: SoundCue[];
 }
 
 /** 😊 Citoslovce/emoční reakce postav — jediná podmnožina SoundEffect, co má

@@ -200,12 +200,16 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
   // Reference photos go first, each labeled with the character's name,
   // so Gemini can match the likeness when drawing the stylized scene
   const parts: Array<Record<string, unknown>> = [];
-  for (const ref of refImages) {
+  const orderedRefs = [...refImages].sort((a, b) =>
+    (a.role === "story-style" ? 0 : a.role === "scale" ? 1 : a.role === "character-canon" ? 3 : 2) -
+    (b.role === "story-style" ? 0 : b.role === "scale" ? 1 : b.role === "character-canon" ? 3 : 2)
+  );
+  for (const ref of orderedRefs) {
     parts.push({ text: ref.label || `Reference photo of ${ref.name || "a story character"} (match this person's/animal's likeness):` });
     parts.push({ inlineData: { data: ref.data, mimeType: ref.mimeType } });
   }
-  if (refImages.length > 0) {
-    parts.push({ text: "Draw the characters so they are clearly recognizable as the people/animals in the reference photos above — same face shape, hair color and style, eye color, build, AGE and body size — but rendered in the illustration style described below. Keep every character's age and size true to their photo in every scene. Do NOT copy the photos' backgrounds or clothing unless the prompt says so." });
+  if (orderedRefs.length > 0) {
+    parts.push({ text: "REFERENCE PRIORITY IS STRICT: AUTHORITATIVE CHARACTER CANON portraits/contracts outrank scale sheets and all STORY STYLE / SETTING references. A previous story scene NEVER defines a named character's identity. Draw each named character as the exact same person/animal as their own canon portrait: same face shape, exact hair color/length/style, eye color, apparent AGE, build, body proportions, permanent markings/accessories and required outfit. Use story-scene references only for art style, lighting, setting and recurring objects. Do NOT copy their character appearance. Unless the scene explicitly requires someone to watch a distant object, stand guard, leave, or be alone, every visible person and animal must engage with the scene's shared action: gaze, face and body oriented toward another character or the object/event they are jointly reacting to — never stare randomly out of frame." });
   }
   parts.push({ text: prompt });
   const bodyBuf = Buffer.from(
@@ -371,6 +375,13 @@ function normalizeSeverity(f: QaFinding): QaFinding {
   if (/look-?alike|looks like (a |the )?(hero|copy)|near-?copy|same face|copy of|identical to (the )?(hero|reference)/i.test(f.problem)) {
     return { ...f, severity: "MAJOR" };
   }
+  // Výslovné rodinné identity anchors nejsou dekorace. Chybějící Archieho
+  // obojek/blaze, Janova vlasová silueta nebo Vájin batolecí tvar jsou přesně
+  // vady, které rodič pozná napříč slidy — vždy je posuň do opravitelné MAJOR.
+  if (/collar|red tag|forehead.*blaze|muzzle.*blaze|widow.?s peak|receding (hairline|temples)|hair (amount|density|silhouette|length)|below (the )?shoulders|stubble|toddler proportions|body proportions|identity anchor|overweight|too (heavy|old|young)|apparent age/i.test(`${f.problem} ${f.attribute || ""}`)) {
+    return { ...f, severity: "MAJOR" };
+  }
+  if (f.rule === 14) return { ...f, severity: "MAJOR" };
   // Pravidlo 3 — barvy. VLASY jsou identitní znak (dva sourozenci s různou,
   // byť "sousední" barvou vlasů — blond vs. zrzavá/kaštanová — jsou pro
   // rodiče viditelně PROHOZENÍ, ne malířská odchylka): tolerovat se smí jen
@@ -434,18 +445,34 @@ function decideAction(findings: QaFinding[]): QaAction {
   return needsRedraw ? "REDRAW" : "EDIT";
 }
 
+/** Vady identity, které se nesmějí propustit ani po deadline. */
+export function hasHardCanonFailure(v: QaVerdict | null): boolean {
+  if (!v) return false;
+  return v.findings.some(f => f.severity === "MAJOR" &&
+    ([1, 2, 3, 4, 7, 13].includes(f.rule) ||
+      /identity|face|hair|age|body|build|proportion|collar|tag|blaze|marking|look-?alike/i.test(`${f.problem} ${f.attribute || ""}`))
+  );
+}
+
 export async function verifySceneImage(
   apiKey: string, img: ImageResult, heroDescription: string, scenePrompt = "",
   refs: ReferenceImage[] = [], // 🕵️ kanonické portréty — inspektor porovnává TVÁŘE, ne jen text
   deadline?: number
 ): Promise<QaVerdict | null> {
+  // Server story jobs have a shared deadline. Two 30s verifier attempts plus
+  // the caller's former third verification could spend 90s on QA alone for a
+  // single already-rendered image. One bounded inspection is enough in this
+  // path; interactive/manual operations (no deadline) retain two attempts.
+  const maxAttempts = deadline === undefined ? 2 : 1;
   // Referenční portréty jdou inspektorovi PŘED kontrolovaný obrázek — dřív
   // soudil jen podle textu a „Bella jako černoška" mu nemohla padnout do oka
   const refParts = refs.slice(0, 8).flatMap((r, i) => [
-    { text: `REFERENCE ${i + 1} — ${(r.label || (r.name ? `canonical portrait of ${r.name}` : "reference image")).slice(0, 300)}:` },
+    { text: `REFERENCE ${i + 1} [${r.role || "other"}] — ${(r.label || (r.name ? `canonical portrait of ${r.name}` : "reference image")).slice(0, 1500)}:` },
     { inlineData: { data: r.data, mimeType: r.mimeType } },
   ]);
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const remainingMs = deadline === undefined ? GEMINI_VERIFY_TIMEOUT_MS : deadline - Date.now();
+    if (remainingMs < 2_000) break;
     try {
       const raw = await geminiPost(apiKey, VERIFY_MODEL, {
         contents: [{
@@ -482,6 +509,7 @@ export async function verifySceneImage(
               ...(refParts.length ? [
                 "13) IDENTITY MATCH TO REFERENCES: compare EVERY visible named character against their REFERENCE image above — it must clearly be the SAME person: same face, same underlying SKIN TONE/ethnicity, same hair color and style, same apparent AGE and BODY SIZE (a small child in the reference must stay a small child — drawn as a teenager or adult = FAIL; an adult must stay an adult), same signature outfit. A character who looks like a DIFFERENT person than their reference (different ethnicity, different age, different face) = FAIL. Do NOT fail for lighting-only differences (sun-tanned, warmer/cooler color grading, shadows, golden-hour light) when the person is otherwise clearly the same individual — judge the underlying tone, not the lighting. EXCEPTION: if the scene description explicitly states this character is now a different height/size (a deliberate story-driven transformation), a body-size difference from the reference is CORRECT, not a fail — still check face/hair/ethnicity/outfit match.",
               ] : []),
+              "14) SHARED-ACTION ENGAGEMENT: unless the scene explicitly requires a character/animal to watch something distant, stand guard, leave, hide, sleep, or be alone, everyone must visibly engage with the shared action — gaze and body toward another character or the jointly relevant object/event. A pet randomly staring out of frame while the family acts together is MODERATE and must be fixed.",
               "",
               "CLASSIFY EVERY FINDING BY SEVERITY — this is as important as finding it:",
               "· MAJOR = breaks the illusion for a child or reader: wrong/missing/extra named person, merged or swapped identities, a character who is not the person in their reference photo, colors jumping between families, broken art style, broken anatomy, body scale outside the stated tolerance, key content cut off by the frame, wrong setting.",
@@ -512,7 +540,7 @@ export async function verifySceneImage(
           temperature: 0,
           ...(VERIFY_MODEL.includes("2.5") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
         },
-      }, GEMINI_VERIFY_TIMEOUT_MS);
+      }, Math.min(GEMINI_VERIFY_TIMEOUT_MS, remainingMs));
       const data = JSON.parse(raw) as { candidates?: GeminiCandidate[] };
       const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
       const m = text.match(/\{[\s\S]*\}/);
@@ -572,8 +600,8 @@ export async function verifySceneImage(
       // dostal ok:true). Podezřele vysoký počet nálezů => bereme to jako
       // selhání kontroly a zkusíme to znovu, ne že bychom to rovnou platili.
       const SUSPICIOUS_FINDINGS_COUNT = 8;
-      if (findings.length >= SUSPICIOUS_FINDINGS_COUNT && attempt < 2) {
-        console.warn(`[Gemini QA] verify attempt ${attempt}/2: podezřele ${findings.length} nálezů najednou (pravděpodobně "okomentovala všechna pravidla" místo jen chyb) → zkouším znovu`);
+      if (findings.length >= SUSPICIOUS_FINDINGS_COUNT && attempt < maxAttempts) {
+        console.warn(`[Gemini QA] verify attempt ${attempt}/${maxAttempts}: podezřele ${findings.length} nálezů najednou (pravděpodobně "okomentovala všechna pravidla" místo jen chyb) → zkouším znovu`);
         await new Promise(r => setTimeout(r, 2000));
         continue;
       }
@@ -592,11 +620,11 @@ export async function verifySceneImage(
       };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`[Gemini QA] verify attempt ${attempt}/2 failed: ${msg}`);
+      console.warn(`[Gemini QA] verify attempt ${attempt}/${maxAttempts} failed: ${msg}`);
       // Času se nedostává — další pokus by jen ukrajoval z rozpočtu na
       // dokreslení/předání štafety, aniž by měl reálnou šanci stihnout se
       if (deadline !== undefined && Date.now() > deadline) break;
-      if (attempt < 2) await new Promise(r => setTimeout(r, 2500 * attempt));
+      if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 2500 * attempt));
     }
   }
   console.warn("[Gemini QA] verify UNAVAILABLE after retries — image accepted unchecked");
@@ -811,6 +839,7 @@ function buildAppearanceLock(heroDescription: string): { open: string; close: st
       // every independent scene draw after it — generalized here so it
       // protects any character, not just the ones already special-cased.
       `10) DO NOT REGRESS ATYPICAL FEATURES TOWARD THE GENERIC/EXPECTED LOOK: when a description above states something UNUSUAL for that kind of person or animal — thinning or receding hair instead of a full hairline, an off-standard marking or coloring instead of the typical one, an asymmetric or unusual detail — that is a DELIBERATE, PERMANENT trait, not a one-off note. Draw it EXACTLY as stated in EVERY single scene, even under the natural pull to draw a more "normal"/average-looking version of that face or creature. If a character's hair, marking or build looks noticeably more typical/generic here than the description states, it has been drawn WRONG and must be corrected to match, no matter how small the deviation seems.`,
+      `11) DEFAULT TO INTERACTION, NOT DISCONNECTION: unless this exact scene explicitly requires a character or animal to watch a distant object, stand guard, leave, hide, sleep, or be alone, every visible participant must engage with the shared action. Point their gaze, facial expression and body toward another character or toward the object/event everyone is reacting to. A family pet must not stare randomly out of frame while the family acts together.`,
     ].join(" "),
     close: `⚠ CONSISTENCY REMINDER: match hair, eyes, clothing, age, body size, relative heights, cast size and relationships EXACTLY as stated above — do NOT alter any detail, do NOT add anyone not named, and do NOT soften any unusual/atypical stated feature back toward a more generic look.`,
   };
@@ -842,7 +871,12 @@ export async function generateSceneImage(
   let llmSanitized = false;
   console.log(`[Gemini] scene ${scene.index} model=${model} (${safePrompt.length} chars): ${safePrompt.slice(0, 200)}`);
 
-  const MAX_ATTEMPTS = 3;
+  // A queued story passes a shared deadline. Retrying one slow image request
+  // three times used up to 180 seconds (observed live on scene 2), starving all
+  // remaining pages. Let the job runner persist progress and retry the missing
+  // scene in its next invocation. Interactive/manual generation has no shared
+  // deadline and keeps the more forgiving three attempts.
+  const MAX_ATTEMPTS = deadline === undefined ? 3 : 1;
   // Denní kvóta platí na model → při stropu primárního modelu zkusit záložní
   const models = FALLBACK_IMAGE_MODEL && FALLBACK_IMAGE_MODEL !== model
     ? [model, FALLBACK_IMAGE_MODEL]
@@ -870,7 +904,7 @@ export async function generateSceneImage(
         // ale zavřená mezera je tu důležitější než pár ušetřených requestů.
         if (heroDescription) {
           let v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt, refImages, deadline);
-          if (!v0 && !(deadline !== undefined && Date.now() > deadline)) {
+          if (!v0 && deadline === undefined) {
             // Kontrola 2× selhala (typicky rate-limit) → po pauze ještě jednou;
             // teprve pak se obrázek přijme s varováním (jinak by se nic nedokreslilo)
             await new Promise(r => setTimeout(r, 6000));
@@ -891,10 +925,10 @@ export async function generateSceneImage(
           const lenientScene = sceneCastCount > 0 && sceneCastCount <= 2;
           if (v0 && !v0.ok && lenientScene && !v0.findings.some(f => f.severity === "MAJOR")) {
             console.log(`[Gemini QA] scene ${scene.index}: jen MODERATE nález na ${sceneCastCount}-osobové scéně → odlehčený režim, tolerováno bez opravy (${v0.problems})`);
-          } else if (v0 && !v0.ok && deadline !== undefined && Date.now() > deadline) {
+          } else if (v0 && !v0.ok && deadline !== undefined && Date.now() > deadline && !hasHardCanonFailure(v0)) {
             console.warn(`[Gemini QA] scene ${scene.index}: REJECTED [${v0.badRules} rules] (${v0.problems}) but DEADLINE passed → accepted as-is, no redraw`);
           } else if (v0 && !v0.ok) {
-            let best = { img, badRules: v0.badRules, problems: v0.problems };
+            let best = { img, badRules: v0.badRules, problems: v0.problems, verdict: v0 };
             // 🎯 Jedno opravné kolo — ale podle ZÁVAŽNOSTI: drobné vady
             // (barva očí, chybějící mašle) se cíleně DOEDITUJÍ na hotovém
             // obrázku, jen skutečné rozbití (styl, měřítko, ořez, cizí
@@ -914,13 +948,16 @@ export async function generateSceneImage(
                     );
                 const v2 = await verifySceneImage(apiKey, img2, heroDescription, scene.imagePrompt, refImages, deadline);
                 if (v2 && (v2.ok || v2.badRules < best.badRules)) {
-                  best = { img: img2, badRules: v2.ok ? 0 : v2.badRules, problems: v2.problems };
+                  best = { img: img2, badRules: v2.ok ? 0 : v2.badRules, problems: v2.problems, verdict: v2 };
                 }
               } catch (e2) {
                 console.warn(`[Gemini QA] scene ${scene.index}: ${useEdit ? "edit" : "redraw"} failed (${e2 instanceof Error ? e2.message : e2})`);
               }
             }
             img = best.img;
+            if (best.badRules > 0 && hasHardCanonFailure(best.verdict)) {
+              throw new Error(`CANON_IDENTITY_REJECTED: scene ${scene.index}: ${best.problems}`);
+            }
             if (best.badRules > 0) console.warn(`[Gemini QA] scene ${scene.index}: still imperfect [${best.badRules}] (${best.problems})`);
             else console.log(`[Gemini QA] scene ${scene.index}: fixed ✓`);
           } else if (v0 && v0.ok && v0.findings.length > 0) {
@@ -1005,7 +1042,7 @@ export async function generateSceneImage(
 /** Ověří bílé dělicí linky a rozřeže arch na grid×grid výřezů (s malým
  *  odsazením, ať v obraze nezůstanou zbytky mezer). Vrací null, když mřížka
  *  nesedí — takový arch se nesmí řezat. */
-async function sliceSheet(img: ImageResult, grid: number): Promise<ImageResult[] | null> {
+async function sliceSheet(img: ImageResult, grid: number, allowFixedGridFallback = false): Promise<ImageResult[] | null> {
   try {
     const sharp = (await import("sharp")).default;
     const { data, info } = await sharp(img.buffer).greyscale().raw().toBuffer({ resolveWithObject: true });
@@ -1039,15 +1076,29 @@ async function sliceSheet(img: ImageResult, grid: number): Promise<ImageResult[]
     };
     const vLines: number[] = [0];
     const hLines: number[] = [0];
+    let usedFixedGrid = false;
     for (let k = 1; k < grid; k++) {
       const vx = findLine(true, info.width, k);
       const hy = findLine(false, info.height, k);
       if (vx === null || hy === null) {
-        console.warn(`[Gemini sheet] mřížka nesedí (linka ${k}/${grid} nenalezena) → arch zamítnut`);
-        return null;
+        if (!allowFixedGridFallback) {
+          console.warn(`[Gemini sheet] mřížka nesedí (linka ${k}/${grid} nenalezena) → arch zamítnut`);
+          return null;
+        }
+        usedFixedGrid = true;
+        break;
       }
       vLines.push(vx);
       hLines.push(hy);
+    }
+    if (usedFixedGrid) {
+      vLines.length = 1;
+      hLines.length = 1;
+      for (let k = 1; k < grid; k++) {
+        vLines.push(Math.round((info.width * k) / grid));
+        hLines.push(Math.round((info.height * k) / grid));
+      }
+      console.warn(`[Gemini sheet] bílé linky nenalezeny → pevný ${grid}×${grid} řez; každý panel ještě rozhodne vision QA`);
     }
     vLines.push(info.width);
     hLines.push(info.height);
@@ -1087,7 +1138,19 @@ export async function generateSceneSheet(
   // ⚡ Volitelný callback: zavolá se, JAKMILE je hotový KAŽDÝ jednotlivý panel
   // (po vlastní editaci/QA), místo čekání na celý arch — volající tak může
   // uložit a zobrazit scénu hned, ne až po nejpomalejším panelu z 6-9.
-  onPanelReady?: (i: number, result: ImageResult | null) => void | Promise<void>
+  onPanelReady?: (i: number, result: ImageResult | null) => void | Promise<void>,
+  options: {
+    /** Epoch ms. Po deadline se už nespouští placená oprava panelu. */
+    deadline?: number;
+    /** Stejná politika jako solo scény: MODERATE u 1–2 lidí přijmout. */
+    lenientSimplePanels?: boolean;
+    /** Kolikrát nejvýš znovu vyrábět celý 4K arch kvůli rozbité mřížce. */
+    maxGridAttempts?: number;
+    /** Sdílený budget placených panelových editací na celý arch. */
+    maxPanelEdits?: number;
+    /** Bez bílých linek zkusit pevné třetiny; panelová vision QA stále platí. */
+    allowFixedGridFallback?: boolean;
+  } = {}
 ): Promise<{ results: Array<ImageResult | null>; report: string }> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
@@ -1133,7 +1196,8 @@ export async function generateSceneSheet(
   // mřížce) a vadné panely jdou rovnou sólo cestou — celoarchová QA
   // překreslení se nevešla do 5min limitu funkce a job se točil dokola.
   let slices: ImageResult[] | null = null;
-  for (let attempt = 1; attempt <= 2 && !slices; attempt++) {
+  const maxGridAttempts = Math.max(1, Math.min(2, options.maxGridAttempts ?? 2));
+  for (let attempt = 1; attempt <= maxGridAttempts && !slices; attempt++) {
     let sheet: ImageResult;
     try {
       sheet = await callGeminiImage(
@@ -1153,7 +1217,7 @@ export async function generateSceneSheet(
       }
       throw e;
     }
-    slices = await sliceSheet(sheet, grid);
+    slices = await sliceSheet(sheet, grid, options.allowFixedGridFallback === true);
     if (!slices) console.warn(`[Gemini sheet] attempt ${attempt}: mřížka nesedí`);
   }
   if (!slices) throw new Error("sheet: mřížka se nepodařila nakreslit");
@@ -1165,7 +1229,7 @@ export async function generateSceneSheet(
   for (let i = 0; i < n; i += 4) {
     const chunk = await Promise.all(
       Array.from({ length: Math.min(4, n - i) }, (_, j) =>
-        verifySceneImage(apiKey, slices![i + j], heroDescription, scenes[i + j].imagePrompt, refImages)
+        verifySceneImage(apiKey, slices![i + j], heroDescription, scenes[i + j].imagePrompt, refImages, options.deadline)
       )
     );
     chunk.forEach((v, j) => { verdicts[i + j] = v; });
@@ -1182,16 +1246,28 @@ export async function generateSceneSheet(
   // editSceneImage+verifySceneImage najednou umí vyčerpat rate-limit
   // kontrolního modelu úplně stejně jako kdysi 9 souběžných verify (0/6
   // panelů prošlo, log plný „QA verdict missing JSON").
+  let panelEditsClaimed = 0;
   const doPanel = async (i: number) => {
     const v = verdicts[i];
     let result: ImageResult | null = null;
+    const sceneCastCount = (sceneCastList(scenes[i].imagePrompt) || "").split(",").map(s => s.trim()).filter(Boolean).length;
+    const lenientModerate = !!v && !v.ok && options.lenientSimplePanels === true &&
+      sceneCastCount > 0 && sceneCastCount <= 2 && !v.findings.some(f => f.severity === "MAJOR");
+    if (lenientModerate) {
+      console.log(`[Gemini sheet] panel ${i + 1}: jen MODERATE nález na ${sceneCastCount}-osobové scéně → přijato bez placené opravy (${v.problems})`);
+      result = await compressImage(slices![i]);
+    }
     // 🖌️ Panel s drobnou vadou se NEZAHAZUJE do sóla (to je nejdražší cesta —
     // arch je flat-price, sólo stojí plnou cenu za každou scénu): zkusí se
     // cílená editace přímo na výřezu. Sólo zůstává jen pro skutečné rozbití.
-    if (v && !v.ok && v.action === "EDIT" && v.fixInstruction) {
+    const editBudget = Math.max(0, options.maxPanelEdits ?? Number.POSITIVE_INFINITY);
+    const mayEdit = !result && v && !v.ok && v.action === "EDIT" && !!v.fixInstruction &&
+      !(options.deadline !== undefined && Date.now() > options.deadline) && panelEditsClaimed < editBudget;
+    if (mayEdit) {
+      panelEditsClaimed += 1;
       try {
-        const fixed = await editSceneImage(apiKey, model, slices![i], v.fixInstruction, refImages, null);
-        const v2 = await verifySceneImage(apiKey, fixed, heroDescription, scenes[i].imagePrompt, refImages);
+        const fixed = await editSceneImage(apiKey, model, slices![i], v!.fixInstruction, refImages, null);
+        const v2 = await verifySceneImage(apiKey, fixed, heroDescription, scenes[i].imagePrompt, refImages, options.deadline);
         if (v2 && v2.ok) {
           console.log(`[Gemini sheet] panel ${i + 1}: drobná vada doeditována ✓`);
           result = await compressImage(fixed);

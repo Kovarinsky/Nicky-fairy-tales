@@ -18,13 +18,12 @@ export const USD_TO_CZK = 23;
 
 /** Gemini 1K obrázek scény — zdroj: komentář u IMAGE_MODEL, lib/gemini.ts. */
 export const COST_USD_PER_IMAGE_1K = 0.067;
-/** 4K arch (víc scén/portrét v jednom obrázku) — appka účtuje odděleně
- *  (genCounter.img4k), ale přesná sazba nebyla nikde zaznamenaná; 3× cena
- *  1K obrázku je konzervativní odhad podle větší plochy/rozlišení výstupu. */
-export const COST_USD_PER_IMAGE_4K = COST_USD_PER_IMAGE_1K * 3;
-/** ElevenLabs namlouvání — veřejně inzerovaná sazba se podle tarifu liší;
- *  $0.24 / 1000 znaků je střední odhad, NE ověřeno proti účtu appky. */
-export const COST_USD_PER_1K_VOICE_CHARS = 0.24;
+/** 4K arch (víc scén v jednom obrázku). Oficiální Gemini 3.1 Flash Image
+ *  sazba k 2026-08-13: $0.151 za 4K výstup. */
+export const COST_USD_PER_IMAGE_4K = 0.151;
+/** ElevenLabs Flash/Turbo API sazba k 2026-08-13. Multilingual v2/v3 stojí
+ *  $0.10/1k znaků; produkční default eleven_flash_v2_5 stojí $0.05/1k. */
+export const COST_USD_PER_1K_VOICE_CHARS = 0.05;
 /** Claude (psaní scénáře) — paušál na 10stránkovou pohádku, POUZE fallback
  *  pro staré/nedohledatelné joby bez writeTokens (viz job-runner.ts). Od
  *  2026-08-06 appka měří SKUTEČNÉ tokeny (message_start/message_delta SSE,
@@ -32,17 +31,13 @@ export const COST_USD_PER_1K_VOICE_CHARS = 0.24;
  *  tohohle paušálu, když jsou k dispozici. */
 export const COST_USD_PER_STORY_WRITING = 0.15;
 
-/** Claude Sonnet 5 (claude-sonnet-5) — oficiální ceník platform.claude.com,
- *  ověřeno 2026-08-06. Introduktorní sazba (~1/3 sleva) platí jen do
- *  2026-08-31 — POTOM přepnout na standardní $3/$15 za MTok, jinak appka
- *  bude náklady na psaní podhodnocovat. */
-const CLAUDE_INTRO_PRICING_EXPIRES = "2026-08-31";
-const claudeIntroPricingActive = new Date() <= new Date(`${CLAUDE_INTRO_PRICING_EXPIRES}T23:59:59Z`);
+/** Claude Sonnet 5 (claude-sonnet-5) — Anthropic 2026-08-10 oznámil, že
+ *  původně úvodní $2/$10 sazba zůstává standardní a 2026-09-01 se nezvýší. */
 /** USD za 1M input tokenů. */
-export const COST_USD_PER_MTOK_INPUT = claudeIntroPricingActive ? 2.0 : 3.0;
+export const COST_USD_PER_MTOK_INPUT = 2.0;
 /** USD za 1M output tokenů (zahrnuje thinking tokeny, appka thinking
  *  nepoužívá — viz callAnthropicApi). */
-export const COST_USD_PER_MTOK_OUTPUT = claudeIntroPricingActive ? 10.0 : 15.0;
+export const COST_USD_PER_MTOK_OUTPUT = 10.0;
 /** 🩺 2026-08-06 (2): psaní scénáře posílá system prompt s cache_control:
  *  ephemeral (buildSystemPrompt, ~4k tokenů, neměnný napříč pohádkami se
  *  stejným jazykem) — `input_tokens` v odpovědi je proto jen NEKEŠOVANÝ

@@ -26,11 +26,21 @@ export async function POST(req: NextRequest) {
     // účtu) — appka to hlídá i na klientovi (Home screen, createStory), ale
     // tenhle server endpoint je AUTORITATIVNÍ místo: bez platné session se
     // sem vůbec nedostane, ať klient obejde cokoliv jinde.
-    const username = verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
+    // 🧪 Preview-only end-to-end hook. Je neaktivní na production targetu
+    // a bez dlouhého tajného tokenu. Umožní automatický benchmark
+    // bez kopírování uživatelského session cookie do skriptů, ale jen pokud
+    // má konkrétní preview deployment neveřejný dostatečně dlouhý token.
+    const prototypeToken = process.env.PROTOTYPE_BENCHMARK_TOKEN;
+    const prototypeBenchmark = process.env.VERCEL_ENV !== "production" &&
+      typeof prototypeToken === "string" && prototypeToken.length >= 24 &&
+      req.headers.get("x-prototype-benchmark-token") === prototypeToken;
+    const username = prototypeBenchmark
+      ? (process.env.NEXT_PUBLIC_ADMIN_USERNAME || "jan")
+      : verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
     if (!username) {
       return NextResponse.json({ error: "Pro vytvoření pohádky se prosím přihlaste." }, { status: 401 });
     }
-    {
+    if (!prototypeBenchmark) {
       const acc = await readAccount(username);
       if (!acc) {
         return NextResponse.json({ error: "Účet nenalezen." }, { status: 402 });
@@ -46,8 +56,10 @@ export async function POST(req: NextRequest) {
           );
         }
       }
-      body.username = username; // ← job-runner podle něj po dokončení odečte kredit
     }
+    // Benchmark nemá sahat na kredit žádného skutečného účtu; jobId a usage
+    // se přesto normálně zapíší pro měření provider nákladů.
+    if (!prototypeBenchmark) body.username = username;
     // 🛑 MĚSÍČNÍ SPEND-CAP POJISTKA (2026-08-09): appka narazila na Googlein
     // strop automatického navyšování zůstatku ("Dosáhli jste měsíčního
     // limitu…", GCP účet 01B33D-DEEC68-5E789A) — appka do teď neměla ŽÁDNOU
@@ -90,6 +102,14 @@ export async function POST(req: NextRequest) {
     const work = putJson(`jobs/${id}/request.json`, body)
       .catch(e => console.error(`[job ${id}] request.json write failed:`, e))
       .then(() => runJob(id, body));
+    // Preview benchmark musí držet HTTP invokaci otevřenou. Reálný test
+    // ukázal, že fire-and-forget waitUntil ve Preview skončil už po ~17 s
+    // uprostřed Claude streamu, i když maxDuration je 300 s. Produkce dál
+    // používá okamžitou odpověď a waitUntil beze změny.
+    if (prototypeBenchmark) {
+      await work;
+      return NextResponse.json({ jobId: id, benchmarkAwaited: true });
+    }
     try { waitUntil(work); } catch { /* local dev — the promise runs in-process */ }
     return NextResponse.json({ jobId: id });
   } catch (err) {

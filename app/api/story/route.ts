@@ -41,7 +41,13 @@ export async function POST(req: NextRequest) {
     // sledování spotřeby/kreditů jako job-runner.ts, takže se tu zatím jen
     // vynucuje přihlášení, ne odečet kreditů (ta cesta je dnes výjimečná,
     // ne hlavní tok — dořešit, pokud se z ní stane běžná fallback varianta).
-    const username = verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
+    const prototypeToken = process.env.PROTOTYPE_BENCHMARK_TOKEN;
+    const previewE2e = process.env.VERCEL_ENV !== "production" &&
+      typeof prototypeToken === "string" && prototypeToken.length >= 24 &&
+      req.headers.get("x-prototype-benchmark-token") === prototypeToken;
+    const username = previewE2e
+      ? (process.env.NEXT_PUBLIC_ADMIN_USERNAME || "jan")
+      : verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
     if (!username) {
       return NextResponse.json({ error: "Pro vytvoření pohádky se prosím přihlaste." }, { status: 401 });
     }
