@@ -29,6 +29,35 @@ export interface CanonPreflightRename {
   replacement: string;
 }
 
+function selectedLibraryIds(req: StoryRequest): Set<string> {
+  return new Set(req.characters.map(c => c.id));
+}
+
+function replaceReservedNames(
+  text: string,
+  req: StoryRequest,
+  extras: { customCharacters?: Array<{ name: string }> } = {}
+): { text: string; renames: CanonPreflightRename[] } {
+  const selectedIds = selectedLibraryIds(req);
+  const selectedCustomNames = (extras.customCharacters || []).map(c => c.name.toLocaleLowerCase("cs"));
+  const renames: CanonPreflightRename[] = [];
+
+  for (const [id, pattern] of Object.entries(RESERVED_LIBRARY_PATTERNS)) {
+    if (selectedIds.has(id) || selectedCustomNames.some(name => pattern.test(name))) continue;
+    if (!pattern.test(text)) continue;
+    const replacement = SAFE_REPLACEMENT_NAMES[id];
+    const globalPattern = new RegExp(pattern.source, `${pattern.flags.replace("g", "")}g`);
+    text = text.replace(globalPattern, match => {
+      const lower = match.toLocaleLowerCase("cs");
+      if (id === "jan" && lower.startsWith("táta ")) return `táta ${replacement}`;
+      if (id === "jana" && lower.startsWith("máma ")) return `máma ${replacement}`;
+      return replacement;
+    });
+    renames.push({ libraryId: id, replacement });
+  }
+  return { text, renames };
+}
+
 /**
  * Resolve a library-name conflict before any paid model call. A name written
  * in the outline does not implicitly select its library portrait: if its card
@@ -39,21 +68,43 @@ export function prepareStoryRequestCanon(
   req: StoryRequest,
   extras: { customCharacters?: Array<{ name: string }> } = {}
 ): { request: StoryRequest; renames: CanonPreflightRename[] } {
-  const selectedIds = new Set(req.characters.map(c => c.id));
-  const selectedCustomNames = (extras.customCharacters || []).map(c => c.name.toLocaleLowerCase("cs"));
-  const renames: CanonPreflightRename[] = [];
-  let topic = req.topic;
-
-  for (const [id, pattern] of Object.entries(RESERVED_LIBRARY_PATTERNS)) {
-    if (selectedIds.has(id) || selectedCustomNames.some(name => pattern.test(name))) continue;
-    if (!pattern.test(topic)) continue;
-    const replacement = SAFE_REPLACEMENT_NAMES[id];
-    const globalPattern = new RegExp(pattern.source, `${pattern.flags.replace("g", "")}g`);
-    topic = topic.replace(globalPattern, replacement);
-    renames.push({ libraryId: id, replacement });
-  }
-
+  const { text: topic, renames } = replaceReservedNames(req.topic, req, extras);
   return { request: topic === req.topic ? req : { ...req, topic }, renames };
+}
+
+/**
+ * Final safety net for names invented by the model itself. Unlike validation,
+ * this preserves the completed story and changes only the forbidden identity
+ * label, so a 12-scene response is never discarded for a deterministic rename.
+ */
+export function repairStoryCanonNames(
+  script: StoryScript,
+  req: StoryRequest,
+  extras: { customCharacters?: Array<{ name: string }> } = {}
+): CanonPreflightRename[] {
+  const mappings = new Map<string, CanonPreflightRename>();
+  const repair = (value: string | undefined): string | undefined => {
+    if (!value) return value;
+    const result = replaceReservedNames(value, req, extras);
+    result.renames.forEach(rename => mappings.set(rename.libraryId, rename));
+    return result.text;
+  };
+
+  script.title = repair(script.title) || script.title;
+  script.heroDescription = repair(script.heroDescription) || script.heroDescription;
+  script.worldNotes = repair(script.worldNotes);
+  const scenes = script.choice ? [...script.scenes, ...script.choice.altScenes] : script.scenes;
+  for (const scene of scenes) {
+    scene.narration = repair(scene.narration) || scene.narration;
+    scene.imagePrompt = repair(scene.imagePrompt) || scene.imagePrompt;
+  }
+  if (script.choice) {
+    script.choice.options = [
+      repair(script.choice.options[0]) || script.choice.options[0],
+      repair(script.choice.options[1]) || script.choice.options[1],
+    ];
+  }
+  return [...mappings.values()];
 }
 
 export class StoryCanonError extends Error {

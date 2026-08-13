@@ -77,6 +77,8 @@ export interface JobStatus {
   writeTokens?: { input: number; output: number; cacheCreation: number; cacheRead: number };
   /** Preflight konflikty knihovních jmen vyřešené před prvním placeným voláním. */
   canonPreflight?: { renamed: number; mappings: string[] };
+  /** Stejná ochrana aplikovaná na jména, která si model sám vymyslel ve výstupu. */
+  canonPostflight?: { renamed: number; mappings: string[] };
   /** Délka rozepsaného textu při minulém běhu — restart s delším partial = zdravé navázání */
   partialLen?: number;
   /** Restarty psaní BEZ pokroku v partial.json — jen ty znamenají zaseknutí */
@@ -179,6 +181,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
           stuckRestarts: prev?.stuckRestarts,
           writeTokens: prev?.writeTokens,
           canonPreflight: prev?.canonPreflight,
+          canonPostflight: prev?.canonPostflight,
           imgSpent: prev?.imgSpent,
           spent1k: prev?.spent1k,
           spent4k: prev?.spent4k,
@@ -196,7 +199,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       total: st.total, done: st.done,
       createdAt: st.createdAt, updatedAt: st.updatedAt, finishedAt: st.finishedAt, wroteAt: st.wroteAt,
       chains: st.chains, restarts: st.restarts, stuckRestarts: st.stuckRestarts,
-      canonPreflight: st.canonPreflight, writeTokens: st.writeTokens,
+      canonPreflight: st.canonPreflight, canonPostflight: st.canonPostflight, writeTokens: st.writeTokens,
       spent1k: st.spent1k, spent4k: st.spent4k, imgSpent: st.imgSpent,
       log: st.log,
     };
@@ -597,6 +600,9 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
             cacheCreation: prevCacheC + usage.cacheCreationTokens,
             cacheRead: prevCacheR + usage.cacheReadTokens,
           };
+        }, renames => {
+          const mappings = renames.map(r => `${r.libraryId}→${r.replacement}`);
+          st.canonPostflight = { renamed: mappings.length, mappings };
         });
       } finally {
         clearTimeout(writingKick);

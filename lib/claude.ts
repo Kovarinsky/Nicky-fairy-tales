@@ -1,6 +1,6 @@
 import type { StoryRequest, StoryScript, Character, Scene, Soundscape, SoundCue } from "./types";
 import { loadCharacters } from "./characters";
-import { prepareStoryRequestCanon, StoryCanonError, validateStoryCanon } from "./story-canon";
+import { prepareStoryRequestCanon, repairStoryCanonNames, StoryCanonError, validateStoryCanon, type CanonPreflightRename } from "./story-canon";
 import musicManifest from "../public/music-lib/manifest.json";
 
 // Runtime allow-list generated from the files that are actually shipped. This
@@ -1172,7 +1172,8 @@ export async function generateStory(
   onLog?: (msg: string) => void,
   // 🩺 2026-08-06: reálná cena psaní místo paušálu — job-runner sečte
   // vstupní/výstupní tokeny napříč pokusy (resume/redraw = víc volání)
-  onUsage?: (usage: { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number }) => void
+  onUsage?: (usage: { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number }) => void,
+  onCanonRepair?: (renames: CanonPreflightRename[]) => void
 ): Promise<StoryScript> {
   // Resolve reserved library names before composing the prompt. Doing this
   // here protects every caller (/job and the direct /story API), not only UI.
@@ -1252,6 +1253,14 @@ export async function generateStory(
     const raw = prefix ? mergeContinuation(prefix, continuation) : continuation;
     try {
       const script = parseScript(raw);
+      // Model can invent a forbidden name even when the prompt explicitly
+      // prohibits it. Repair the completed JSON in-place instead of discarding
+      // minutes of valid story and paying for a full rewrite.
+      const canonRepairs = repairStoryCanonNames(script, req, extras);
+      if (canonRepairs.length) {
+        onCanonRepair?.(canonRepairs);
+        onLog?.(`🛡️ canon postflight: hotový scénář zachován, nevybraná jména přejmenována (${canonRepairs.map(r => `${r.libraryId}→${r.replacement}`).join(", ")})`);
+      }
       // PRAVIDLO KONZISTENCE #1: vzhled známých postav je KANONICKÝ — vždy
       // doslova z reference/characters.json, ať Claude napsal cokoliv.
       // (Řeší „jednou blond, podruhé hnědé vlasy" mezi pohádkami.)

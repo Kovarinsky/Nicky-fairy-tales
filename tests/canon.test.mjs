@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { prepareStoryRequestCanon, StoryCanonError, validateStoryCanon } from "../lib/story-canon.ts";
+import { prepareStoryRequestCanon, repairStoryCanonNames, StoryCanonError, validateStoryCanon } from "../lib/story-canon.ts";
 
 const cues = [
   { effect: "bell_ring", at: 0.2 },
@@ -51,6 +51,18 @@ test("reserved-name validator exposes a non-retryable analytics code", () => {
     () => validateStoryCanon(script("Přiběhl James."), req),
     error => error instanceof StoryCanonError && error.code === "RESERVED_LIBRARY_NAME",
   );
+});
+
+test("model-invented reserved names are repaired without discarding the story", () => {
+  const completed = script("Táta Jan zavolal na děti a Jan jim zamával.");
+  completed.imagePrompt = undefined;
+  completed.scenes[0].imagePrompt = "Dad Jan waves from the cable car.";
+  const repairs = repairStoryCanonNames(completed, req);
+  assert.deepEqual(repairs, [{ libraryId: "jan", replacement: "Martin" }]);
+  assert.match(completed.scenes[0].narration, /táta Martin/iu);
+  assert.doesNotMatch(completed.scenes[0].narration, /\bJan\b/iu);
+  assert.match(completed.scenes[0].imagePrompt, /Martin/);
+  assert.doesNotThrow(() => validateStoryCanon(completed, req));
 });
 
 test("every new scene requires two distinct separated sound cues", () => {
