@@ -342,11 +342,21 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     logEv(`♻️ předávám štafetu další funkci (řetěz ${st.chains}, běh ${secsSince(runStartedAt)}s)`);
     await write();
     try {
+      // Preview E2E continuation must keep its HTTP function alive; ordinary
+      // Preview waitUntil was observed to stop before the last missing scene.
+      // Only image-phase handoffs use this token/longer wait — a writing kick
+      // near the 300s function ceiling must still return immediately.
+      const previewContinuationToken = process.env.VERCEL_ENV !== "production" && st.scenesScript?.length
+        ? process.env.PROTOTYPE_BENCHMARK_TOKEN
+        : undefined;
       await fetch(`https://${host}/api/job/continue`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(previewContinuationToken ? { "x-prototype-benchmark-token": previewContinuationToken } : {}),
+        },
         body: JSON.stringify({ id, force: true }),
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(previewContinuationToken ? 45_000 : 10_000),
       });
     } catch (e) {
       console.warn(`[job ${id}] self-continue failed:`, e instanceof Error ? e.message : e);
