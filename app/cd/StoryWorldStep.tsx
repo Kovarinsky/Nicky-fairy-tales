@@ -28,6 +28,7 @@ export default function StoryWorldStep({
   childAgeNumber,
   onBack,
   onContinue,
+  mobilePreview = false,
 }: {
   backgroundImage?: string;
   readyWorlds: WorldTile[];
@@ -42,12 +43,13 @@ export default function StoryWorldStep({
   childAgeNumber?: number;
   onBack?: () => void;
   onContinue?: () => void;
+  mobilePreview?: boolean;
 }) {
   const [ageFilterOn, setAgeFilterOn] = useState(childAgeNumber != null);
   const ageOk = (w: WorldTile) => !ageFilterOn || childAgeNumber == null || w.minAge == null || ((w.minAge ?? 0) <= childAgeNumber && childAgeNumber <= (w.maxAge ?? 99));
   const visibleReady = readyWorlds.filter(ageOk);
   return (
-    <main className={styles.screen}>
+    <main className={`${styles.screen} ${mobilePreview ? styles.mobilePreview : ""}`}>
       <div className={styles.bgLayer} style={{ backgroundImage: `url(${backgroundImage})` }} />
       <div className={styles.scrim} aria-hidden />
 

@@ -8,6 +8,9 @@
   font-family: "Nunito", system-ui, sans-serif;
   user-select: none;
 }
+.mobilePreview {
+  width: 100%;
+}
 .bgLayer {
   position: absolute;
   inset: 0;
@@ -255,11 +258,13 @@
 /* The handoff is designed mobile-first, but on desktop the tiles are deliberately
    larger and the content breathes instead of looking like a scaled phone UI. */
 @media (min-width: 700px) {
-  .header {
+  .screen:not(.mobilePreview) {
+  }
+  .screen:not(.mobilePreview) .header {
     padding-top: clamp(58px, 5.5vh, 96px);
   }
 
-  .backBtn {
+  .screen:not(.mobilePreview) .backBtn {
     left: clamp(20px, 2.4vw, 48px);
     top: clamp(52px, 5vh, 86px);
     width: 46px;
@@ -267,57 +272,57 @@
     font-size: 24px;
   }
 
-  .title {
+  .screen:not(.mobilePreview) .title {
     font-size: clamp(30px, 2.4vw, 46px);
   }
 
-  .stepLabel {
+  .screen:not(.mobilePreview) .stepLabel {
     font-size: clamp(12px, 0.9vw, 16px);
   }
 
-  .scroll {
+  .screen:not(.mobilePreview) .scroll {
     top: clamp(132px, 15vh, 190px);
     bottom: clamp(104px, 14vh, 170px);
   }
 
-  .cardLabel {
+  .screen:not(.mobilePreview) .cardLabel {
     font-size: clamp(11px, 0.8vw, 15px);
   }
 
-  .roller {
+  .screen:not(.mobilePreview) .roller {
     gap: clamp(10px, 0.9vw, 18px);
   }
 
-  .tile,
-  .tileActive,
-  .tileAll,
-  .tileDashed {
+  .screen:not(.mobilePreview) .tile,
+  .screen:not(.mobilePreview) .tileActive,
+  .screen:not(.mobilePreview) .tileAll,
+  .screen:not(.mobilePreview) .tileDashed {
     width: clamp(104px, 7vw, 150px);
     min-height: clamp(116px, 10vw, 176px);
     border-radius: clamp(16px, 1.2vw, 24px);
   }
 
-  .tileLabel {
+  .screen:not(.mobilePreview) .tileLabel {
     font-size: clamp(11px, 0.9vw, 17px);
   }
 
-  .pillOn,
-  .pillOff {
+  .screen:not(.mobilePreview) .pillOn,
+  .screen:not(.mobilePreview) .pillOff {
     height: clamp(52px, 4vw, 72px);
     font-size: clamp(14px, 1.1vw, 20px);
   }
 
-  .hint {
+  .screen:not(.mobilePreview) .hint {
     font-size: clamp(11px, 0.8vw, 15px);
   }
 
-  .footer {
+  .screen:not(.mobilePreview) .footer {
     padding-left: clamp(16px, 2.4vw, 48px);
     padding-right: clamp(16px, 2.4vw, 48px);
     padding-bottom: clamp(26px, 3vh, 48px);
   }
 
-  .cta {
+  .screen:not(.mobilePreview) .cta {
     height: clamp(62px, 6vh, 82px);
     font-size: clamp(20px, 1.5vw, 30px);
   }

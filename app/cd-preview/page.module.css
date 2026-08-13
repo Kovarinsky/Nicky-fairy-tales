@@ -1,0 +1,17 @@
+.previewViewport {
+  width: min(100vw, 430px);
+  height: 100dvh;
+  margin: 0 auto;
+  overflow: hidden;
+  position: relative;
+  background: #241447;
+  isolation: isolate;
+}
+
+@media (min-width: 700px) {
+  .previewViewport {
+    border-left: 1px solid rgba(253, 224, 138, 0.22);
+    border-right: 1px solid rgba(253, 224, 138, 0.22);
+    box-shadow: 0 0 70px rgba(8, 3, 20, 0.7);
+  }
+}
