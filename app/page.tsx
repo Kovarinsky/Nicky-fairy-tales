@@ -44,6 +44,8 @@ interface HistoryEntry {
   /** 🖼️ Malý náhled (skutečná scéna 1 TÉTO pohádky, ne obecná ikonka) —
    *  zmenšeno na pár KB, ať historie zbytečně nenafoukne localStorage. */
   coverUrl?: string;
+  /** Lazy bonus — URL je content-hash cache, takže přežije zařízení/sync. */
+  songUrl?: string;
 }
 
 /** Zmenší obrázek scény na malý čtvercový náhled pro historii (canvas,
@@ -417,6 +419,15 @@ export default function Home() {
     try { localStorage.setItem("nicky-subtitles-on", subtitlesOn ? "1" : "0"); } catch {}
   }, [subtitlesOn]);
   const [showCredits, setShowCredits] = useState(false);
+  const [storySongUrl, setStorySongUrl] = useState<string | null>(null);
+  const [storySongLoading, setStorySongLoading] = useState(false);
+  const [storySongError, setStorySongError] = useState<string | null>(null);
+  const storySongAudioRef = useRef<HTMLAudioElement | null>(null);
+  const closeCredits = useCallback(() => {
+    storySongAudioRef.current?.pause();
+    ambientRef.current?.setVolume(musicOn ? 0.22 : 0);
+    setShowCredits(false);
+  }, [musicOn]);
   const goodnightCacheRef = useRef<{ key: string; url: string } | null>(null);
   const goodnightAudioRef = useRef<HTMLAudioElement | null>(null);
   // 🌙 Závěrečný obrázek titulky NA MÍRU obsazení TÉTO pohádky (lib/portraits.ts
@@ -1302,7 +1313,7 @@ export default function Home() {
             const key = `${page}:${cueIndex}`;
             if (progress >= cue.at && !sfxFiredRef.current.has(key)) {
               sfxFiredRef.current.add(key);
-              ambientRef.current?.playEffect(cue.effect, cue.voice);
+              ambientRef.current?.playEffectUrl(cue.audioUrl, cue.effect, cue.voice);
             }
           });
         }
@@ -3011,6 +3022,8 @@ export default function Home() {
     readerEntryIdRef.current = job.jobId;
     // 🔀 Dva konce: meta výběru z uložené historie + kontext pro línou větev B
     const hEntry = loadHistory().find(e => e.id === job.jobId);
+    setStorySongUrl(hEntry?.songUrl || null);
+    setStorySongError(null);
     readerHeroRef.current = hEntry?.heroDescription || "";
     readerCharIdsRef.current = hEntry?.selectedIds || selectedIds;
     setStoryChoice(hEntry?.choice ?? null);
@@ -3699,6 +3712,28 @@ export default function Home() {
   function openTopicEditor(value = topic) {
     topicBeforeEditRef.current = value;
     setTopicEditorOpen(true);
+  }
+
+  async function createOrPlayStorySong(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (storySongUrl) {
+      const el = storySongAudioRef.current;
+      if (!el) return;
+      if (el.paused) { ambientRef.current?.setVolume(0.06); await el.play().catch(() => {}); }
+      else { el.pause(); ambientRef.current?.setVolume(musicOn ? 0.22 : 0); }
+      return;
+    }
+    setStorySongLoading(true); setStorySongError(null);
+    try {
+      const res = await fetch("/api/story-song", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, language: uiLang, scenes: scenes.map(s => ({ narration: s.narration })) }) });
+      const data = await safeJson<{ audioUrl?: string; error?: string }>(res);
+      if (!res.ok || !data.audioUrl) throw new Error(data.error || "Písničku se nepodařilo vytvořit.");
+      setStorySongUrl(data.audioUrl);
+      const id = readerEntryIdRef.current;
+      if (id) { patchHistoryEntry(id, { songUrl: data.audioUrl }); setStoryHistory(loadHistory()); }
+      setTimeout(() => { ambientRef.current?.setVolume(0.06); storySongAudioRef.current?.play().catch(() => {}); }, 80);
+    } catch (err) { setStorySongError(err instanceof Error ? err.message : "Písničku se nepodařilo vytvořit."); }
+    finally { setStorySongLoading(false); }
   }
   function handleTopicInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const value = e.target.value;
@@ -4413,6 +4448,8 @@ export default function Home() {
       introFiredRef.current = false;
       setTitle(entry.title);
       readerEntryIdRef.current = entry.id;
+      setStorySongUrl(entry.songUrl || null);
+      setStorySongError(null);
       readerHeroRef.current = entry.heroDescription || "";
       readerCharIdsRef.current = entry.selectedIds || selectedIds;
       setStoryChoice(entry.choice ?? null);
@@ -6282,7 +6319,7 @@ export default function Home() {
       )}
 
       {showCredits && (
-        <div className="credits-overlay" onClick={() => setShowCredits(false)}>
+        <div className="credits-overlay" onClick={closeCredits}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={goodnightImgUrl || "/bg-credits.png"} alt="" aria-hidden="true" className="credits-bg-img"
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
@@ -6302,6 +6339,13 @@ export default function Home() {
               <p className="credits-item">© {new Date().getFullYear()}</p>
 
               <p className="credits-goodnight">🌙 {goodnightText(goodnightLang())} 🌙</p>
+
+              <button type="button" className="credits-song-btn" disabled={storySongLoading} onClick={createOrPlayStorySong}>
+                {storySongLoading ? (uiLang === "en" ? "🎼 Creating song…" : "🎼 Tvořím písničku…") : storySongUrl ? (uiLang === "en" ? "🎵 Play / pause song" : "🎵 Přehrát / pozastavit písničku") : (uiLang === "en" ? "✨ Create a story song" : "✨ Vytvořit písničku z pohádky")}
+              </button>
+              {!storySongUrl && <p className="credits-song-hint">{uiLang === "en" ? "Optional ElevenLabs bonus — generated only after this tap." : "Volitelný ElevenLabs bonus — vytvoří se až po tomto klepnutí."}</p>}
+              {storySongError && <p className="credits-song-error">{storySongError}</p>}
+              {storySongUrl && <audio ref={storySongAudioRef} src={storySongUrl} onEnded={() => ambientRef.current?.setVolume(musicOn ? 0.22 : 0)} />}
 
               <p className="credits-tap">— klikni pro zavření —</p>
             </div>

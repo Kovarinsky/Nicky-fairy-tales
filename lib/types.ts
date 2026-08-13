@@ -90,6 +90,11 @@ export interface SoundCue {
   at: number;
   /** Pohlaví hlasu pouze pro GENDERED_SFX. */
   voice?: "m" | "f";
+  /** Volitelný unikátní zvuk navržený scenáristou. Knihovní `effect` zůstává
+   * vždy fallbackem; job materializuje URL maximálně u dvou cue na příběh. */
+  customPrompt?: string;
+  customDurationSec?: number;
+  audioUrl?: string;
 }
 
 /** Jedna scéna = jedna stránka knížky */

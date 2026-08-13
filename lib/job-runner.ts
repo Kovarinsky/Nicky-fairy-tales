@@ -15,6 +15,7 @@ import { blobToken } from "@/lib/blob-token";
 import { chargeForCompletedStory } from "@/lib/accounts";
 import { estimateStoryCostCredits, actualStoryCostCredits } from "@/lib/pricing";
 import { prepareStoryRequestCanon } from "@/lib/story-canon";
+import { materializeStorySounds } from "@/lib/elevenlabs-creative";
 
 // 💳 Kreditní systém: "1 kredit = 1 Kč skutečných nákladů appky + 50% marže"
 // (viz lib/pricing.ts pro sazby a odůvodnění) — nahrazuje starý plochý model
@@ -655,6 +656,10 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     }
 
     const scenesScript = st.scenesScript!;
+    // 🔊 Běží souběžně s obrázky; resume je idempotentní díky globální cache.
+    // Výsledek se čeká až před finálním stavem done, aby URL zůstaly ve scénáři.
+    const customSoundsPromise = materializeStorySounds(scenesScript, 2)
+      .catch(() => ({ generated: 0, cachedOrGenerated: 0 }));
     const heroDescription = st.heroDescription || "";
     // 🔀 Líná větev B: obrázky druhého konce se NEKRESLÍ při generování —
     // vzniknou až když na něj čtenář na rozcestí opravdu sáhne (klient si je
@@ -1135,6 +1140,8 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       return;
     }
 
+    const soundResult = await customSoundsPromise;
+    if (soundResult.cachedOrGenerated > 0) logEv(`🔊 zakázkové SFX ${soundResult.generated}/${soundResult.cachedOrGenerated} (zbytek knihovní fallback)`);
     st.phase = "done";
     st.finishedAt = Date.now(); // ⏱ pohádka kompletní
     logEv(`✅ HOTOVO — celkem ${Math.round((st.finishedAt - st.createdAt) / 1000)}s od zadání (psaní ${st.wroteAt ? Math.round((st.wroteAt - st.createdAt) / 1000) : "?"}s, řetězů ${st.chains ?? 0})`);

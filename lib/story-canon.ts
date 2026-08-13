@@ -202,6 +202,13 @@ export function validateStoryCanon(
   const selectedCustomNames = (extras.customCharacters || []).map(c => c.name.toLocaleLowerCase("cs"));
   const narration = allScenes.map(s => s.narration).join("\n");
 
+  const customCues = allScenes.flatMap(s => s.sfxCues || []).filter(c => !!c.customPrompt);
+  if (customCues.length > 2) {
+    // Nezahazuj drahý scénář: přebytečné návrhy se deterministicky vrátí na
+    // své povinné knihovní fallbacky.
+    customCues.slice(2).forEach(c => { delete c.customPrompt; delete c.customDurationSec; delete c.audioUrl; });
+  }
+
   for (const [id, pattern] of Object.entries(RESERVED_LIBRARY_PATTERNS)) {
     if (selectedIds.has(id)) continue;
     if (selectedCustomNames.some(n => pattern.test(n))) continue;

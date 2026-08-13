@@ -101,6 +101,22 @@ test("every new scene requires two distinct separated sound cues", () => {
   );
 });
 
+test("at most two custom hero sounds survive canon postflight", () => {
+  const completed = {
+    title: "Zvuky", heroDescription: "",
+    scenes: [1, 2].map(index => ({
+      index, narration: `Scéna ${index}.`, imagePrompt: "Visible sounds.", soundscape: "magic",
+      sfxCues: [
+        { effect: "bell_ring", at: 0.2, customPrompt: `unique sound ${index}a` },
+        { effect: "giggle", at: 0.7, customPrompt: `unique sound ${index}b` },
+      ],
+    })),
+  };
+  validateStoryCanon(completed, { ...req, sceneCount: 2 });
+  assert.equal(completed.scenes.flatMap(s => s.sfxCues).filter(c => c.customPrompt).length, 2);
+  assert.equal(completed.scenes[1].sfxCues[0].effect, "bell_ring");
+});
+
 test("critical visual identity drift is never deadline-tolerable", () => {
   assert.equal(hasHardCanonFailure({
     ok: false, action: "REDRAW", problems: "wrong hair and age", badRules: 2,

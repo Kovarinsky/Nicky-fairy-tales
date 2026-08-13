@@ -4043,6 +4043,15 @@ textarea.ta-accent:focus {
   text-shadow: 0 2px 14px rgba(255, 224, 130, 0.35);
 }
 
+.credits-song-btn {
+  margin-top: 1rem; border: 1px solid rgba(245,158,11,.75); border-radius: 999px;
+  padding: .72rem 1.15rem; color: #fff7d6; background: rgba(63,31,92,.82);
+  font: inherit; font-weight: 800; cursor: pointer; backdrop-filter: blur(8px);
+}
+.credits-song-btn:disabled { opacity: .65; cursor: wait; }
+.credits-song-error { max-width: 28rem; color: #fecaca; font-size: .82rem; text-align: center; }
+.credits-song-hint { max-width: 24rem; color: rgba(255,255,255,.55); font-size: .72rem; text-align: center; }
+
 
 /* ── Mobile-only overrides (edge-to-edge, smaller fonts) ── */
 @media (max-width: 600px) {

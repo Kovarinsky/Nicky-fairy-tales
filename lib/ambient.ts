@@ -1072,6 +1072,20 @@ export class AmbientPlayer {
     });
   }
 
+  /** Zakázkový ElevenLabs efekt; při síťové/dekódovací chybě okamžitě
+   * použije stabilní knihovní variantu. */
+  playEffectUrl(url: string | undefined, fallback: SoundEffect | undefined, voice?: "m" | "f"): void {
+    if (!url) { this.playEffect(fallback, voice); return; }
+    const { ctx } = this.setup();
+    const dest = this.effectGain;
+    if (!dest) { this.playEffect(fallback, voice); return; }
+    fetch(url).then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.arrayBuffer();
+    }).then(b => ctx.decodeAudioData(b)).then(buf => this.playOneShot(ctx, buf, dest))
+      .catch(() => this.playEffect(fallback, voice));
+  }
+
   private playEffectSynth(effect: SoundEffect | undefined): void {
     if (!effect || !this.running) return;
     const { ctx } = this.setup();
