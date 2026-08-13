@@ -1087,7 +1087,17 @@ export async function generateSceneSheet(
   // ⚡ Volitelný callback: zavolá se, JAKMILE je hotový KAŽDÝ jednotlivý panel
   // (po vlastní editaci/QA), místo čekání na celý arch — volající tak může
   // uložit a zobrazit scénu hned, ne až po nejpomalejším panelu z 6-9.
-  onPanelReady?: (i: number, result: ImageResult | null) => void | Promise<void>
+  onPanelReady?: (i: number, result: ImageResult | null) => void | Promise<void>,
+  options: {
+    /** Epoch ms. Po deadline se už nespouští placená oprava panelu. */
+    deadline?: number;
+    /** Stejná politika jako solo scény: MODERATE u 1–2 lidí přijmout. */
+    lenientSimplePanels?: boolean;
+    /** Kolikrát nejvýš znovu vyrábět celý 4K arch kvůli rozbité mřížce. */
+    maxGridAttempts?: number;
+    /** Sdílený budget placených panelových editací na celý arch. */
+    maxPanelEdits?: number;
+  } = {}
 ): Promise<{ results: Array<ImageResult | null>; report: string }> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Chybí GEMINI_API_KEY.");
@@ -1133,7 +1143,8 @@ export async function generateSceneSheet(
   // mřížce) a vadné panely jdou rovnou sólo cestou — celoarchová QA
   // překreslení se nevešla do 5min limitu funkce a job se točil dokola.
   let slices: ImageResult[] | null = null;
-  for (let attempt = 1; attempt <= 2 && !slices; attempt++) {
+  const maxGridAttempts = Math.max(1, Math.min(2, options.maxGridAttempts ?? 2));
+  for (let attempt = 1; attempt <= maxGridAttempts && !slices; attempt++) {
     let sheet: ImageResult;
     try {
       sheet = await callGeminiImage(
@@ -1165,7 +1176,7 @@ export async function generateSceneSheet(
   for (let i = 0; i < n; i += 4) {
     const chunk = await Promise.all(
       Array.from({ length: Math.min(4, n - i) }, (_, j) =>
-        verifySceneImage(apiKey, slices![i + j], heroDescription, scenes[i + j].imagePrompt, refImages)
+        verifySceneImage(apiKey, slices![i + j], heroDescription, scenes[i + j].imagePrompt, refImages, options.deadline)
       )
     );
     chunk.forEach((v, j) => { verdicts[i + j] = v; });
@@ -1182,16 +1193,28 @@ export async function generateSceneSheet(
   // editSceneImage+verifySceneImage najednou umí vyčerpat rate-limit
   // kontrolního modelu úplně stejně jako kdysi 9 souběžných verify (0/6
   // panelů prošlo, log plný „QA verdict missing JSON").
+  let panelEditsClaimed = 0;
   const doPanel = async (i: number) => {
     const v = verdicts[i];
     let result: ImageResult | null = null;
+    const sceneCastCount = (sceneCastList(scenes[i].imagePrompt) || "").split(",").map(s => s.trim()).filter(Boolean).length;
+    const lenientModerate = !!v && !v.ok && options.lenientSimplePanels === true &&
+      sceneCastCount > 0 && sceneCastCount <= 2 && !v.findings.some(f => f.severity === "MAJOR");
+    if (lenientModerate) {
+      console.log(`[Gemini sheet] panel ${i + 1}: jen MODERATE nález na ${sceneCastCount}-osobové scéně → přijato bez placené opravy (${v.problems})`);
+      result = await compressImage(slices![i]);
+    }
     // 🖌️ Panel s drobnou vadou se NEZAHAZUJE do sóla (to je nejdražší cesta —
     // arch je flat-price, sólo stojí plnou cenu za každou scénu): zkusí se
     // cílená editace přímo na výřezu. Sólo zůstává jen pro skutečné rozbití.
-    if (v && !v.ok && v.action === "EDIT" && v.fixInstruction) {
+    const editBudget = Math.max(0, options.maxPanelEdits ?? Number.POSITIVE_INFINITY);
+    const mayEdit = !result && v && !v.ok && v.action === "EDIT" && !!v.fixInstruction &&
+      !(options.deadline !== undefined && Date.now() > options.deadline) && panelEditsClaimed < editBudget;
+    if (mayEdit) {
+      panelEditsClaimed += 1;
       try {
-        const fixed = await editSceneImage(apiKey, model, slices![i], v.fixInstruction, refImages, null);
-        const v2 = await verifySceneImage(apiKey, fixed, heroDescription, scenes[i].imagePrompt, refImages);
+        const fixed = await editSceneImage(apiKey, model, slices![i], v!.fixInstruction, refImages, null);
+        const v2 = await verifySceneImage(apiKey, fixed, heroDescription, scenes[i].imagePrompt, refImages, options.deadline);
         if (v2 && v2.ok) {
           console.log(`[Gemini sheet] panel ${i + 1}: drobná vada doeditována ✓`);
           result = await compressImage(fixed);

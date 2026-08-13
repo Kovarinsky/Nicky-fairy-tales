@@ -844,6 +844,10 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     // vrať SHEET_SKIP_CAST_SIZE zpátky na 4.
     const SHEET_SKIP_CAST_SIZE = 7;
     const sheetMode = (process.env.IMAGE_SHEET_MODE || "3x3").toLowerCase();
+    // 🧪 Prototyp 2026-08-13: první/hero scéna zůstává samostatná kotva a až
+    // devět zbývajících scén se pokusí vyrobit v JEDINÉM 4K storyboardu.
+    // Feature flag je defaultně vypnutý; produkční pipeline se beze změny.
+    const oneSheetStory = /^(1|true|on)$/i.test(process.env.ONE_SHEET_STORY || "");
     if (st.sheetGaveUp) logEv("🗂️ archová fáze už dřív vzdala (žádný nový panel) → rovnou sólo");
     else if (castSize >= SHEET_SKIP_CAST_SIZE) logEv(`🧪 ${castSize} postav v pohádce (≥${SHEET_SKIP_CAST_SIZE}) — archy přeskočeny, rovnou sólo (viz test 2026-08-05, prah zvednut 2026-08-11)`);
     else if (castSize >= 3) logEv(`🧪 ${castSize} postav v pohádce — mezistupeň: archy 2×2, max 2 lidi/panel (přísnější než obvykle, rozšířeno z castSize=3 na 3-${SHEET_SKIP_CAST_SIZE - 1} dne 2026-08-11)`);
@@ -855,13 +859,14 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     // místo rovnou padnout na dražší sólo. Dřív jen castSize===3.
     const castMidTier = castSize >= 3 && castSize < SHEET_SKIP_CAST_SIZE;
     if (sheetMode !== "off" && !quotaExhausted && !st.sheetGaveUp && castSize < SHEET_SKIP_CAST_SIZE && st.sceneUrls![0]) {
-      const maxCells = castMidTier ? 4 : sheetMode === "2x2" ? 4 : 9;
+      const maxCells = oneSheetStory ? 9 : castMidTier ? 4 : sheetMode === "2x2" ? 4 : 9;
       // ⚡ Archy jedné vlny běží PARALELNĚ (15 stránek = archy 9+5 najednou —
       // 4K arch generuje ~stejně dlouho jako jedna 1K scéna, sériově to byla
       // zbytečná minuta navíc). Max 2 vlny; vlna bez jediného nového panelu
       // ukončuje archovou fázi (pojistka proti smyčce archů).
       let prevRoundReports = ""; // výtky z 1. vlny → 2. vlna kreslí s korekcí
-      for (let round = 1; round <= 2 && !quotaExhausted && !timeUp() && !budgetBlown() && !overallTimeUp(); round++) {
+      const maxSheetRounds = oneSheetStory ? 1 : 2;
+      for (let round = 1; round <= maxSheetRounds && !quotaExhausted && !timeUp() && !budgetBlown() && !overallTimeUp(); round++) {
         const pend = [...Array(total).keys()].filter(i => !st.sceneUrls![i]);
         if (pend.length < 2) break;
         // 🎯 Scény se STEJNÝM obsazením seskupit do stejného archu — čím míň
@@ -879,19 +884,21 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
         // různých osob (per-panel popisky referencí `refsForPanels` umí i
         // míchané obsazení). Obojí jde stáhnout envem, kdyby kvalita klesla.
         const maxPanelPeople = castMidTier ? 2 : Number(process.env.IMAGE_SHEET_MAX_PANEL_PEOPLE || 3);
-        const maxSheetPeople = Number(process.env.IMAGE_SHEET_MAX_PEOPLE || 4);
+        const maxSheetPeople = Number(process.env.IMAGE_SHEET_MAX_PEOPLE || (oneSheetStory ? 7 : 4));
         // ⚡ Skutečný počet panelů v JEDNOM archu — dřív šel až na maxCells (9 v
         // 3×3 mřížce). Čím víc panelů v jednom volání, tím víc verifikačních
         // dávek (po 4) a tím déle trvá, než je hotový byť POSLEDNÍ panel toho
         // archu (nahlášeno: „obrázky se načítají dlouho potom co se pohádka
         // načte"). 6 defaultně = max 2 verifikační dávky místo 3, arch pořád
         // stojí stejnou paušální cenu (prázdné buňky = jen klidná scenérie).
-        const maxGroupPanels = Math.min(maxCells, Number(process.env.IMAGE_SHEET_MAX_REAL_PANELS || 6));
+        const maxGroupPanels = Math.min(maxCells, Number(process.env.IMAGE_SHEET_MAX_REAL_PANELS || (oneSheetStory ? 9 : 6)));
         // Řadit podle obsazení, při shodě podle indexu scény — sousední scény
         // se tak drží pohromadě, což bývá i stejné prostředí (jeden arch =
         // jedno místo = model drží kulisu konzistentně sám od sebe)
         const pendGrouped = pend.filter(i => castPeople(castKey(i)) <= maxPanelPeople)
-          .sort((a, b) => castKey(a).localeCompare(castKey(b)) || a - b);
+          // One-sheet storyboard drží děj chronologicky. Běžný režim dál
+          // seskupuje podle castu, jak byl odladěný v produkci.
+          .sort((a, b) => oneSheetStory ? a - b : castKey(a).localeCompare(castKey(b)) || a - b);
         const groups: number[][] = [];
         let cur: number[] = [];
         let curPeople = new Set<string>();
@@ -947,7 +954,13 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
                 st.sceneUrls![i] = url;
                 st.done = Object.keys(st.sceneUrls!).length;
                 await write();
-              }
+              },
+              oneSheetStory ? {
+                deadline: sceneDeadline(),
+                lenientSimplePanels: true,
+                maxGridAttempts: 1,
+                maxPanelEdits: 1,
+              } : { deadline: sceneDeadline() }
             );
             if (report) roundReports.push(report);
             const passed = results.filter(Boolean).length;
@@ -1009,7 +1022,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       st.error = `Ochrana rozpočtu: pohádka už vygenerovala ${st.imgSpent} obrázků (limit ${IMG_BUDGET} pro ${total} stránek, hotovo ${Object.keys(st.sceneUrls!).length}/${total}) — zrušte ji ✕ a zadejte znovu, případně s méně stránkami.`;
       logEv(`⛔ STOP: rozpočet obrázků vyčerpán (${st.imgSpent}/${IMG_BUDGET})`);
       await write();
-      await writeUsageRecord(totalImages1k(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true);
+      await writeUsageRecord(totalImages1k(), 0, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true);
       return;
     }
 
@@ -1040,7 +1053,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       // "samo se to ráno spraví", i když šlo o placení, ne o čas.
       logEv(`⛔ STOP: ${spendCapped ? "měsíční rozpočtový strop" : creditsDepleted ? "vyčerpaný kredit" : "denní kvóta"} Gemini vyčerpaná (${Object.keys(st.sceneUrls!).length}/${total})`);
       await write();
-      await writeUsageRecord(totalImages1k(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true);
+      await writeUsageRecord(totalImages1k(), 0, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true);
       return;
     }
 
@@ -1062,12 +1075,17 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     // (jiná pohádka stejné rodiny) se neúčtují znovu, jen co se OPRAVDU
     // nakreslilo v TOMHLE běhu (madeImages/madeSheets).
     if (st.username && !st.creditsCharged) {
-      const cost = actualStoryCostCredits({ images1k: madeImages(), images4k: madeSheets(), voiceChars }, st.writeTokens);
+      // Použít kumulativní počty přes VŠECHNY self-chain invokace. madeImages/
+      // madeSheets obsahují jen aktuální běh a u řetězené pohádky podhodnocovaly
+      // kreditní cenu, zatímco usage log níž už totals používal správně.
+      const cost = actualStoryCostCredits({ images1k: totalImages1k(), images4k: totalImages4k(), voiceChars }, st.writeTokens);
       await chargeForCompletedStory(st.username, cost).catch(() => {});
       st.creditsCharged = true;
     }
     await write();
-    await writeUsageRecord(totalImages1k(), voiceChars, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true,
+    // TTS se vyrábí až přes /api/scene, který zapisuje SKUTEČNĚ namluvené
+    // znaky. Kdyby je story record zapsal také, agregát je počítá dvakrát.
+    await writeUsageRecord(totalImages1k(), 0, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true,
       (st.finishedAt - st.createdAt) / 1000); // ⏱ trvání přípravy do panelu Spotřeba
   } catch (e) {
     st.phase = "error";
