@@ -67,16 +67,16 @@
   left: 0;
   right: 0;
   overflow: auto;
-  padding: 8px 16px 12px;
+  padding: 8px clamp(16px, 2.4vw, 48px) 12px;
   box-sizing: border-box;
 }
 .stack {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: clamp(9px, 1vw, 18px);
 }
 .card {
-  padding: 11px 16px 12px;
+  padding: clamp(11px, 1.1vw, 20px) clamp(16px, 1.8vw, 32px) clamp(12px, 1.2vw, 20px);
   border-radius: 24px;
   background: rgba(30, 16, 58, 0.65);
   border: 1.5px solid rgba(253, 224, 138, 0.4);
@@ -111,8 +111,8 @@
   gap: 10px;
   align-items: stretch;
   overflow-x: auto;
-  margin: 0 -16px;
-  padding: 2px 16px 6px;
+  margin: 0 clamp(-32px, -1.8vw, -16px);
+  padding: 2px clamp(16px, 1.8vw, 32px) 6px;
 }
 .tile,
 .tileActive,
@@ -250,6 +250,77 @@
   letter-spacing: 0.02em;
   cursor: pointer;
   transition: transform 0.12s ease;
+}
+
+/* The handoff is designed mobile-first, but on desktop the tiles are deliberately
+   larger and the content breathes instead of looking like a scaled phone UI. */
+@media (min-width: 700px) {
+  .header {
+    padding-top: clamp(58px, 5.5vh, 96px);
+  }
+
+  .backBtn {
+    left: clamp(20px, 2.4vw, 48px);
+    top: clamp(52px, 5vh, 86px);
+    width: 46px;
+    height: 46px;
+    font-size: 24px;
+  }
+
+  .title {
+    font-size: clamp(30px, 2.4vw, 46px);
+  }
+
+  .stepLabel {
+    font-size: clamp(12px, 0.9vw, 16px);
+  }
+
+  .scroll {
+    top: clamp(132px, 15vh, 190px);
+    bottom: clamp(104px, 14vh, 170px);
+  }
+
+  .cardLabel {
+    font-size: clamp(11px, 0.8vw, 15px);
+  }
+
+  .roller {
+    gap: clamp(10px, 0.9vw, 18px);
+  }
+
+  .tile,
+  .tileActive,
+  .tileAll,
+  .tileDashed {
+    width: clamp(104px, 7vw, 150px);
+    min-height: clamp(116px, 10vw, 176px);
+    border-radius: clamp(16px, 1.2vw, 24px);
+  }
+
+  .tileLabel {
+    font-size: clamp(11px, 0.9vw, 17px);
+  }
+
+  .pillOn,
+  .pillOff {
+    height: clamp(52px, 4vw, 72px);
+    font-size: clamp(14px, 1.1vw, 20px);
+  }
+
+  .hint {
+    font-size: clamp(11px, 0.8vw, 15px);
+  }
+
+  .footer {
+    padding-left: clamp(16px, 2.4vw, 48px);
+    padding-right: clamp(16px, 2.4vw, 48px);
+    padding-bottom: clamp(26px, 3vh, 48px);
+  }
+
+  .cta {
+    height: clamp(62px, 6vh, 82px);
+    font-size: clamp(20px, 1.5vw, 30px);
+  }
 }
 .cta:active {
   transform: translateY(1px) scale(0.98);
