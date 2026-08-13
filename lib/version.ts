@@ -1,6 +1,7 @@
-export const APP_VERSION = "4.99.82";
+export const APP_VERSION = "4.99.83";
 
 // Changelog (newest first)
+// 4.99.83 - 📖 READER UX + CANON + 2× ČASOVANÉ SFX: zadání se píše nejdřív přímo ve formuláři a velký editor se otevře až při skutečném overflow; titulní karta nemá transport, editace textu je jen při pauze, titulky jsou jednořádkový spodní teletext a ovládání se ukáže jen při pauze/ťuknutí. Vája má deterministický dvouslovný limit řeči, nevybraná knihovní jména jsou rezervovaná a vzhled Váji/Jana/Archieho/Nicoláska dostal tvrdé identity anchors + MAJOR QA. Každá nová scéna vyžaduje dvě rozestoupené zvukové cue z reálně dodaného manifestu, spouští je podle průběhu hlasu a prompt váže jejich zdroj i reakce postav do obrazu.
 // 4.99.82 - 🎛️ CD OVLÁDACÍ PANEL + KINOTITULKOVÝ KARAOKE BOX + PŘEPÍNAČ TITULEK: dokončeno
 // zadání "Pushni to pls na main... Ovládací panel chceme jak byl navržený v CD, zvládneš?".
 // .book-nav přestavěn z tenkého proužku ←tečky→ uprostřed obrázku na kompaktní tmavou

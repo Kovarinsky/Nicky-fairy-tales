@@ -1269,6 +1269,8 @@ export default function Home() {
   // takže zvýraznění znatelně zaostávalo za skutečně slyšeným slovem.
   // rAF smyčka čte audioRef.currentTime KAŽDÝ snímek (~60×/s) po celou
   // dobu přehrávání — mnohem těsnější souběh se skutečným zvukem.
+  const sfxFiredRef = useRef<Set<string>>(new Set());
+  useEffect(() => { sfxFiredRef.current.clear(); }, [page]);
   useEffect(() => {
     if (!isPlaying) return;
     let raf = 0;
@@ -1289,24 +1291,27 @@ export default function Home() {
             setCurrentWordIdx(prev => (prev === idx ? prev : idx));
           }
         }
+        // 🔊 Nové příběhy mají dva cue načasované relativně k namluvení.
+        // Staré uložené pohádky s jediným `sfx` zůstávají kompatibilní.
+        if (el.duration && Number.isFinite(el.duration)) {
+          const cues = scene.sfxCues?.length
+            ? scene.sfxCues
+            : scene.sfx ? [{ effect: scene.sfx, at: 0.08, voice: scene.sfxVoice }] : [];
+          const progress = Math.max(0, Math.min(1, t / el.duration));
+          cues.forEach((cue, cueIndex) => {
+            const key = `${page}:${cueIndex}`;
+            if (progress >= cue.at && !sfxFiredRef.current.has(key)) {
+              sfxFiredRef.current.add(key);
+              ambientRef.current?.playEffect(cue.effect, cue.voice);
+            }
+          });
+        }
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [isPlaying, page, scenes]);
-
-  // 🔊 Jednorázový zvukový efekt podle děje TÉTO scény (vlny/hrom/chrápání) —
-  // jednou na stránku (ref hlídá, ať se nespustí znovu při každém re-renderu)
-  const sfxFiredRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!bookReady) return;
-    const key = `${readerEntryIdRef.current || "x"}:${page}`;
-    if (sfxFiredRef.current === key) return;
-    sfxFiredRef.current = key;
-    ambientRef.current?.playEffect(scenes[page]?.sfx, scenes[page]?.sfxVoice);
-  }, [page, bookReady, scenes]);
-
 
   // 📖 Titulní obrazovka: název pohádky + úvodní fanfára, PŘED prvním slidem
   // — teprve po jejím zavření appka ukáže scénu 1 a spustí namlouvání.
@@ -1520,10 +1525,10 @@ export default function Home() {
     if (viewMode === "reader" && !bookReady) setViewMode("form");
   }, [viewMode, bookReady]);
 
-  // Reader controls: show briefly when reader opens (auto-hide timer is
-  // the single effect further down — this used to be duplicated here too)
+  // Reader controls start hidden. A tap during playback pauses and reveals
+  // them; pressing Play hides them again. Changing slides must not flash them.
   useEffect(() => {
-    if (viewMode === "reader") setCtrlsOpen(true);
+    if (viewMode === "reader") setCtrlsOpen(false);
   }, [viewMode]);
 
   // Re-run layout-dependent effects when the device rotates (portrait ⇄
@@ -1787,7 +1792,7 @@ export default function Home() {
     const el = pageBodyRef.current;
     if (!el || viewMode !== "reader") return;
     // Landscape: shrink the ticker to the image's DISPLAYED width (letterboxed
-    // content, not the full screen); portrait uses the full width
+    // content, not the full screen); portrait uses the CSS responsive width.
     const imgEl = pageImgRef.current;
     const landscape = window.matchMedia("(orientation: landscape)").matches;
     if (landscape && imgEl && imgEl.naturalWidth > 0) {
@@ -1807,13 +1812,13 @@ export default function Home() {
     // width tady už není potřeba (dřív zarovnávalo pruh na šířku obrázku).
     el.scrollTop = 0;
     el.scrollLeft = 0;
-    // Landscape: roluje vnitřní .page-clip (bílý rámeček stojí, text jede)
+    // V obou orientacích roluje vnitřní .page-clip; box zůstává na místě.
     const clip = pageClipRef.current;
-    const scroller = landscape && clip ? clip : el;
+    const scroller = clip || el;
     scroller.scrollLeft = 0;
-    // Only the landscape single-line ticker rolls; portrait shows the whole text
+    // Jednořádkový teletext roluje jen tehdy, když se věta nevejde.
     const overflow = scroller.scrollWidth - scroller.clientWidth;
-    if (!landscape || overflow <= 0) return;
+    if (overflow <= 0) return;
     // Synchronizace s hlasem: text dojede na konec ~2 s před koncem nahrávky.
     // Bez hlasu (nepřehrává se) fallback na konstantní rychlost.
     const audio = audioRef.current;
@@ -3691,9 +3696,19 @@ export default function Home() {
   // ✕ Zrušit vrátí text do podoby před otevřením editoru.
   const [topicEditorOpen, setTopicEditorOpen] = useState(false);
   const topicBeforeEditRef = useRef("");
-  function openTopicEditor() {
-    topicBeforeEditRef.current = topic;
+  function openTopicEditor(value = topic) {
+    topicBeforeEditRef.current = value;
     setTopicEditorOpen(true);
+  }
+  function handleTopicInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const value = e.target.value;
+    const textarea = e.currentTarget;
+    setTopic(value);
+    // Nejdřív se píše přímo ve formuláři. Velký editor se otevře až ve
+    // chvíli, kdy obsah reálně přeteče responzivní počet viditelných řádků.
+    requestAnimationFrame(() => {
+      if (textarea.scrollHeight > textarea.clientHeight + 2) openTopicEditor(value);
+    });
   }
   // 🌍 Stejný velký editor i pro POPIS VLASTNÍHO SVĚTA
   const [worldEditorOpen, setWorldEditorOpen] = useState(false);
@@ -5331,8 +5346,8 @@ export default function Home() {
               <p className="gen-step-hint">{t.sequelHint}</p>
             </>
           )}
-          {/* Ťuknutí otevře velký editor — celý text viditelný, pohodlné psaní.
-              Oranžový ✕ NAD polem vpravo maže text (nepřekrývá ho) */}
+          {/* Píše se přímo zde. Velký editor se otevře automaticky teprve,
+              když text přeteče responzivní počet řádků. Oranžový ✕ maže. */}
           {topic.trim() !== "" && (
             <div className="ta-toolbar">
               <span className="ta-clear-hint">{t.clearTextBtn}</span>
@@ -5341,9 +5356,8 @@ export default function Home() {
             </div>
           )}
           <div className="ta-wrap">
-            <textarea className="ta-accent" value={topic} readOnly placeholder={t.wishPlaceholder}
-              onClick={openTopicEditor}
-              onFocus={e => { e.target.blur(); openTopicEditor(); }} />
+            <textarea className="ta-accent" value={topic} rows={5}
+              onChange={handleTopicInput} placeholder={t.wishPlaceholder} />
           </div>
           <div className="insp-row">
             <button type="button" className="insp-btn" onClick={() => suggestIdea()} disabled={ideaLoading}>
@@ -5678,7 +5692,11 @@ export default function Home() {
           <div className={`book-card${pageLeaving ? " book-card-leaving" : ""}`} key={slideKey}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            onClick={() => { if (readerMode) setCtrlsOpen(v => !v); }}
+            onClick={() => {
+              if (!readerMode || titleCardOpen) return;
+              if (isPlaying) audioRef.current?.pause();
+              else setCtrlsOpen(true);
+            }}
           >
             {/* 📖 Titulní obrazovka: název + úvodní fanfára, PŘED prvním slidem —
                 zbytek pohádky se pod ní klidně dokresluje/čeká. Zavřít jde JEN
@@ -5814,10 +5832,13 @@ export default function Home() {
                     ))}
                   </p>
                 </div>
-                {/* ✏️ Ruční úprava textu — jako u běžné pohádky, i u zkopírované */}
-                <button type="button" className="page-edit" aria-label={t.editTextBtn} title={t.editTextBtn}
-                  disabled={loading}
-                  onClick={e => { e.stopPropagation(); audioRef.current?.pause(); openPageEditor(page); }}>✏️</button>
+                {/* ✏️ Úprava textu je dostupná jen při pauze; za přehrávání
+                    nesmí rušit dítě ani vést k nechtěnému otevření editoru. */}
+                {!isPlaying && (
+                  <button type="button" className="page-edit" aria-label={t.editTextBtn} title={t.editTextBtn}
+                    disabled={loading}
+                    onClick={e => { e.stopPropagation(); openPageEditor(page); }}>✏️</button>
+                )}
               </div>
             )}
 
@@ -5838,14 +5859,6 @@ export default function Home() {
                 níž, přesně jako design-bundle-v7 ReaderScreen .controls),
                 tenhle řádek teď drží jen VEDLEJŠÍ přepínače (4 tlačítka). */}
             <div className="book-controls" onClick={e => e.stopPropagation()}>
-              {/* 🎤 Titulky — nový přepínač vedle hudby/otočení/domů (viz
-                  subtitlesOn výš). */}
-              <button type="button" className={`ctrl-cell${subtitlesOn ? " ctrl-cell-on" : ""}`}
-                onClick={() => setSubtitlesOn(p => !p)}>
-                <span className="ctrl-ico">{subtitlesOn ? "💬" : "🚫"}</span>
-                <span className="ctrl-txt">{t.subtitlesLabel}</span>
-              </button>
-
               {/* 🎵 Hudba/zvuky — dřív šlo přepnout jen ve formuláři PŘED
                   vytvořením pohádky; při otevření uložené pohádky z historie
                   se ale formulář vůbec nezobrazí, takže nebyl žádný způsob,
@@ -5879,7 +5892,7 @@ export default function Home() {
               a ověřit, že se pohádka správně nahrála (titulka na pozadí
               ukazuje NÁHLED aktuální stránky, viz scenes[page] u
               .title-card-bg výš). */}
-          <div className="book-nav" ref={navRef} onClick={e => e.stopPropagation()}>
+          {!titleCardOpen && <div className="book-nav" ref={navRef} onClick={e => e.stopPropagation()}>
             <div className="nav-transport">
               {/* 🔙 Na první stránce vede šipka zpět na titulní obrazovku (jinak
                   by na první scéně nešlo nikam couvnout — je to jediná stránka
@@ -5901,11 +5914,7 @@ export default function Home() {
                 {!current.audioUrl && !regenAudio ? <span className="placeholder-spinner placeholder-spinner-sm" /> : isPlaying ? "⏸" : "▶"}
               </button>
               <button type="button" className="ctrl-btn ctrl-nav" onClick={() => nextVisible !== null && goToPage(nextVisible)} disabled={!hasNext} aria-label={t.next}>›</button>
-              {/* 🎤 2026-08-12: titulky-přepínač přímo na ovladači (dřív jen
-                  v .book-controls vpravo nahoře — uživatel ho chtěl i/hlavně
-                  tady, ať nemusí hledat druhý panel). Menší/tlumenější než
-                  ‹▶› (stejný stav subtitlesOn jako ta druhá kopie výš — appka
-                  je záměrně nechává OBĚ, žádná duplicitní logika navíc). */}
+              {/* Jediné místo pro vypnutí titulků — žádná druhá kopie nahoře. */}
               <button type="button" className={`nav-mini-btn${subtitlesOn ? " nav-mini-btn-on" : ""}`}
                 onClick={() => setSubtitlesOn(p => !p)}
                 aria-label={t.subtitlesLabel} title={t.subtitlesLabel}>
@@ -5918,7 +5927,7 @@ export default function Home() {
                 aria-label={t.scrubLabel} />
               <span className="nav-page-label">{pagePos + 1} / {visiblePages.length}{storyChoice && branch === null ? "+" : ""}</span>
             </div>
-          </div>
+          </div>}
 
           {/* 🔀 Návrat k rozbočce — vyzkoušet druhou variantu konce */}
           {viewMode === "reader" && storyChoice && branch !== null && (
@@ -5962,6 +5971,7 @@ export default function Home() {
             <audio ref={audioRef} key={current.audioUrl} src={current.audioUrl}
               onPlay={() => {
                 setIsPlaying(true);
+                if ((audioRef.current?.currentTime || 0) < 0.12) sfxFiredRef.current.clear();
                 // 🩺 pojistka k suppressNextPauseRevealRef výš: pause() na už
                 // pauznutém/doznělém audiu (typicky auto-advance po "ended")
                 // nemusí vůbec vyvolat 'pause' event, co by flag spotřeboval —

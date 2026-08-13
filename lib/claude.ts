@@ -1,5 +1,16 @@
-import type { StoryRequest, StoryScript, Character, Scene, Soundscape, SoundEffect } from "./types";
-import { GENDERED_SFX } from "./types";
+import type { StoryRequest, StoryScript, Character, Scene, Soundscape, SoundCue } from "./types";
+import { loadCharacters } from "./characters";
+import { validateStoryCanon } from "./story-canon";
+import musicManifest from "../public/music-lib/manifest.json";
+
+// Runtime allow-list generated from the files that are actually shipped. This
+// prevents a valid-looking but nonexistent model-invented key from going silent.
+const LIBRARY_EFFECTS = new Set(
+  Object.keys(musicManifest)
+    .filter(key => key.startsWith("sfx-"))
+    .map(key => key.replace(/^sfx-/, "").replace(/-(?:m|f)$/, ""))
+);
+const LIBRARY_EFFECT_VOCABULARY = [...LIBRARY_EFFECTS].sort().join(", ");
 
 // Příběhy píše Sonnet — kvalitou pohádek srovnatelný s Opusem, ~5× levnější.
 // Starší proměnná ANTHROPIC_MODEL (na Vercelu claude-opus-4-8) se už nepoužívá;
@@ -140,9 +151,9 @@ function buildSystemPrompt(language: string): string {
       '  "adventure" — movement, adventure, challenge, danger, rescue',
       '  "cozy"      — home, food, hugs, safety, family, warmth, story ending',
       "",
-      "═══ SOUND EFFECT (sfx) ═══",
-      "Optional `sfx` field on a scene — a ONE-SHOT sound effect for something the NARRATION OF THAT SCENE explicitly describes happening RIGHT THEN, on top of the ambient soundscape. This covers ANY scene where a specific sound-making object or action is the center of that moment — an instrument being played, a bell rung, a book's pages turning, a key turning in a lock, swords clashing, someone whistling a tune — the categories below are examples of the PATTERN, not an exhaustive list of situations; but the `sfx` VALUE itself must always be the single closest key from this list (never invent a key that isn't listed).",
-      "SFX SHOULD BE THE DEFAULT, NOT THE EXCEPTION: aim for roughly 70-90% of scenes to carry an sfx (for a typical 10-scene story that's about 7-9 scenes; scale up for longer stories, down only for very short ones) — a story with hardly any sfx sounds flat and lifeless. Don't just look for sfx opportunities in scenes you already planned — actively WRITE the scenes (plot beat, character action, imagePrompt) so they naturally CONTAIN a sound-making moment: a character playing an instrument, an animal reacting, a door creaking, rain starting, a gasp of surprise, a page turning. Vary the CATEGORY scene to scene (animal, then object, then weather, then an emotion, then a machine…) — don't lean on the same one or two categories the whole story. Only skip `sfx` for the rare scene where truly nothing sound-worthy happens, and never pick more than one per scene:",
+      "═══ TIMED SOUND EFFECTS (sfxCues) ═══",
+      "EVERY scene MUST contain `sfxCues`: an array of EXACTLY TWO distinct sound moments from the library below. Each cue is {effect, at, voice?}; `at` is the relative narration position from 0.08 to 0.90. Put each cue where its source is actually narrated, in chronological order, never both at the start. `voice` is m/f only for EMOTIONS keys. Do not emit the legacy `sfx`/`sfxVoice` fields.",
+      "WRITE FOR SOUND: every narration must naturally contain two audible actions or reactions, and the same scene's imagePrompt must visibly show BOTH sources mid-action plus every other named character reacting. Use varied categories and two different effects; never add an unrelated decorative sound merely to reach two cues:",
       '  WEATHER/WATER: "waves" (sea/ocean lapping or crashing) · "water_flow" (a calm river, stream or fountain flowing/trickling nearby — use this, NOT "waves", for rivers like the Vltava, streams, brooks and fountains) · "thunder" (thunder/lightning striking) · "wind_gust" (a gust or steady breeze of wind — use whenever the scene mentions wind, leaves rustling in the breeze, hair/clothes blowing) · "rain" (rain falling) · "snow_crunch" (footsteps crunching in snow) · "ice_crack" (ice cracking/creaking, e.g. a frozen lake or icicles)',
       '  NATURE/PLACES: "campfire_crackle" (a campfire crackling nearby) · "waterfall" (a waterfall rushing in the distance) · "cave_drip" (water dripping in a cave) · "leaves_crunch" (footsteps through fallen autumn leaves) · "volcano_rumble" (a distant volcanic rumble) · "desert_wind" (dry wind over sand) · "mole_dig" (a small creature digging/burrowing in the ground) · "bubbles_underwater" (bubbles rising underwater)',
       '  ANIMALS (the animal itself makes its sound in THIS scene): "cow" (moo) · "pig" (oink) · "chicken" (cluck) · "sheep" (bleat) · "goat" (bleat, distinct pitch from sheep) · "horse" (neigh) · "donkey" (bray/hee-haw) · "duck" (quack) · "dog" (bark) · "cat" (meow) · "frog" (croak) · "owl" (hoot) · "rooster" (crow) · "bee" (buzzing) · "rabbit" (soft hop/sniff) · "elephant" (trumpet) · "bear" (gentle friendly grumble/huff) · "mouse" (squeak) · "bird" (chirp/tweet) · "squirrel" (chatter) · "wing_flap" (a bird\'s wings flapping as it takes off) · "dino_roar" (a friendly, playful dinosaur roar) · "fox" (soft yip-bark) · "wolf" (a gentle distant howl) · "monkey" (chatter/hoot) · "seagull" (cry) · "dolphin" (click/whistle) · "cricket" (chirping at night)',
@@ -153,16 +164,15 @@ function buildSystemPrompt(language: string): string {
       '  INSTRUMENTS/OBJECTS (a specific instrument or object is played, rung, or handled in THIS scene): "violin" (a violin is played) · "piano" (a piano is played) · "guitar" (a guitar is played/strummed) · "flute" (a flute is played) · "drum" (a drum is beaten) · "trumpet" (a trumpet is played) · "harp" (a harp is played) · "accordion" (an accordion is played) · "xylophone" (a xylophone is played) · "music_box" (a music box plays) · "tambourine" (a tambourine is shaken) · "harmonica" (a harmonica is played) · "bell_ring" (a hand bell/chime rings once) · "page_turn" (a book page turns) · "key_turn" (a key turns in a lock) · "sword_clash" (swords clash once) · "whistle" (a character whistles a tune) · "umbrella_open" (an umbrella opens) · "camera_click" (a camera shutter clicks) · "kettle_whistle" (a kettle whistles) · "cart_wheels" (a cart/wagon creaks and rolls) · "coin_clink" (coins clink) · "drawer_open" (a drawer slides open) · "zipper" (a zipper is pulled)',
       '  MOOD ACCENTS (a musical sting, not a literal sound effect): "magic_chime" (a magical sparkle moment) · "triumphant" (a victorious/joyful high point) · "tense_sting" (a sudden scare or shock) · "sad_tone" (a sorrowful, tender beat)',
       '  EMOTIONS (a character\'s own non-verbal reaction, in THIS scene — use to make feelings audible, not just narrated): "giggle" (soft happy giggling) · "cheer_yay" (a joyful group cheer) · "sigh" (a soft contented sigh) · "yawn" (a sleepy yawn) · "sneeze" (a gentle sneeze) · "hiccup" (cute hiccupping) · "hum_content" (contented humming) · "surprised_oh" (a soft gasp of pleasant surprise) · "group_aww" (a warm, endeared "aww") · "gasp_fear" (a mild fright gasp, never terrifying) · "determined_grunt" (a short effortful grunt) · "relief_exhale" (a long relieved breath) · "whisper" (a soft hushed whisper)',
-      '  EMOTIONS VOICE: these 13 EMOTIONS keys are recorded in both a male and a female voice — whenever `sfx` is one of them, ALSO set `sfxVoice` to `"m"` or `"f"` matching the gender of the character making that sound in THIS scene (the narration/imagePrompt makes this clear). Every other sfx category ignores `sfxVoice` entirely — never set it for a non-EMOTIONS sfx.',
+      '  EMOTIONS VOICE: for these 13 keys set the cue `voice` to `"m"` or `"f"` matching the character making the sound. Omit `voice` for all other effects.',
       '  SLEEP: "snore" (a character audibly snoring/sleeping in THIS scene)',
-      "Omit `sfx` only for the rare scene where none of these genuinely fit — never pick more than one per scene.",
-      "SOUND MUST MATCH THE PICTURE: whenever you DO set `sfx`, the imagePrompt for that same scene MUST visibly show that exact sound happening — the listener hears it AND sees it. An animal `sfx` needs the animal drawn mid-sound (mouth open barking/mooing/quacking, an expressive sound-making pose) — but ALWAYS gentle and FRIENDLY, never aggressive or scary: a happy open-mouth bark with a wagging tail and soft eyes, NEVER bared teeth, a snarl, or a threatening posture, even for a big dog breed. An instrument `sfx` needs a character actively playing it (bow on the violin strings, hands on the piano keys, fingers on the guitar strings), an object or vehicle `sfx` needs the object shown mid-action (the bell mid-ring with motion lines, the key turning in the lock, the page mid-turn, the airplane visible in the sky, the ball mid-bounce), a weather or NATURE/PLACES `sfx` needs that weather or setting visibly present in the scene (rain falling, lightning flashing, leaves blown sideways in the wind, a campfire glowing, a waterfall in the background), drawn as gentle/cozy rather than dramatic, and an EMOTIONS `sfx` needs the character's face/body clearly showing that exact feeling (a wide giggling smile, a big yawn with an open mouth, arms raised mid-cheer) — never set one whose feeling isn't also visible on the character's face. Never set an `sfx` whose source is off-screen or already finished by the time of the picture. ANY OTHER named character present in that same scene (not just the one making the sound) must ALSO visibly react to it — turned head or eyes toward the source, a startled/delighted/curious expression, a hand cupped to an ear, a small flinch or lean-in — so the cause-and-effect between sound and picture reads clearly even with the volume off, not just the sound-maker performing in isolation.",
+      "SOUND MUST MATCH THE PICTURE: both cues must be visible in the same imagePrompt. Animals are mid-sound, instruments actively played, objects mid-action, weather visible, and emotions clear on face/body. Every other named character visibly reacts to each relevant source. Keep it gentle and friendly.",
       "",
       "═══ OUTPUT ═══",
       "Reply with ONLY valid RFC 8259 JSON — no markdown, no code fences, no // comments, no trailing commas.",
-      "Required fields per scene: index (number), narration (string), imagePrompt (string), soundscape (one of the 5 values). Optional: sfx, sfxVoice (only alongside an EMOTIONS sfx, see above).",
+      "Required fields per scene: index, narration, imagePrompt, soundscape, and sfxCues with exactly two cues.",
       "Compact example structure (fill in real content):",
-      '{"title":"...","heroDescription":"...","worldNotes":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"cozy","sfx":"giggle","sfxVoice":"f"},{"index":3,"narration":"...","imagePrompt":"...","soundscape":"night","sfx":"snore"}]}',
+      '{"title":"...","heroDescription":"...","worldNotes":"...","scenes":[{"index":1,"narration":"A bell rang. Mia gasped happily.","imagePrompt":"Mia rings a bell while Ben turns toward her with a delighted open-mouth gasp.","soundscape":"magic","sfxCues":[{"effect":"bell_ring","at":0.2},{"effect":"surprised_oh","at":0.68,"voice":"f"}]}]}',
     ].join("\n");
   }
 
@@ -262,9 +272,9 @@ function buildSystemPrompt(language: string): string {
     '  "adventure" — pohyb, dobrodružství, výzva, nebezpečí, záchrana',
     '  "cozy"      — domov, jídlo, objetí, bezpečí, rodina, teplo, konec pohádky',
     "",
-    "═══ ZVUKOVÝ EFEKT (sfx) ═══",
-    "Volitelné pole `sfx` u scény — JEDNORÁZOVÝ zvukový efekt navíc k ambientnímu soundscape, pro něco, co DĚJ TÉTO KONKRÉTNÍ scény výslovně popisuje PRÁVĚ TEĎ. Zahrnuje JAKOUKOLI scénu, kde je středem okamžiku konkrétní zvuk-tvořící předmět nebo akce — hraje se na nástroj, zazvoní zvonek, listuje se v knize, otočí se klíč v zámku, střetnou se meče, někdo si zapíská melodii — kategorie níže jsou příklady TOHOTO VZORU, ne vyčerpávající seznam situací; ale samotná HODNOTA `sfx` musí být vždy nejbližší klíč z tohoto seznamu (nikdy nevymýšlej klíč, který tam není).",
-    "SFX MÁ BÝT PRAVIDLO, NE VÝJIMKA: cíl je zhruba 70-90 % scén se sfx (u typické 10scénové pohádky to je asi 7-9 scén, u delší pohádky víc, míň jen u opravdu krátké) — pohádka skoro bez sfx zní ploše a bez života. Nehledej sfx příležitosti jen ve scénách, co už máš naplánované — rovnou PIŠ scény (dějový bod, akce postavy, imagePrompt) tak, aby zvuková chvíle byla PŘIROZENOU součástí děje: postava hraje na nástroj, zvíře zareaguje, vrznou dveře, spustí se déšť, někdo se nadechne překvapením, otočí se stránka. Střídej KATEGORIE scénu od scény (zvíře, pak předmět, pak počasí, pak emoce, pak stroj…) — nedrž se pořád jen jedné nebo dvou kategorií. Pole `sfx` vynech jen u té výjimečné scény, kde se opravdu nic zvukového nehodí, a nikdy nevybírej víc než jeden na scénu:",
+    "═══ ČASOVANÉ ZVUKOVÉ EFEKTY (sfxCues) ═══",
+    "KAŽDÁ scéna MUSÍ mít `sfxCues`: pole PŘESNĚ DVOU odlišných zvukových okamžiků z knihovny níže. Cue má tvar {effect, at, voice?}; `at` je relativní pozice v namluvení od 0.08 do 0.90. Umísti cue tam, kde narace jeho zdroj opravdu zmiňuje, chronologicky a ne oba na začátek. `voice` je m/f jen u klíčů EMOCE. Staré `sfx`/`sfxVoice` nevypisuj.",
+    "PIŠ PRO ZVUK: každá narace musí přirozeně obsahovat dvě slyšitelné akce nebo reakce a imagePrompt stejné scény musí VIDITELNĚ ukázat OBA zdroje uprostřed akce i reakci ostatních jmenovaných postav. Střídej kategorie a použij dva různé efekty; nikdy nepřidávej nesouvisející dekorativní zvuk jen do počtu:",
     '  POČASÍ/VODA: "waves" (moře naráží/šplouchá) · "water_flow" (klidná řeka, potok nebo fontánka poblíž teče/zurčí — použij TOHLE, ne "waves", pro řeky jako Vltava, potoky a fontánky) · "thunder" (hrom/blesk udeří) · "wind_gust" (poryv nebo stálý vánek větru — použij vždy, když scéna zmiňuje vítr, šumění listí ve větru, vlající vlasy/oblečení) · "rain" (padá déšť) · "snow_crunch" (kroky křupou ve sněhu) · "ice_crack" (praská/vrže led, např. na zamrzlém jezeře nebo rampouchy)',
     '  PŘÍRODA/MÍSTA: "campfire_crackle" (praská ohníček poblíž) · "waterfall" (v dálce hučí vodopád) · "cave_drip" (v jeskyni kape voda) · "leaves_crunch" (kroky šustí napadaným podzimním listím) · "volcano_rumble" (vzdálené sopečné dunění) · "desert_wind" (suchý vítr nad pískem) · "mole_dig" (malý tvor hrabe/hloubí v zemi) · "bubbles_underwater" (bubliny stoupají pod vodou)',
     '  ZVÍŘATA (zvíře se v TÉTO scéně samo ozve): "cow" (bučení) · "pig" (chrochtání) · "chicken" (kdákání) · "sheep" (bečení) · "goat" (mečení, jiná výška než ovce) · "horse" (řehtání) · "donkey" (hýkání) · "duck" (kvákání) · "dog" (štěkání) · "cat" (mňoukání) · "frog" (kuňkání) · "owl" (houkání) · "rooster" (kokrhání) · "bee" (bzučení) · "rabbit" (tiché poskakování/čenichání) · "elephant" (troubení) · "bear" (jemné přátelské mručení/funění) · "mouse" (pískání) · "bird" (cvrlikání) · "squirrel" (rychlé cvakání) · "wing_flap" (pták mocně zamává křídly při vzletu) · "dino_roar" (přátelský, hravý řev dinosaura) · "fox" (tiché zaštěknutí) · "wolf" (jemné vzdálené vytí) · "monkey" (chichotání/houkání) · "seagull" (křik racka) · "dolphin" (cvakání/pískání) · "cricket" (cvrlikání cvrčků v noci)',
@@ -275,16 +285,15 @@ function buildSystemPrompt(language: string): string {
     '  NÁSTROJE/PŘEDMĚTY (v TÉTO scéně se hraje na konkrétní nástroj nebo se manipuluje s předmětem): "violin" (hraje se na housle) · "piano" (hraje se na klavír) · "guitar" (hraje/brnká se na kytaru) · "flute" (hraje se na flétnu) · "drum" (bubnuje se) · "trumpet" (hraje se na trumpetu) · "harp" (hraje se na harfu) · "accordion" (hraje se na tahací harmoniku) · "xylophone" (hraje se na xylofon) · "music_box" (hraje hrací skříňka) · "tambourine" (rozeznívá se tamburína) · "harmonica" (hraje se na foukací harmoniku) · "bell_ring" (jednou zazvoní ruční zvonek/zvoneček) · "page_turn" (otočí se stránka knihy) · "key_turn" (otočí se klíč v zámku) · "sword_clash" (jednou se střetnou meče) · "whistle" (postava si zapíská melodii) · "umbrella_open" (otevře se deštník) · "camera_click" (cvakne spoušť fotoaparátu) · "kettle_whistle" (píská konvička) · "cart_wheels" (vrže/jede vozík či kára) · "coin_clink" (cinknou mince) · "drawer_open" (vysune se zásuvka) · "zipper" (zapne se zip)',
     '  NÁLADOVÉ AKCENTY (hudební akcent, ne doslovný zvuk): "magic_chime" (kouzelný jiskřivý moment) · "triumphant" (vítězný/radostný vrchol) · "tense_sting" (náhlé leknutí/napětí) · "sad_tone" (smutný, dojemný moment)',
     '  EMOCE (postava sama neverbálně reaguje v TÉTO scéně — použij, ať jsou pocity SLYŠET, ne jen popsané): "giggle" (tiché šťastné hihňání) · "cheer_yay" (radostné hurá skupinky) · "sigh" (spokojený povzdech) · "yawn" (ospalé zívnutí) · "sneeze" (jemné kýchnutí) · "hiccup" (roztomilé škytání) · "hum_content" (spokojené broukání) · "surprised_oh" (tiché nadechnutí příjemným překvapením) · "group_aww" (vřelé, dojaté "ách") · "gasp_fear" (mírné leknutí, nikdy hrůza) · "determined_grunt" (krátké odhodlané zabručení při snaze) · "relief_exhale" (dlouhý úlevný výdech) · "whisper" (tichý šepot)',
-    '  HLAS U EMOCÍ: těchto 13 klíčů kategorie EMOCE je nahraných v mužské i ženské verzi — kdykoli je `sfx` jeden z nich, NASTAV NAVÍC `sfxVoice` na `"m"` nebo `"f"` podle pohlaví postavy, co ten zvuk v TÉTO scéně vydává (jasné z narace/imagePromptu). Žádná jiná kategorie sfx `sfxVoice` nepoužívá — u ne-EMOČNÍHO sfx ho nikdy nenastavuj.',
+    '  HLAS U EMOCÍ: u těchto 13 klíčů nastav v cue `voice` na `"m"` nebo `"f"` podle postavy, která zvuk vydává. U ostatních efektů `voice` vynech.',
     '  SPÁNEK: "snore" (postava slyšitelně chrápe/spí v téhle scéně)',
-    "Pole `sfx` vynech jen u výjimečné scény, kde se z tohoto seznamu opravdu nic nehodí — nikdy nevybírej víc než jeden na scénu.",
-    "ZVUK MUSÍ SEDĚT S OBRÁZKEM: kdykoli `sfx` NASTAVÍŠ, imagePrompt téže scény MUSÍ ten přesný zvuk viditelně ukazovat — posluchač ho slyší A VIDÍ. Zvíře u `sfx` potřebuje být nakreslené PŘI zvuku (otevřená tlama při štěkání/bučení/kvákání, výrazná póza) — ale VŽDY jemně a PŘÁTELSKY, nikdy agresivně nebo strašidelně: šťastné štěknutí s otevřenou tlamou, vrtícím ocasem a měkkýma očima, NIKDY vyceněné zuby, vrčení nebo výhružná póza, ani u velkého psího plemene. Nástroj potřebuje postavu AKTIVNĚ hrající (smyčec na strunách houslí, prsty na klávesách klavíru, prsty na strunách kytary), předmět nebo vozidlo potřebuje být zachycené PŘI akci (zvoneček uprostřed zvonění s pohybovými čarami, klíč otáčející se v zámku, stránka uprostřed otáčení, letadlo viditelné na obloze, míč uprostřed odrazu), počasí nebo PŘÍRODA/MÍSTA u `sfx` potřebuje to počasí nebo prostředí viditelně být ve scéně přítomné (padající déšť, blesk, vítr čechrající listí do strany, zářící ohníček, vodopád v pozadí), nakreslené útulně, ne dramaticky, a EMOCE u `sfx` potřebují ten přesný pocit vidět i na tváři/postoji postavy (široký hihňavý úsměv, velké zívnutí s otevřenou pusou, ruce vzhůru při jásotu) — nikdy nenastavuj emoci, kterou postava zároveň nedává najevo v obrázku. Nikdy nenastavuj `sfx`, jehož zdroj je mimo záběr nebo už v obrázku dávno doznělý. KAŽDÁ DALŠÍ jmenovaná postava v téže scéně (ne jen ta, co zvuk vydává) musí na něj VIDITELNĚ reagovat — otočená hlava nebo pohled směrem ke zdroji, polekaný/nadšený/zvědavý výraz, dlaň u ucha, mírné nadskočení nebo naklonění k němu — ať je souvislost zvuku a obrázku jasná i beze zvuku, ne aby zvukotvorná postava hrála úplně sama.",
+    "ZVUK MUSÍ SEDĚT S OBRÁZKEM: oba cue musí být v imagePromptu viditelné. Zvíře je uprostřed zvuku, na nástroj se aktivně hraje, předmět je v pohybu, počasí je vidět a emoce je jasná na tváři/těle. Ostatní jmenované postavy na zdroj viditelně reagují. Vše jemně a přátelsky.",
     "",
     "═══ VÝSTUP ═══",
     "Odpověz POUZE validním RFC 8259 JSON — bez markdown, bez ``` obalení, bez // komentářů, bez trailing čárek.",
-    "Povinné pole na každou scénu: index (číslo), narration (string), imagePrompt (string), soundscape (jedna z 5 hodnot). Volitelné: sfx, sfxVoice (jen spolu se sfx z kategorie EMOCE, viz výše).",
+    "Povinné pole na každou scénu: index, narration, imagePrompt, soundscape a sfxCues s přesně dvěma cue.",
     "Příklad struktury (vyplň reálným obsahem):",
-    '{"title":"...","heroDescription":"...","worldNotes":"...","scenes":[{"index":1,"narration":"...","imagePrompt":"...","soundscape":"magic"},{"index":2,"narration":"...","imagePrompt":"...","soundscape":"cozy","sfx":"giggle","sfxVoice":"f"},{"index":3,"narration":"...","imagePrompt":"...","soundscape":"night","sfx":"snore"}]}',
+    '{"title":"...","heroDescription":"...","worldNotes":"...","scenes":[{"index":1,"narration":"Zazvonil zvonek. Mia radostně vydechla.","imagePrompt":"Mia zvoní na zvonek, Ben se k ní otáčí s nadšeným výrazem a otevřenou pusou.","soundscape":"magic","sfxCues":[{"effect":"bell_ring","at":0.2},{"effect":"surprised_oh","at":0.68,"voice":"f"}]}]}',
   ].join("\n");
 }
 
@@ -394,6 +403,24 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
     en && c.nameEn ? c.nameEn : c.name;
   const cast = allChars.map((c) => `- ${displayName(c)}: ${c.description}`).join("\n");
 
+  // Jména kartotéky jsou identita, ne zásobník náhodných jmen. Pokud postava
+  // není vybraná, vypravěč její jméno nesmí půjčit novému člověku/zvířeti.
+  const selectedLibraryIds = new Set(req.characters.map(c => c.id));
+  const reservedLibraryNames = loadCharacters()
+    .filter(c => !selectedLibraryIds.has(c.id))
+    .flatMap(c => [c.name, c.nameEn].filter((n): n is string => !!n));
+  const reservedNamesRule = reservedLibraryNames.length
+    ? (en
+      ? `RESERVED LIBRARY NAMES — these characters were NOT selected. Do not mention them and never reuse any of these names for invented characters: ${reservedLibraryNames.join(", ")}. Invent clearly different names.`
+      : `REZERVOVANÁ JMÉNA KARTOTÉKY — tyto postavy NEJSOU vybrané. Nezmiňuj je a nikdy jejich jména nepůjčuj vymyšleným postavám: ${reservedLibraryNames.join(", ")}. Vymysli zřetelně jiná jména.`)
+    : "";
+
+  const valentynaSpeechRule = allChars.some(c => c.id === "valentyna")
+    ? (en
+      ? "VALENTÝNA SPEECH LOCK: she is two years old. Her DIRECT SPEECH may contain only one word or a natural two-word toddler phrase at a time (e.g. ‘Look!’, ‘Me too’, ‘Big star’). She NEVER speaks a grammatical adult sentence, explains a plan, or delivers abstract thoughts. The narrator may describe her feelings normally."
+      : "ZÁMEK ŘEČI VALENTÝNKY/VÁJI: jsou jí dva roky. Její PŘÍMÁ ŘEČ smí mít vždy jen jedno slovo nebo přirozené dvouslovné batolecí spojení (např. „Jé!“, „Já taky“, „Velká hvězda“). NIKDY nemluví gramaticky dospělou větou, nevysvětluje plán ani abstraktní myšlenky. Vypravěč smí její pocity normálně popsat.")
+    : "";
+
   const hasNicky = allChars.some((c) => c.id === "nicolas");
   const hasValentyna = allChars.some((c) => c.id === "valentyna");
   const hasParents = allChars.some((c) => c.id === "jan" || c.id === "jana");
@@ -436,6 +463,8 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
         `Characters:`,
         cast,
         familyContext,
+        reservedNamesRule,
+        valentynaSpeechRule,
         ageProfile,
         `Number of scenes: ${req.sceneCount}`,
         `Narration language: ${langName}`,
@@ -450,6 +479,8 @@ function buildUserPrompt(req: StoryRequest, extras: StoryExtras = {}): string {
         `Postavy:`,
         cast,
         familyContext,
+        reservedNamesRule,
+        valentynaSpeechRule,
         ageProfile,
         `Počet scén: ${req.sceneCount}`,
         `Jazyk vyprávění: čeština`,
@@ -561,6 +592,24 @@ function sanitizeJson(s: string): string {
   return s;
 }
 
+function normalizeSceneSoundCues(scene: Scene): Scene {
+  const raw = Array.isArray(scene.sfxCues) ? scene.sfxCues : [];
+  const cues = raw
+    .filter((c): c is SoundCue => !!c && typeof c.effect === "string" && LIBRARY_EFFECTS.has(c.effect) && Number.isFinite(Number(c.at)))
+    .map(c => ({
+      effect: c.effect,
+      at: Math.max(0.08, Math.min(0.9, Number(c.at))),
+      ...(c.voice === "m" || c.voice === "f" ? { voice: c.voice } : {}),
+    }))
+    .sort((a, b) => a.at - b.at)
+    .slice(0, 3);
+  // U starých/částečně navázaných výstupů zachovat původní jeden efekt.
+  if (cues.length === 0 && scene.sfx) {
+    cues.push({ effect: scene.sfx, at: 0.18, ...(scene.sfxVoice ? { voice: scene.sfxVoice } : {}) });
+  }
+  return { ...scene, sfxCues: cues };
+}
+
 function parseScript(raw: string): StoryScript {
   // Strip code fences
   let cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
@@ -584,7 +633,7 @@ function parseScript(raw: string): StoryScript {
   if (!parsed.scenes || parsed.scenes.length === 0) {
     throw new Error("Claude nevrátil žádné scény — zkus to znovu.");
   }
-  parsed.scenes = parsed.scenes.map((s, i) => ({ ...s, index: i + 1 }));
+  parsed.scenes = parsed.scenes.map((s, i) => normalizeSceneSoundCues({ ...s, index: i + 1 }));
   // 🔀 Dva konce — nový formát: scenes = jen společný děj, endingA/endingB
   // odděleně (Claude v něm nemůže splést počítání scén). Převede se na
   // interní choice {afterScene, options, altScenes}.
@@ -596,11 +645,11 @@ function parseScript(raw: string): StoryScript {
       const endB = p.endingB.filter(validScene);
       if (endA.length >= 1 && endB.length >= 1) {
         const common = parsed.scenes.length;
-        parsed.scenes = [...parsed.scenes, ...endA].map((s, i) => ({ ...s, index: i + 1 }));
+        parsed.scenes = [...parsed.scenes, ...endA].map((s, i) => normalizeSceneSoundCues({ ...s, index: i + 1 }));
         parsed.choice = {
           afterScene: common,
           options: [String(p.choiceOptions[0]), String(p.choiceOptions[1])],
-          altScenes: endB,
+          altScenes: endB.map(normalizeSceneSoundCues),
         };
       }
       delete p.endingA;
@@ -622,7 +671,7 @@ function parseScript(raw: string): StoryScript {
     if (ok) {
       c.afterScene = Math.round(c.afterScene);
       c.options = [String(c.options[0]).slice(0, 60), String(c.options[1]).slice(0, 60)];
-      c.altScenes = c.altScenes.map((s, i) => ({ ...s, index: parsed.scenes.length + i + 1 }));
+      c.altScenes = c.altScenes.map((s, i) => normalizeSceneSoundCues({ ...s, index: parsed.scenes.length + i + 1 }));
     } else {
       console.warn("[Claude] choice branch invalid — falling back to single ending");
       delete parsed.choice;
@@ -633,24 +682,25 @@ function parseScript(raw: string): StoryScript {
 
 // 🎚️ "Dozor" nad zvukovým designem — JEDNO doplňkové, levné textové volání
 // PO dopsání scénáře (ne jeden extra dotaz na scénu — celý scénář najednou),
-// které projde soundscape/sfx všech scén a opraví jen SKUTEČNÉ problémy
-// (sfx, co neodpovídá textu; stejný sfx opakovaný 3+ scény po sobě; nálada,
+// které projde soundscape/sfxCues všech scén a opraví jen SKUTEČNÉ problémy
+// (cue neodpovídá textu; chybí dva cue; časování je mimo pořadí; nálada,
 // co nesedí s prostředím). Nikdy netvoří nový obsah, jen upraví, co Claude
 // už napsal při psaní scénáře — a nikdy nesmí generování zablokovat: chyba
 // v revizi (síť, špatný JSON) = scénář jede beze změny dál (best-effort).
-interface SoundFix { index: number; soundscape?: Soundscape; sfx?: SoundEffect | null; }
+interface SoundFix { index: number; soundscape?: Soundscape; sfxCues?: SoundCue[]; }
 
 async function reviewSoundDesign(scenes: Scene[], language: string): Promise<void> {
   try {
     const brief = scenes.map(s => ({
       index: s.index,
-      narration: s.narration.slice(0, 260),
+      narration: s.narration.slice(0, 420),
+      imagePrompt: s.imagePrompt.slice(0, 420),
       soundscape: s.soundscape,
-      sfx: s.sfx ?? null,
+      sfxCues: s.sfxCues ?? [],
     }));
     const prompt = language === "en"
-      ? `You are a sound-design supervisor for a children's bedtime story app. Review each scene's 'soundscape' (background mood) and 'sfx' (one-shot effect) choices against its narration text — flag ONLY real problems: an sfx that doesn't match what the text describes, an sfx repeated in 3+ scenes in a row (should vary), a soundscape that clashes with the scene's setting/mood. Reply with ONLY a JSON array of corrections, one entry per scene that needs a fix, e.g. [{"index":1,"sfx":null},{"index":3,"soundscape":"cozy","sfx":"owl"}] — omit any field that's already fine, omit scenes needing no change entirely. Reply with [] if everything is already good.\nScenes:\n${JSON.stringify(brief)}`
-      : `Jsi dozor nad zvukovým designem dětské appky na pohádky před spaním. Projdi u každé scény volbu 'soundscape' (nálada na pozadí) a 'sfx' (jednorázový efekt) proti textu narace — nahlas JEN skutečné problémy: sfx, který neodpovídá tomu, co text popisuje, sfx opakovaný 3+ scény po sobě (mělo by se to střídat), soundscape, který nesedí s prostředím/náladou scény. Odpověz POUZE JSON polem oprav, jeden záznam na scénu, co potřebuje opravit, např. [{"index":1,"sfx":null},{"index":3,"soundscape":"cozy","sfx":"owl"}] — vynech pole, co je už v pořádku, vynech scény, co žádnou opravu nepotřebují. Odpověz [], pokud je vše v pořádku.\nScény:\n${JSON.stringify(brief)}`;
+      ? `You supervise sound for a children's story. Every scene must have EXACTLY TWO distinct timed sfxCues, each explicitly supported by its narration and visibly supported by its imagePrompt. at must be chronological, 0.08..0.90, near the narrated moment; voice m/f only for human emotion cues. Also check soundscape. Return ONLY a JSON array of corrections, e.g. [{"index":1,"sfxCues":[{"effect":"bell_ring","at":0.2},{"effect":"giggle","at":0.7,"voice":"f"}]}]. Omit scenes already correct; [] if all correct. Allowed existing library keys: ${LIBRARY_EFFECT_VOCABULARY}.\nScenes:\n${JSON.stringify(brief)}`
+      : `Jsi dozor zvuku dětské pohádky. Každá scéna musí mít PŘESNĚ DVA odlišné časované sfxCues, oba výslovně podložené narací a viditelné v imagePromptu. at musí jít chronologicky, být 0.08..0.90 a poblíž popsaného okamžiku; voice m/f jen u lidské emoční reakce. Zkontroluj i soundscape. Vrať POUZE JSON pole oprav, např. [{"index":1,"sfxCues":[{"effect":"bell_ring","at":0.2},{"effect":"giggle","at":0.7,"voice":"f"}]}]. Správné scény vynech; pokud je vše správně, vrať []. Povolené existující klíče knihovny: ${LIBRARY_EFFECT_VOCABULARY}.\nScény:\n${JSON.stringify(brief)}`;
 
     const raw = await callAnthropicApi({
       model: MODEL.trim(),
@@ -669,12 +719,8 @@ async function reviewSoundDesign(scenes: Scene[], language: string): Promise<voi
       const scene = scenes.find(s => s.index === fix.index);
       if (!scene) continue;
       if (fix.soundscape) scene.soundscape = fix.soundscape;
-      if ("sfx" in fix) {
-        scene.sfx = fix.sfx ?? undefined;
-        // 🎙️ dozor nezná sfxVoice, ať tam po výměně sfx nezůstane sirotek ze
-        // starého párování (viz Scene.sfxVoice, lib/types.ts) — vymaž ho,
-        // kdykoli nový sfx není z GENDERED_SFX (nebo se sfx smazal úplně).
-        if (!scene.sfx || !GENDERED_SFX.includes(scene.sfx)) scene.sfxVoice = undefined;
+      if (Array.isArray(fix.sfxCues)) {
+        scene.sfxCues = normalizeSceneSoundCues({ ...scene, sfxCues: fix.sfxCues }).sfxCues;
       }
     }
   } catch (e) {
@@ -1218,10 +1264,11 @@ export async function generateStory(
         script.choice ? [...script.scenes, ...script.choice.altScenes] : script.scenes,
         language
       );
+      validateStoryCanon(script, req, extras);
       return script;
     } catch (e) {
       if (attempt === 3) throw e;
-      const msg = `📄 Claude: scénář se nedal přečíst (JSON), zkouším ještě jednou celý od začátku (${attempt}/3): ${e instanceof Error ? e.message.slice(0, 140) : e}`;
+      const msg = `📄 Claude: scénář neprošel strukturou/canon kontrolou, zkouším ještě jednou celý od začátku (${attempt}/3): ${e instanceof Error ? e.message.slice(0, 140) : e}`;
       console.warn(msg);
       onLog?.(msg);
     }
@@ -1395,7 +1442,7 @@ export function enforceCanonicalAppearance(hero: string, req: StoryRequest, extr
   // dvě různé instrukce o tom, co má přesně držet — a právě velikosti postav
   // pak mezi scénami plavaly (nahlášeno: Valentýnka jednou po uši, jinde po
   // pás). Před dělením proto nový řádek před známou sekcí normalizujeme na "|".
-  const SECTIONS = "heights|key objects|story outfits|team kits|world & setting lock|world and setting lock|pronunciation hints";
+  const SECTIONS = "heights|key objects|story outfits|team kits|world & setting lock|world and setting lock|pronunciation hints|non-negotiable identity anchors";
   const normalized = hero.replace(new RegExp(`\\s*\\n+\\s*(?=(?:${SECTIONS})\\s*:)`, "gi"), " | ");
   const parts = normalized.split("|").map(s => s.trim()).filter(Boolean);
   // Jména kanonických postav (cs + en varianta + jméno z popisu)
@@ -1442,12 +1489,22 @@ export function enforceCanonicalAppearance(hero: string, req: StoryRequest, extr
   }
   const finalParts = [...canonical, ...kept];
   if (mergedHeights) finalParts.push(mergedHeights);
+  const identityAnchors: Record<string, string> = {
+    valentyna: "Valentýna always has hazel brown-green eyes (NEVER blue), pale wavy blonde hair with the same large pink bow, genuine two-year-old toddler proportions and the same relative height in every scene",
+    jan: "Dad Jan always has the same medium-brown hair amount and silhouette: receding temples plus a soft central widow's peak, a full short top with a few messy forehead strands, and the same short light stubble — never balder, never thick-haired, never clean-shaven",
+    archie: "Archie always has the same compact small-to-medium body, solid warm tan coat, white forehead-to-muzzle blaze, white chest/paws, AND his black studded collar with round red tag in every scene — none of these may disappear",
+    nicolas: "Nicolas always has warm golden-blond hair, hazel brown-green eyes, the same school-age child face/body proportions and his white shirt with two red stripes",
+  };
+  const selectedAnchors = req.characters.map(c => identityAnchors[c.id]).filter(Boolean);
+  if (selectedAnchors.length) {
+    finalParts.push(`Non-negotiable identity anchors: ${selectedAnchors.join("; ")}. Any missing or changed anchor means the character is NOT canon.`);
+  }
   return finalParts.join(" | ");
 }
 
 // Sekce v heroDescription, které NEJSOU jména postav (aby je invented-jméno
 // parser nebral omylem jako vymyšlenou postavu)
-const HERO_DESC_NON_CHARACTER_SECTIONS = new Set(["heights", "key objects", "story outfits", "world & setting lock", "world and setting lock", "pronunciation hints"]);
+const HERO_DESC_NON_CHARACTER_SECTIONS = new Set(["heights", "key objects", "story outfits", "world & setting lock", "world and setting lock", "pronunciation hints", "non-negotiable identity anchors"]);
 
 /** 🕵️ Jména postav VYMYŠLENÝCH pro tuhle konkrétní pohádku (ne z kartotéky) —
  *  ty NEMAJÍ malovaný referenční portrét, takže bez obrázkové kotvy jejich

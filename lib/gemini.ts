@@ -371,6 +371,12 @@ function normalizeSeverity(f: QaFinding): QaFinding {
   if (/look-?alike|looks like (a |the )?(hero|copy)|near-?copy|same face|copy of|identical to (the )?(hero|reference)/i.test(f.problem)) {
     return { ...f, severity: "MAJOR" };
   }
+  // Výslovné rodinné identity anchors nejsou dekorace. Chybějící Archieho
+  // obojek/blaze, Janova vlasová silueta nebo Vájin batolecí tvar jsou přesně
+  // vady, které rodič pozná napříč slidy — vždy je posuň do opravitelné MAJOR.
+  if (/collar|red tag|forehead.*blaze|muzzle.*blaze|widow.?s peak|receding (hairline|temples)|hair (amount|density|silhouette)|stubble|toddler proportions|body proportions|identity anchor/i.test(`${f.problem} ${f.attribute || ""}`)) {
+    return { ...f, severity: "MAJOR" };
+  }
   // Pravidlo 3 — barvy. VLASY jsou identitní znak (dva sourozenci s různou,
   // byť "sousední" barvou vlasů — blond vs. zrzavá/kaštanová — jsou pro
   // rodiče viditelně PROHOZENÍ, ne malířská odchylka): tolerovat se smí jen
