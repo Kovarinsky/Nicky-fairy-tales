@@ -26,7 +26,16 @@ export async function POST(req: NextRequest) {
     // účtu) — appka to hlídá i na klientovi (Home screen, createStory), ale
     // tenhle server endpoint je AUTORITATIVNÍ místo: bez platné session se
     // sem vůbec nedostane, ať klient obejde cokoliv jinde.
-    const username = verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
+    // 🧪 Preview-only benchmark hook pro ONE_SHEET_STORY. Je neaktivní na
+    // production targetu i bez feature flagu a preview samotné navíc chrání
+    // Vercel Deployment Protection. Umožní automatický noční benchmark bez
+    // kopírování uživatelského session cookie do skriptů.
+    const prototypeBenchmark = process.env.VERCEL_ENV !== "production" &&
+      /^(1|true|on)$/i.test(process.env.ONE_SHEET_STORY || "") &&
+      req.headers.get("x-prototype-benchmark") === "one-sheet-v1";
+    const username = prototypeBenchmark
+      ? (process.env.NEXT_PUBLIC_ADMIN_USERNAME || "jan")
+      : verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
     if (!username) {
       return NextResponse.json({ error: "Pro vytvoření pohádky se prosím přihlaste." }, { status: 401 });
     }
