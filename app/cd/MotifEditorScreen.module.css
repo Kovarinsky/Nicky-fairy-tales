@@ -1,0 +1,119 @@
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: #241447;
+  color: #fdf3d7;
+  font-family: "Nunito", system-ui, sans-serif;
+  user-select: none;
+}
+.bgLayer {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(16, 8, 36, 0.6), rgba(16, 8, 36, 0.2) 28%, rgba(16, 8, 36, 0.3) 68%, rgba(14, 7, 32, 0.9));
+}
+.body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 54px 20px 30px;
+  gap: 16px;
+}
+.headerRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.backBtn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+  color: #fdf3d7;
+  font-size: 22px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.title {
+  font-family: "Alegreya", Georgia, serif;
+  font-size: 25px;
+  font-weight: 800;
+  color: #fdf3d7;
+  text-shadow: 0 2px 10px rgba(20, 8, 40, 0.7);
+}
+.textarea {
+  flex: 1;
+  min-height: 0;
+  border: 1.5px solid rgba(253, 224, 138, 0.4);
+  border-radius: 22px;
+  padding: 18px;
+  font-size: 17px;
+  line-height: 1.55;
+  font-weight: 700;
+  color: #fdf3d7;
+  background: rgba(16, 8, 36, 0.55);
+  backdrop-filter: blur(8px);
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.row {
+  display: flex;
+  gap: 10px;
+}
+.secondaryBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f59e0b, #f97316);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.35);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.discIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28);
+}
+.cta {
+  width: 100%;
+  height: 62px;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
+  box-shadow: 0 4px 24px rgba(245, 158, 11, 0.35);
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 800;
+  cursor: pointer;
+}

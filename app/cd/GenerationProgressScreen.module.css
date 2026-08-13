@@ -1,0 +1,156 @@
+@import "./tokens.css";
+
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  box-sizing: border-box;
+  padding: 0 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  background: var(--gradient-night);
+  color: var(--color-cream);
+  font-family: var(--font-body);
+}
+.icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  background: var(--glass-fill);
+  border: 1.5px solid var(--glass-border);
+}
+.title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 21px;
+  font-weight: 800;
+}
+.body {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: rgba(253, 243, 215, 0.85);
+  text-wrap: pretty;
+}
+.bodyMuted {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(253, 243, 215, 0.55);
+}
+.spinner {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 3px solid rgba(253, 224, 138, 0.22);
+  border-top-color: var(--color-gold-soft);
+  animation: spin 900ms linear infinite;
+}
+.spinnerStatic {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 3px solid rgba(253, 224, 138, 0.22);
+  border-top-color: var(--color-gold-soft);
+}
+.progressRow {
+  display: flex;
+  gap: 6px;
+  width: 220px;
+}
+.progressSeg,
+.progressSegOn {
+  flex: 1;
+  height: 6px;
+  border-radius: 4px;
+}
+.progressSeg {
+  background: rgba(255, 255, 255, 0.15);
+}
+.progressSegOn {
+  background: var(--gradient-cta);
+  transition: background 600ms ease-out;
+}
+.textBtn {
+  border: none;
+  background: none;
+  color: rgba(253, 224, 138, 0.85);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 6px;
+}
+.cta {
+  height: 56px;
+  padding: 0 24px;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--radius-pill);
+  color: #fff;
+  background: var(--gradient-cta);
+  box-shadow: var(--shadow-cta);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.dangerBtn {
+  height: 48px;
+  border: 1.5px solid rgba(248, 113, 113, 0.5);
+  border-radius: var(--radius-pill);
+  background: rgba(80, 20, 30, 0.35);
+  color: var(--color-danger);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 300px;
+}
+.confirmOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.confirmScrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim-heavy);
+}
+.confirmCard {
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  top: 30%;
+  padding: 20px;
+  border-radius: 22px;
+  background: var(--color-night-1);
+  border: 1.5px solid var(--glass-border);
+  box-shadow: var(--shadow-panel);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.confirmTitle {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 800;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

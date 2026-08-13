@@ -1,0 +1,26 @@
+@import "./tokens.css";
+
+.overlay { position: fixed; inset: 0; z-index: 55; display: flex; font-family: var(--font-body); }
+.scrim { position: absolute; inset: 0; background: var(--scrim-heavy); }
+.card {
+  position: relative; margin: auto; width: 84%; max-width: 320px; box-sizing: border-box;
+  padding: 22px; border-radius: var(--radius-card-sm); background: var(--color-night-1);
+  border: 1.5px solid var(--glass-border); display: flex; flex-direction: column; gap: 12px;
+  text-align: center; color: var(--color-cream);
+}
+.icon {
+  width: 54px; height: 54px; border-radius: 50%; margin: 0 auto; font-size: 26px;
+  display: flex; align-items: center; justify-content: center; background: var(--glass-fill);
+  border: 1.5px solid var(--glass-border);
+}
+.title { margin: 0; font-family: var(--font-serif); font-size: 19px; font-weight: 800; }
+.body { margin: 0; font-size: 13px; font-weight: 600; color: rgba(253,243,215,.85); }
+.cta {
+  height: 52px; border: 1.5px solid rgba(255,255,255,.9); border-radius: var(--radius-pill);
+  color: #fff; background: var(--gradient-cta); box-shadow: var(--shadow-cta);
+  font-family: inherit; font-size: 15px; font-weight: 800; cursor: pointer;
+}
+.textBtn {
+  border: none; background: none; color: rgba(253,224,138,.85); font-family: inherit;
+  font-size: 13px; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 4px;
+}

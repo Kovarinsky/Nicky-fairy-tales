@@ -1,0 +1,158 @@
+@import "./tokens.css";
+
+.screen {
+  position: relative;
+  width: 100%;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: 58px 16px 26px;
+  background: var(--gradient-night);
+  color: var(--color-cream);
+  font-family: var(--font-body);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.backBtn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--color-cream);
+  font-size: 20px;
+  cursor: pointer;
+}
+.title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 800;
+}
+.resumeBanner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-card-sm);
+  background: var(--glass-fill);
+  border: 1.5px solid var(--glass-border);
+}
+.resumeIcon { font-size: 20px; }
+.resumeText { flex: 1; display: flex; flex-direction: column; }
+.resumeLabel { font-size: 10px; font-weight: 800; color: rgba(253, 224, 138, 0.8); }
+.resumeTitle { font-size: 14px; font-weight: 800; }
+.resumeCta {
+  height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-cta);
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+}
+.resumeDismiss {
+  border: none;
+  background: none;
+  color: rgba(253, 243, 215, 0.6);
+  font-size: 16px;
+  cursor: pointer;
+}
+.errorBanner {
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(80, 20, 30, 0.35);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: var(--color-danger);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.skeleton {
+  height: 150px;
+  border-radius: var(--radius-tile);
+  background: linear-gradient(90deg, rgba(253, 224, 138, 0.08), rgba(253, 224, 138, 0.18), rgba(253, 224, 138, 0.08));
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+.card {
+  position: relative;
+  height: 150px;
+  border-radius: var(--radius-tile);
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+.cardBody {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding: 10px;
+  cursor: pointer;
+  color: #fff;
+}
+.cardLabel { font-size: 12.5px; font-weight: 800; }
+.cardDate { font-size: 10.5px; font-weight: 700; opacity: 0.75; }
+.cardMenu {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+}
+.menuDot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(8, 3, 20, 0.6);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 40px 20px;
+}
+.emptyIcon { font-size: 30px; }
+.emptyTitle { margin: 0; font-family: var(--font-serif); font-size: 19px; font-weight: 800; }
+.emptyBody { margin: 0; font-size: 13px; font-weight: 600; color: rgba(253, 243, 215, 0.7); }
+.cta {
+  height: 56px;
+  padding: 0 24px;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--radius-pill);
+  color: #fff;
+  background: var(--gradient-cta);
+  box-shadow: var(--shadow-cta);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

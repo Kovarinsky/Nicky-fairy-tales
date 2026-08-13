@@ -1,0 +1,99 @@
+@import "./tokens.css";
+
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  box-sizing: border-box;
+  background-size: cover;
+  background-position: center;
+  font-family: var(--font-body);
+  color: var(--color-cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.closeBtn {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--gradient-cta);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+.card {
+  width: min(84%, 340px);
+  box-sizing: border-box;
+  padding: 24px 20px;
+  border-radius: var(--radius-card);
+  background: rgba(30, 16, 58, 0.72);
+  border: 1.5px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: center;
+  /* always fits within the viewport, never overflows */
+  max-height: 90dvh;
+  overflow: auto;
+}
+.sparkle {
+  font-size: 30px;
+  animation: burst 1.2s ease-in-out;
+}
+.title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 32px;
+  font-weight: 800;
+}
+.cta {
+  height: 56px;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--radius-pill);
+  color: #fff;
+  background: var(--gradient-cta);
+  box-shadow: var(--shadow-cta);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.secondary {
+  height: 44px;
+  border: 1.5px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-cream);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.textBtn {
+  border: none;
+  background: none;
+  color: rgba(253, 224, 138, 0.85);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 6px;
+}
+@keyframes burst {
+  0% { opacity: 0; transform: scale(0.2); }
+  60% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.4); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sparkle { animation: none; opacity: 0; }
+}
