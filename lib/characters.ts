@@ -66,6 +66,11 @@ export interface ReferenceImage {
   name?: string;
   /** Volitelný vlastní instrukční text místo výchozího "Reference photo of ..." */
   label?: string;
+  /** Určuje autoritu reference. Knihovní kánon má vždy přednost před
+   * obrázkem z předchozí scény, který smí držet jen styl/prostředí. */
+  role?: "character-canon" | "story-style" | "scale" | "other";
+  /** Stabilní id knihovní postavy pro audit a cílenou kontrolu. */
+  characterId?: string;
 }
 
 function mimeFromExt(file: string): string {

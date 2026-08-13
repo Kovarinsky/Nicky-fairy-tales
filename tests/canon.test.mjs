@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { prepareStoryRequestCanon, repairStoryCanonNames, repairStoryNarrationLanguage, repairToddlerSpeech, StoryCanonError, validateStoryCanon } from "../lib/story-canon.ts";
+import { hasHardCanonFailure } from "../lib/gemini.ts";
 
 const cues = [
   { effect: "bell_ring", at: 0.2 },
@@ -91,4 +92,19 @@ test("every new scene requires two distinct separated sound cues", () => {
     () => validateStoryCanon(script("James zazvonil dvakrát.", [{ effect: "bell_ring", at: 0.2 }, { effect: "bell_ring", at: 0.7 }]), req),
     /dva odlišné/
   );
+});
+
+test("critical visual identity drift is never deadline-tolerable", () => {
+  assert.equal(hasHardCanonFailure({
+    ok: false, action: "REDRAW", problems: "wrong hair and age", badRules: 2,
+    findings: [
+      { rule: 4, severity: "MAJOR", problem: "Valentyna hair extends below shoulders" },
+      { rule: 13, severity: "MAJOR", problem: "Nicolas appears too old" },
+    ], fixInstruction: "redraw",
+  }), true);
+  assert.equal(hasHardCanonFailure({
+    ok: false, action: "EDIT", problems: "pet gaze", badRules: 1,
+    findings: [{ rule: 14, severity: "MAJOR", problem: "Archie looks out of frame" }],
+    fixInstruction: "turn Archie toward Nicolas",
+  }), false);
 });

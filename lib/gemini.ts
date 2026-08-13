@@ -200,12 +200,16 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
   // Reference photos go first, each labeled with the character's name,
   // so Gemini can match the likeness when drawing the stylized scene
   const parts: Array<Record<string, unknown>> = [];
-  for (const ref of refImages) {
+  const orderedRefs = [...refImages].sort((a, b) =>
+    (a.role === "character-canon" ? 0 : a.role === "scale" ? 1 : a.role === "story-style" ? 3 : 2) -
+    (b.role === "character-canon" ? 0 : b.role === "scale" ? 1 : b.role === "story-style" ? 3 : 2)
+  );
+  for (const ref of orderedRefs) {
     parts.push({ text: ref.label || `Reference photo of ${ref.name || "a story character"} (match this person's/animal's likeness):` });
     parts.push({ inlineData: { data: ref.data, mimeType: ref.mimeType } });
   }
-  if (refImages.length > 0) {
-    parts.push({ text: "Draw the characters so they are clearly recognizable as the people/animals in the reference photos above — same face shape, hair color and style, eye color, build, AGE and body size — but rendered in the illustration style described below. Keep every character's age and size true to their photo in every scene. Do NOT copy the photos' backgrounds or clothing unless the prompt says so." });
+  if (orderedRefs.length > 0) {
+    parts.push({ text: "REFERENCE PRIORITY IS STRICT: AUTHORITATIVE CHARACTER CANON portraits/contracts outrank scale sheets and all STORY STYLE / SETTING references. A previous story scene NEVER defines a named character's identity. Draw each named character as the exact same person/animal as their own canon portrait: same face shape, exact hair color/length/style, eye color, apparent AGE, build, body proportions, permanent markings/accessories and required outfit. Use story-scene references only for art style, lighting, setting and recurring objects. Do NOT copy their character appearance. Unless the scene explicitly requires someone to watch a distant object, stand guard, leave, or be alone, every visible person and animal must engage with the scene's shared action: gaze, face and body oriented toward another character or the object/event they are jointly reacting to — never stare randomly out of frame." });
   }
   parts.push({ text: prompt });
   const bodyBuf = Buffer.from(
@@ -374,9 +378,10 @@ function normalizeSeverity(f: QaFinding): QaFinding {
   // Výslovné rodinné identity anchors nejsou dekorace. Chybějící Archieho
   // obojek/blaze, Janova vlasová silueta nebo Vájin batolecí tvar jsou přesně
   // vady, které rodič pozná napříč slidy — vždy je posuň do opravitelné MAJOR.
-  if (/collar|red tag|forehead.*blaze|muzzle.*blaze|widow.?s peak|receding (hairline|temples)|hair (amount|density|silhouette)|stubble|toddler proportions|body proportions|identity anchor/i.test(`${f.problem} ${f.attribute || ""}`)) {
+  if (/collar|red tag|forehead.*blaze|muzzle.*blaze|widow.?s peak|receding (hairline|temples)|hair (amount|density|silhouette|length)|below (the )?shoulders|stubble|toddler proportions|body proportions|identity anchor|overweight|too (heavy|old|young)|apparent age/i.test(`${f.problem} ${f.attribute || ""}`)) {
     return { ...f, severity: "MAJOR" };
   }
+  if (f.rule === 14) return { ...f, severity: "MAJOR" };
   // Pravidlo 3 — barvy. VLASY jsou identitní znak (dva sourozenci s různou,
   // byť "sousední" barvou vlasů — blond vs. zrzavá/kaštanová — jsou pro
   // rodiče viditelně PROHOZENÍ, ne malířská odchylka): tolerovat se smí jen
@@ -440,6 +445,15 @@ function decideAction(findings: QaFinding[]): QaAction {
   return needsRedraw ? "REDRAW" : "EDIT";
 }
 
+/** Vady identity, které se nesmějí propustit ani po deadline. */
+export function hasHardCanonFailure(v: QaVerdict | null): boolean {
+  if (!v) return false;
+  return v.findings.some(f => f.severity === "MAJOR" &&
+    ([1, 2, 3, 4, 7, 13].includes(f.rule) ||
+      /identity|face|hair|age|body|build|proportion|collar|tag|blaze|marking|look-?alike/i.test(`${f.problem} ${f.attribute || ""}`))
+  );
+}
+
 export async function verifySceneImage(
   apiKey: string, img: ImageResult, heroDescription: string, scenePrompt = "",
   refs: ReferenceImage[] = [], // 🕵️ kanonické portréty — inspektor porovnává TVÁŘE, ne jen text
@@ -448,7 +462,7 @@ export async function verifySceneImage(
   // Referenční portréty jdou inspektorovi PŘED kontrolovaný obrázek — dřív
   // soudil jen podle textu a „Bella jako černoška" mu nemohla padnout do oka
   const refParts = refs.slice(0, 8).flatMap((r, i) => [
-    { text: `REFERENCE ${i + 1} — ${(r.label || (r.name ? `canonical portrait of ${r.name}` : "reference image")).slice(0, 300)}:` },
+    { text: `REFERENCE ${i + 1} [${r.role || "other"}] — ${(r.label || (r.name ? `canonical portrait of ${r.name}` : "reference image")).slice(0, 1500)}:` },
     { inlineData: { data: r.data, mimeType: r.mimeType } },
   ]);
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -488,6 +502,7 @@ export async function verifySceneImage(
               ...(refParts.length ? [
                 "13) IDENTITY MATCH TO REFERENCES: compare EVERY visible named character against their REFERENCE image above — it must clearly be the SAME person: same face, same underlying SKIN TONE/ethnicity, same hair color and style, same apparent AGE and BODY SIZE (a small child in the reference must stay a small child — drawn as a teenager or adult = FAIL; an adult must stay an adult), same signature outfit. A character who looks like a DIFFERENT person than their reference (different ethnicity, different age, different face) = FAIL. Do NOT fail for lighting-only differences (sun-tanned, warmer/cooler color grading, shadows, golden-hour light) when the person is otherwise clearly the same individual — judge the underlying tone, not the lighting. EXCEPTION: if the scene description explicitly states this character is now a different height/size (a deliberate story-driven transformation), a body-size difference from the reference is CORRECT, not a fail — still check face/hair/ethnicity/outfit match.",
               ] : []),
+              "14) SHARED-ACTION ENGAGEMENT: unless the scene explicitly requires a character/animal to watch something distant, stand guard, leave, hide, sleep, or be alone, everyone must visibly engage with the shared action — gaze and body toward another character or the jointly relevant object/event. A pet randomly staring out of frame while the family acts together is MODERATE and must be fixed.",
               "",
               "CLASSIFY EVERY FINDING BY SEVERITY — this is as important as finding it:",
               "· MAJOR = breaks the illusion for a child or reader: wrong/missing/extra named person, merged or swapped identities, a character who is not the person in their reference photo, colors jumping between families, broken art style, broken anatomy, body scale outside the stated tolerance, key content cut off by the frame, wrong setting.",
@@ -817,6 +832,7 @@ function buildAppearanceLock(heroDescription: string): { open: string; close: st
       // every independent scene draw after it — generalized here so it
       // protects any character, not just the ones already special-cased.
       `10) DO NOT REGRESS ATYPICAL FEATURES TOWARD THE GENERIC/EXPECTED LOOK: when a description above states something UNUSUAL for that kind of person or animal — thinning or receding hair instead of a full hairline, an off-standard marking or coloring instead of the typical one, an asymmetric or unusual detail — that is a DELIBERATE, PERMANENT trait, not a one-off note. Draw it EXACTLY as stated in EVERY single scene, even under the natural pull to draw a more "normal"/average-looking version of that face or creature. If a character's hair, marking or build looks noticeably more typical/generic here than the description states, it has been drawn WRONG and must be corrected to match, no matter how small the deviation seems.`,
+      `11) DEFAULT TO INTERACTION, NOT DISCONNECTION: unless this exact scene explicitly requires a character or animal to watch a distant object, stand guard, leave, hide, sleep, or be alone, every visible participant must engage with the shared action. Point their gaze, facial expression and body toward another character or toward the object/event everyone is reacting to. A family pet must not stare randomly out of frame while the family acts together.`,
     ].join(" "),
     close: `⚠ CONSISTENCY REMINDER: match hair, eyes, clothing, age, body size, relative heights, cast size and relationships EXACTLY as stated above — do NOT alter any detail, do NOT add anyone not named, and do NOT soften any unusual/atypical stated feature back toward a more generic look.`,
   };
@@ -897,10 +913,10 @@ export async function generateSceneImage(
           const lenientScene = sceneCastCount > 0 && sceneCastCount <= 2;
           if (v0 && !v0.ok && lenientScene && !v0.findings.some(f => f.severity === "MAJOR")) {
             console.log(`[Gemini QA] scene ${scene.index}: jen MODERATE nález na ${sceneCastCount}-osobové scéně → odlehčený režim, tolerováno bez opravy (${v0.problems})`);
-          } else if (v0 && !v0.ok && deadline !== undefined && Date.now() > deadline) {
+          } else if (v0 && !v0.ok && deadline !== undefined && Date.now() > deadline && !hasHardCanonFailure(v0)) {
             console.warn(`[Gemini QA] scene ${scene.index}: REJECTED [${v0.badRules} rules] (${v0.problems}) but DEADLINE passed → accepted as-is, no redraw`);
           } else if (v0 && !v0.ok) {
-            let best = { img, badRules: v0.badRules, problems: v0.problems };
+            let best = { img, badRules: v0.badRules, problems: v0.problems, verdict: v0 };
             // 🎯 Jedno opravné kolo — ale podle ZÁVAŽNOSTI: drobné vady
             // (barva očí, chybějící mašle) se cíleně DOEDITUJÍ na hotovém
             // obrázku, jen skutečné rozbití (styl, měřítko, ořez, cizí
@@ -920,13 +936,16 @@ export async function generateSceneImage(
                     );
                 const v2 = await verifySceneImage(apiKey, img2, heroDescription, scene.imagePrompt, refImages, deadline);
                 if (v2 && (v2.ok || v2.badRules < best.badRules)) {
-                  best = { img: img2, badRules: v2.ok ? 0 : v2.badRules, problems: v2.problems };
+                  best = { img: img2, badRules: v2.ok ? 0 : v2.badRules, problems: v2.problems, verdict: v2 };
                 }
               } catch (e2) {
                 console.warn(`[Gemini QA] scene ${scene.index}: ${useEdit ? "edit" : "redraw"} failed (${e2 instanceof Error ? e2.message : e2})`);
               }
             }
             img = best.img;
+            if (best.badRules > 0 && hasHardCanonFailure(best.verdict)) {
+              throw new Error(`CANON_IDENTITY_REJECTED: scene ${scene.index}: ${best.problems}`);
+            }
             if (best.badRules > 0) console.warn(`[Gemini QA] scene ${scene.index}: still imperfect [${best.badRules}] (${best.problems})`);
             else console.log(`[Gemini QA] scene ${scene.index}: fixed ✓`);
           } else if (v0 && v0.ok && v0.findings.length > 0) {

@@ -85,8 +85,9 @@ function portraitPrompt(c: Character): string {
 
 function portraitLabel(c: Character): string {
   return (
-    `CANONICAL PORTRAIT of ${c.name} — this is EXACTLY how ${c.name} looks in this book's art style. ` +
-    `Copy this appearance in every scene: same hair color and hairstyle, same face, same outfit and colors, same body size and proportions.`
+    `AUTHORITATIVE CHARACTER CANON for ${c.name} (id=${c.id}) — this portrait and the contract below outrank every story-scene/style reference. ` +
+    `The person/animal in this image is the ONLY allowed design for ${c.name}. Copy the same face, hair color and exact length/style, apparent age, build, body proportions, outfit, markings and permanent accessories. ` +
+    `CONTRACT: ${c.description}`
   );
 }
 
@@ -126,6 +127,9 @@ export async function getCharacterPortrait(c: Character, force = false): Promise
         data: buf.toString("base64"),
         mimeType: h.contentType || "image/webp",
         label: portraitLabel(c),
+        role: "character-canon",
+        characterId: c.id,
+        name: c.name,
       };
       memCache.set(key, ref);
       return ref;
@@ -176,6 +180,9 @@ export async function getCharacterPortrait(c: Character, force = false): Promise
       data: img.buffer.toString("base64"),
       mimeType: img.mimeType,
       label: portraitLabel(c),
+      role: "character-canon",
+      characterId: c.id,
+      name: c.name,
     };
     memCache.set(key, ref);
     return ref;
@@ -1093,7 +1100,13 @@ export async function loadPortraitRefEntries(characters: Character[]): Promise<P
   const out: PortraitRefEntry[] = [];
   for (const c of characters) {
     const portrait = await getCharacterPortrait(c);
-    const refs = portrait ? [portrait] : loadReferenceImages([c]);
+    const refs = portrait ? [portrait] : loadReferenceImages([c]).map(ref => ({
+      ...ref,
+      role: "character-canon" as const,
+      characterId: c.id,
+      name: c.name,
+      label: portraitLabel(c),
+    }));
     const keys = [c.name, c.nameEn, c.description?.split(":")[0]]
       .filter(Boolean)
       .map(s => String(s).trim().toLowerCase())
@@ -1118,7 +1131,9 @@ export function refsForText(entries: PortraitRefEntry[], text: string): Referenc
     return false;
   };
   const hit = entries.filter(e => e.keys.some(wordHit));
-  return (hit.length > 0 ? hit : entries).map(e => e.ref);
+  // Bez shody nevracej celé obsazení: cizí portréty modelu míchaly identity
+  // do postav, které na dané scéně vůbec nejsou. Scénář musí postavy jmenovat.
+  return hit.map(e => e.ref);
 }
 
 // ── Reference pro ARCH (víc scén v jednom obrázku) ──────────────────────────

@@ -25,7 +25,7 @@ import { prepareStoryRequestCanon } from "@/lib/story-canon";
 export { estimateStoryCostCredits };
 
 const ANCHOR_LABEL =
-  "CONSISTENCY ANCHOR — an illustration from THIS SAME story. Copy from it EXACTLY: every character's design, clothing, hair, body size and the relative heights between characters, the art style, AND every recurring object. The car keeps the identical body type, shape, colors and details in this scene (a sedan stays a sedan — it never becomes a different car):";
+  "STORY STYLE / SETTING REFERENCE ONLY — reuse its painterly style, palette, lighting, recurring setting and recurring objects. NEVER copy a person's or animal's face, hair, age, body shape, size, markings, clothing or accessories from this image. For every named library character, the AUTHORITATIVE CHARACTER CANON portrait and contract override this image completely:";
 
 export const MAX_SCENES = 20;
 
@@ -744,7 +744,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       try {
         const s0 = await fetch(st.sceneUrls[0], { cache: "no-store" }).then(r => (r.ok ? r.json() : null));
         const m = typeof s0?.imageUrl === "string" ? s0.imageUrl.match(/^data:(image\/[a-z.+-]+);base64,(.+)$/) : null;
-        if (m) anchor = { data: m[2], mimeType: m[1], label: ANCHOR_LABEL };
+        if (m) anchor = { data: m[2], mimeType: m[1], label: ANCHOR_LABEL, role: "story-style" };
       } catch {}
     }
 
@@ -811,7 +811,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       st.done = Object.keys(st.sceneUrls!).length;
       await write();
       if (i === 0 && !anchor) {
-        anchor = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: ANCHOR_LABEL };
+        anchor = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: ANCHOR_LABEL, role: "story-style" };
       }
       // 🕵️ První úspěšné nakreslení vymyšlené postavy = její vlastní kotva
       // pro všechny další scény, kde se jmenovitě objeví (viz komentář výše
@@ -839,7 +839,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
         });
         st.sceneUrls![0] = url;
         st.done = Object.keys(st.sceneUrls!).length;
-        anchor = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: ANCHOR_LABEL };
+        anchor = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: ANCHOR_LABEL, role: "story-style" };
         await write();
       }
     }
