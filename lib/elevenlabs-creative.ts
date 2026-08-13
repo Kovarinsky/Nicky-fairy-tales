@@ -19,7 +19,7 @@ async function cachedAudio(path: string): Promise<string | null> {
   try { return (await head(path, { token })).url; } catch { return null; }
 }
 
-async function audit(kind: "sfx" | "song", cacheHit: boolean, durationSec: number, digest: string): Promise<void> {
+async function audit(kind: "sfx" | "song" | "outro", cacheHit: boolean, durationSec: number, digest: string): Promise<void> {
   const token = blobToken();
   if (!token) return;
   const path = `creative-usage/u${Date.now()}-${kind}-${cacheHit ? "cache" : "generated"}-d${durationSec}-${digest.slice(0, 12)}.json`;
@@ -104,5 +104,32 @@ export async function generateStorySong(input: {
   if (!res.ok) throw new Error(`ElevenLabs Music ${res.status}: ${(await res.text()).slice(0, 220)}`);
   const url = await store(path, await res.arrayBuffer(), res.headers.get("content-type") || "audio/mpeg");
   await audit("song", false, duration, digest);
+  return url;
+}
+
+/** Krátký instrumentální most do usínací smyčky. Je cachovaný podle nálady
+ * prostředí, takže se stejný lesní/vesmírný/mořský závěr negeneruje znovu. */
+export async function generateStoryOutro(input: {
+  mood: string; theme?: string; durationSec?: number;
+}): Promise<string> {
+  const duration = Math.max(10, Math.min(22, Number(input.durationSec) || 14));
+  const mood = input.mood.replace(/[^a-z0-9 _-]/gi, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "gentle magic";
+  const theme = (input.theme || "storybook").replace(/[^a-z0-9 _-]/gi, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  const prompt = `Original instrumental children's story outro for a ${theme} world with a ${mood} mood. ` +
+    `Warm, tender and safe for bedtime; a tiny playful motif at the start, then gradually slower, softer and simpler, ` +
+    `ending on a long calm consonant chord that can flow into a lullaby loop. No vocals, no speech, no dramatic hit, no copyrighted melody or artist imitation.`;
+  const digest = hash(`${prompt}|${duration}`);
+  const path = `creative-audio/outro-v1-${digest}.mp3`;
+  const cached = await cachedAudio(path);
+  if (cached) { await audit("outro", true, duration, digest); return cached; }
+  if (!key()) throw new Error("ELEVENLABS_API_KEY chybí");
+  const res = await fetch(`${API}/v1/music?output_format=mp3_44100_128`, {
+    method: "POST",
+    headers: { "xi-api-key": key(), "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, music_length_ms: duration * 1000, model_id: "music_v2", force_instrumental: true }),
+  });
+  if (!res.ok) throw new Error(`ElevenLabs Outro ${res.status}: ${(await res.text()).slice(0, 220)}`);
+  const url = await store(path, await res.arrayBuffer(), res.headers.get("content-type") || "audio/mpeg");
+  await audit("outro", false, duration, digest);
   return url;
 }

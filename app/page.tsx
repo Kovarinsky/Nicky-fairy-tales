@@ -423,13 +423,15 @@ export default function Home() {
   const [storySongLoading, setStorySongLoading] = useState(false);
   const [storySongError, setStorySongError] = useState<string | null>(null);
   const storySongAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [storyOutroUrl, setStoryOutroUrl] = useState<string | null>(null);
+  const storyOutroAudioRef = useRef<HTMLAudioElement | null>(null);
+  const creditsOutroStartedRef = useRef(false);
   const closeCredits = useCallback(() => {
     storySongAudioRef.current?.pause();
+    storyOutroAudioRef.current?.pause();
     ambientRef.current?.setVolume(musicOn ? 0.22 : 0);
     setShowCredits(false);
   }, [musicOn]);
-  const goodnightCacheRef = useRef<{ key: string; url: string } | null>(null);
-  const goodnightAudioRef = useRef<HTMLAudioElement | null>(null);
   // 🌙 Závěrečný obrázek titulky NA MÍRU obsazení TÉTO pohádky (lib/portraits.ts
   // getGoodnightScene) místo natvrdo uloženého /bg-credits.png — viz useEffect
   // na showCredits níž. null, dokud se nedotáhne (appka zatím ukazuje statický
@@ -1542,6 +1544,13 @@ export default function Home() {
     if (viewMode === "reader") setCtrlsOpen(false);
   }, [viewMode]);
 
+  // Přechod stránky nikdy není pokyn uživatele k odkrytí ovládání. Starý
+  // <audio> může v některých prohlížečích poslat `pause` až po překreslení
+  // další stránky; explicitní reset podle identity slidu ten závod uzavírá.
+  useEffect(() => {
+    if (viewMode === "reader") setCtrlsOpen(false);
+  }, [viewMode, page, slideKey]);
+
   // Re-run layout-dependent effects when the device rotates (portrait ⇄
   // landscape) — ALE i vstup/výstup z fullscreen a obyčejný resize mění
   // zobrazenou šířku obrázku (tablet skryje/zobrazí lišty prohlížeče beze
@@ -1563,47 +1572,60 @@ export default function Home() {
     };
   }, []);
 
-  // Spoken "good night" when the credits roll at the end of the story
+  // Závěr je záměrně vizuálně klidný. Text „dobrou noc“ zůstává na kartě;
+  // zvukovou tečku obstará tematické outro a následná ukolébavka.
   useEffect(() => {
-    if (!showCredits) {
-      goodnightAudioRef.current?.pause();
-      goodnightAudioRef.current = null;
-      return;
+    if (!showCredits) return;
+    audioRef.current?.pause();
+  }, [showCredits]);
+
+  // Přehraje jednu krátkou tematickou tečku a nechá pod ní už rozběhnutou
+  // usínací smyčku plynule zesílit. Když ElevenLabs verze není připravená,
+  // použije se okamžitě lokální bezpečný fallback.
+  useEffect(() => {
+    if (!showCredits || creditsOutroStartedRef.current || !musicOn) return;
+    creditsOutroStartedRef.current = true;
+    ambientRef.current?.setVolume(0.07);
+    if (!storyOutroUrl) {
+      ambientRef.current?.playOutro();
+      const t = setTimeout(() => ambientRef.current?.setVolume(0.22), 5200);
+      return () => clearTimeout(t);
     }
-    const lang = goodnightLang();
-    const text = goodnightText(lang);
-    const key = `${selectedVoiceId}|${lang}|${text}`;
+    const a = new Audio(storyOutroUrl);
+    storyOutroAudioRef.current = a;
+    a.onended = () => ambientRef.current?.setVolume(0.22);
+    a.play().catch(() => {
+      ambientRef.current?.playOutro();
+      ambientRef.current?.setVolume(0.22);
+    });
+    return () => { a.onended = null; };
+  }, [showCredits, storyOutroUrl, musicOn]);
+
+  // ElevenLabs outro se připraví na pozadí už během čtení. Klíčem cache je
+  // prostředí/nálada, ne celý text pohádky: stejná lesní melodie se tak platí
+  // jen jednou. Při výpadku zůstává procedurální/knihovní fallback.
+  useEffect(() => {
+    if (!readerMode || !bookReady || !scenes.length) return;
     let cancelled = false;
+    setStoryOutroUrl(null);
     (async () => {
       try {
-        let url = goodnightCacheRef.current?.key === key ? goodnightCacheRef.current.url : null;
-        if (!url) {
-          const res = await fetch("/api/scene", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            signal: AbortSignal.timeout(30_000),
-            body: JSON.stringify({
-              scene: { index: 0, narration: text, imagePrompt: "x" },
-              audioOnly: true,
-              voiceId: selectedVoiceId || undefined,
-              language: lang,
-            }),
-          });
-          const data = await safeJson<{ audioUrl?: string }>(res);
-          if (!res.ok || !data.audioUrl) return;
-          url = data.audioUrl;
-          goodnightCacheRef.current = { key, url };
-        }
-        if (cancelled) return;
-        audioRef.current?.pause();
-        const a = new Audio(url);
-        goodnightAudioRef.current = a;
-        a.play().catch(() => {});
+        const mood = scenes[scenes.length - 1]?.soundscape || scenes[0]?.soundscape || "magic";
+        const theme = storyHistory.find(e => e.id === readerEntryIdRef.current)?.themeId || selectedTheme || "storybook";
+        const res = await fetch("/api/story-song", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(120_000),
+          body: JSON.stringify({ kind: "outro", mood, theme }),
+        });
+        const data = await safeJson<{ audioUrl?: string }>(res);
+        if (!cancelled && res.ok && data.audioUrl) setStoryOutroUrl(data.audioUrl);
       } catch {}
     })();
     return () => { cancelled = true; };
+    // title identifies a newly opened story; scene arrays update progressively.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showCredits]);
+  }, [readerMode, bookReady, title]);
 
   // 🌙 Závěrečný obrázek titulky NA MÍRU obsazení TÉTO pohádky (místo natvrdo
   // uloženého /bg-credits.png) — appka zjistí, kdo v pohádce OPRAVDU
@@ -1900,6 +1922,7 @@ export default function Home() {
     // require 30px horizontal movement and horizontal > vertical (2:1 ratio)
     if (Math.abs(dx) < 30 || Math.abs(dx) < Math.abs(dy) * 2) return;
     if (dx < 0 && nextVisible !== null) goToPage(nextVisible);
+    else if (dx < 0 && pagePos === visiblePages.length - 1) openStoryCredits();
     else if (dx > 0 && prevVisible !== null) goToPage(prevVisible);
   }
 
@@ -1950,6 +1973,15 @@ export default function Home() {
   const nextVisible = pagePos + 1 < visiblePages.length ? visiblePages[pagePos + 1] : null;
   const prevVisible = pagePos > 0 ? visiblePages[pagePos - 1] : null;
 
+  function openStoryCredits() {
+    audioRef.current?.pause();
+    setIsPlaying(false);
+    setCtrlsOpen(false);
+    creditsOutroStartedRef.current = false;
+    ambientRef.current?.enterSleepMode();
+    setShowCredits(true);
+  }
+
   // 🌙 Klesající usínací melodie — hraje se teď v handleAudioEnded, přesně
   // když dozní narace POSLEDNÍ stránky (viz komentář tam). Dřív hrála hned
   // při PŘÍCHODU na poslední stránku, tedy souběžně s vlastní narací téhle
@@ -1975,12 +2007,13 @@ export default function Home() {
     // (jen u pohádky, jejíž generování stále běží; jinak by blokla větev B)
     if (n > 0 && !scenesRef.current[n]?.imageUrl
         && serverJobsRef.current.some(jb => jb.jobId === readerEntryIdRef.current && jb.phase === "generating")) return;
-    // 🩺 viz suppressNextPauseRevealRef výš — jen u AUTO-ADVANCE (isAutoAdvanceRef
-    // už je true, nastaveno volajícím PŘED touhle voláním) potlačit reveal,
-    // co by jinak vyvolala nativní onPause z pause() o řádek níž.
-    if (isAutoAdvanceRef.current) suppressNextPauseRevealRef.current = true;
+    // Každé listování (automatické, šipkou, scrubberem i swipe) interně
+    // pauzne starý <audio>. Není to uživatelův povel „Pauza“, takže jeho
+    // opožděný pause event nesmí na nové stránce otevřít ovladače.
+    suppressNextPauseRevealRef.current = true;
     audioRef.current?.pause();
     setIsPlaying(false);
+    setCtrlsOpen(false);
     setPage(n);
     setSlideKey(k => k + 1);
   }, [scenes.length]);
@@ -1995,6 +2028,7 @@ export default function Home() {
       if (e.key === "ArrowRight" || e.key === "PageDown") {
         e.preventDefault();
         if (nextVisible !== null) goToPage(nextVisible);
+        else if (pagePos === visiblePages.length - 1) openStoryCredits();
       } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
         e.preventDefault();
         if (prevVisible !== null) goToPage(prevVisible);
@@ -2032,7 +2066,10 @@ export default function Home() {
     try {
       ms.setActionHandler("play", () => audioRef.current?.play().catch(() => {}));
       ms.setActionHandler("pause", () => audioRef.current?.pause());
-      ms.setActionHandler("nexttrack", () => { if (nextVisible !== null) goToPage(nextVisible); });
+      ms.setActionHandler("nexttrack", () => {
+        if (nextVisible !== null) goToPage(nextVisible);
+        else if (pagePos === visiblePages.length - 1) openStoryCredits();
+      });
       ms.setActionHandler("previoustrack", () => { if (prevVisible !== null) goToPage(prevVisible); });
     } catch {}
     return () => {
@@ -2055,6 +2092,7 @@ export default function Home() {
 
   function handleAudioEnded() {
     setIsPlaying(false);
+    setCtrlsOpen(false);
     // 🔀 Konec společného děje — místo otáčení stránky se ukáže výběr konce
     if (storyChoice && branch === null && page === storyChoice.common - 1) return;
     if (!autoAdvance) return;
@@ -2066,9 +2104,7 @@ export default function Home() {
       // později při zobrazení titulků) — outro tak plynule PŘEJDE do stejné
       // tiché usínací melodie, místo aby po něm nastalo ticho a smyčka
       // naskočila samostatně o chvíli později.
-      ambientRef.current?.playOutro();
-      ambientRef.current?.enterSleepMode();
-      setTimeout(() => setShowCredits(true), 3200);
+      openStoryCredits();
       return;
     }
     // 🔇 Generický "cinkavý" stinger po KAŽDÉ scéně byl na výslovné přání
@@ -3719,7 +3755,11 @@ export default function Home() {
     if (storySongUrl) {
       const el = storySongAudioRef.current;
       if (!el) return;
-      if (el.paused) { ambientRef.current?.setVolume(0.06); await el.play().catch(() => {}); }
+      if (el.paused) {
+        storyOutroAudioRef.current?.pause();
+        ambientRef.current?.setVolume(0.025);
+        await el.play().catch(() => {});
+      }
       else { el.pause(); ambientRef.current?.setVolume(musicOn ? 0.22 : 0); }
       return;
     }
@@ -3731,7 +3771,11 @@ export default function Home() {
       setStorySongUrl(data.audioUrl);
       const id = readerEntryIdRef.current;
       if (id) { patchHistoryEntry(id, { songUrl: data.audioUrl }); setStoryHistory(loadHistory()); }
-      setTimeout(() => { ambientRef.current?.setVolume(0.06); storySongAudioRef.current?.play().catch(() => {}); }, 80);
+      setTimeout(() => {
+        storyOutroAudioRef.current?.pause();
+        ambientRef.current?.setVolume(0.025);
+        storySongAudioRef.current?.play().catch(() => {});
+      }, 80);
     } catch (err) { setStorySongError(err instanceof Error ? err.message : "Písničku se nepodařilo vytvořit."); }
     finally { setStorySongLoading(false); }
   }
@@ -5950,7 +5994,13 @@ export default function Home() {
                 aria-label={!current.audioUrl && !regenAudio ? t.voiceLoading : isPlaying ? t.pause : t.play}>
                 {!current.audioUrl && !regenAudio ? <span className="placeholder-spinner placeholder-spinner-sm" /> : isPlaying ? "⏸" : "▶"}
               </button>
-              <button type="button" className="ctrl-btn ctrl-nav" onClick={() => nextVisible !== null && goToPage(nextVisible)} disabled={!hasNext} aria-label={t.next}>›</button>
+              <button type="button" className="ctrl-btn ctrl-nav"
+                onClick={() => {
+                  if (nextVisible !== null) goToPage(nextVisible);
+                  else if (pagePos === visiblePages.length - 1) openStoryCredits();
+                }}
+                disabled={!hasNext && pagePos !== visiblePages.length - 1}
+                aria-label={nextVisible === null ? (uiLang === "en" ? "Open ending" : "Otevřít závěr") : t.next}>›</button>
               {/* Jediné místo pro vypnutí titulků — žádná druhá kopie nahoře. */}
               <button type="button" className={`nav-mini-btn${subtitlesOn ? " nav-mini-btn-on" : ""}`}
                 onClick={() => setSubtitlesOn(p => !p)}
@@ -6319,10 +6369,12 @@ export default function Home() {
       )}
 
       {showCredits && (
-        <div className="credits-overlay" onClick={closeCredits}>
+        <div className="credits-overlay">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={goodnightImgUrl || "/bg-credits.png"} alt="" aria-hidden="true" className="credits-bg-img"
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+          <button type="button" className="credits-close" onClick={closeCredits}
+            aria-label={uiLang === "en" ? "Close ending" : "Zavřít závěr"}>×</button>
           <div className="credits-scroll">
             <div className="credits-content">
               <p className="credits-end">✨ Konec ✨</p>
@@ -6345,9 +6397,12 @@ export default function Home() {
               </button>
               {!storySongUrl && <p className="credits-song-hint">{uiLang === "en" ? "Optional ElevenLabs bonus — generated only after this tap." : "Volitelný ElevenLabs bonus — vytvoří se až po tomto klepnutí."}</p>}
               {storySongError && <p className="credits-song-error">{storySongError}</p>}
-              {storySongUrl && <audio ref={storySongAudioRef} src={storySongUrl} onEnded={() => ambientRef.current?.setVolume(musicOn ? 0.22 : 0)} />}
+              {storySongUrl && <audio ref={storySongAudioRef} src={storySongUrl}
+                onEnded={() => ambientRef.current?.setVolume(musicOn ? 0.22 : 0)} />}
 
-              <p className="credits-tap">— klikni pro zavření —</p>
+              <button type="button" className="credits-home-btn" onClick={closeCredits}>
+                🏠 {uiLang === "en" ? "Back to story" : "Zpět k pohádce"}
+              </button>
             </div>
           </div>
         </div>

@@ -41,6 +41,9 @@ export interface JobStatus {
   total?: number;
   done?: number;
   sceneUrls?: Record<number, string>;
+  /** Story-scoped temporary character library: invented name -> JSON blob of
+   * the first approved illustration that established that character. */
+  inventedAnchors?: Record<string, string>;
   error?: string;
   /** Poslední chyba kreslení obrázku (429 kvóta, billing…) — ukazuje se v UI */
   imgError?: string;
@@ -731,6 +734,19 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       const isLetter = (ch: string) => /[a-záčďéěíňóřšťúůýž]/i.test(ch);
       return !isLetter(low[i - 1] || " ") && !isLetter(low[i + k.length] || " ");
     };
+    // Obnovit dočasnou knihovnu i po předání jobu další serverless funkci.
+    // Dřív byla jen v RAM jedné funkce; po ~5 minutách chain pokračoval s
+    // prázdnou Map a stejnému skřítkovi znovu vymyslel jiný vzhled.
+    for (const [name, url] of Object.entries(st.inventedAnchors || {})) {
+      try {
+        const saved = await fetch(url, { cache: "no-store" }).then(r => (r.ok ? r.json() : null));
+        const m = typeof saved?.imageUrl === "string" ? saved.imageUrl.match(/^data:(image\/[a-z.+-]+);base64,(.+)$/) : null;
+        if (m) inventedRefs.set(name, {
+          data: m[2], mimeType: m[1], name, role: "character-canon",
+          label: `STORY CAST LOCK — ${name}'s approved design from the first appearance in THIS SAME story. Copy this character EXACTLY in every later scene: species, face, body shape, colors, clothing, distinctive features and size relative to the heroes:`,
+        });
+      } catch {}
+    }
     const refsFor = (txt: string): ReferenceImage[] => {
       const own = refsForText(refEntries, txt);
       const invented = inventedNames.filter(n => inventedRefs.has(n) && nameHit(txt, n)).map(n => inventedRefs.get(n)!);
@@ -814,7 +830,6 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       const url = await putJson(`jobs/${id}/scene-${i}.json`, payload);
       st.sceneUrls![i] = url;
       st.done = Object.keys(st.sceneUrls!).length;
-      await write();
       if (i === 0 && !anchor) {
         anchor = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: ANCHOR_LABEL, role: "story-style" };
       }
@@ -826,10 +841,13 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
         if (!inventedRefs.has(name) && nameHit(scene.imagePrompt, name)) {
           inventedRefs.set(name, {
             data: img.buffer.toString("base64"), mimeType: img.mimeType, name,
-            label: `REFERENCE — ${name}'s design as established earlier in THIS story. Match EXACTLY: species/what it's made of, body shape, colors, distinguishing features, size relative to the other characters:`,
+            role: "character-canon",
+            label: `STORY CAST LOCK — ${name}'s approved design from the first appearance in THIS SAME story. Copy this character EXACTLY in every later scene: species, face, body shape, colors, clothing, distinctive features and size relative to the heroes:`,
           });
+          st.inventedAnchors = { ...(st.inventedAnchors || {}), [name]: url };
         }
       }
+      await write();
     }
 
     // ⚡ Scéna 1 z ranného kreslení (běžela souběžně s psaním) — když vyšla,
@@ -845,6 +863,15 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
         st.sceneUrls![0] = url;
         st.done = Object.keys(st.sceneUrls!).length;
         anchor = { data: img.buffer.toString("base64"), mimeType: img.mimeType, label: ANCHOR_LABEL, role: "story-style" };
+        for (const name of inventedNames) {
+          if (!inventedRefs.has(name) && nameHit(scenesScript[0]?.imagePrompt, name)) {
+            inventedRefs.set(name, {
+              data: img.buffer.toString("base64"), mimeType: img.mimeType, name, role: "character-canon",
+              label: `STORY CAST LOCK — ${name}'s approved design from the first appearance in THIS SAME story. Copy this character EXACTLY in every later scene: species, face, body shape, colors, clothing, distinctive features and size relative to the heroes:`,
+            });
+            st.inventedAnchors = { ...(st.inventedAnchors || {}), [name]: url };
+          }
+        }
         await write();
       }
     }
@@ -1004,7 +1031,10 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
             // PANEL X" — bez toho model při 3+ postavách v archu míchal/
             // vymýšlel obličeje (nevěděl, který portrét patří ke kterému panelu)
             const panelTexts = group.map(i => `${scenesScript[i].imagePrompt} ${scenesScript[i].narration}`);
-            const groupRefs = [...refsForPanels(refEntries, panelTexts), ...customRefs];
+            const inventedGroupRefs = inventedNames
+              .filter(name => inventedRefs.has(name) && panelTexts.some(text => nameHit(text, name)))
+              .map(name => inventedRefs.get(name)!);
+            const groupRefs = [...refsForPanels(refEntries, panelTexts), ...customRefs, ...inventedGroupRefs];
             // 📏🖼️ Arch kreslí víc scén najednou → poměry výšek se v něm musí
             // držet napříč panely; výškový list i skupinová kotva jsou tu
             // proto vždy (když existují)
@@ -1026,6 +1056,15 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
                 });
                 st.sceneUrls![i] = url;
                 st.done = Object.keys(st.sceneUrls!).length;
+                for (const name of inventedNames) {
+                  if (!inventedRefs.has(name) && nameHit(scenesScript[i]?.imagePrompt, name)) {
+                    inventedRefs.set(name, {
+                      data: img.buffer.toString("base64"), mimeType: img.mimeType, name, role: "character-canon",
+                      label: `STORY CAST LOCK — ${name}'s approved design from the first appearance in THIS SAME story. Copy this character EXACTLY in every later scene: species, face, body shape, colors, clothing, distinctive features and size relative to the heroes:`,
+                    });
+                    st.inventedAnchors = { ...(st.inventedAnchors || {}), [name]: url };
+                  }
+                }
                 await write();
               },
               oneSheetStory ? {

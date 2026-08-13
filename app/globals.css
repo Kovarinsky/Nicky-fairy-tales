@@ -3936,21 +3936,16 @@ textarea.ta-accent:focus {
 }
 
 /* ── Rolling credits ── */
-@keyframes creditsScroll {
-  from { transform: translateY(100vh); }
-  to   { transform: translateY(-100%); }
-}
-
 .credits-overlay {
   position: fixed;
   inset: 0;
   z-index: 300;
   background: rgba(5, 5, 24, 0.9);
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   overflow: hidden;
-  cursor: pointer;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
 }
 
 /* 🌙 Klidná ilustrace usínajících dětí za titulky — appka dřív měla jen
@@ -3982,12 +3977,21 @@ textarea.ta-accent:focus {
 
 .credits-scroll {
   width: 100%;
-  max-width: 480px;
-  animation: creditsScroll 22s linear forwards;
+  max-width: min(92vw, 520px);
+  max-height: min(88dvh, 760px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  border: 1px solid rgba(253,224,138,.3);
+  border-radius: clamp(22px, 5vw, 36px);
+  background: rgba(20, 10, 44, .62);
+  box-shadow: 0 22px 65px rgba(3, 1, 12, .55);
+  backdrop-filter: blur(14px);
 }
+.credits-scroll::-webkit-scrollbar { display: none; }
 
 .credits-content {
-  padding: 2rem 2rem 8rem;
+  min-height: min(82dvh, 680px);
+  padding: clamp(1.4rem, 5vh, 3rem) clamp(1rem, 5vw, 2.5rem) clamp(1.2rem, 4vh, 2rem);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4028,13 +4032,6 @@ textarea.ta-accent:focus {
   line-height: 1.5;
 }
 
-.credits-tap {
-  margin-top: 3rem;
-  font-size: 0.8rem;
-  color: rgba(255,255,255,0.3);
-  font-weight: 600;
-}
-
 .credits-goodnight {
   margin-top: 2.5rem;
   font-size: 1.25rem;
@@ -4051,6 +4048,29 @@ textarea.ta-accent:focus {
 .credits-song-btn:disabled { opacity: .65; cursor: wait; }
 .credits-song-error { max-width: 28rem; color: #fecaca; font-size: .82rem; text-align: center; }
 .credits-song-hint { max-width: 24rem; color: rgba(255,255,255,.55); font-size: .72rem; text-align: center; }
+.credits-close {
+  position: fixed; z-index: 3;
+  top: max(.7rem, env(safe-area-inset-top)); right: max(.7rem, env(safe-area-inset-right));
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 1px solid rgba(253,224,138,.4); color: #fff7d6;
+  background: rgba(30,16,58,.72); backdrop-filter: blur(10px);
+  font-size: 1.65rem; line-height: 1; cursor: pointer;
+}
+.credits-home-btn {
+  margin-top: .7rem; border: 0; border-radius: 999px; padding: .68rem 1.05rem;
+  color: rgba(255,255,255,.84); background: rgba(255,255,255,.1);
+  font: inherit; font-size: .82rem; font-weight: 800; cursor: pointer;
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .credits-scroll { max-width: min(78vw, 700px); max-height: calc(100dvh - 1rem); }
+  .credits-content { min-height: 0; padding: .8rem 1.4rem; gap: .24rem; }
+  .credits-end { font-size: 1.65rem; margin-bottom: .1rem; }
+  .credits-title { font-size: 1.1rem; margin-bottom: .25rem; }
+  .credits-section { margin-top: .42rem; }
+  .credits-goodnight { margin-top: .55rem; font-size: 1rem; }
+  .credits-song-btn { margin-top: .35rem; padding: .55rem .9rem; }
+}
 
 
 /* ── Mobile-only overrides (edge-to-edge, smaller fonts) ── */

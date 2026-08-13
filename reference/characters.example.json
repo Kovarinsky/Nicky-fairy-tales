@@ -2,13 +2,13 @@
   {
     "id": "nicolas",
     "name": "Nicolásek",
-    "description": "a cheerful 6-year-old boy with light blond hair and a bright smile; the big brother, a head taller than his little sister",
+    "description": "Nicolas: straight VERY LIGHT PALE-BLOND hair, clearly LIGHTER and less golden than Valentýna's hair; a cheerful 6-year-old school-age boy with a bright smile, a head taller than his little sister",
     "referenceFile": "nicolas.jpg"
   },
   {
     "id": "valentyna",
     "name": "Valentýnka",
-    "description": "an almost-2-year-old toddler girl with blond hair, often wearing a hair bow; the little sister, noticeably smaller than her big brother",
+    "description": "Valentýna: SHOULDER-LENGTH wavy WARM GOLDEN-BLOND hair, clearly DARKER and more golden than Nicolas's hair, with a large pink bow; a true 2-year-old toddler, noticeably smaller than her big brother",
     "referenceFile": "valentyna.jpg"
   }
 ]

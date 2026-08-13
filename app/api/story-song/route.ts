@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/accounts";
-import { generateCustomSound, generateStorySong } from "@/lib/elevenlabs-creative";
+import { generateCustomSound, generateStoryOutro, generateStorySong } from "@/lib/elevenlabs-creative";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -17,6 +17,14 @@ export async function POST(req: NextRequest) {
     if (previewE2e && body.kind === "sfx") {
       const audioUrl = await generateCustomSound(String(body.prompt || "").slice(0, 450), Number(body.durationSec) || 1.5);
       return NextResponse.json({ audioUrl, kind: "sfx" });
+    }
+    if (body.kind === "outro") {
+      const audioUrl = await generateStoryOutro({
+        mood: String(body.mood || "gentle magic"),
+        theme: String(body.theme || "storybook"),
+        durationSec: 14,
+      });
+      return NextResponse.json({ audioUrl, kind: "outro" });
     }
     const title = String(body.title || "Pohádka").trim().slice(0, 160);
     const scenes = Array.isArray(body.scenes) ? body.scenes.slice(0, 20) : [];
