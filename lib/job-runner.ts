@@ -192,10 +192,19 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     };
     return putJson(`debug-logs/${id}.json`, record).catch(e => console.error(`[job ${id}] debug archive write failed:`, e));
   };
+  // Heartbeat, early draw a hlavní pipeline mohou zavolat write() souběžně.
+  // Přímé paralelní PUTy se dokončovaly mimo pořadí (v benchmarku status
+  // po 2958 znacích skočil zpět na 1603), takže starší snapshot přepsal
+  // novější. Zápisy statusu se proto serializují v pořadí vzniku.
+  let statusWriteChain: Promise<unknown> = Promise.resolve();
   const write = () => {
     st.updatedAt = Date.now();
     void writeDebugArchive();
-    return putJson(statusPath, st).catch(e => console.error(`[job ${id}] status write failed:`, e));
+    const snapshot = JSON.parse(JSON.stringify(st)) as JobStatus;
+    statusWriteChain = statusWriteChain
+      .then(() => putJson(statusPath, snapshot))
+      .catch(e => console.error(`[job ${id}] status write failed:`, e));
+    return statusWriteChain;
   };
   // 📋 Deník: co se kdy stalo (trvání kroků, chyby) — bez await, zapíše se
   // s nejbližším write(); do konzole jde záznam hned

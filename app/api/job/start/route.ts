@@ -101,6 +101,14 @@ export async function POST(req: NextRequest) {
     const work = putJson(`jobs/${id}/request.json`, body)
       .catch(e => console.error(`[job ${id}] request.json write failed:`, e))
       .then(() => runJob(id, body));
+    // Preview benchmark musí držet HTTP invokaci otevřenou. Reálný test
+    // ukázal, že fire-and-forget waitUntil ve Preview skončil už po ~17 s
+    // uprostřed Claude streamu, i když maxDuration je 300 s. Produkce dál
+    // používá okamžitou odpověď a waitUntil beze změny.
+    if (prototypeBenchmark) {
+      await work;
+      return NextResponse.json({ jobId: id, benchmarkAwaited: true });
+    }
     try { waitUntil(work); } catch { /* local dev — the promise runs in-process */ }
     return NextResponse.json({ jobId: id });
   } catch (err) {
