@@ -1,4 +1,3 @@
-@import "./tokens.css";
 
 .overlay { position: fixed; inset: 0; z-index: 50; display: flex; font-family: var(--font-body); }
 .scrim { position: absolute; inset: 0; background: var(--scrim-heavy); }

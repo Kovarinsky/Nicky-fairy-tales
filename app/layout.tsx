@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Nunito, Alegreya } from "next/font/google";
 import "./globals.css";
+import "./cd-tokens.css";
 import PhotoBackground from "./PhotoBackground";
 
 const nunito = Nunito({
