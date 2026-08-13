@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { prepareStoryRequestCanon, repairStoryCanonNames, repairStoryNarrationLanguage, StoryCanonError, validateStoryCanon } from "../lib/story-canon.ts";
+import { prepareStoryRequestCanon, repairStoryCanonNames, repairStoryNarrationLanguage, repairToddlerSpeech, StoryCanonError, validateStoryCanon } from "../lib/story-canon.ts";
 
 const cues = [
   { effect: "bell_ring", at: 0.2 },
@@ -70,6 +70,15 @@ test("isolated English words are removed from Czech narration", () => {
   assert.equal(repairStoryNarrationLanguage(completed, "cs"), 1);
   assert.equal(completed.scenes[0].narration, "Máma Jana přivinula děti k sobě.");
   assert.equal(repairStoryNarrationLanguage(completed, "en"), 0);
+});
+
+test("long Valentýnka speech is locally shortened instead of regenerating the story", () => {
+  const toddlerReq = { ...req, characters: [valentyna] };
+  const completed = script("Valentýnka se rozzářila a zvolala: „Podívej, mami, opravdový skřítek!“ Pak běžela dál.");
+  assert.equal(repairToddlerSpeech(completed, toddlerReq), 1);
+  assert.match(completed.scenes[0].narration, /„Skřítek!“/);
+  assert.match(completed.scenes[0].narration, /Pak běžela dál/);
+  assert.doesNotThrow(() => validateStoryCanon(completed, toddlerReq));
 });
 
 test("every new scene requires two distinct separated sound cues", () => {

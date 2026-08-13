@@ -132,6 +132,52 @@ export function repairStoryNarrationLanguage(script: StoryScript, language: stri
   return replacements;
 }
 
+function toddlerSpeechReplacement(speech: string): string {
+  const lower = speech.toLocaleLowerCase("cs");
+  const semantic: Array<[RegExp, string]> = [
+    [/skřít/iu, "Skřítek!"],
+    [/mam(?:i|ink)/iu, "Mami!"],
+    [/boj/iu, "Bojím se!"],
+    [/podívej|koukej/iu, "Podívej!"],
+    [/pojď/iu, "Pojď!"],
+    [/krás|nádher/iu, "Krásné!"],
+    [/děkuj/iu, "Děkuju!"],
+    [/našli|našla/iu, "Našli jsme!"],
+    [/chci/iu, "Chci taky!"],
+  ];
+  for (const [pattern, value] of semantic) if (pattern.test(lower)) return value;
+  const words = speech.replace(/[!?.,…]/gu, " ").trim().split(/\s+/u).filter(Boolean);
+  if (["já", "to", "tam", "tady", "ještě", "moc"].includes(words[0]?.toLocaleLowerCase("cs"))) {
+    return `${words.slice(0, 2).join(" ")}!`;
+  }
+  return `${words[0] || "Jé"}!`;
+}
+
+/** Shorten only direct speech attributed to selected two-year-old Valentýna.
+ * The completed plot and all other narration remain untouched. */
+export function repairToddlerSpeech(script: StoryScript, req: StoryRequest): number {
+  if (!selectedLibraryIds(req).has("valentyna")) return 0;
+  const scenes = script.choice ? [...script.scenes, ...script.choice.altScenes] : script.scenes;
+  const speechVerb = /(?:řekla|zeptala|zašeptala|zvolala|povídala|odpověděla|vykřikla|vyjekla|said|asked|whispered|called|replied)/iu;
+  const name = /(?:valent[ýy]n|váj)/iu;
+  let repairs = 0;
+  for (const scene of scenes) {
+    const original = scene.narration;
+    const quoteRe = /[„“"]([^„“"]+)[“"]/gu;
+    scene.narration = original.replace(quoteRe, (full, speech: string, offset: number) => {
+      const before = original.slice(Math.max(0, offset - 100), offset);
+      const after = original.slice(offset + full.length, offset + full.length + 100);
+      const context = `${before} ${after}`;
+      if (!name.test(context) || !speechVerb.test(context)) return full;
+      const words = speech.replace(/[!?.,…]/gu, " ").trim().split(/\s+/u).filter(Boolean);
+      if (words.length <= 2) return full;
+      repairs++;
+      return `${full[0]}${toddlerSpeechReplacement(speech)}${full[full.length - 1]}`;
+    });
+  }
+  return repairs;
+}
+
 export class StoryCanonError extends Error {
   readonly code: "RESERVED_LIBRARY_NAME" | "TODDLER_SPEECH" | "SOUND_CUES";
 
