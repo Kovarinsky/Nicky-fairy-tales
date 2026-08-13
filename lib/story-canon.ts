@@ -1,15 +1,17 @@
 import type { StoryRequest, StoryScript } from "./types";
 
 const RESERVED_LIBRARY_PATTERNS: Record<string, RegExp> = {
-  nicolas: /\bnicol[aá]s(?:ek|ka|kovi|kem|ku)?\b/iu,
-  valentyna: /\b(?:valent[ýy]n(?:ka|ku|ce|kou|ky)?|váj(?:a|i|u|ou)?)\b/iu,
-  jan: /\b(?:táta\s+)?jan(?:ovi|em)?\b/iu,
-  jana: /\b(?:máma\s+)?jan(?:a|ě|u|ou)\b/iu,
-  archie: /\barchi(?:e|emu|eho|em)\b/iu,
-  james: /\bjames(?:e|ovi|em)?\b/iu,
-  bella: /\bbell(?:a|u|e|ou|y)\b/iu,
-  eva: /\bev(?:a|u|ě|ou|y)\b/iu,
-  jakob: /\bjakob(?:a|ovi|em)?\b/iu,
+  // JavaScriptové \b zná jen ASCII: v „dřevěná" proto chybně považovalo
+  // „evě" za samostatné jméno Eva. Unicode hranice hlídají všechna písmena.
+  nicolas: /(?<!\p{L})nicol[aá]s(?:ek|ka|kovi|kem|ku)?(?!\p{L})/iu,
+  valentyna: /(?<!\p{L})(?:valent[ýy]n(?:ka|ku|ce|kou|ky)?|váj(?:a|i|u|ou)?)(?!\p{L})/iu,
+  jan: /(?<!\p{L})(?:táta\s+)?jan(?:ovi|em)?(?!\p{L})/iu,
+  jana: /(?<!\p{L})(?:máma\s+)?jan(?:a|ě|u|ou)(?!\p{L})/iu,
+  archie: /(?<!\p{L})archi(?:e|emu|eho|em)(?!\p{L})/iu,
+  james: /(?<!\p{L})james(?:e|ovi|em)?(?!\p{L})/iu,
+  bella: /(?<!\p{L})bell(?:a|u|e|ou|y)(?!\p{L})/iu,
+  eva: /(?<!\p{L})ev(?:a|u|ě|ou|y)(?!\p{L})/iu,
+  jakob: /(?<!\p{L})jakob(?:a|ovi|em)?(?!\p{L})/iu,
 };
 
 const SAFE_REPLACEMENT_NAMES: Record<string, string> = {

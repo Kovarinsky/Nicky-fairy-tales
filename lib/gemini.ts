@@ -201,8 +201,8 @@ function callGeminiImage(apiKey: string, model: string, prompt: string, aspect: 
   // so Gemini can match the likeness when drawing the stylized scene
   const parts: Array<Record<string, unknown>> = [];
   const orderedRefs = [...refImages].sort((a, b) =>
-    (a.role === "character-canon" ? 0 : a.role === "scale" ? 1 : a.role === "story-style" ? 3 : 2) -
-    (b.role === "character-canon" ? 0 : b.role === "scale" ? 1 : b.role === "story-style" ? 3 : 2)
+    (a.role === "story-style" ? 0 : a.role === "scale" ? 1 : a.role === "character-canon" ? 3 : 2) -
+    (b.role === "story-style" ? 0 : b.role === "scale" ? 1 : b.role === "character-canon" ? 3 : 2)
   );
   for (const ref of orderedRefs) {
     parts.push({ text: ref.label || `Reference photo of ${ref.name || "a story character"} (match this person's/animal's likeness):` });

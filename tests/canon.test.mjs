@@ -66,6 +66,13 @@ test("model-invented reserved names are repaired without discarding the story", 
   assert.doesNotThrow(() => validateStoryCanon(completed, req));
 });
 
+test("reserved-name repair never changes a name embedded in a Czech word", () => {
+  const completed = script("Dřevěná stezka vedla mezi stromy a dětem se líbila.");
+  const repairs = repairStoryCanonNames(completed, req);
+  assert.deepEqual(repairs, []);
+  assert.equal(completed.scenes[0].narration, "Dřevěná stezka vedla mezi stromy a dětem se líbila.");
+});
+
 test("isolated English words are removed from Czech narration", () => {
   const completed = script("Máma Jana children přivinula k sobě.");
   assert.equal(repairStoryNarrationLanguage(completed, "cs"), 1);
