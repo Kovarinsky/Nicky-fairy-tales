@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateStoryCanon } from "../lib/story-canon.ts";
+import { prepareStoryRequestCanon, StoryCanonError, validateStoryCanon } from "../lib/story-canon.ts";
 
 const cues = [
   { effect: "bell_ring", at: 0.2 },
@@ -17,6 +17,8 @@ function script(narration, sfxCues = cues) {
 
 const valentyna = { id: "valentyna", name: "Valentýnka", description: "toddler" };
 const james = { id: "james", name: "James", description: "boy" };
+const nicolas = { id: "nicolas", name: "Nicolásek", description: "boy" };
+const req = { topic: "", characters: [nicolas], age: 5, sceneCount: 1, language: "cs" };
 
 test("Valentýnka may use only one- or two-word toddler speech", () => {
   const req = { topic: "", characters: [valentyna], age: 5, sceneCount: 1, language: "cs" };
@@ -31,6 +33,24 @@ test("unselected library names cannot be assigned to invented characters", () =>
   const req = { topic: "", characters: [valentyna], age: 5, sceneCount: 1, language: "cs" };
   assert.throws(() => validateStoryCanon(script("Přiběhl nový kamarád James."), req), /rezervované jméno/);
   assert.doesNotThrow(() => validateStoryCanon(script("James zazvonil a zasmál se."), { ...req, characters: [james] }));
+});
+
+test("reserved names in an outline are renamed before a paid model call", () => {
+  const prepared = prepareStoryRequestCanon({
+    ...req,
+    topic: "James, Bella, Jakob a Eva potkají Nicolásek.",
+  });
+  assert.equal(prepared.renames.length, 4);
+  assert.match(prepared.request.topic, /Matěj, Rozárka, Tobiáš a Amálka/);
+  assert.match(prepared.request.topic, /Nicolásek/);
+  assert.doesNotMatch(prepared.request.topic, /James|Bella|Jakob|Eva/);
+});
+
+test("reserved-name validator exposes a non-retryable analytics code", () => {
+  assert.throws(
+    () => validateStoryCanon(script("Přiběhl James."), req),
+    error => error instanceof StoryCanonError && error.code === "RESERVED_LIBRARY_NAME",
+  );
 });
 
 test("every new scene requires two distinct separated sound cues", () => {

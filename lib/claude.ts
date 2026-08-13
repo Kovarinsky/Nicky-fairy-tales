@@ -1,6 +1,6 @@
 import type { StoryRequest, StoryScript, Character, Scene, Soundscape, SoundCue } from "./types";
 import { loadCharacters } from "./characters";
-import { validateStoryCanon } from "./story-canon";
+import { prepareStoryRequestCanon, StoryCanonError, validateStoryCanon } from "./story-canon";
 import musicManifest from "../public/music-lib/manifest.json";
 
 // Runtime allow-list generated from the files that are actually shipped. This
@@ -1174,6 +1174,9 @@ export async function generateStory(
   // vstupní/výstupní tokeny napříč pokusy (resume/redraw = víc volání)
   onUsage?: (usage: { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number }) => void
 ): Promise<StoryScript> {
+  // Resolve reserved library names before composing the prompt. Doing this
+  // here protects every caller (/job and the direct /story API), not only UI.
+  req = prepareStoryRequestCanon(req, extras).request;
   const model = MODEL.trim();
   const parts: AnthropicPart[] = [];
 
@@ -1267,6 +1270,10 @@ export async function generateStory(
       validateStoryCanon(script, req, extras);
       return script;
     } catch (e) {
+      // A reserved name is deterministic input/canon conflict, not stochastic
+      // bad JSON. Rewriting the whole 12-scene story cannot fix its input and
+      // previously burned several minutes/tokens per identical retry.
+      if (e instanceof StoryCanonError && e.code === "RESERVED_LIBRARY_NAME") throw e;
       if (attempt === 3) throw e;
       const msg = `📄 Claude: scénář neprošel strukturou/canon kontrolou, zkouším ještě jednou celý od začátku (${attempt}/3): ${e instanceof Error ? e.message.slice(0, 140) : e}`;
       console.warn(msg);

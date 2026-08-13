@@ -14,6 +14,7 @@ import type { StoryRequest, Character, Scene, StoryChoiceMeta } from "@/lib/type
 import { blobToken } from "@/lib/blob-token";
 import { chargeForCompletedStory } from "@/lib/accounts";
 import { estimateStoryCostCredits, actualStoryCostCredits } from "@/lib/pricing";
+import { prepareStoryRequestCanon } from "@/lib/story-canon";
 
 // 💳 Kreditní systém: "1 kredit = 1 Kč skutečných nákladů appky + 50% marže"
 // (viz lib/pricing.ts pro sazby a odůvodnění) — nahrazuje starý plochý model
@@ -74,6 +75,8 @@ export interface JobStatus {
    *  odděleně, protože mají JINOU sazbu než obyčejný input (1,25×/0,1×) —
    *  system prompt psaní jede s cache_control: ephemeral (lib/claude.ts). */
   writeTokens?: { input: number; output: number; cacheCreation: number; cacheRead: number };
+  /** Preflight konflikty knihovních jmen vyřešené před prvním placeným voláním. */
+  canonPreflight?: { renamed: number; mappings: string[] };
   /** Délka rozepsaného textu při minulém běhu — restart s delším partial = zdravé navázání */
   partialLen?: number;
   /** Restarty psaní BEZ pokroku v partial.json — jen ty znamenají zaseknutí */
@@ -174,6 +177,11 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
           chains: prev?.chains,
           partialLen: prev?.partialLen,
           stuckRestarts: prev?.stuckRestarts,
+          writeTokens: prev?.writeTokens,
+          canonPreflight: prev?.canonPreflight,
+          imgSpent: prev?.imgSpent,
+          spent1k: prev?.spent1k,
+          spent4k: prev?.spent4k,
           log: prev?.log, // deník přežívá restarty psaní
         };
   // 🩺 Trvalý diagnostický záznam běhu — NEZÁVISLÝ na jobs/<id>/* (ten smaže
@@ -188,6 +196,8 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
       total: st.total, done: st.done,
       createdAt: st.createdAt, updatedAt: st.updatedAt, finishedAt: st.finishedAt, wroteAt: st.wroteAt,
       chains: st.chains, restarts: st.restarts, stuckRestarts: st.stuckRestarts,
+      canonPreflight: st.canonPreflight, writeTokens: st.writeTokens,
+      spent1k: st.spent1k, spent4k: st.spent4k, imgSpent: st.imgSpent,
       log: st.log,
     };
     return putJson(`debug-logs/${id}.json`, record).catch(e => console.error(`[job ${id}] debug archive write failed:`, e));
@@ -346,6 +356,15 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
   let earlyDraw: Promise<{ buffer: Buffer; mimeType: string } | null> | null = null;
   let earlyImg: { buffer: Buffer; mimeType: string } | null = null;
 
+  // Snapshot BEFORE portraits/anchors/early scene start. The previous snapshot
+  // lived after story writing, so a scene drawn concurrently with Claude was
+  // real provider spend but invisible to both budget and failure analytics.
+  const genAtRunStart = { ...getGenCounter() };
+  const spent1kAtRunStart = st.spent1k ?? 0;
+  const spent4kAtRunStart = st.spent4k ?? 0;
+  const madeImagesThisRun = () => Math.max(0, getGenCounter().img1k - genAtRunStart.img1k);
+  const madeSheetsThisRun = () => Math.max(0, getGenCounter().img4k - genAtRunStart.img4k);
+
   // ⚡ Portréty postav se načítají SOUBĚŽNĚ s psaním (dřív se na ně čekalo
   // až po dopsání — u studeného startu ~3–5 s navíc)
   const refIds: string[] = withCarryover(Array.isArray(body.characterIds) ? (body.characterIds as string[]) : []);
@@ -401,7 +420,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
         ? { name: String(rawCustomTheme.name || "Vlastní svět"), prompt: String(rawCustomTheme.prompt).slice(0, 1200) }
         : undefined;
 
-      const storyReq: StoryRequest = {
+      let storyReq: StoryRequest = {
         topic,
         themeName: customTheme?.name ?? theme?.name,
         themePrompt: customTheme?.prompt ?? theme?.prompt,
@@ -448,6 +467,19 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
         pdfBriefText: st.pdfBrief || undefined,
         inspirationUrlText: urlText || undefined,
       };
+
+      // 🔒 Canon preflight musí proběhnout PŘED Claude API. Když osnova
+      // obsahuje jméno nevybrané knihovní postavy, ponechá se role, ale jméno
+      // se deterministicky přejmenuje. Dříve se konflikt zjistil až po ~2 min
+      // psaní a celý scénář se opakovaně zahodil.
+      const canonPreflight = prepareStoryRequestCanon(storyReq, extras);
+      storyReq = canonPreflight.request;
+      if (canonPreflight.renames.length) {
+        const mappings = canonPreflight.renames.map(r => `${r.libraryId}→${r.replacement}`);
+        st.canonPreflight = { renamed: mappings.length, mappings };
+        logEv(`🛡️ canon preflight: ${mappings.length} nevybraných knihovních jmen přejmenováno před psaním (${mappings.join(", ")})`);
+        await write();
+      }
 
       // Navázání psaní po restartu: rozepsaný text z minulého běhu se načte
       // a Claude POKRAČUJE tam, kde funkce umřela (prefill odpovědi) —
@@ -626,9 +658,8 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     // účtují zvlášť). Namlouvání appka spouští líně až KLIENTSKY po
     // dokončení jobu (fillMissingAudio, app/page.tsx), ale text scénáře —
     // a tedy přesný počet znaků, co půjde do ElevenLabs — appka zná už teď.
-    const genAtStart = { ...getGenCounter() };
-    const madeImages = () => Math.max(0, getGenCounter().img1k - genAtStart.img1k);
-    const madeSheets = () => Math.max(0, getGenCounter().img4k - genAtStart.img4k);
+    const madeImages = madeImagesThisRun;
+    const madeSheets = madeSheetsThisRun;
     const voiceChars = scenesScript.reduce((sum, s) => sum + (s.narration?.length || 0), 0);
 
     // ── 2) Scenes (Gemini) with the consistency anchor ──
@@ -1113,8 +1144,14 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     st.phase = "error";
     st.error = e instanceof Error ? e.message : String(e);
     st.lastError = st.error;
+    // Preserve and meter provider spend even when no story is completed. This
+    // includes the early scene that may have rendered while Claude was writing.
+    st.spent1k = spent1kAtRunStart + madeImagesThisRun();
+    st.spent4k = spent4kAtRunStart + madeSheetsThisRun();
+    st.imgSpent = st.spent1k + st.spent4k;
     logEv(`💥 CHYBA běhu: ${st.error.slice(0, 160)}`);
     await write();
+    await writeUsageRecord(st.spent1k, 0, typeof body.deviceId === "string" ? body.deviceId : undefined, st.spent4k);
   }
 }
 
