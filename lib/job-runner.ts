@@ -245,6 +245,9 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
   // rozpočet na scénu; ≤10 scén je beze změny (280s už ověřeně stíhá).
   const requestedScenes = Math.max(1, Math.min(MAX_SCENES, Number(body.sceneCount) || 10));
   const effectiveScenes = body.twoEndings ? Math.ceil(requestedScenes * 1.3) : requestedScenes;
+  // 🧪 Feature flag prototypu. Je potřeba už před archovou fází, protože
+  // ovlivňuje i sekvenční kotvení vymyšlených postav.
+  const oneSheetStory = /^(1|true|on)$/i.test(process.env.ONE_SHEET_STORY || "");
   // 🩺 2026-08-12: „pokračování" (previousStory) cituje jména KNIHOVNÍCH
   // postav jako "kanonické, zkopíruj doslova" (buildUserPrompt, claude.ts),
   // klidně i takových, co uživatel pro TUTO pohádku vůbec nezaškrtl —
@@ -809,10 +812,15 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     // vymyšlené jméno nejdřív SEKVENČNĚ (ne souběžně) dokreslí jeho
     // nejnižší-indexovou scénu, než vůbec spustí archy/paralelní kreslíře
     // níže — kotva tak vždy vznikne z opravdu prvního výskytu v ději.
-    for (const name of inventedNames) {
-      if (inventedRefs.has(name) || timeUp() || overallTimeUp()) continue;
-      const firstIdx = [...Array(total).keys()].find(i => !st.sceneUrls![i] && nameHit(scenesScript[i].imagePrompt, name));
-      if (firstIdx !== undefined) await doScene(firstIdx);
+    // V one-sheet režimu drží návrh nové postavy jediný společný modelový
+    // výstup. Samostatná kotvící scéna by z 9panelového storyboardu udělala
+    // jen 8 panelů a zničila cílovou ekonomiku 1× hero + 1× 4K.
+    if (!oneSheetStory) {
+      for (const name of inventedNames) {
+        if (inventedRefs.has(name) || timeUp() || overallTimeUp()) continue;
+        const firstIdx = [...Array(total).keys()].find(i => !st.sceneUrls![i] && nameHit(scenesScript[i].imagePrompt, name));
+        if (firstIdx !== undefined) await doScene(firstIdx);
+      }
     }
 
     // 🗂️ Režim archů: zbylé scény po skupinách v JEDNOM obrázku (3×3 ve 4K =
@@ -861,7 +869,6 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     // 🧪 Prototyp 2026-08-13: první/hero scéna zůstává samostatná kotva a až
     // devět zbývajících scén se pokusí vyrobit v JEDINÉM 4K storyboardu.
     // Feature flag je defaultně vypnutý; produkční pipeline se beze změny.
-    const oneSheetStory = /^(1|true|on)$/i.test(process.env.ONE_SHEET_STORY || "");
     if (st.sheetGaveUp) logEv("🗂️ archová fáze už dřív vzdala (žádný nový panel) → rovnou sólo");
     else if (castSize >= SHEET_SKIP_CAST_SIZE) logEv(`🧪 ${castSize} postav v pohádce (≥${SHEET_SKIP_CAST_SIZE}) — archy přeskočeny, rovnou sólo (viz test 2026-08-05, prah zvednut 2026-08-11)`);
     else if (castSize >= 3) logEv(`🧪 ${castSize} postav v pohádce — mezistupeň: archy 2×2, max 2 lidi/panel (přísnější než obvykle, rozšířeno z castSize=3 na 3-${SHEET_SKIP_CAST_SIZE - 1} dne 2026-08-11)`);
@@ -974,6 +981,7 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
                 lenientSimplePanels: true,
                 maxGridAttempts: 1,
                 maxPanelEdits: 1,
+                allowFixedGridFallback: true,
               } : { deadline: sceneDeadline() }
             );
             if (report) roundReports.push(report);

@@ -1005,7 +1005,7 @@ export async function generateSceneImage(
 /** Ověří bílé dělicí linky a rozřeže arch na grid×grid výřezů (s malým
  *  odsazením, ať v obraze nezůstanou zbytky mezer). Vrací null, když mřížka
  *  nesedí — takový arch se nesmí řezat. */
-async function sliceSheet(img: ImageResult, grid: number): Promise<ImageResult[] | null> {
+async function sliceSheet(img: ImageResult, grid: number, allowFixedGridFallback = false): Promise<ImageResult[] | null> {
   try {
     const sharp = (await import("sharp")).default;
     const { data, info } = await sharp(img.buffer).greyscale().raw().toBuffer({ resolveWithObject: true });
@@ -1039,15 +1039,29 @@ async function sliceSheet(img: ImageResult, grid: number): Promise<ImageResult[]
     };
     const vLines: number[] = [0];
     const hLines: number[] = [0];
+    let usedFixedGrid = false;
     for (let k = 1; k < grid; k++) {
       const vx = findLine(true, info.width, k);
       const hy = findLine(false, info.height, k);
       if (vx === null || hy === null) {
-        console.warn(`[Gemini sheet] mřížka nesedí (linka ${k}/${grid} nenalezena) → arch zamítnut`);
-        return null;
+        if (!allowFixedGridFallback) {
+          console.warn(`[Gemini sheet] mřížka nesedí (linka ${k}/${grid} nenalezena) → arch zamítnut`);
+          return null;
+        }
+        usedFixedGrid = true;
+        break;
       }
       vLines.push(vx);
       hLines.push(hy);
+    }
+    if (usedFixedGrid) {
+      vLines.length = 1;
+      hLines.length = 1;
+      for (let k = 1; k < grid; k++) {
+        vLines.push(Math.round((info.width * k) / grid));
+        hLines.push(Math.round((info.height * k) / grid));
+      }
+      console.warn(`[Gemini sheet] bílé linky nenalezeny → pevný ${grid}×${grid} řez; každý panel ještě rozhodne vision QA`);
     }
     vLines.push(info.width);
     hLines.push(info.height);
@@ -1097,6 +1111,8 @@ export async function generateSceneSheet(
     maxGridAttempts?: number;
     /** Sdílený budget placených panelových editací na celý arch. */
     maxPanelEdits?: number;
+    /** Bez bílých linek zkusit pevné třetiny; panelová vision QA stále platí. */
+    allowFixedGridFallback?: boolean;
   } = {}
 ): Promise<{ results: Array<ImageResult | null>; report: string }> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -1164,7 +1180,7 @@ export async function generateSceneSheet(
       }
       throw e;
     }
-    slices = await sliceSheet(sheet, grid);
+    slices = await sliceSheet(sheet, grid, options.allowFixedGridFallback === true);
     if (!slices) console.warn(`[Gemini sheet] attempt ${attempt}: mřížka nesedí`);
   }
   if (!slices) throw new Error("sheet: mřížka se nepodařila nakreslit");
