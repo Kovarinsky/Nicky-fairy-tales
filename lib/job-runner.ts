@@ -300,7 +300,12 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
   const selfContinue = async (): Promise<void> => {
     if (selfKicked) return;
     selfKicked = true;
-    const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+    // Preview job musí pokračovat na STEJNÉM preview deploymentu. Dřívější
+    // pořadí preferovalo production URL i ve preview, takže experiment po
+    // self-chainu tiše přeskočil na produkční kód a ztratil feature flagy.
+    const host = process.env.VERCEL_ENV === "production"
+      ? (process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL)
+      : (process.env.VERCEL_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL);
     if (!host) return; // lokální vývoj — pokračování zajistí klient jako dřív
     st.chains = (st.chains ?? 0) + 1;
     if (st.chains > 10) { // pojistka proti nekonečnému řetězu (nikdy nenastává)
