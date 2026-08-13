@@ -1145,7 +1145,17 @@ async function runJobImpl(id: string, body: Record<string, unknown>) {
     // pohádka mohla řetězit donekonečna (viz „Kvarner" — 7 řetězů, 36 min)
     if (!quotaExhausted && Object.keys(st.sceneUrls!).length < total && (timeUp() || overallTimeUp())) {
       if (overallTimeUp()) {
-        logEv(`⏱️ globální strop ${Math.round(HARD_DEADLINE_MS / 1000)}s dosažen (${Object.keys(st.sceneUrls!).length}/${total} scén hotovo) → uzavírám pohádku i s chybějícími scénami (jdou 🖌 opravit ručně)`);
+        // An incomplete story must NEVER be advertised as done. Previously this
+        // fell through to the success block below, deleted the resumable request
+        // on the client, charged the story and opened the reader. The title-card
+        // watchdog then regenerated every missing image serially via /api/scene,
+        // creating the observed 20+ minute, repeatedly billed retry loop.
+        st.phase = "error";
+        st.error = `Příprava překročila časový limit (${Object.keys(st.sceneUrls!).length}/${total} obrázků hotovo). Nedokončená pohádka nebyla uložena a uživatelský kredit se neodečetl — zkuste ji znovu.`;
+        logEv(`⛔ STOP: globální strop ${Math.round(HARD_DEADLINE_MS / 1000)}s dosažen (${Object.keys(st.sceneUrls!).length}/${total} scén hotovo) — NEÚPLNÝ job se neoznačí jako hotový`);
+        await write();
+        await writeUsageRecord(totalImages1k(), 0, typeof body.deviceId === "string" ? body.deviceId : undefined, totalImages4k(), true);
+        return;
       } else {
         await selfContinue();
         return;

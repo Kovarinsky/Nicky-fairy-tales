@@ -1392,11 +1392,11 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [titleCardOpen, storyFullyReady]);
 
-  // 🎨 Auto-retry nepovedené scény, DOKUD čtenář čeká na titulce (ne teprve
-  // až na ni narazí při listování — na tu stránku se totiž vůbec nedostane,
-  // dokud storyFullyReady není true, viz allScenesReady výš). Bez tohohle by
-  // JEDNA scéna, co se při generování nepovedla, appku uvěznila na
-  // "Připravuji pohádku…" navždy (jen 45s únik na Domů).
+  // Missing IMAGE auto-repair is deliberately forbidden here. A server job
+  // used to report done with only 3/12 images and this title-card effect then
+  // regenerated the remaining nine serially, retrying a timed-out /api/scene
+  // forever. Incomplete server jobs are now errors; an old/corrupt saved story
+  // stays safely closed and can only be repaired explicitly by its owner.
   //
   // 🩺 2026-08-05: tohle řešilo jen nepovedený OBRÁZEK (placeholder) — ale
   // allScenesReady/storyFullyReady vyžaduje u KAŽDÉ scény i audioUrl, a
@@ -1408,11 +1408,8 @@ export default function Home() {
   // případ (obrázek OK, ale audioUrl chybí) a dodělá ho stejným způsobem.
   useEffect(() => {
     if (!titleCardOpen || storyFullyReady || fixingScene !== null) return;
-    const brokenImg = scenes.findIndex(s => s.imageUrl && isPlaceholderImg(s.imageUrl));
-    if (brokenImg >= 0) {
-      const t = setTimeout(() => repairSceneImage(brokenImg), 4000);
-      return () => clearTimeout(t);
-    }
+    const brokenImg = scenes.findIndex(s => !s.imageUrl || isPlaceholderImg(s.imageUrl));
+    if (brokenImg >= 0) return;
     const brokenAudio = scenes.findIndex(s => s.imageUrl && !isPlaceholderImg(s.imageUrl) && s.narration && !s.audioUrl);
     if (brokenAudio < 0) return;
     const t = setTimeout(() => repairSceneAudio(brokenAudio), 4000);
@@ -3260,6 +3257,19 @@ export default function Home() {
           prefetchJobAudio(jobId, st);
           updateServerJob(jobId, { phase: "generating", done: st.done || 0, total: st.total || 0, title: st.title, imgError: st.imgError || undefined, log: st.log, ...createdAtPatch });
         } else if (st.phase === "done") {
+          // Defensive compatibility with older/broken server versions: never
+          // finalize, persist or open a job whose counters say it is incomplete.
+          const expected = Number(st.total) || 0;
+          const completed = Number(st.done) || 0;
+          if (expected > 0 && completed < expected) {
+            stopJobPolling(jobId);
+            updateServerJob(jobId, {
+              phase: "error",
+              error: `Příprava skončila neúplná (${completed}/${expected} obrázků). Pohádka nebyla uložena — zkuste ji znovu.`,
+              log: st.log,
+            });
+            return;
+          }
           stopJobPolling(jobId);
           await finalizeServerJob(st, jobId);
         } else if (st.phase === "error") {

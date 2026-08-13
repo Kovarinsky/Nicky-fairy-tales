@@ -459,13 +459,20 @@ export async function verifySceneImage(
   refs: ReferenceImage[] = [], // 🕵️ kanonické portréty — inspektor porovnává TVÁŘE, ne jen text
   deadline?: number
 ): Promise<QaVerdict | null> {
+  // Server story jobs have a shared deadline. Two 30s verifier attempts plus
+  // the caller's former third verification could spend 90s on QA alone for a
+  // single already-rendered image. One bounded inspection is enough in this
+  // path; interactive/manual operations (no deadline) retain two attempts.
+  const maxAttempts = deadline === undefined ? 2 : 1;
   // Referenční portréty jdou inspektorovi PŘED kontrolovaný obrázek — dřív
   // soudil jen podle textu a „Bella jako černoška" mu nemohla padnout do oka
   const refParts = refs.slice(0, 8).flatMap((r, i) => [
     { text: `REFERENCE ${i + 1} [${r.role || "other"}] — ${(r.label || (r.name ? `canonical portrait of ${r.name}` : "reference image")).slice(0, 1500)}:` },
     { inlineData: { data: r.data, mimeType: r.mimeType } },
   ]);
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const remainingMs = deadline === undefined ? GEMINI_VERIFY_TIMEOUT_MS : deadline - Date.now();
+    if (remainingMs < 2_000) break;
     try {
       const raw = await geminiPost(apiKey, VERIFY_MODEL, {
         contents: [{
@@ -533,7 +540,7 @@ export async function verifySceneImage(
           temperature: 0,
           ...(VERIFY_MODEL.includes("2.5") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
         },
-      }, GEMINI_VERIFY_TIMEOUT_MS);
+      }, Math.min(GEMINI_VERIFY_TIMEOUT_MS, remainingMs));
       const data = JSON.parse(raw) as { candidates?: GeminiCandidate[] };
       const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
       const m = text.match(/\{[\s\S]*\}/);
@@ -593,8 +600,8 @@ export async function verifySceneImage(
       // dostal ok:true). Podezřele vysoký počet nálezů => bereme to jako
       // selhání kontroly a zkusíme to znovu, ne že bychom to rovnou platili.
       const SUSPICIOUS_FINDINGS_COUNT = 8;
-      if (findings.length >= SUSPICIOUS_FINDINGS_COUNT && attempt < 2) {
-        console.warn(`[Gemini QA] verify attempt ${attempt}/2: podezřele ${findings.length} nálezů najednou (pravděpodobně "okomentovala všechna pravidla" místo jen chyb) → zkouším znovu`);
+      if (findings.length >= SUSPICIOUS_FINDINGS_COUNT && attempt < maxAttempts) {
+        console.warn(`[Gemini QA] verify attempt ${attempt}/${maxAttempts}: podezřele ${findings.length} nálezů najednou (pravděpodobně "okomentovala všechna pravidla" místo jen chyb) → zkouším znovu`);
         await new Promise(r => setTimeout(r, 2000));
         continue;
       }
@@ -613,11 +620,11 @@ export async function verifySceneImage(
       };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`[Gemini QA] verify attempt ${attempt}/2 failed: ${msg}`);
+      console.warn(`[Gemini QA] verify attempt ${attempt}/${maxAttempts} failed: ${msg}`);
       // Času se nedostává — další pokus by jen ukrajoval z rozpočtu na
       // dokreslení/předání štafety, aniž by měl reálnou šanci stihnout se
       if (deadline !== undefined && Date.now() > deadline) break;
-      if (attempt < 2) await new Promise(r => setTimeout(r, 2500 * attempt));
+      if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 2500 * attempt));
     }
   }
   console.warn("[Gemini QA] verify UNAVAILABLE after retries — image accepted unchecked");
@@ -864,7 +871,12 @@ export async function generateSceneImage(
   let llmSanitized = false;
   console.log(`[Gemini] scene ${scene.index} model=${model} (${safePrompt.length} chars): ${safePrompt.slice(0, 200)}`);
 
-  const MAX_ATTEMPTS = 3;
+  // A queued story passes a shared deadline. Retrying one slow image request
+  // three times used up to 180 seconds (observed live on scene 2), starving all
+  // remaining pages. Let the job runner persist progress and retry the missing
+  // scene in its next invocation. Interactive/manual generation has no shared
+  // deadline and keeps the more forgiving three attempts.
+  const MAX_ATTEMPTS = deadline === undefined ? 3 : 1;
   // Denní kvóta platí na model → při stropu primárního modelu zkusit záložní
   const models = FALLBACK_IMAGE_MODEL && FALLBACK_IMAGE_MODEL !== model
     ? [model, FALLBACK_IMAGE_MODEL]
@@ -892,7 +904,7 @@ export async function generateSceneImage(
         // ale zavřená mezera je tu důležitější než pár ušetřených requestů.
         if (heroDescription) {
           let v0 = await verifySceneImage(apiKey, img, heroDescription, scene.imagePrompt, refImages, deadline);
-          if (!v0 && !(deadline !== undefined && Date.now() > deadline)) {
+          if (!v0 && deadline === undefined) {
             // Kontrola 2× selhala (typicky rate-limit) → po pauze ještě jednou;
             // teprve pak se obrázek přijme s varováním (jinak by se nic nedokreslilo)
             await new Promise(r => setTimeout(r, 6000));
