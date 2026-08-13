@@ -27,12 +27,14 @@ export async function POST(req: NextRequest) {
     // tenhle server endpoint je AUTORITATIVNÍ místo: bez platné session se
     // sem vůbec nedostane, ať klient obejde cokoliv jinde.
     // 🧪 Preview-only benchmark hook pro ONE_SHEET_STORY. Je neaktivní na
-    // production targetu i bez feature flagu a preview samotné navíc chrání
-    // Vercel Deployment Protection. Umožní automatický noční benchmark bez
-    // kopírování uživatelského session cookie do skriptů.
+    // production targetu i bez feature flagu. Umožní automatický benchmark
+    // bez kopírování uživatelského session cookie do skriptů, ale jen pokud
+    // má konkrétní preview deployment neveřejný dostatečně dlouhý token.
+    const prototypeToken = process.env.PROTOTYPE_BENCHMARK_TOKEN;
     const prototypeBenchmark = process.env.VERCEL_ENV !== "production" &&
       /^(1|true|on)$/i.test(process.env.ONE_SHEET_STORY || "") &&
-      req.headers.get("x-prototype-benchmark") === "one-sheet-v1";
+      typeof prototypeToken === "string" && prototypeToken.length >= 24 &&
+      req.headers.get("x-prototype-benchmark-token") === prototypeToken;
     const username = prototypeBenchmark
       ? (process.env.NEXT_PUBLIC_ADMIN_USERNAME || "jan")
       : verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
