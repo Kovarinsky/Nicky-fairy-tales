@@ -26,13 +26,12 @@ export async function POST(req: NextRequest) {
     // účtu) — appka to hlídá i na klientovi (Home screen, createStory), ale
     // tenhle server endpoint je AUTORITATIVNÍ místo: bez platné session se
     // sem vůbec nedostane, ať klient obejde cokoliv jinde.
-    // 🧪 Preview-only benchmark hook pro ONE_SHEET_STORY. Je neaktivní na
-    // production targetu i bez feature flagu. Umožní automatický benchmark
+    // 🧪 Preview-only end-to-end hook. Je neaktivní na production targetu
+    // a bez dlouhého tajného tokenu. Umožní automatický benchmark
     // bez kopírování uživatelského session cookie do skriptů, ale jen pokud
     // má konkrétní preview deployment neveřejný dostatečně dlouhý token.
     const prototypeToken = process.env.PROTOTYPE_BENCHMARK_TOKEN;
     const prototypeBenchmark = process.env.VERCEL_ENV !== "production" &&
-      /^(1|true|on)$/i.test(process.env.ONE_SHEET_STORY || "") &&
       typeof prototypeToken === "string" && prototypeToken.length >= 24 &&
       req.headers.get("x-prototype-benchmark-token") === prototypeToken;
     const username = prototypeBenchmark
