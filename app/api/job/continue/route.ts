@@ -36,6 +36,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "request-not-found" }, { status: 404 });
     }
     const job = runJob(id, body);
+    const prototypeToken = process.env.PROTOTYPE_BENCHMARK_TOKEN;
+    const previewE2e = process.env.VERCEL_ENV !== "production" &&
+      typeof prototypeToken === "string" && prototypeToken.length >= 24 &&
+      req.headers.get("x-prototype-benchmark-token") === prototypeToken;
+    if (previewE2e) {
+      await job;
+      return NextResponse.json({ ok: true, resumed: true, benchmarkAwaited: true });
+    }
     try { waitUntil(job); } catch { /* local dev */ }
     return NextResponse.json({ ok: true, resumed: true });
   } catch (err) {

@@ -107,6 +107,31 @@ export function repairStoryCanonNames(
   return [...mappings.values()];
 }
 
+const CZECH_NARRATION_LEAKS: Array<[RegExp, string]> = [
+  [/\b(Máma\s+\p{L}+)\s+children\s+přivinula\b/giu, "$1 přivinula děti"],
+  [/\bchildren\b/giu, "děti"],
+  [/\bchild\b/giu, "dítě"],
+  [/\bmother\b/giu, "maminka"],
+  [/\bfather\b/giu, "tatínek"],
+  [/\btogether\b/giu, "společně"],
+];
+
+/** Remove isolated English prompt leakage from Czech narration without another
+ * model call. Image prompts intentionally remain English. */
+export function repairStoryNarrationLanguage(script: StoryScript, language: string): number {
+  if (language !== "cs") return 0;
+  const scenes = script.choice ? [...script.scenes, ...script.choice.altScenes] : script.scenes;
+  let replacements = 0;
+  for (const scene of scenes) {
+    for (const [pattern, replacement] of CZECH_NARRATION_LEAKS) {
+      const matches = scene.narration.match(pattern);
+      if (matches) replacements += matches.length;
+      scene.narration = scene.narration.replace(pattern, replacement);
+    }
+  }
+  return replacements;
+}
+
 export class StoryCanonError extends Error {
   readonly code: "RESERVED_LIBRARY_NAME" | "TODDLER_SPEECH" | "SOUND_CUES";
 

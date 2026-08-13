@@ -1,6 +1,6 @@
 import type { StoryRequest, StoryScript, Character, Scene, Soundscape, SoundCue } from "./types";
 import { loadCharacters } from "./characters";
-import { prepareStoryRequestCanon, repairStoryCanonNames, StoryCanonError, validateStoryCanon, type CanonPreflightRename } from "./story-canon";
+import { prepareStoryRequestCanon, repairStoryCanonNames, repairStoryNarrationLanguage, StoryCanonError, validateStoryCanon, type CanonPreflightRename } from "./story-canon";
 import musicManifest from "../public/music-lib/manifest.json";
 
 // Runtime allow-list generated from the files that are actually shipped. This
@@ -1261,6 +1261,8 @@ export async function generateStory(
         onCanonRepair?.(canonRepairs);
         onLog?.(`🛡️ canon postflight: hotový scénář zachován, nevybraná jména přejmenována (${canonRepairs.map(r => `${r.libraryId}→${r.replacement}`).join(", ")})`);
       }
+      const languageRepairs = repairStoryNarrationLanguage(script, language);
+      if (languageRepairs) onLog?.(`🗣️ language postflight: opraveno ${languageRepairs} cizojazyčných slov v české naraci`);
       // PRAVIDLO KONZISTENCE #1: vzhled známých postav je KANONICKÝ — vždy
       // doslova z reference/characters.json, ať Claude napsal cokoliv.
       // (Řeší „jednou blond, podruhé hnědé vlasy" mezi pohádkami.)

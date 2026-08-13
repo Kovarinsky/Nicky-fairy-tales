@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { prepareStoryRequestCanon, repairStoryCanonNames, StoryCanonError, validateStoryCanon } from "../lib/story-canon.ts";
+import { prepareStoryRequestCanon, repairStoryCanonNames, repairStoryNarrationLanguage, StoryCanonError, validateStoryCanon } from "../lib/story-canon.ts";
 
 const cues = [
   { effect: "bell_ring", at: 0.2 },
@@ -63,6 +63,13 @@ test("model-invented reserved names are repaired without discarding the story", 
   assert.doesNotMatch(completed.scenes[0].narration, /\bJan\b/iu);
   assert.match(completed.scenes[0].imagePrompt, /Martin/);
   assert.doesNotThrow(() => validateStoryCanon(completed, req));
+});
+
+test("isolated English words are removed from Czech narration", () => {
+  const completed = script("Máma Jana children přivinula k sobě.");
+  assert.equal(repairStoryNarrationLanguage(completed, "cs"), 1);
+  assert.equal(completed.scenes[0].narration, "Máma Jana přivinula děti k sobě.");
+  assert.equal(repairStoryNarrationLanguage(completed, "en"), 0);
 });
 
 test("every new scene requires two distinct separated sound cues", () => {
