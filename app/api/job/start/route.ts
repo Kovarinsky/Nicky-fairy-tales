@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     if (!username) {
       return NextResponse.json({ error: "Pro vytvoření pohádky se prosím přihlaste." }, { status: 401 });
     }
-    {
+    if (!prototypeBenchmark) {
       const acc = await readAccount(username);
       if (!acc) {
         return NextResponse.json({ error: "Účet nenalezen." }, { status: 402 });
@@ -55,8 +55,10 @@ export async function POST(req: NextRequest) {
           );
         }
       }
-      body.username = username; // ← job-runner podle něj po dokončení odečte kredit
     }
+    // Benchmark nemá sahat na kredit žádného skutečného účtu; jobId a usage
+    // se přesto normálně zapíší pro měření provider nákladů.
+    if (!prototypeBenchmark) body.username = username;
     // 🛑 MĚSÍČNÍ SPEND-CAP POJISTKA (2026-08-09): appka narazila na Googlein
     // strop automatického navyšování zůstatku ("Dosáhli jste měsíčního
     // limitu…", GCP účet 01B33D-DEEC68-5E789A) — appka do teď neměla ŽÁDNOU
