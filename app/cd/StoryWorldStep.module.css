@@ -202,7 +202,7 @@
 }
 .pillOn {
   border: 2px solid #f97316;
-  background: linear-gradient(90deg, #f59e0b, #f97316);
+  background: var(--nicky-cta-gradient, linear-gradient(90deg, #f59e0b, #f97316));
   color: #fff;
   box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.3);
 }
@@ -245,7 +245,7 @@
   border: 1.5px solid rgba(255, 255, 255, 0.9);
   border-radius: 999px;
   color: #fff;
-  background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
+  background: var(--nicky-cta-gradient, linear-gradient(90deg, #f59e0b 0%, #f97316 100%));
   box-shadow: 0 4px 24px rgba(245, 158, 11, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
   font-family: inherit;
   font-size: 20px;

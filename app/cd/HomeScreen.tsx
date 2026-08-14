@@ -81,12 +81,17 @@ export default function HomeScreen({
     } catch { /* corrupted local preference falls back to defaults */ }
   }, []);
   useEffect(() => {
+    const gradient = BUTTON_GRADIENTS[buttonTheme] ?? BUTTON_GRADIENTS.orange;
+    const filter = MOOD_FILTERS[moodTheme] ?? MOOD_FILTERS.dusk;
+    document.documentElement.style.setProperty("--nicky-cta-gradient", gradient);
+    document.documentElement.style.setProperty("--nicky-bg-filter", filter);
     try { localStorage.setItem("nicky-appearance-v1", JSON.stringify({ buttonTheme, moodTheme })); } catch { /* storage can be unavailable in private mode */ }
   }, [buttonTheme, moodTheme]);
 
   const appearanceStyle = {
     "--home-cta-gradient": BUTTON_GRADIENTS[buttonTheme] ?? BUTTON_GRADIENTS.orange,
     "--home-bg-filter": MOOD_FILTERS[moodTheme] ?? MOOD_FILTERS.dusk,
+    "--nicky-cta-gradient": BUTTON_GRADIENTS[buttonTheme] ?? BUTTON_GRADIENTS.orange,
   } as CSSProperties;
 
   function pickBg(id: string) {

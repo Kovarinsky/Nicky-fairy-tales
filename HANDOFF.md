@@ -23,7 +23,7 @@ Convert the Claude Design mobile product flow into the existing Next.js app whil
 - Primary back/close/settings controls were normalized to at least 44×44px touch targets, with centered mask icons.
 - Remaining text/emoji navigation glyphs were replaced with shared `/cd-icons` SVG masks across the main CD forms, library, voice and end screens; a second icon pass is still needed for inline SVG helpers and non-manifest decorative glyphs.
 - Preview now uses dedicated vFinal4 character/voice avatars instead of catalogue art. "Poslechnout v originále" has its specified book icon, desktop tooltip, mobile-visible explanation and a working preview route into generation.
-- Home appearance choices now visibly affect the Home CTA/background grade and persist locally under `nicky-appearance-v1`; account sync and true app-wide propagation remain pending.
+- Home appearance choices affect the Home CTA/background grade, persist locally under `nicky-appearance-v1`, and the chosen button gradient now propagates through the CD flow via a root CSS variable. Account sync and app-wide background mood propagation remain pending.
 - Old story-generation flow: `sanitizeJson` now repairs unescaped quotes/control newlines inside Claude JSON strings before parsing, preventing complete stories from being discarded and rewritten after the observed `Expected ',' or '}'` failure.
 - vFinal4's `home-background.md` references `bg-log.jpg` and three variants, but those background files are not present in the ZIP; current app backgrounds remain the fallback until CD supplies/approves the exact files.
 - vFinal3 supplies the source-of-truth responsive rules, navigation/state map, style bible, final icon manifest, 12 reference screenshots and known-differences list.

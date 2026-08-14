@@ -18,9 +18,12 @@ for (const viewport of [
   const settings = page.getByRole("dialog", { name: "Nastavení vzhledu aplikace" });
   await settings.waitFor();
   await page.screenshot({ path: `test-results/cd-${viewport.name}-settings.png`, fullPage: true });
+  await settings.getByRole("button", { name: "plum" }).click();
   await settings.getByRole("button", { name: "Zavřít", exact: true }).click();
   await page.getByRole("button", { name: "Start nové pohádky" }).click();
   await page.getByRole("heading", { name: "Výběr pohádky" }).waitFor();
+  const continueBackground = await page.getByRole("button", { name: "Pokračovat" }).evaluate((element) => getComputedStyle(element).backgroundImage);
+  if (!continueBackground.includes("139, 92, 246")) throw new Error(`${viewport.name}: appearance setting did not propagate to the world CTA`);
   await page.screenshot({ path: `test-results/cd-${viewport.name}-world.png`, fullPage: true });
   await page.getByRole("button", { name: "Pohádka podle mé polohy" }).click();
   await page.getByRole("button", { name: "Povolit" }).click();

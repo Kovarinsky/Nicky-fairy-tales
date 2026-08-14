@@ -17,5 +17,5 @@
 .addCircle { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(145deg,#f59e0b,#f97316); color: #fff; border: 2px solid #fff4d6; }
 .footer { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; padding: 10px 18px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(180deg,rgba(15,7,34,0),rgba(15,7,34,.97) 25%); }
 .footer p { margin: 0 0 6px; text-align: center; color: rgba(253,243,215,.75); font-size: 11px; font-weight: 700; }
-.cta { width: 100%; min-height: 58px; border: 1.5px solid rgba(255,255,255,.9); border-radius: 999px; background: linear-gradient(90deg,#f59e0b,#f97316); color: #fff; font: 800 18px "Nunito",system-ui,sans-serif; cursor: pointer; box-shadow: 0 5px 22px rgba(245,158,11,.3); }
+.cta { width: 100%; min-height: 58px; border: 1.5px solid rgba(255,255,255,.9); border-radius: 999px; background: var(--nicky-cta-gradient, linear-gradient(90deg,#f59e0b,#f97316)); color: #fff; font: 800 18px "Nunito",system-ui,sans-serif; cursor: pointer; box-shadow: 0 5px 22px rgba(245,158,11,.3); }
 .cta:active { transform: scale(.97); }.cta:disabled { opacity: .38; cursor: not-allowed; }
