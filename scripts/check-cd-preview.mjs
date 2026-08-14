@@ -21,9 +21,20 @@ for (const viewport of [
 
   await page.getByRole("button", { name: "Zpět" }).click();
   await page.getByRole("heading", { name: "Výběr pohádky" }).waitFor();
+  await page.getByRole("button", { name: /Vlastní pohádka/ }).click();
+  await page.getByText("Vytvořit vlastní pohádku").waitFor();
+  await page.getByRole("button", { name: "Zpět" }).click();
   await page.getByRole("button", { name: "Všechny pohádky" }).click();
   await page.getByRole("heading", { name: "Výběr pohádky" }).waitFor();
-  results.push(`${viewport.name}: world → details → world → catalog OK`);
+  await page.getByRole("button", { name: "Pokračovat" }).click();
+  await page.getByText("KROK 2 ZE 2 · POHÁDKA").waitFor();
+  await page.getByRole("button", { name: "Přidat" }).click();
+  await page.getByText("Nová postava").waitFor();
+  await page.getByRole("button", { name: "Zpět" }).click();
+  await page.getByRole("button", { name: /Žena/ }).click();
+  await page.getByRole("heading", { name: "Výběr hlasu" }).waitFor();
+  await page.getByRole("button", { name: "Zpět" }).click();
+  results.push(`${viewport.name}: world → catalog → custom world → details → character → voice OK`);
   await page.close();
 }
 
