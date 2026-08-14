@@ -164,8 +164,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -484,8 +484,8 @@
   border: none;
   background: rgba(30, 16, 58, 0.75);
   border-radius: 999px;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   cursor: pointer;
   color: #fdf3d7;
   font-size: 17px;
@@ -570,7 +570,7 @@
 .settingsSheet { position: absolute; left: 10px; right: 10px; bottom: 10px; padding: 20px; border: 1px solid rgba(253,224,138,.42); border-radius: 24px; background: rgba(27,14,57,.97); box-shadow: 0 -12px 40px rgba(0,0,0,.45); color: #fdf3d7; }
 .settingsHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .settingsHead h2 { margin: 0; font: 800 24px Alegreya, Georgia, serif; }
-.settingsHead button { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(255,255,255,.1); color: #fdf3d7; cursor: pointer; }
+.settingsHead button { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(255,255,255,.1); color: #fdf3d7; cursor: pointer; }
 .settingsSheet h3 { margin: 18px 0 8px; font-size: 12px; letter-spacing: .08em; color: #f7d77a; text-transform: uppercase; }
 .swatches { display: flex; gap: 10px; flex-wrap: wrap; }
 .swatch { width: 42px; height: 42px; padding: 0; border: 2px solid transparent; border-radius: 50%; cursor: pointer; box-shadow: inset 0 1px 4px rgba(255,255,255,.35); }

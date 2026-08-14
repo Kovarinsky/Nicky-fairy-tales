@@ -51,9 +51,7 @@ export default function AccountModal({
     <>
       <div className={styles.scrim} onClick={close} />
       <button className={styles.closeBtn} onClick={close} aria-label="Zavřít">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round">
-          <path d="M6 6l12 12M18 6L6 18" />
-        </svg>
+        <Icon name="close-x" size={18} />
       </button>
       <div className={styles.panel}>
         <div className={styles.identity}>
@@ -67,9 +65,7 @@ export default function AccountModal({
         <div className={styles.creditsRow}>
           <div className={styles.creditsLeft}>
             <span className={styles.coin}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="12" cy="12" r="9" />
-              </svg>
+              <Icon name="coin" size={15} />
             </span>
             <div className={styles.creditsText}>
               <span className={styles.creditsLabel}>KREDITY</span>
@@ -147,10 +143,7 @@ export default function AccountModal({
         {note && <span className={styles.note}>{note}</span>}
 
         <button className={styles.logoutBtn} onClick={onLogout}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 5H6a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h9" />
-            <path d="M18 8l3 4-3 4M21 12h-9" />
-          </svg>
+          <Icon name="logout" size={16} />
           <span>Odhlásit se</span>
         </button>
       </div>

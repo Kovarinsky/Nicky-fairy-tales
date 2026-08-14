@@ -32,8 +32,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: none;
   background: rgba(255, 255, 255, 0.18);
@@ -212,8 +212,8 @@
 }
 .detailBack {
   flex: none;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1.5px solid rgba(253, 224, 138, 0.45);
   background: rgba(18, 8, 40, 0.72);
@@ -234,8 +234,8 @@
 .navRight {
   position: absolute;
   bottom: 14px;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid rgba(253, 224, 138, 0.35);
   background: rgba(18, 8, 40, 0.55);

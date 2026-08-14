@@ -28,7 +28,9 @@ export type IconName =
   | "music"
   | "sparkle"
   | "wand"
-  | "candle";
+  | "candle"
+  | "chevron-down"
+  | "logout";
 
 export default function Icon({ name, size = 24 }: { name: IconName; size?: number }) {
   return (

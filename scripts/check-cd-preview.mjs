@@ -13,18 +13,32 @@ for (const viewport of [
   const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
   await page.goto(baseUrl, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: /Nickyho/ }).waitFor();
+  await page.screenshot({ path: `test-results/cd-${viewport.name}-home.png`, fullPage: true });
+  await page.getByRole("button", { name: "Nastavení" }).click();
+  const settings = page.getByRole("dialog", { name: "Nastavení vzhledu aplikace" });
+  await settings.waitFor();
+  await page.screenshot({ path: `test-results/cd-${viewport.name}-settings.png`, fullPage: true });
+  await settings.getByRole("button", { name: "Zavřít", exact: true }).click();
   await page.getByRole("button", { name: "Start nové pohádky" }).click();
   await page.getByRole("heading", { name: "Výběr pohádky" }).waitFor();
   await page.screenshot({ path: `test-results/cd-${viewport.name}-world.png`, fullPage: true });
+  await page.getByRole("button", { name: "Pohádka podle mé polohy" }).click();
+  await page.getByRole("button", { name: "Povolit" }).click();
 
   await page.getByRole("button", { name: "Pokračovat" }).click();
   await page.getByText("KROK 2 ZE 2 · POHÁDKA").waitFor();
   await page.screenshot({ path: `test-results/cd-${viewport.name}-details.png`, fullPage: true });
+  await page.getByRole("button", { name: "Rozvinout" }).click();
+  await page.getByText("Motiv pohádky", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Rozvinout" }).click();
+  await page.getByRole("button", { name: "Hotovo" }).click();
 
   await page.getByRole("button", { name: "Zpět" }).click();
   await page.getByRole("heading", { name: "Výběr pohádky" }).waitFor();
   await page.getByRole("button", { name: /Vlastní pohádka/ }).click();
   await page.getByText("Vytvořit vlastní pohádku").waitFor();
+  await page.getByRole("button", { name: "Prostudovat" }).click();
+  await page.getByText("Ukázkový svět je připravený.").waitFor();
   await page.getByRole("button", { name: "Zpět" }).click();
   await page.getByRole("button", { name: "Všechny pohádky" }).click();
   await page.getByRole("heading", { name: "Výběr pohádky" }).waitFor();

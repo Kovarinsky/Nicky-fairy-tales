@@ -150,7 +150,7 @@ export default function HomeScreen({
       <header className={styles.header}>
         <button className={styles.bgPill} onClick={() => setBgSheetOpen((v) => !v)} aria-label="Zvolit svět">
           <span className={styles.bgThumb} style={{ backgroundImage: `url(${activeBg})` }} />
-          <ChevronDown />
+          <Icon name="chevron-down" size={11} />
         </button>
         {version && <span className={styles.versionTag}>{version}</span>}
         <button className={styles.settingsBtn} onClick={() => setSettingsOpen(true)} aria-label="Nastavení">
@@ -176,13 +176,13 @@ export default function HomeScreen({
             ))}
           </span>
           <span className={styles.discIcon}>
-            <PlayIcon />
+            <Icon name="play" size={15} />
           </span>
           <span>Start nové pohádky</span>
         </button>
         {!user && (
           <button className={styles.loginBtn} onClick={() => setLoginOpen(true)}>
-            <UserIcon />
+            <Icon name="account" size={17} />
             <span>Přihlásit se</span>
           </button>
         )}
@@ -199,7 +199,7 @@ export default function HomeScreen({
               </button>
             ))}
             <button className={activeBgId === "custom" ? styles.bgCustomTileActive : styles.bgCustomTile} onClick={() => setBgAddOpen(true)} aria-label="Vlastní pozadí z fotky">
-              <PlusIcon />
+              <Icon name="plus" size={18} />
               <span>VLASTNÍ</span>
             </button>
           </div>
@@ -208,7 +208,7 @@ export default function HomeScreen({
               <div className={styles.sheetScrim} onClick={() => setBgAddOpen(false)} />
               <div className={styles.bgAddMenu}>
                 <button onClick={openFilePicker}>
-                  <PhotoIcon /> Přidat foto z galerie
+                  <Icon name="upload" size={18} /> Přidat foto z galerie
                 </button>
               </div>
             </>
@@ -390,42 +390,3 @@ const BUTTON_GRADIENTS: Record<string, string> = {
 const MOOD_FILTERS: Record<string, string> = {
   none: "none", dusk: "brightness(1.08) saturate(1.35) sepia(.18) hue-rotate(-14deg) contrast(1.04)", night: "brightness(.72) saturate(1.05) hue-rotate(8deg)", velvet: "brightness(.9) saturate(1.25) hue-rotate(18deg)", milk: "brightness(1.16) saturate(.78) sepia(.12)", forest: "brightness(.9) saturate(1.3) hue-rotate(42deg)",
 };
-
-function ChevronDown() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.75 }}>
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
-function PlayIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: 2 }}>
-      <path d="M7 4.5v15a1 1 0 0 0 1.53.85l12-7.5a1 1 0 0 0 0-1.7l-12-7.5A1 1 0 0 0 7 4.5Z" />
-    </svg>
-  );
-}
-function UserIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="8" r="3.6" />
-      <path d="M4.8 20c.9-3.7 3.8-5.6 7.2-5.6s6.3 1.9 7.2 5.6" />
-    </svg>
-  );
-}
-function PlusIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round">
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
-function PhotoIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fde68a" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="16" rx="3" />
-      <path d="M3 16l5-4 4 3 3-2 6 5" />
-      <circle cx="8.5" cy="9" r="1.4" fill="#fde68a" stroke="none" />
-    </svg>
-  );
-}
