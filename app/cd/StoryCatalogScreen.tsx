@@ -126,9 +126,13 @@ export default function StoryCatalogScreen({
               Vybrat tuto pohádku
             </button>
             {detail.supportsOriginal && (
-              <button className={styles.ctaSecondary} onClick={() => onPickOriginal?.(detail)}>
-                Poslechnout v originále
-              </button>
+              <>
+                <button className={styles.ctaSecondary} onClick={() => onPickOriginal?.(detail)} title="Vygeneruje se s klasickými postavami pohádky, ne s vaší rodinou">
+                  <Icon name="book" size={19} />
+                  <span>Poslechnout v originále</span>
+                </button>
+                <p className={styles.originalHint}>Vygeneruje se s klasickými postavami pohádky, ne s vaší rodinou.</p>
+              </>
             )}
           </div>
         </div>

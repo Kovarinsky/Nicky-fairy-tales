@@ -265,7 +265,7 @@
   gap: 12px;
 }
 .ctaSecondary {
-  height: 42px;
+  min-height: 44px;
   border: 1.5px solid rgba(253, 224, 138, 0.5);
   border-radius: 999px;
   color: #fdf3d7;
@@ -274,7 +274,12 @@
   font-size: 13px;
   font-weight: 800;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
+.originalHint { margin: -5px 12px 0; text-align: center; color: rgba(253,243,215,.68); font-size: 11px; line-height: 1.35; font-weight: 700; }
 .detailCard {
   padding: 16px 18px 18px;
   border-radius: 26px;

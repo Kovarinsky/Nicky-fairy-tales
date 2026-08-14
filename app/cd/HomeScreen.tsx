@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import styles from "./HomeScreen.module.css";
 import AccountModal, { AccountUser } from "./AccountModal";
 import Icon from "./Icon";
@@ -73,6 +73,22 @@ export default function HomeScreen({
   const [buttonTheme, setButtonTheme] = useState("orange");
   const [moodTheme, setMoodTheme] = useState("dusk");
 
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("nicky-appearance-v1") || "null") as { buttonTheme?: string; moodTheme?: string } | null;
+      if (saved?.buttonTheme) setButtonTheme(saved.buttonTheme);
+      if (saved?.moodTheme) setMoodTheme(saved.moodTheme);
+    } catch { /* corrupted local preference falls back to defaults */ }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("nicky-appearance-v1", JSON.stringify({ buttonTheme, moodTheme })); } catch { /* storage can be unavailable in private mode */ }
+  }, [buttonTheme, moodTheme]);
+
+  const appearanceStyle = {
+    "--home-cta-gradient": BUTTON_GRADIENTS[buttonTheme] ?? BUTTON_GRADIENTS.orange,
+    "--home-bg-filter": MOOD_FILTERS[moodTheme] ?? MOOD_FILTERS.dusk,
+  } as CSSProperties;
+
   function pickBg(id: string) {
     setLocalBgId(id);
     onSelectBackground?.(id);
@@ -113,7 +129,7 @@ export default function HomeScreen({
   }
 
   return (
-    <main className={styles.screen}>
+    <main className={styles.screen} style={appearanceStyle}>
       <span className={styles.moonGlow} aria-hidden />
       <span className={styles.moon} aria-hidden />
       <div className={styles.stars} aria-hidden>
@@ -368,6 +384,12 @@ const SPARK_POS: [string, string, string, number, number][] = [
   ["9%", "20%", "5px", 0, 2.1], ["16%", "78%", "4px", 0.5, 2.7], ["23%", "14%", "3px", 1.1, 2.3],
   ["53%", "86%", "4px", 1.3, 2.4], ["73%", "84%", "4px", 0.8, 2.2], ["91%", "64%", "4px", 0.2, 2.8],
 ];
+const BUTTON_GRADIENTS: Record<string, string> = {
+  orange: "linear-gradient(90deg,#f59e0b,#f97316)", plum: "linear-gradient(90deg,#8b5cf6,#5b21b6)", fire: "linear-gradient(90deg,#ff7b00,#d62828)", night: "linear-gradient(90deg,#4361ee,#1d3557)", water: "linear-gradient(90deg,#38bdf8,#2563eb)",
+};
+const MOOD_FILTERS: Record<string, string> = {
+  none: "none", dusk: "brightness(1.08) saturate(1.35) sepia(.18) hue-rotate(-14deg) contrast(1.04)", night: "brightness(.72) saturate(1.05) hue-rotate(8deg)", velvet: "brightness(.9) saturate(1.25) hue-rotate(18deg)", milk: "brightness(1.16) saturate(.78) sepia(.12)", forest: "brightness(.9) saturate(1.3) hue-rotate(42deg)",
+};
 
 function ChevronDown() {
   return (

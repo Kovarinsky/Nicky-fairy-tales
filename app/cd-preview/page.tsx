@@ -17,6 +17,7 @@ import styles from "./page.module.css";
 import catalogData from "../../docs/cd-handoff/vFinal4/classic-tales.final.json";
 
 const A = "/cd-assets";
+const A4 = "/cd-assets-v4";
 const worlds: WorldTile[] = [
   { id: "dinosauri", name: "Dinosauři", image: `${A}/svety/webp/dinosauri.webp`, minAge: 3, maxAge: 10 },
   { id: "krkonose", name: "Krkonoše", image: `${A}/svety/webp/krkonose.webp`, minAge: 3, maxAge: 12 },
@@ -50,9 +51,9 @@ export default function CdPreviewPage() {
   const [readerPlaying, setReaderPlaying] = useState(false);
   const [songPlaying, setSongPlaying] = useState(true);
   const voices: VoiceItem[] = [
-    { id: "zena", name: "Žena", image: `${A}/katalog/webp/a-malenka.webp` },
-    { id: "muz", name: "Muž", image: `${A}/katalog/webp/a-hrasek.webp` },
-    { id: "dite", name: "Dítě", image: `${A}/katalog/webp/a-malenka.webp` },
+    { id: "zena", name: "Žena", image: `${A4}/hlasy/vypravecka.png` },
+    { id: "muz", name: "Muž", image: `${A4}/hlasy/vypravec.png` },
+    { id: "dite", name: "Dítě", image: `${A4}/hlasy/vesely.png` },
   ];
   const homeBackgrounds = [
     { id: "storybook", name: "Pohádkový les", image: "/bg-intro-v2.png" },
@@ -60,7 +61,12 @@ export default function CdPreviewPage() {
     { id: "kouzelny-les", name: "Kouzelný les", image: `${A}/svety/big/kouzelny-les.jpg` },
   ];
   const selectedVoice = voices.find((voice) => voice.id === selectedVoiceId) ?? voices[0];
-  const selected = useMemo(() => [{ id: "nicolas", name: "Nicolásek", avatar: `${A}/katalog/webp/a-hrasek.webp`, selected: true }, { id: "valentyna", name: "Vája", avatar: `${A}/katalog/webp/a-malenka.webp`, selected: true }], []);
+  const selected = useMemo(() => [
+    { id: "nicolas", name: "Nicolásek", avatar: `${A4}/postavy/avatar-nicolasek.png`, selected: true },
+    { id: "valentyna", name: "Vája", avatar: `${A4}/postavy/avatar-valentynka.png`, selected: true },
+    { id: "james", name: "James", avatar: `${A4}/postavy/avatar-james.png`, selected: false },
+    { id: "bella", name: "Bella", avatar: `${A4}/postavy/avatar-bella.png`, selected: false },
+  ], []);
   useEffect(() => {
     if (screen !== "progress") return;
     setGenerationStep(1);
@@ -70,7 +76,7 @@ export default function CdPreviewPage() {
     return () => { window.clearTimeout(step2); window.clearTimeout(step3); window.clearTimeout(done); };
   }, [screen]);
   if (screen === "home") return <div className={styles.previewViewport}><HomeScreen backgroundOptions={homeBackgrounds} version="vFinal3" onStart={() => setScreen("world")} /></div>;
-  if (screen === "catalog") return <div className={styles.previewViewport}><StoryCatalogScreen backgroundImage={`${A}/svety/big/krkonose.jpg`} stories={stories} onBack={() => setScreen("world")} onPick={(s) => { setMotif(`${s.name} — nové dobrodružství Nicoláska a Váji.`); setScreen("details"); }} /></div>;
+  if (screen === "catalog") return <div className={styles.previewViewport}><StoryCatalogScreen backgroundImage={`${A}/svety/big/krkonose.jpg`} stories={stories} onBack={() => setScreen("world")} onPick={(s) => { setMotif(`${s.name} — nové dobrodružství Nicoláska a Váji.`); setScreen("details"); }} onPickOriginal={(s) => { setMotif(`${s.name} — klasické vyprávění s původními postavami.`); setScreen("progress"); }} /></div>;
   if (screen === "details") return <div className={styles.previewViewport}><StoryDetailsStep backgroundImage={`${A}/svety/big/${world.id}.jpg`} worldName={world.name} worldImage={world.image} motif={motif} onMotifChange={setMotif} characters={selected} voice={selectedVoice} length={length} onLengthChange={setLength} onOpenCharacter={() => setScreen("newCharacter")} onAddCharacter={() => setScreen("newCharacter")} onOpenVoice={() => setScreen("voice")} onBackToWorld={() => setScreen("world")} onBack={() => setScreen("world")} onSubmit={() => setScreen("progress")} /></div>;
   if (screen === "progress") return <div className={styles.previewViewport}><GenerationProgressScreen step={generationStep} subIndex={generationStep - 1} onCancel={() => setScreen("details")} /></div>;
   if (screen === "reader") return <div className={styles.previewViewport}><ReaderScreen backgroundImage={`${A}/svety/big/${world.id}.jpg`} sentences={[readerPage === 1 ? "Nicolásek a Vája vstoupili do kouzelného světa." : readerPage === 2 ? "Za stromy zazářilo světlo a ukázalo jim tajnou cestu." : "Společně se vrátili domů a věděli, že dobrodružství nekončí."]} playing={readerPlaying} onPlayToggle={() => setReaderPlaying((v) => !v)} page={readerPage} pageCount={3} onPageChange={(page) => page >= 3 ? setReaderPage(3) : setReaderPage(Math.max(1, page))} onPrevPage={() => setReaderPage((p) => Math.max(1, p - 1))} onNextPage={() => readerPage >= 3 ? setScreen("end") : setReaderPage((p) => p + 1)} /></div>;
