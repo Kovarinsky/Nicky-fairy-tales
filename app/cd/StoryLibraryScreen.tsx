@@ -1,5 +1,6 @@
 "use client";
 import styles from "./StoryLibraryScreen.module.css";
+import Icon from "./Icon";
 
 export interface LibraryStory {
   id: string;
@@ -32,7 +33,7 @@ export default function StoryLibraryScreen({
   return (
     <main className={styles.screen}>
       <header className={styles.header}>
-        <button className={styles.backBtn} onClick={onBack} aria-label="Zpět">‹</button>
+        <button className={styles.backBtn} onClick={onBack} aria-label="Zpět"><Icon name="back-chevron" size={22} /></button>
         <h1 className={styles.title}>Moje pohádky</h1>
       </header>
 
@@ -44,7 +45,7 @@ export default function StoryLibraryScreen({
             <span className={styles.resumeTitle}>{resumeBanner.title}</span>
           </div>
           <button className={styles.resumeCta} onClick={resumeBanner.onResume}>Pokračovat</button>
-          <button className={styles.resumeDismiss} onClick={resumeBanner.onDismiss} aria-label="Zavřít">×</button>
+          <button className={styles.resumeDismiss} onClick={resumeBanner.onDismiss} aria-label="Zavřít"><Icon name="close-x" size={18} /></button>
         </div>
       )}
 

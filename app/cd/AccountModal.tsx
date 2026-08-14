@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import styles from "./AccountModal.module.css";
+import Icon from "./Icon";
 
 /**
  * Nickyho pohádky — account / profile modal (credits, email, password, logout).
@@ -93,7 +94,7 @@ export default function AccountModal({
               <span className={styles.rowLabel}>E-MAIL</span>
               <span className={styles.rowValue}>{user.email || "Nezadán — přidat"}</span>
             </span>
-            <span className={styles.chevron}>›</span>
+            <span className={styles.chevron}><Icon name="chevron-right" size={18} /></span>
           </button>
           <button
             className={styles.row}
@@ -106,7 +107,7 @@ export default function AccountModal({
               <span className={styles.rowLabel}>HESLO</span>
               <span className={styles.rowValue}>Změnit heslo</span>
             </span>
-            <span className={styles.chevron}>›</span>
+            <span className={styles.chevron}><Icon name="chevron-right" size={18} /></span>
           </button>
         </div>
 

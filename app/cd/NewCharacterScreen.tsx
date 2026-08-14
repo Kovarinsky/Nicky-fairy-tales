@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import styles from "./NewCharacterScreen.module.css";
+import Icon from "./Icon";
 
 /**
  * Nickyho pohádky — Nová postava (create) / Detail postavy (edit).
@@ -54,7 +55,7 @@ export default function NewCharacterScreen({
 
       <div className={styles.headerRow}>
         <button className={styles.backBtn} onClick={onBack} aria-label="Zpět">
-          ‹
+          <Icon name="back-chevron" size={22} />
         </button>
         {isEdit && (
           <span className={styles.avatar} style={{ backgroundImage: avatar ? `url(${avatar})` : undefined }} />
@@ -125,7 +126,7 @@ export default function NewCharacterScreen({
           <div className={styles.editorBody}>
             <div className={styles.headerRow} style={{ padding: "54px 0 0" }}>
               <button className={styles.backBtn} onClick={() => setDescEditorOpen(false)} aria-label="Zpět">
-                ‹
+                <Icon name="back-chevron" size={22} />
               </button>
               <div className={styles.title}>Popis postavy</div>
             </div>
@@ -134,7 +135,7 @@ export default function NewCharacterScreen({
               autoFocus
               value={description}
               onChange={(e) => onDescriptionChange?.(e.target.value)}
-              placeholder="Jak postava vypadá, jakou má povahu, co má ráda… ✏️"
+              placeholder="Jak postava vypadá, jakou má povahu, co má ráda…"
             />
             <button className={styles.cta} onClick={() => setDescEditorOpen(false)}>
               Hotovo

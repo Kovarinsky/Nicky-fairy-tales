@@ -8,7 +8,15 @@ export type IconName =
   | "lock"
   | "play"
   | "pause"
-  | "settings";
+  | "settings"
+  | "camera"
+  | "location-pin"
+  | "upload"
+  | "link"
+  | "research"
+  | "voice"
+  | "account"
+  | "book";
 
 export default function Icon({ name, size = 24 }: { name: IconName; size?: number }) {
   return (

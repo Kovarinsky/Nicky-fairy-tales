@@ -262,7 +262,7 @@ export default function HomeScreen({
         <div className={styles.loginOverlay}>
           <div className={styles.loginHeader}>
             <button className={styles.backBtn} onClick={() => setLoginOpen(false)} aria-label="Zavřít">
-              ‹
+              <Icon name="back-chevron" size={22} />
             </button>
             <span className={styles.loginKicker}>{isRegister ? "NOVÝ ÚČET" : "PŘIHLÁŠENÍ"}</span>
           </div>

@@ -14,6 +14,8 @@ Convert the Claude Design mobile product flow into the existing Next.js app whil
 - vFinal4 adds the formal Home Settings spec, 25-icon manifest, dedicated avatar assets, button behavior/tooltip rules, hit-area alignment rules, and explicit responsive confirmation.
 - vFinal4 assets are also available under `public/cd-assets-v4/`; the seven added SVG icons are in `public/cd-icons/`.
 - CD preview now loads the vFinal4 34-tale JSON catalogue and Home exposes a first-pass Settings sheet with button/mood swatches.
+- CD preview now has a complete demo route through progress → reader → end → bonus song → library; this is preview-state wiring only, not yet the production job/audio integration.
+- Remaining text/emoji navigation glyphs were replaced with shared `/cd-icons` SVG masks across the main CD forms, library, voice and end screens; a second icon pass is still needed for inline SVG helpers and non-manifest decorative glyphs.
 - Old story-generation flow: `sanitizeJson` now repairs unescaped quotes/control newlines inside Claude JSON strings before parsing, preventing complete stories from being discarded and rewritten after the observed `Expected ',' or '}'` failure.
 - vFinal4's `home-background.md` references `bg-log.jpg` and three variants, but those background files are not present in the ZIP; current app backgrounds remain the fallback until CD supplies/approves the exact files.
 - vFinal3 supplies the source-of-truth responsive rules, navigation/state map, style bible, final icon manifest, 12 reference screenshots and known-differences list.

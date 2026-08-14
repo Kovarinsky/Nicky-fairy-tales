@@ -96,7 +96,7 @@ export default function StoryDetailsStep({
                 onMotifChange?.(e.target.value);
               }}
               onClick={onOpenMotifEditor}
-              placeholder="O čem by pohádka měla být… ✏️"
+              placeholder="O čem by pohádka měla být…"
             />
             <div className={styles.row2}>
               <button className={styles.secondaryBtn} onClick={onGenerateMotif}>

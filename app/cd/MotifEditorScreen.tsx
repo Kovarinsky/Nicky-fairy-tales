@@ -1,5 +1,6 @@
 "use client";
 import styles from "./MotifEditorScreen.module.css";
+import Icon from "./Icon";
 
 /**
  * Nickyho pohádky — Motiv pohádky (fullscreen text editor).
@@ -13,7 +14,7 @@ export default function MotifEditorScreen({
   onGenerate,
   onExpand,
   onDone,
-  placeholder = "O čem by pohádka měla být? Popiš svět, postavy, dobrodružství… ✏️",
+  placeholder = "O čem by pohádka měla být? Popiš svět, postavy, dobrodružství…",
 }: {
   backgroundImage?: string;
   value: string;
@@ -32,7 +33,7 @@ export default function MotifEditorScreen({
       <div className={styles.body}>
         <div className={styles.headerRow}>
           <button className={styles.backBtn} onClick={onDone} aria-label="Zpět">
-            ‹
+            <Icon name="back-chevron" size={22} />
           </button>
           <div className={styles.title}>Motiv pohádky</div>
         </div>

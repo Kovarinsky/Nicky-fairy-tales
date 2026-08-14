@@ -1,5 +1,6 @@
 "use client";
 import styles from "./StoryEndScreen.module.css";
+import Icon from "./Icon";
 
 /**
  * Per product decision: content always fits one responsive box (no overflow off-screen),
@@ -24,7 +25,7 @@ export default function StoryEndScreen({
 }) {
   return (
     <main className={styles.screen} style={{ backgroundImage: `linear-gradient(0deg, rgba(20,10,5,.55), rgba(120,70,10,.35)), url(${backgroundImage})` }}>
-      <button className={styles.closeBtn} onClick={onClose} aria-label="Zavřít">×</button>
+      <button className={styles.closeBtn} onClick={onClose} aria-label="Zavřít"><Icon name="close-x" size={22} /></button>
       <div className={styles.card}>
         <div className={styles.sparkle}>✨</div>
         <h1 className={styles.title}>Konec</h1>

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import styles from "./CreateWorldScreen.module.css";
+import Icon from "./Icon";
 
 /**
  * Nickyho pohádky — Vytvořit vlastní pohádku (custom world sheet).
@@ -62,7 +63,7 @@ export default function CreateWorldScreen({
 
       <div className={styles.headerRow}>
         <button className={styles.backBtn} onClick={onBack} aria-label="Zpět">
-          ‹
+          <Icon name="back-chevron" size={22} />
         </button>
         <div className={styles.title}>Vytvořit vlastní pohádku</div>
       </div>
@@ -93,7 +94,7 @@ export default function CreateWorldScreen({
               {photos.map((src, i) => (
                 <div key={i} className={styles.photoThumb} style={{ backgroundImage: `url(${src})` }}>
                   <button className={styles.photoDelete} onClick={() => onRemovePhoto?.(i)} aria-label="Smazat fotku">
-                    ×
+                    <Icon name="close-x" size={18} />
                   </button>
                 </div>
               ))}
@@ -150,7 +151,7 @@ export default function CreateWorldScreen({
           <div className={styles.editorBody}>
             <div className={styles.headerRow}>
               <button className={styles.backBtn} onClick={() => setDescEditorOpen(false)} aria-label="Zpět">
-                ‹
+                <Icon name="back-chevron" size={22} />
               </button>
               <div className={styles.title}>Popis světa</div>
             </div>
@@ -159,7 +160,7 @@ export default function CreateWorldScreen({
               autoFocus
               value={description}
               onChange={(e) => onDescriptionChange?.(e.target.value)}
-              placeholder="Jak svět vypadá, kdo v něm žije, jaká tam platí pravidla… ✏️"
+              placeholder="Jak svět vypadá, kdo v něm žije, jaká tam platí pravidla…"
             />
             <button className={styles.cta} onClick={() => setDescEditorOpen(false)}>
               Hotovo

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import styles from "./VoiceSelectionScreen.module.css";
+import Icon from "./Icon";
 
 /**
  * Nickyho pohádky — Výběr hlasu.
@@ -50,7 +51,7 @@ export default function VoiceSelectionScreen({
 
       <header className={styles.header}>
         <button className={styles.backBtn} onClick={onBack} aria-label="Zpět">
-          ‹
+          <Icon name="back-chevron" size={22} />
         </button>
         <h1 className={styles.title}>Výběr hlasu</h1>
       </header>
@@ -99,7 +100,7 @@ export default function VoiceSelectionScreen({
                 <button key={v.id} className={styles.premiumBtn} onClick={onUpgrade} aria-label={v.name}>
                   <span className={styles.premiumAvatarWrap}>
                     <span className={styles.premiumAvatar} style={{ backgroundImage: `url(${v.image})` }} />
-                    <span className={styles.lockBadge}>🔒</span>
+                    <span className={styles.lockBadge}><Icon name="lock" size={14} /></span>
                   </span>
                   <span className={styles.premiumName}>{v.name}</span>
                 </button>
