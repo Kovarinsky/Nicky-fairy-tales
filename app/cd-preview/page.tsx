@@ -40,9 +40,9 @@ export default function CdPreviewPage() {
     { id: "dite", name: "Dítě", image: `${A}/katalog/webp/a-malenka.webp` },
   ];
   const homeBackgrounds = [
+    { id: "storybook", name: "Pohádkový les", image: "/bg-intro-v2.png" },
     { id: "krkonose", name: "Krkonoše", image: `${A}/svety/big/krkonose.jpg` },
     { id: "kouzelny-les", name: "Kouzelný les", image: `${A}/svety/big/kouzelny-les.jpg` },
-    { id: "dinosauri", name: "Dinosauři", image: `${A}/svety/big/dinosauri.jpg` },
   ];
   const selectedVoice = voices.find((voice) => voice.id === selectedVoiceId) ?? voices[0];
   const selected = useMemo(() => [{ id: "nicolas", name: "Nicolásek", avatar: `${A}/katalog/webp/a-hrasek.webp`, selected: true }, { id: "valentyna", name: "Vája", avatar: `${A}/katalog/webp/a-malenka.webp`, selected: true }], []);

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import styles from "./StoryCatalogScreen.module.css";
+import Icon from "./Icon";
 
 /**
  * Nickyho pohádky — Výběr pohádky: katalog / vyhledávání + detail.
@@ -58,7 +59,7 @@ export default function StoryCatalogScreen({
 
       <header className={styles.header}>
         <button className={styles.backBtn} onClick={onBack} aria-label="Zpět">
-          ‹
+          <Icon name="back-chevron" size={22} />
         </button>
         <h1 className={styles.title}>Výběr pohádky</h1>
         <div className={styles.stepLabel}>VŠECHNY POHÁDKY · {stories.length}</div>
@@ -105,15 +106,15 @@ export default function StoryCatalogScreen({
             <div className={styles.detailBottomScrim} />
             <div className={styles.detailHeader}>
               <button className={styles.detailBack} onClick={() => setDetailId(null)} aria-label="Zpět">
-                ‹
+                <Icon name="chevron-left" size={22} />
               </button>
               <span className={styles.detailGroup}>{detail.group.toUpperCase()}</span>
             </div>
             <button className={styles.navLeft} onClick={() => step(-1)} aria-label="Předchozí pohádka">
-              ‹
+              <Icon name="chevron-left" size={22} />
             </button>
             <button className={styles.navRight} onClick={() => step(1)} aria-label="Další pohádka">
-              ›
+              <Icon name="chevron-right" size={22} />
             </button>
           </div>
           <div className={styles.detailCardWrap}>

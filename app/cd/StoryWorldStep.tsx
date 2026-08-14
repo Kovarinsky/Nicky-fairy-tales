@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import styles from "./StoryWorldStep.module.css";
+import Icon from "./Icon";
 
 /**
  * Nickyho pohádky — Výběr pohádky, krok 1/2 (Svět).
@@ -55,7 +56,7 @@ export default function StoryWorldStep({
 
       <header className={styles.header}>
         <button className={styles.backBtn} onClick={onBack} aria-label="Zpět">
-          ‹
+          <Icon name="back-chevron" size={22} />
         </button>
         <h1 className={styles.title}>Výběr pohádky</h1>
         <div className={styles.stepLabel}>KROK 1 ZE 2 · SVĚT</div>

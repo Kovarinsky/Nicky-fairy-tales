@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import styles from "./StoryDetailsStep.module.css";
+import Icon from "./Icon";
 
 /**
  * Nickyho pohádky — Výběr pohádky, krok 2/2 (Pohádka).
@@ -67,7 +68,7 @@ export default function StoryDetailsStep({
 
       <header className={styles.header}>
         <button className={styles.backBtn} onClick={onBack} aria-label="Zpět">
-          ‹
+          <Icon name="back-chevron" size={22} />
         </button>
         <h1 className={styles.title}>Výběr pohádky</h1>
         <div className={styles.stepLabel}>KROK 2 ZE 2 · POHÁDKA</div>
@@ -81,7 +82,7 @@ export default function StoryDetailsStep({
               <span className={styles.summaryLabel}>SVĚT POHÁDKY</span>
               <span className={styles.summaryValue}>{worldName ?? "Nevybráno"}</span>
             </span>
-            <span className={styles.chevron}>›</span>
+            <span className={styles.chevron}><Icon name="chevron-right" size={20} /></span>
           </button>
 
           <section className={styles.card}>
@@ -141,7 +142,7 @@ export default function StoryDetailsStep({
               <span className={styles.summaryValue}>{voice?.name ?? "Nevybráno"}</span>
               {voice?.subtitle && <span className={styles.summarySub}>{voice.subtitle}</span>}
             </span>
-            <span className={styles.chevron}>›</span>
+            <span className={styles.chevron}><Icon name="chevron-right" size={20} /></span>
           </button>
 
           <section className={styles.card}>
