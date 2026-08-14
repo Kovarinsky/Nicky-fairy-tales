@@ -26,7 +26,7 @@ for (const viewport of [
   await page.getByRole("button", { name: "Zpět" }).click();
   await page.getByRole("button", { name: "Všechny pohádky" }).click();
   await page.getByRole("heading", { name: "Výběr pohádky" }).waitFor();
-  await page.getByRole("button", { name: "Pokračovat" }).click();
+  await page.getByRole("button", { name: "Červená karkulka" }).click();
   await page.getByText("KROK 2 ZE 2 · POHÁDKA").waitFor();
   await page.getByRole("button", { name: "Přidat" }).click();
   await page.getByText("Nová postava").waitFor();
