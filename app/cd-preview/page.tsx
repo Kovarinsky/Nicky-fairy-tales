@@ -33,6 +33,7 @@ export default function CdPreviewPage() {
   const [worldDescription, setWorldDescription] = useState("");
   const [characterName, setCharacterName] = useState("");
   const [characterDescription, setCharacterDescription] = useState("");
+  const [selectedVoiceId, setSelectedVoiceId] = useState("zena");
   const voices: VoiceItem[] = [
     { id: "zena", name: "Žena", image: `${A}/katalog/webp/a-malenka.webp` },
     { id: "muz", name: "Muž", image: `${A}/katalog/webp/a-hrasek.webp` },
@@ -43,13 +44,14 @@ export default function CdPreviewPage() {
     { id: "kouzelny-les", name: "Kouzelný les", image: `${A}/svety/big/kouzelny-les.jpg` },
     { id: "dinosauri", name: "Dinosauři", image: `${A}/svety/big/dinosauri.jpg` },
   ];
-  if (screen === "home") return <div className={styles.previewViewport}><HomeScreen backgroundOptions={homeBackgrounds} version="vFinal3" onStart={() => setScreen("world")} /></div>;
+  const selectedVoice = voices.find((voice) => voice.id === selectedVoiceId) ?? voices[0];
   const selected = useMemo(() => [{ id: "nicolas", name: "Nicolásek", avatar: `${A}/katalog/webp/a-hrasek.webp`, selected: true }, { id: "valentyna", name: "Vája", avatar: `${A}/katalog/webp/a-malenka.webp`, selected: true }], []);
+  if (screen === "home") return <div className={styles.previewViewport}><HomeScreen backgroundOptions={homeBackgrounds} version="vFinal3" onStart={() => setScreen("world")} /></div>;
   if (screen === "catalog") return <div className={styles.previewViewport}><StoryCatalogScreen backgroundImage={`${A}/svety/big/krkonose.jpg`} stories={stories} onBack={() => setScreen("world")} onPick={(s) => { setMotif(`${s.name} — nové dobrodružství Nicoláska a Váji.`); setScreen("details"); }} /></div>;
-  if (screen === "details") return <div className={styles.previewViewport}><StoryDetailsStep backgroundImage={`${A}/svety/big/${world.id}.jpg`} worldName={world.name} worldImage={world.image} motif={motif} onMotifChange={setMotif} characters={selected} length={length} onLengthChange={setLength} onOpenCharacter={() => setScreen("newCharacter")} onAddCharacter={() => setScreen("newCharacter")} onOpenVoice={() => setScreen("voice")} onBackToWorld={() => setScreen("world")} onBack={() => setScreen("world")} onSubmit={() => setScreen("progress")} /></div>;
+  if (screen === "details") return <div className={styles.previewViewport}><StoryDetailsStep backgroundImage={`${A}/svety/big/${world.id}.jpg`} worldName={world.name} worldImage={world.image} motif={motif} onMotifChange={setMotif} characters={selected} voice={selectedVoice} length={length} onLengthChange={setLength} onOpenCharacter={() => setScreen("newCharacter")} onAddCharacter={() => setScreen("newCharacter")} onOpenVoice={() => setScreen("voice")} onBackToWorld={() => setScreen("world")} onBack={() => setScreen("world")} onSubmit={() => setScreen("progress")} /></div>;
   if (screen === "progress") return <div className={styles.previewViewport}><GenerationProgressScreen step={2} subIndex={1} onCancel={() => setScreen("details")} /></div>;
   if (screen === "createWorld") return <div className={styles.previewViewport}><CreateWorldScreen backgroundImage={`${A}/svety/big/kouzelny-les.jpg`} name={worldName} onNameChange={setWorldName} description={worldDescription} onDescriptionChange={setWorldDescription} photos={[]} onAddPhoto={() => {}} link="" onSave={() => setScreen("world")} onBack={() => setScreen("world")} onCancel={() => setScreen("world")} /></div>;
   if (screen === "newCharacter") return <div className={styles.previewViewport}><NewCharacterScreen backgroundImage={`${A}/svety/big/kouzelny-les.jpg`} name={characterName} onNameChange={setCharacterName} description={characterDescription} onDescriptionChange={setCharacterDescription} onAddPhoto={() => {}} onTakePhoto={() => {}} onSave={() => setScreen("details")} onBack={() => setScreen("details")} onCancel={() => setScreen("details")} /></div>;
-  if (screen === "voice") return <div className={styles.previewViewport}><VoiceSelectionScreen backgroundImage={`${A}/svety/big/kouzelny-les.jpg`} voices={voices} premiumVoices={voices.slice(0, 2)} onBack={() => setScreen("details")} onConfirm={() => setScreen("details")} /></div>;
+  if (screen === "voice") return <div className={styles.previewViewport}><VoiceSelectionScreen backgroundImage={`${A}/svety/big/kouzelny-les.jpg`} voices={voices} premiumVoices={voices.slice(0, 2)} selectedVoiceId={selectedVoiceId} onSelectVoice={setSelectedVoiceId} onBack={() => setScreen("details")} onConfirm={(id) => { setSelectedVoiceId(id); setScreen("details"); }} /></div>;
   return <div className={styles.previewViewport}><StoryWorldStep mobilePreview backgroundImage={`${A}/svety/big/krkonose.jpg`} readyWorlds={worlds} ownWorlds={[]} selectedId={world.id} onSelect={(id) => setWorld(worlds.find((w) => w.id === id) ?? worlds[0])} onOpenCatalog={() => setScreen("catalog")} onCreateNew={() => setScreen("createWorld")} onContinue={() => setScreen("details")} /></div>;
 }
