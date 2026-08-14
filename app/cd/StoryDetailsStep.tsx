@@ -101,13 +101,13 @@ export default function StoryDetailsStep({
             <div className={styles.row2}>
               <button className={styles.secondaryBtn} onClick={onGenerateMotif}>
                 <span className={styles.discIcon}>
-                  <SparkleIcon />
+                  <Icon name="sparkle" size={15} />
                 </span>
                 Vymysli námět
               </button>
               <button className={styles.secondaryBtn} onClick={onOpenMotifEditor}>
                 <span className={styles.discIcon}>
-                  <WandIcon />
+                  <Icon name="wand" size={15} />
                 </span>
                 Rozvinout
               </button>
@@ -121,14 +121,14 @@ export default function StoryDetailsStep({
                 <button key={c.id} className={styles.avatarBtn} onClick={() => onOpenCharacter?.(c.id)} aria-label={c.name}>
                   <span className={styles.avatarWrap}>
                     <span className={c.selected ? styles.avatarActive : styles.avatarImg} style={{ backgroundImage: `url(${c.avatar})` }} />
-                    {c.selected && <span className={styles.selBadge}>✓</span>}
+                    {c.selected && <span className={styles.selBadge}><Icon name="checkmark" size={13} /></span>}
                   </span>
                   <span className={styles.avatarName}>{c.name}</span>
                 </button>
               ))}
               <button className={styles.avatarBtn} onClick={onAddCharacter} aria-label="Přidat postavu">
                 <span className={styles.avatarAdd}>
-                  <PlusIcon />
+                  <Icon name="plus" size={20} />
                 </span>
                 <span className={styles.avatarName}>Přidat</span>
               </button>
@@ -158,41 +158,11 @@ export default function StoryDetailsStep({
       <div className={styles.footer}>
         <button className={styles.cta} onClick={onSubmit}>
           <span className={styles.discIcon}>
-            <PlayIcon />
+            <Icon name="play" size={15} />
           </span>
           Vytvořit pohádku
         </button>
       </div>
     </main>
-  );
-}
-
-function SparkleIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M12 3l1.8 4.9L18 9l-4.2 1.9L12 16l-1.8-5L6 9l4.2-1.1L12 3Z" />
-    </svg>
-  );
-}
-function WandIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M5 19L15 9" />
-      <path d="M15.5 3.4l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" />
-    </svg>
-  );
-}
-function PlusIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden>
-      <path d="M12 6v12M6 12h12" />
-    </svg>
-  );
-}
-function PlayIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M7 4.5v15a1 1 0 0 0 1.53.85l12-7.5a1 1 0 0 0 0-1.7l-12-7.5A1 1 0 0 0 7 4.5Z" />
-    </svg>
   );
 }

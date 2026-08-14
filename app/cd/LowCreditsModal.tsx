@@ -1,5 +1,6 @@
 "use client";
 import styles from "./LowCreditsModal.module.css";
+import Icon from "./Icon";
 
 export default function LowCreditsModal({
   open,
@@ -19,7 +20,7 @@ export default function LowCreditsModal({
     <div className={styles.overlay}>
       <div className={styles.scrim} onClick={onBack} />
       <div className={styles.card}>
-        <div className={styles.icon}>🪙</div>
+        <div className={styles.icon}><Icon name="coin" size={34} /></div>
         <h2 className={styles.title}>Nedostatek kreditů</h2>
         <p className={styles.body}>Tato pohádka potřebuje {needed} kreditů, máte {have}.</p>
         <button className={styles.cta} onClick={onTopUp}>Dobít kredity</button>

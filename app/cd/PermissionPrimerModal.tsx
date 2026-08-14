@@ -1,13 +1,13 @@
 "use client";
-import { useState } from "react";
 import styles from "./PermissionPrimerModal.module.css";
+import Icon, { type IconName } from "./Icon";
 
 export type PermissionKind = "camera" | "microphone" | "location";
 
-const COPY: Record<PermissionKind, { icon: string; body: string }> = {
-  camera: { icon: "📷", body: "Potřebujeme přístup k fotoaparátu, abyste mohli vyfotit postavu nebo místo pro pohádku." },
-  microphone: { icon: "🎙️", body: "Potřebujeme přístup k mikrofonu, abychom mohli nahrát váš hlas pro vypravěče." },
-  location: { icon: "📍", body: "Potřebujeme vaši polohu, abychom mohli pohádku zasadit do vašeho okolí. Polohu nikam neukládáme trvale." },
+const COPY: Record<PermissionKind, { icon: IconName; body: string }> = {
+  camera: { icon: "camera", body: "Potřebujeme přístup k fotoaparátu, abyste mohli vyfotit postavu nebo místo pro pohádku." },
+  microphone: { icon: "mic", body: "Potřebujeme přístup k mikrofonu, abychom mohli nahrát váš hlas pro vypravěče." },
+  location: { icon: "location-pin", body: "Potřebujeme vaši polohu, abychom mohli pohádku zasadit do vašeho okolí. Polohu nikam neukládáme trvale." },
 };
 
 export default function PermissionPrimerModal({
@@ -31,7 +31,7 @@ export default function PermissionPrimerModal({
     <div className={styles.overlay}>
       <div className={styles.scrim} onClick={onNotNow} />
       <div className={styles.card}>
-        <div className={styles.icon}>{copy.icon}</div>
+        <div className={styles.icon}><Icon name={copy.icon} size={34} /></div>
         {denied ? (
           <>
             <h2 className={styles.title}>Povolení bylo odmítnuto</h2>

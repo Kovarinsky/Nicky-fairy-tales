@@ -16,7 +16,19 @@ export type IconName =
   | "research"
   | "voice"
   | "account"
-  | "book";
+  | "book"
+  | "checkmark"
+  | "plus"
+  | "mic"
+  | "coin"
+  | "search"
+  | "share"
+  | "trash"
+  | "menu-dots"
+  | "music"
+  | "sparkle"
+  | "wand"
+  | "candle";
 
 export default function Icon({ name, size = 24 }: { name: IconName; size?: number }) {
   return (

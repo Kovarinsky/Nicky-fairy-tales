@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import styles from "./ReaderScreen.module.css";
+import Icon from "./Icon";
 
 /**
  * Nickyho pohádky — čtečka pohádky (reader / playback).
@@ -17,6 +18,7 @@ export default function ReaderScreen({
   onPageChange,
   onPrevPage,
   onNextPage,
+  includeOutro = false,
   wordIntervalMs = 340,
 }: {
   backgroundImage?: string;
@@ -30,19 +32,35 @@ export default function ReaderScreen({
   onPageChange?: (page: number) => void;
   onPrevPage?: () => void;
   onNextPage?: () => void;
+  /** Include the end/outro as the last scrubber position. */
+  includeOutro?: boolean;
   wordIntervalMs?: number;
 }) {
   const [localPlaying, setLocalPlaying] = useState(false);
   const isPlaying = playing ?? localPlaying;
-  const [uiVisible, setUiVisible] = useState(true);
+  const [uiVisible, setUiVisible] = useState(false);
   const [sentIdx, setSentIdx] = useState(0);
   const [wordIdx, setWordIdx] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const captionRef = useRef<HTMLDivElement | null>(null);
+  const activeWordRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
     setSentIdx(0);
     setWordIdx(0);
   }, [sentences]);
+
+  useEffect(() => {
+    if (isPlaying) setUiVisible(false);
+  }, [isPlaying]);
+
+  useEffect(() => {
+    const strip = captionRef.current;
+    const activeWord = activeWordRef.current;
+    if (!strip || !activeWord) return;
+    const target = activeWord.offsetLeft + activeWord.offsetWidth / 2 - strip.clientWidth / 2;
+    strip.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+  }, [sentIdx, wordIdx]);
 
   useEffect(() => {
     function loop() {
@@ -82,10 +100,10 @@ export default function ReaderScreen({
       <img className={styles.bg} src={backgroundImage} alt="" aria-hidden draggable={false} />
       <div className={styles.bottomFade} aria-hidden />
 
-      <div className={styles.caption} style={{ bottom: uiVisible ? 130 : 34 }}>
+      <div ref={captionRef} className={styles.caption} style={{ bottom: uiVisible ? 130 : 18 }}>
         <p className={styles.captionText}>
           {words.map((w, i) => (
-            <span key={i} className={!isPlaying || i < wordIdx ? styles.wordRead : i === wordIdx ? styles.wordActive : styles.wordPending}>
+            <span ref={i === wordIdx ? activeWordRef : undefined} key={i} className={!isPlaying || i < wordIdx ? styles.wordRead : i === wordIdx ? styles.wordActive : styles.wordPending}>
               {w}{" "}
             </span>
           ))}
@@ -104,10 +122,10 @@ export default function ReaderScreen({
                 }}
                 aria-label="Předchozí strana"
               >
-                <ChevronIcon dir="l" />
+                <Icon name="chevron-left" size={20} />
               </button>
               <button className={styles.playBtn} onClick={togglePlay} aria-label="Přehrát / pozastavit">
-                {isPlaying ? <PauseIcon /> : <PlayIcon />}
+                <Icon name={isPlaying ? "pause" : "play"} size={22} />
               </button>
               <button
                 className={styles.navBtn}
@@ -117,49 +135,30 @@ export default function ReaderScreen({
                 }}
                 aria-label="Další strana"
               >
-                <ChevronIcon dir="r" />
+                <Icon name="chevron-right" size={20} />
               </button>
             </div>
             <div className={styles.scrubRow}>
               <input
                 className={styles.range}
                 type="range"
-                min={0}
-                max={pageCount}
+                min={1}
+                max={pageCount + (includeOutro ? 1 : 0)}
                 value={page}
-                onChange={(e) => onPageChange?.(+e.target.value)}
+                onChange={(e) => {
+                  const target = +e.target.value;
+                  if (includeOutro && target > pageCount) onNextPage?.();
+                  else onPageChange?.(target);
+                }}
                 aria-label="Strana pohádky"
               />
               <span className={styles.pageLabel}>
-                {page} / {pageCount}
+                {page} / {pageCount + (includeOutro ? 1 : 0)}
               </span>
             </div>
           </div>
         </div>
       </div>
     </main>
-  );
-}
-
-function ChevronIcon({ dir }: { dir: "l" | "r" }) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d={dir === "l" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7"} />
-    </svg>
-  );
-}
-function PlayIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff" style={{ marginLeft: 3 }} aria-hidden>
-      <path d="M7 4.5v15a1 1 0 0 0 1.53.85l12-7.5a1 1 0 0 0 0-1.7l-12-7.5A1 1 0 0 0 7 4.5Z" />
-    </svg>
-  );
-}
-function PauseIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff" aria-hidden>
-      <rect x="6" y="4" width="4" height="16" rx="1.5" />
-      <rect x="14" y="4" width="4" height="16" rx="1.5" />
-    </svg>
   );
 }

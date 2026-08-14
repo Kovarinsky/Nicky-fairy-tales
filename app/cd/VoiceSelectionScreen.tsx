@@ -4,7 +4,7 @@ import styles from "./VoiceSelectionScreen.module.css";
 import Icon from "./Icon";
 
 /**
- * Nickyho pohádky — Výběr hlasu.
+ * Nickyho pohádky — Výběr vypravěče.
  * Background: /public/images/bg-log.jpg. Fonts: Alegreya 800, Nunito 600–800.
  */
 
@@ -53,7 +53,7 @@ export default function VoiceSelectionScreen({
         <button className={styles.backBtn} onClick={onBack} aria-label="Zpět">
           <Icon name="back-chevron" size={22} />
         </button>
-        <h1 className={styles.title}>Výběr hlasu</h1>
+        <h1 className={styles.title}>Výběr vypravěče</h1>
       </header>
 
       <section className={styles.hero}>
@@ -73,7 +73,7 @@ export default function VoiceSelectionScreen({
       )}
       <div className={styles.sampleWrap}>
         <button className={styles.sampleBtn} onClick={() => active && onPlaySample?.(active.id)} aria-label="Přehrát ukázku">
-          <PlayIcon />
+          <Icon name="play" size={26} />
         </button>
         <div className={styles.sampleLabel}>Přehrát ukázku</div>
       </div>
@@ -114,7 +114,7 @@ export default function VoiceSelectionScreen({
       <footer className={styles.footer}>
         <button className={styles.cta} onClick={() => active && onConfirm?.(active.id)}>
           <span className={styles.discIcon}>
-            <CheckIcon />
+            <Icon name="checkmark" size={16} />
           </span>
           Vybrat tento hlas
         </button>
@@ -140,19 +140,5 @@ function Bars() {
         />
       ))}
     </span>
-  );
-}
-function PlayIcon() {
-  return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="#5a3a00" style={{ marginLeft: 3 }} aria-hidden>
-      <path d="M7 4.5v15a1 1 0 0 0 1.53.85l12-7.5a1 1 0 0 0 0-1.7l-12-7.5A1 1 0 0 0 7 4.5Z" />
-    </svg>
-  );
-}
-function CheckIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M5 12.5l4.5 4.5L19 7" />
-    </svg>
   );
 }

@@ -27,15 +27,15 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 48px 20px 6px;
+  padding: max(24px, env(safe-area-inset-top)) 20px 6px;
 }
 .backBtn {
   flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: none;
   background: rgba(255, 255, 255, 0.16);

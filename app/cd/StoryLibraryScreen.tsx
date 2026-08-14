@@ -57,7 +57,7 @@ export default function StoryLibraryScreen({
         </div>
       ) : stories.length === 0 ? (
         <div className={styles.empty}>
-          <div className={styles.emptyIcon}>📖</div>
+          <div className={styles.emptyIcon}><Icon name="book" size={42} /></div>
           <h2 className={styles.emptyTitle}>Zatím žádné pohádky</h2>
           <p className={styles.emptyBody}>Vytvořte první pohádku a objeví se tady.</p>
           <button className={styles.cta} onClick={onCreateFirst}>Vytvořit první pohádku</button>
@@ -71,8 +71,8 @@ export default function StoryLibraryScreen({
                 <span className={styles.cardDate}>{s.relativeDate}</span>
               </button>
               <div className={styles.cardMenu}>
-                <button className={styles.menuDot} onClick={() => onShare?.(s.id)} aria-label="Sdílet">⤴</button>
-                <button className={styles.menuDot} onClick={() => onDeleteRequest?.(s.id)} aria-label="Smazat">🗑</button>
+                <button className={styles.menuDot} onClick={() => onShare?.(s.id)} aria-label="Sdílet"><Icon name="share" size={18} /></button>
+                <button className={styles.menuDot} onClick={() => onDeleteRequest?.(s.id)} aria-label="Smazat"><Icon name="trash" size={18} /></button>
               </div>
             </div>
           ))}

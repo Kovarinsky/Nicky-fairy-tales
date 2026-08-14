@@ -100,7 +100,7 @@ export default function CreateWorldScreen({
               ))}
               {photos.length < maxPhotos && (
                 <button className={styles.photoAdd} onClick={onAddPhoto} aria-label="Přidat fotku">
-                  <PlusIcon />
+                  <Icon name="plus" size={20} />
                 </button>
               )}
             </div>
@@ -117,14 +117,14 @@ export default function CreateWorldScreen({
           <div className={styles.row2}>
             <button className={linkOpen ? styles.secondaryBtnOn : styles.secondaryBtn} onClick={() => setLinkOpen((v) => !v)}>
               <span className={styles.discIcon}>
-                <LinkIcon />
+                <Icon name="link" size={14} />
               </span>
               Odkaz
             </button>
             {onStudy && (
               <button className={styles.secondaryBtn} onClick={handleStudy} disabled={studying}>
                 <span className={styles.discIcon}>
-                  <SearchIcon />
+                  <Icon name="research" size={14} />
                 </span>
                 {studying ? "Studuji…" : "Prostudovat"}
               </button>
@@ -169,30 +169,5 @@ export default function CreateWorldScreen({
         </div>
       )}
     </div>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden>
-      <path d="M12 6v12M6 12h12" />
-    </svg>
-  );
-}
-function LinkIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M9.5 14.5l5-5" />
-      <path d="M12.5 7.5l1.6-1.6a3.6 3.6 0 0 1 5 5L17.5 12.5" />
-      <path d="M11.5 16.5l-1.6 1.6a3.6 3.6 0 0 1-5-5L6.5 11.5" />
-    </svg>
-  );
-}
-function SearchIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="11" cy="11" r="6.2" />
-      <path d="M15.6 15.6L20 20" />
-    </svg>
   );
 }

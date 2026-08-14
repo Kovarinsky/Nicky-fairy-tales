@@ -1,5 +1,6 @@
 "use client";
 import styles from "./GenerationProgressScreen.module.css";
+import Icon from "./Icon";
 
 /**
  * Nickyho pohádky — story generation loading screen (spec §11-13 in MASTER-SPEC-vFinal2.md).
@@ -40,7 +41,7 @@ export default function GenerationProgressScreen({
   if (error) {
     return (
       <main className={styles.screen}>
-        <div className={styles.icon}>🕯️</div>
+        <div className={styles.icon}><Icon name="candle" size={36} /></div>
         <h1 className={styles.title}>Něco se nepovedlo</h1>
         <p className={styles.body}>{error.message ?? "Zkuste to prosím znovu."}</p>
         <p className={styles.bodyMuted}>Nic jsme vám nestrhli.</p>

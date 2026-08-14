@@ -26,18 +26,18 @@
 
 .header {
   position: relative;
-  padding: 58px 20px 6px;
+  padding: max(38px, env(safe-area-inset-top)) 20px 6px;
   text-align: center;
 }
 .backBtn {
   position: absolute;
   left: 20px;
-  top: 52px;
+  top: max(32px, env(safe-area-inset-top));
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: none;
   background: rgba(255, 255, 255, 0.18);
@@ -70,16 +70,16 @@
   left: 0;
   right: 0;
   overflow: auto;
-  padding: 8px clamp(16px, 2.4vw, 48px) 12px;
+  padding: 8px 16px 12px;
   box-sizing: border-box;
 }
 .stack {
   display: flex;
   flex-direction: column;
-  gap: clamp(9px, 1vw, 18px);
+  gap: 9px;
 }
 .card {
-  padding: clamp(11px, 1.1vw, 20px) clamp(16px, 1.8vw, 32px) clamp(12px, 1.2vw, 20px);
+  padding: 11px 16px 12px;
   border-radius: 24px;
   background: rgba(30, 16, 58, 0.65);
   border: 1.5px solid rgba(253, 224, 138, 0.4);
@@ -114,8 +114,8 @@
   gap: 10px;
   align-items: stretch;
   overflow-x: auto;
-  margin: 0 clamp(-32px, -1.8vw, -16px);
-  padding: 2px clamp(16px, 1.8vw, 32px) 6px;
+  margin: 0 -16px;
+  padding: 2px 16px 6px;
 }
 .tile,
 .tileActive,

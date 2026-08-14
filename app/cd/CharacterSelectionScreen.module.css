@@ -1,0 +1,21 @@
+.screen { position: relative; width: 100%; height: 100dvh; overflow: hidden; color: #fdf3d7; font-family: "Nunito",system-ui,sans-serif; background: #170c32; }
+.bg { position: absolute; inset: 0; background-size: cover; background-position: center; }
+.scrim { position: absolute; inset: 0; background: linear-gradient(180deg,rgba(13,6,31,.5),rgba(20,9,45,.82) 38%,rgba(16,7,37,.94)); backdrop-filter: saturate(1.08); }
+.header { position: relative; z-index: 1; display: flex; align-items: center; gap: 14px; padding: max(18px,env(safe-area-inset-top)) 18px 12px; }
+.header h1 { margin: 0; font: 800 31px/1.05 "Alegreya",Georgia,serif; }
+.header p { margin: 4px 0 0; color: #f7d77a; font-size: 12px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.back { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex: 0 0 44px; padding: 0; border: 1px solid rgba(253,224,138,.38); border-radius: 50%; background: rgba(255,255,255,.13); color: #fff6dd; cursor: pointer; }
+.card { position: relative; z-index: 1; height: calc(100dvh - 178px); overflow-y: auto; margin: 0 14px; padding: 16px; border: 1px solid rgba(253,224,138,.43); border-radius: 24px; background: rgba(36,18,69,.76); backdrop-filter: blur(12px); box-sizing: border-box; }
+.grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.tile,.tileSelected,.addTile { min-height: 132px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px 8px; border-radius: 20px; color: #fff5dc; font: 800 14px "Nunito",system-ui,sans-serif; cursor: pointer; }
+.tile { border: 1px solid rgba(253,224,138,.28); background: rgba(26,13,54,.72); }
+.tileSelected { border: 2px solid #f59e0b; background: linear-gradient(145deg,rgba(245,158,11,.2),rgba(86,43,105,.72)); box-shadow: 0 0 18px rgba(245,158,11,.23); }
+.avatarWrap { position: relative; width: 78px; height: 78px; }
+.avatar { display: block; width: 78px; height: 78px; border-radius: 50%; object-fit: cover; object-position: 50% 38%; border: 2px solid rgba(253,224,138,.78); }
+.check { position: absolute; top: -3px; right: -4px; display: flex; align-items: center; justify-content: center; width: 25px; height: 25px; border-radius: 50%; color: #fff; background: linear-gradient(145deg,#fbbf24,#f97316); border: 2px solid #fff4d6; }
+.addTile { border: 1.5px dashed rgba(253,224,138,.5); background: rgba(26,13,54,.45); }
+.addCircle { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(145deg,#f59e0b,#f97316); color: #fff; border: 2px solid #fff4d6; }
+.footer { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; padding: 10px 18px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(180deg,rgba(15,7,34,0),rgba(15,7,34,.97) 25%); }
+.footer p { margin: 0 0 6px; text-align: center; color: rgba(253,243,215,.75); font-size: 11px; font-weight: 700; }
+.cta { width: 100%; min-height: 58px; border: 1.5px solid rgba(255,255,255,.9); border-radius: 999px; background: linear-gradient(90deg,#f59e0b,#f97316); color: #fff; font: 800 18px "Nunito",system-ui,sans-serif; cursor: pointer; box-shadow: 0 5px 22px rgba(245,158,11,.3); }
+.cta:active { transform: scale(.97); }.cta:disabled { opacity: .38; cursor: not-allowed; }

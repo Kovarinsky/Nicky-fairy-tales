@@ -96,13 +96,13 @@ export default function NewCharacterScreen({
           <div className={styles.row2}>
             <button className={styles.secondaryBtn} onClick={onAddPhoto}>
               <span className={styles.discIcon}>
-                <PhotoIcon />
+                <Icon name="upload" size={14} />
               </span>
               Nahrát fotku ({photoCount}/{maxPhotos})
             </button>
             <button className={styles.secondaryBtn} onClick={onTakePhoto}>
               <span className={styles.discIcon}>
-                <CameraIcon />
+                <Icon name="camera" size={14} />
               </span>
               Vyfotit
             </button>
@@ -144,23 +144,5 @@ export default function NewCharacterScreen({
         </div>
       )}
     </div>
-  );
-}
-
-function PhotoIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="3" y="5" width="18" height="14" rx="2.5" />
-      <circle cx="8.5" cy="10" r="1.6" />
-      <path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5" />
-    </svg>
-  );
-}
-function CameraIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M3 8.5h4l1.6-2h6.8l1.6 2H21v10H3z" />
-      <circle cx="12" cy="13" r="3.2" />
-    </svg>
   );
 }

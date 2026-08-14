@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
 import styles from "./BonusSongScreen.module.css";
+import Icon from "./Icon";
 
 export default function BonusSongScreen({
   coverImage,
@@ -27,7 +27,7 @@ export default function BonusSongScreen({
       )}
       {status === "error" && (
         <>
-          <div className={styles.icon}>🎵</div>
+          <div className={styles.icon}><Icon name="music" size={34} /></div>
           <p className={styles.body}>Písnička teď není k dispozici</p>
           <button className={styles.textBtn} onClick={onDone}>Hotovo</button>
         </>
@@ -42,7 +42,7 @@ export default function BonusSongScreen({
             ))}
           </div>
           <button className={styles.playBtn} onClick={onTogglePlay} aria-label="Přehrát / pozastavit">
-            {status === "playing" ? "❚❚" : "►"}
+            <Icon name={status === "playing" ? "pause" : "play"} size={24} />
           </button>
           <button className={styles.textBtn} onClick={onDone}>Hotovo</button>
         </>
