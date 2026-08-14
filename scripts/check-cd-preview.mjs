@@ -12,6 +12,8 @@ for (const viewport of [
 ]) {
   const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
   await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.getByRole("heading", { name: /Nickyho/ }).waitFor();
+  await page.getByRole("button", { name: "Start nové pohádky" }).click();
   await page.getByRole("heading", { name: "Výběr pohádky" }).waitFor();
   await page.screenshot({ path: `test-results/cd-${viewport.name}-world.png`, fullPage: true });
 

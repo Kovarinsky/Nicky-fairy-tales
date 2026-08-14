@@ -1,0 +1,14 @@
+# Known Differences vs. Current Prototype/Implementation
+
+Tracked gaps between this design-system handoff and what's likely live in the app right now, based on the brief that prompted this package ("současný převod do aplikace není vizuálně dostatečně věrný CD návrhům").
+
+1. **App-frame containment.** If the current implementation renders as a stretched full-width responsive web layout on tablet/desktop, that's the single biggest fidelity gap — see `breakpoints.md`. This app should always render as a centered ~430px-wide mobile frame, never a scaled-up mobile page.
+2. **Font loading.** If Alegreya/Nunito are missing the `latin-ext` subset, Czech diacritics silently fall back to a system font — see `FONT-USAGE.md`. This is a common, easy-to-miss cause of "doesn't look right" typography.
+3. **Emoji-as-icon.** If any UI surface uses an emoji character in place of a real icon (e.g. 🔒 instead of the `lock.svg` glyph), replace it — `icons/` now ships the full flat SVG set for exactly this reason.
+4. **Illustration style drift.** Any AI-generated imagery not run through the Style Bible's Gemini prompt suffix + negative prompt (`style-bible.md`) risks drifting toward one of the explicitly forbidden looks (glossy 3D, flat sticker, crayon). Re-run any drifted asset through the documented prompt pair.
+5. **Generic catalog art standing in for a named character or voice.** Per this round's brief: do not use generic catalog illustrations as character portraits or voice avatars unless explicitly approved — those need dedicated, canon-referenced generations (see `style-bible.md` → Character consistency rules).
+6. **New screens (9, 11, 12) not yet built.** Generation Progress, Konec pohádky, and Bonusová písnička are EXPLORATORY in this handoff (see `screenshot-manifest.md`) — if the current app has a different (or no) implementation of these three, this package is the reference to build against, not a description of what already exists.
+7. **Detail pohádky crop band.** If the current implementation centers the illustration crop/scrim rather than using the top-54%/bottom-scrim band layout, illustrated characters near the top or bottom of the source art are likely being clipped by UI chrome — see `05-detail-pohadky.png` and `focal-points.final.json`'s per-asset `textExclusion` notes.
+8. **Reader stays single-page on desktop.** If desktop Reader has drifted toward a two-page spread, revert to single full-bleed page — a spread is explicitly a future exploration, not a v1 target (see vFinal2's decision log, carried into this package unchanged).
+
+This list reflects gaps visible from the design side without access to the live app's current source — if you can share the current implementation (repo or running URL), a pixel-diff pass against these 12 references would be more precise than this general list.

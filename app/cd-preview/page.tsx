@@ -8,6 +8,7 @@ import GenerationProgressScreen from "../cd/GenerationProgressScreen";
 import CreateWorldScreen from "../cd/CreateWorldScreen";
 import NewCharacterScreen from "../cd/NewCharacterScreen";
 import VoiceSelectionScreen, { type VoiceItem } from "../cd/VoiceSelectionScreen";
+import HomeScreen from "../cd/HomeScreen";
 import styles from "./page.module.css";
 
 const A = "/cd-assets";
@@ -24,7 +25,7 @@ const stories: CatalogStory[] = [
 ];
 
 export default function CdPreviewPage() {
-  const [screen, setScreen] = useState<"world" | "catalog" | "details" | "progress" | "createWorld" | "newCharacter" | "voice">("world");
+  const [screen, setScreen] = useState<"home" | "world" | "catalog" | "details" | "progress" | "createWorld" | "newCharacter" | "voice">("home");
   const [world, setWorld] = useState(worlds[0]);
   const [motif, setMotif] = useState("Nicolásek a Vája objevují tajemství nového světa.");
   const [length, setLength] = useState(8);
@@ -37,6 +38,12 @@ export default function CdPreviewPage() {
     { id: "muz", name: "Muž", image: `${A}/katalog/webp/a-hrasek.webp` },
     { id: "dite", name: "Dítě", image: `${A}/katalog/webp/a-malenka.webp` },
   ];
+  const homeBackgrounds = [
+    { id: "krkonose", name: "Krkonoše", image: `${A}/svety/big/krkonose.jpg` },
+    { id: "kouzelny-les", name: "Kouzelný les", image: `${A}/svety/big/kouzelny-les.jpg` },
+    { id: "dinosauri", name: "Dinosauři", image: `${A}/svety/big/dinosauri.jpg` },
+  ];
+  if (screen === "home") return <div className={styles.previewViewport}><HomeScreen backgroundOptions={homeBackgrounds} version="vFinal3" onStart={() => setScreen("world")} /></div>;
   const selected = useMemo(() => [{ id: "nicolas", name: "Nicolásek", avatar: `${A}/katalog/webp/a-hrasek.webp`, selected: true }, { id: "valentyna", name: "Vája", avatar: `${A}/katalog/webp/a-malenka.webp`, selected: true }], []);
   if (screen === "catalog") return <div className={styles.previewViewport}><StoryCatalogScreen backgroundImage={`${A}/svety/big/krkonose.jpg`} stories={stories} onBack={() => setScreen("world")} onPick={(s) => { setMotif(`${s.name} — nové dobrodružství Nicoláska a Váji.`); setScreen("details"); }} /></div>;
   if (screen === "details") return <div className={styles.previewViewport}><StoryDetailsStep backgroundImage={`${A}/svety/big/${world.id}.jpg`} worldName={world.name} worldImage={world.image} motif={motif} onMotifChange={setMotif} characters={selected} length={length} onLengthChange={setLength} onOpenCharacter={() => setScreen("newCharacter")} onAddCharacter={() => setScreen("newCharacter")} onOpenVoice={() => setScreen("voice")} onBackToWorld={() => setScreen("world")} onBack={() => setScreen("world")} onSubmit={() => setScreen("progress")} /></div>;
