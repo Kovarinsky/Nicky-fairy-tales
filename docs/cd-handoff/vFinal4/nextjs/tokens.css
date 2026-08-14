@@ -1,0 +1,57 @@
+/* Shared design tokens — import once per app (e.g. in the root layout) and
+   reference via var(--token-name) from every component's CSS Module instead
+   of repeating literal values. Mirrors README.md §Design Tokens 1:1. */
+:root {
+  --color-night-1: #241447;
+  --color-night-2: #2e1a55;
+  --color-night-3: #4a2a63;
+  --color-night-4: #6b3d5e;
+  --color-night-5: #8a4f52;
+  --color-night-6: #3a2344;
+  --color-cream: #fdf3d7;
+  --color-cream-soft: #f7ecd9;
+  --color-gold: #fcd34d;
+  --color-gold-soft: #fde68a;
+  --color-accent-1: #f59e0b;
+  --color-accent-2: #f97316;
+  --color-danger: #fca5a5;
+  --color-danger-strong: #f87171;
+
+  --gradient-night: linear-gradient(180deg, var(--color-night-1) 0%, var(--color-night-2) 30%, var(--color-night-3) 55%, var(--color-night-4) 72%, var(--color-night-5) 84%, var(--color-night-6) 100%);
+  --gradient-cta: linear-gradient(90deg, var(--color-accent-1) 0%, var(--color-accent-2) 100%);
+  --gradient-gold: linear-gradient(135deg, var(--color-gold), var(--color-accent-1));
+
+  --glass-fill: rgba(30, 16, 58, 0.6);
+  --glass-fill-strong: rgba(30, 16, 58, 0.65);
+  --glass-border: rgba(253, 224, 138, 0.35);
+  --glass-border-soft: rgba(253, 224, 138, 0.28);
+  --glass-blur: blur(12px);
+
+  --scrim-heavy: rgba(8, 3, 20, 0.72);
+  --scrim-medium: rgba(16, 8, 36, 0.55);
+  --scrim-light: rgba(16, 8, 36, 0.25);
+
+  --font-serif: "Alegreya", Georgia, serif;
+  --font-body: "Nunito", system-ui, sans-serif;
+
+  --radius-pill: 999px;
+  --radius-card: 26px;
+  --radius-card-sm: 20px;
+  --radius-tile: 16px;
+
+  --shadow-card: 0 8px 28px rgba(8, 3, 20, 0.4);
+  --shadow-cta: 0 4px 24px rgba(245, 158, 11, 0.35);
+  --shadow-panel: 0 16px 44px rgba(6, 2, 18, 0.7);
+
+  --ease-press: transform 120ms ease;
+  --ease-standard: 200ms ease;
+  --ease-emphasis: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-sheet: 320ms cubic-bezier(0.32, 0.72, 0, 1);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+}

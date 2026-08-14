@@ -1,0 +1,19 @@
+# Button Behavior Map
+
+Every interactive button in the flow: text, icon, action, target, and state coverage. Loading/error/disabled are "n/a" where a button has no async operation behind it. Tooltip guidance: **hover tooltips are a desktop-only enhancement — every tooltip's content must also be readable without hovering** (inline helper text under/near the control on mobile, never hover-gated functionality).
+
+## Required call-outs
+
+| Button | Text | Icon | Action | Target | Loading | Error | Disabled | Desktop tooltip | Mobile equivalent |
+|---|---|---|---|---|---|---|---|---|---|
+| Poslechnout v originále | "Poslechnout v originále" | `book.svg` | Starts story generation using the tale's traditional cast instead of family characters | → Generation progress | Same as primary CTA (shared generation flow) | Same as primary CTA | Disabled if low on credits (see Low Credits modal) | "Vygeneruje se s klasickými postavami pohádky, ne s vaší rodinou" | Same text always visible as a caption directly under the button — never hover-only |
+| Prostudovat | "Prostudovat" | `research.svg` | AI researches the entered name/link/description to enrich the custom world before saving | Stays on Vytvořit vlastní svět; shows inline result note on completion | Inline spinner replaces the icon, button text → "Prostudovávám…" | Inline red-tinted note under the button, button reverts to idle | Disabled until the name field is non-empty | "Necháme AI najít víc informací o tomto světě" | Same text as a static caption under the button |
+| Rozvinout | "Rozvinout" | none (text-only secondary button) | Expands a short motif into a fuller paragraph via AI | Stays on Detaily pohádky / Motif editor, replaces textarea content | Inline spinner in place of the button label | Textarea content unchanged + small inline error note | Disabled while the motif field is empty | "Necháme AI rozvinout váš krátký nápad do delšího textu" | Same, static caption |
+| Pohádka podle mé polohy | "Pohádka podle mé polohy" | `location-pin.svg` | Toggles using device location to set the story's setting | Stays on Výběr světa; on first enable, triggers the location permission primer if not yet granted | n/a (instant toggle) | If permission denied, shows the Permission Primer's "denied" state inline below the toggle | n/a | "Pohádka se odehraje ve vašem okolí. Polohu neukládáme trvale." | Same text as a fixed caption under the toggle (already how it's built — no hover dependency) |
+| Vybrat tento hlas | "Vybrat tento hlas" | none | Confirms the highlighted narrator/voice choice | → back to Detaily pohádky, voice summary row updates | n/a | n/a | Disabled only if no voice is highlighted (shouldn't occur — one is always pre-selected) | none needed (label is self-explanatory) | — |
+| Vytvořit pohádku | "Vytvořit pohádku" | play-icon badge (custom, not from `icons/`) | Submits the full story draft for generation | → Generation progress | n/a (immediate navigation; the loading lives on the next screen) | Validation errors surface inline on Detaily pohádky before this button becomes tappable | Disabled until all required fields (world, at least one character, length) are set | none needed | — |
+| Start nové pohádky | "Start nové pohádky" | play-icon badge with sparkle particles | Begins the new-story flow | → Výběr světa (step 1) | n/a | n/a | n/a | none needed | — |
+| Nastavení | (icon-only, no visible label) | `settings.svg` | Opens Home Settings | → Home settings screen | n/a | n/a | n/a | "Nastavení vzhledu aplikace" | `aria-label="Nastavení"` on the button; label is never hover-only — screen readers and long-press both surface it |
+
+## General rule
+No button in this system relies on `:hover` to reveal information a mobile user needs — every tooltip above has a stated mobile-visible equivalent (inline caption, always-visible helper text, or self-explanatory label). Hover tooltips are additive polish for desktop/pointer input only.

@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import styles from "./HomeScreen.module.css";
 import AccountModal, { AccountUser } from "./AccountModal";
+import Icon from "./Icon";
 
 /**
  * Nickyho pohádky — home screen.
@@ -68,6 +69,9 @@ export default function HomeScreen({
   const [forgotOpen, setForgotOpen] = useState(false);
 
   const [accountOpen, setAccountOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [buttonTheme, setButtonTheme] = useState("orange");
+  const [moodTheme, setMoodTheme] = useState("dusk");
 
   function pickBg(id: string) {
     setLocalBgId(id);
@@ -133,6 +137,9 @@ export default function HomeScreen({
           <ChevronDown />
         </button>
         {version && <span className={styles.versionTag}>{version}</span>}
+        <button className={styles.settingsBtn} onClick={() => setSettingsOpen(true)} aria-label="Nastavení">
+          <Icon name="settings" size={20} />
+        </button>
         <h1 className={styles.title}>
           Nickyho
           <br />
@@ -326,6 +333,23 @@ export default function HomeScreen({
           onLogout?.();
         }}
       />
+      {settingsOpen && (
+        <div className={styles.settingsOverlay} role="dialog" aria-label="Nastavení vzhledu aplikace">
+          <button className={styles.settingsScrim} aria-label="Zavřít nastavení" onClick={() => setSettingsOpen(false)} />
+          <section className={styles.settingsSheet}>
+            <div className={styles.settingsHead}><h2>Nastavení vzhledu</h2><button onClick={() => setSettingsOpen(false)} aria-label="Zavřít"><Icon name="close-x" size={20} /></button></div>
+            <h3>Barva tlačítek</h3>
+            <div className={styles.swatches}>
+              {["orange", "plum", "fire", "night", "water"].map((id) => <button key={id} aria-label={id} className={`${styles.swatch} ${styles[`swatch_${id}`]} ${buttonTheme === id ? styles.swatchActive : ""}`} onClick={() => setButtonTheme(id)} />)}
+            </div>
+            <h3>Světlost a nálada</h3>
+            <div className={styles.swatches}>
+              {["none", "dusk", "night", "velvet", "milk", "forest"].map((id) => <button key={id} aria-label={id} className={`${styles.swatch} ${styles[`mood_${id}`]} ${moodTheme === id ? styles.swatchActive : ""}`} onClick={() => setMoodTheme(id)} />)}
+            </div>
+            <p className={styles.settingsSaved}>✓ Nastavení se použije pro celou aplikaci</p>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

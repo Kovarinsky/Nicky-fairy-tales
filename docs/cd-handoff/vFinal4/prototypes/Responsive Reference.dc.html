@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+<template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#241447"/><text x="50" y="58" font-size="40" text-anchor="middle" fill="#fcd34d">R</text></svg></template>
+<style>body{margin:0;background:#0e0620}</style>
+</helmet>
+<div style="padding:24px;font-family:'Nunito',system-ui,sans-serif;color:#fdf3d7">
+  <h1 style="font-family:Georgia,serif;font-size:20px;margin:0 0 4px">Responsive reference — 3 representative screen types × 4 breakpoints</h1>
+  <p style="font-size:12px;color:rgba(253,243,215,.6);margin:0 0 24px;max-width:640px">Demonstruje pravidla z MASTER-SPEC §4 (full-bleed ilustrace, formulář, mřížka) napříč mobile portrait / landscape, tablet, desktop. Pro plnou interakci a stavy viz "New Screens 11-21.dc.html".</p>
+  <sc-for list="{{ rows }}" as="row" hint-placeholder-count="3">
+    <div style="margin-bottom:36px">
+      <div style="font-size:13px;font-weight:800;margin-bottom:10px;color:#fde68a">{{ row.title }}</div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end">
+        <sc-for list="{{ row.frames }}" as="f" hint-placeholder-count="4">
+          <div style="text-align:center">
+            <div style="{{ f.outerStyle }}"><div style="{{ f.innerStyle }}">{{ f.content }}</div></div>
+            <div style="font-size:10.5px;margin-top:6px;color:rgba(253,243,215,.7)">{{ f.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-for>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+
+const BP = [
+  { id: 'mp', label: 'Mobile portrait 390×844', w: 390, h: 844, scale: 0.28 },
+  { id: 'ml', label: 'Mobile landscape 844×390', w: 844, h: 390, scale: 0.22 },
+  { id: 'tb', label: 'Tablet 768×1024', w: 768, h: 1024, scale: 0.19 },
+  { id: 'dk', label: 'Desktop 1366×768', w: 1366, h: 768, scale: 0.14 },
+];
+
+function fullBleedInner(bp) {
+  if (bp.id === 'mp') return 'position:relative;width:100%;height:100%;background:linear-gradient(160deg,#3a2344,#150826);display:flex;flex-direction:column;justify-content:flex-end;box-sizing:border-box;padding:24px 16px';
+  if (bp.id === 'ml') return 'position:relative;width:100%;height:100%;background:linear-gradient(160deg,#3a2344,#150826);display:flex;justify-content:flex-end;box-sizing:border-box;padding:16px';
+  return 'position:relative;width:100%;height:100%;background:linear-gradient(160deg,#3a2344,#150826);display:flex;align-items:center;justify-content:center;box-sizing:border-box';
+}
+
+class Component extends DCLogic {
+  renderVals() {
+    const rows = [
+      {
+        title: 'A) Full-bleed illustration screen (GenerationProgress / StoryEnd / ReaderScreen)',
+        frames: BP.map(bp => ({
+          label: bp.label,
+          outerStyle: `width:${bp.w * bp.scale}px;height:${bp.h * bp.scale}px;border-radius:${bp.id.startsWith('m') ? 20 : 8}px;overflow:hidden;border:1px solid rgba(253,224,138,.3);box-shadow:0 8px 20px rgba(0,0,0,.4)`,
+          innerStyle: fullBleedInner(bp) + `;font-size:${Math.max(7, 9 * bp.scale * 3)}px;color:#fdf3d7;font-weight:800`,
+          content: bp.id === 'mp' ? 'bottom sheet' : bp.id === 'ml' ? 'right rail' : 'centered card',
+        })),
+      },
+      {
+        title: 'B) Form / wizard screen (StoryDetailsStep / CreateWorldScreen)',
+        frames: BP.map(bp => ({
+          label: bp.label,
+          outerStyle: `width:${bp.w * bp.scale}px;height:${bp.h * bp.scale}px;border-radius:${bp.id.startsWith('m') ? 20 : 8}px;overflow:hidden;border:1px solid rgba(253,224,138,.3);background:#1b1030;box-shadow:0 8px 20px rgba(0,0,0,.4)`,
+          innerStyle: bp.id === 'mp'
+            ? 'width:100%;height:100%;box-sizing:border-box;padding:10px;display:flex;flex-direction:column;gap:6px'
+            : bp.id === 'ml'
+            ? 'width:100%;height:100%;box-sizing:border-box;padding:8px;display:flex;gap:6px'
+            : 'width:70%;height:80%;margin:auto;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center',
+          content: React.createElement('div', { style: { display: 'flex', flexDirection: bp.id === 'ml' ? 'row' : 'column', gap: 4, width: '100%', height: '100%' } },
+            React.createElement('div', { style: { flex: 1, background: 'rgba(253,224,138,.12)', borderRadius: 4 } }),
+            React.createElement('div', { style: { flex: 1, background: 'rgba(253,224,138,.12)', borderRadius: 4 } }),
+            React.createElement('div', { style: { height: bp.id === 'ml' ? '100%' : 10, width: bp.id === 'ml' ? 30 : '100%', background: 'linear-gradient(90deg,#f59e0b,#f97316)', borderRadius: 4 } })),
+        })),
+      },
+      {
+        title: 'C) Grid / catalog screen (StoryLibraryScreen / StoryCatalogScreen)',
+        frames: BP.map(bp => {
+          const cols = bp.id === 'mp' ? 2 : bp.id === 'ml' ? 3 : bp.id === 'tb' ? 3 : 4;
+          return {
+            label: bp.label,
+            outerStyle: `width:${bp.w * bp.scale}px;height:${bp.h * bp.scale}px;border-radius:${bp.id.startsWith('m') ? 20 : 8}px;overflow:hidden;border:1px solid rgba(253,224,138,.3);background:#1b1030;box-shadow:0 8px 20px rgba(0,0,0,.4)`,
+            innerStyle: 'width:100%;height:100%;box-sizing:border-box;padding:8px;display:grid;gap:4px;grid-template-columns:repeat(' + cols + ',1fr)',
+            content: Array.from({ length: cols * 3 }).map((_, i) => React.createElement('div', { key: i, style: { background: 'rgba(253,224,138,.14)', borderRadius: 4 } })),
+          };
+        }),
+      },
+    ];
+    return { rows };
+  }
+}
+
+</script>
+</body>
+</html>

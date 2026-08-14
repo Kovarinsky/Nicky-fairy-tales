@@ -156,6 +156,23 @@
   font-weight: 700;
   box-shadow: 0 4px 14px rgba(6, 2, 18, 0.55);
 }
+.settingsBtn {
+  position: absolute;
+  top: 85px;
+  right: 64px;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,.14);
+  color: #fdf3d7;
+  cursor: pointer;
+}
 
 .footer {
   position: absolute;
@@ -548,6 +565,19 @@
   text-decoration: underline;
   padding: 4px;
 }
+.settingsOverlay { position: absolute; inset: 0; z-index: 70; }
+.settingsScrim { position: absolute; inset: 0; border: 0; background: rgba(8,3,22,.55); backdrop-filter: blur(3px); }
+.settingsSheet { position: absolute; left: 10px; right: 10px; bottom: 10px; padding: 20px; border: 1px solid rgba(253,224,138,.42); border-radius: 24px; background: rgba(27,14,57,.97); box-shadow: 0 -12px 40px rgba(0,0,0,.45); color: #fdf3d7; }
+.settingsHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.settingsHead h2 { margin: 0; font: 800 24px Alegreya, Georgia, serif; }
+.settingsHead button { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(255,255,255,.1); color: #fdf3d7; cursor: pointer; }
+.settingsSheet h3 { margin: 18px 0 8px; font-size: 12px; letter-spacing: .08em; color: #f7d77a; text-transform: uppercase; }
+.swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+.swatch { width: 42px; height: 42px; padding: 0; border: 2px solid transparent; border-radius: 50%; cursor: pointer; box-shadow: inset 0 1px 4px rgba(255,255,255,.35); }
+.swatchActive { border-color: #fff0a8; box-shadow: 0 0 0 3px rgba(253,224,138,.25); }
+.swatch_orange { background: linear-gradient(135deg,#f59e0b,#f97316); }.swatch_plum { background: linear-gradient(135deg,#9b5de5,#5a189a); }.swatch_fire { background: linear-gradient(135deg,#ff7b00,#d62828); }.swatch_night { background: linear-gradient(135deg,#4361ee,#1d3557); }.swatch_water { background: linear-gradient(135deg,#64dfdf,#5390d9); }
+.mood_none { background: #b9b3c8; }.mood_dusk { background: linear-gradient(135deg,#f5c76b,#8064a7); }.mood_night { background: #1a2142; }.mood_velvet { background: #6e4a83; }.mood_milk { background: #f4e6cf; }.mood_forest { background: #3c7958; }
+.settingsSaved { margin: 16px 0 0; color: rgba(253,243,215,.72); font-size: 12px; font-weight: 700; }
 
 @keyframes ffly {
   0%, 100% { opacity: 0.1; transform: translate(0, 0); }

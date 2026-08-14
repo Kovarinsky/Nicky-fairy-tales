@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width:100%;min-height:100vh;background:#1b1030;font-family:'Nunito',system-ui,sans-serif;box-sizing:border-box;padding:24px;color:#fdf3d7">
+  <h1 style="font-family:Georgia,serif;font-size:22px;margin:0 0 4px">Crop review — focal points (reprezentativní vzorek)</h1>
+  <p style="font-size:12.5px;color:rgba(253,243,215,.65);margin:0 0 18px;max-width:600px">Přepínej breakpoint pro každý asset. Plná data pro všech 54 assetů jsou ve focal-points.final.json — zde je vizuální ukázka na reprezentativním vzorku (bezpečné i problematické kompozice).</p>
+  <div style="display:flex;gap:8px;margin-bottom:20px">
+    <sc-for list="{{ breakpoints }}" as="bp" hint-placeholder-count="4">
+      <button onClick="{{ bp.onPick }}" style="{{ bp.style }}">{{ bp.label }}</button>
+    </sc-for>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:20px">
+    <sc-for list="{{ items }}" as="it" hint-placeholder-count="6">
+      <div style="width:220px">
+        <div style="{{ it.frameStyle }}">
+          <img ref="{{ it.imgRef }}" style="{{ it.imgStyle }}" />
+        </div>
+        <div style="font-size:12px;font-weight:800;margin-top:6px">{{ it.name }}</div>
+        <div style="font-size:10.5px;color:rgba(253,243,215,.6);line-height:1.4">{{ it.note }}</div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+
+const BP = [
+  { id: 'mobileP', label: 'Mobile portrait 390×844', w: 156, h: 337 },
+  { id: 'mobileL', label: 'Mobile landscape 844×390', w: 260, h: 120 },
+  { id: 'tablet', label: 'Tablet 768×1024', w: 192, h: 256 },
+  { id: 'desktop', label: 'Desktop 1366×768', w: 260, h: 146 },
+];
+const ASSETS = [
+  { id: 'krkonose', name: 'krkonose (single, off-center face)', src: 'assets/svety/krkonose.jpg', pos: { mobileP: '50% 32%', mobileL: '50% 15%', tablet: '50% 25%', desktop: '50% 15%' }, fit: 'cover', note: 'Face priority on wide crops — object-position moves up as aspect widens.' },
+  { id: 'kouzelny-les', name: 'kouzelny-les (square, symmetric)', src: 'assets/svety/kouzelny-les.jpg', pos: { mobileP: '50% 50%', mobileL: '50% 50%', tablet: '50% 50%', desktop: '50% 50%' }, fit: { mobileP: 'contain', mobileL: 'contain', tablet: 'cover', desktop: 'cover' }, note: 'Square source — contain on phone, cover OK once frame is near-square.' },
+  { id: 'c-karkulka', name: 'c-karkulka (dual subject)', src: 'assets/katalog/c-karkulka.jpg', pos: { mobileP: '45% 50%', mobileL: '50% 50%', tablet: '50% 50%', desktop: '50% 50%' }, fit: 'cover', note: 'Girl prioritized on phone portrait; wider frames keep the wolf too.' },
+  { id: 'c-snehurka', name: 'c-snehurka (wide 9-figure group)', src: 'assets/katalog/c-snehurka.jpg', pos: { mobileP: '50% 50%', mobileL: '50% 50%', tablet: '50% 50%', desktop: '50% 50%' }, fit: { mobileP: 'contain', mobileL: 'cover', tablet: 'cover', desktop: 'cover' }, note: 'Contain on phone portrait keeps outer dwarfs from cropping.' },
+  { id: 'c-otesanek', name: 'c-otesanek (tight face close-up)', src: 'assets/katalog/c-otesanek.jpg', pos: { mobileP: '50% 48%', mobileL: '50% 48%', tablet: '50% 48%', desktop: '50% 48%' }, fit: 'cover', note: 'Minimal safe margin — never place text over the face at any breakpoint.' },
+  { id: 'a-vojacek', name: 'a-vojacek (primary+secondary, right edge)', src: 'assets/katalog/a-vojacek.jpg', pos: { mobileP: '38% 55%', mobileL: '45% 55%', tablet: '45% 55%', desktop: '45% 55%' }, fit: 'cover', note: 'Boat (secondary) only guaranteed visible from mobile-landscape up.' },
+];
+
+class Component extends DCLogic {
+  state = { bp: 'mobileP' };
+  renderVals() {
+    const bp = this.state.bp;
+    const bpDef = BP.find(b => b.id === bp);
+    const breakpoints = BP.map(b => ({
+      label: b.label,
+      onPick: () => this.setState({ bp: b.id }),
+      style: `height:32px;padding:0 12px;border-radius:999px;border:1.5px solid rgba(253,224,138,.35);cursor:pointer;font-size:11.5px;font-weight:800;font-family:Nunito,sans-serif;background:${b.id === bp ? 'linear-gradient(90deg,#f59e0b,#f97316)' : 'rgba(30,16,58,.6)'};color:${b.id === bp ? '#fff' : '#fdf3d7'}`,
+    }));
+    const items = ASSETS.map(a => {
+      const fit = typeof a.fit === 'string' ? a.fit : a.fit[bp];
+      return {
+        name: a.id,
+        note: a.note,
+        imgRef: (el) => { if (el) el.src = a.src; },
+        frameStyle: `width:${bpDef.w}px;height:${bpDef.h}px;border-radius:12px;overflow:hidden;background:#0e0620;border:1px solid rgba(253,224,138,.25)`,
+        imgStyle: `width:100%;height:100%;object-fit:${fit};object-position:${a.pos[bp]}`,
+      };
+    });
+    return { breakpoints, items };
+  }
+}
+
+</script>
+</body>
+</html>

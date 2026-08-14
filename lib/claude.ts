@@ -593,7 +593,52 @@ function sanitizeJson(s: string): string {
   s = s.replace(/("(?:[^"\\]|\\.)*")|\/\/[^\n]*/g, (m, str) => str ?? "");
   // Remove trailing commas before } or ]
   s = s.replace(/,\s*([}\]])/g, "$1");
-  return s;
+  // Claude occasionally emits a quotation mark inside narration/imagePrompt
+  // without escaping it (for example: He said "look" and ran). JSON.parse
+  // then fails near the middle of an otherwise complete 12-scene document.
+  // Repair only quotes that cannot legally close a JSON string; structural
+  // quotes (followed by a comma, colon, closing bracket or end-of-input) are
+  // left untouched. This preserves the completed story and avoids an
+  // expensive full rewrite attempt.
+  let out = "";
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (!inString) {
+      out += ch;
+      if (ch === '"') inString = true;
+      continue;
+    }
+    if (escaped) {
+      out += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      out += ch;
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      let j = i + 1;
+      while (j < s.length && /\s/.test(s[j])) j++;
+      const next = s[j] ?? "";
+      if (next === "" || ",:}]".includes(next)) {
+        out += ch;
+        inString = false;
+      } else {
+        out += '\\"';
+      }
+      continue;
+    }
+    // Literal newlines/control characters are invalid inside JSON strings.
+    if (ch === "\n") out += "\\n";
+    else if (ch === "\r") out += "\\r";
+    else if (ch === "\t") out += "\\t";
+    else out += ch;
+  }
+  return out;
 }
 
 function normalizeSceneSoundCues(scene: Scene): Scene {

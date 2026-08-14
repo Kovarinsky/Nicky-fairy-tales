@@ -10,6 +10,7 @@ import NewCharacterScreen from "../cd/NewCharacterScreen";
 import VoiceSelectionScreen, { type VoiceItem } from "../cd/VoiceSelectionScreen";
 import HomeScreen from "../cd/HomeScreen";
 import styles from "./page.module.css";
+import catalogData from "../../docs/cd-handoff/vFinal4/classic-tales.final.json";
 
 const A = "/cd-assets";
 const worlds: WorldTile[] = [
@@ -18,11 +19,17 @@ const worlds: WorldTile[] = [
   { id: "kouzelny-les", name: "Kouzelný les", image: `${A}/svety/webp/kouzelny-les.webp`, minAge: 2, maxAge: 10 },
   { id: "vesmir", name: "Vesmír", image: `${A}/svety/webp/vesmir.webp`, minAge: 5, maxAge: 12 },
 ];
-const stories: CatalogStory[] = [
-  { id: "karkulka", name: "Červená karkulka", group: "České pohádky", image: `${A}/katalog/webp/c-karkulka.webp`, bigImage: `${A}/katalog/big-webp/c-karkulka.webp`, description: "Klasická pohádka v novém dobrodružství.", minAge: 3, maxAge: 8, supportsOriginal: true },
-  { id: "popelka", name: "Popelka", group: "České pohádky", image: `${A}/katalog/webp/c-popelka.webp`, bigImage: `${A}/katalog/big-webp/c-popelka.webp`, description: "O odvaze, laskavosti a splněném přání.", minAge: 5, maxAge: 12, supportsOriginal: true },
-  { id: "dinosauri", name: "Dinosauři", group: "Svět", image: `${A}/katalog/webp/m-dinosauri.webp`, bigImage: `${A}/katalog/big-webp/m-dinosauri.webp`, description: "Výprava do pravěkého světa.", minAge: 3, maxAge: 10 },
-];
+const stories: CatalogStory[] = catalogData.tales.map((tale) => ({
+  id: tale.id,
+  name: tale.nameCz,
+  group: tale.group,
+  image: `${A}/katalog/webp/${tale.imageFile.replace(/\.jpg$/i, ".webp")}`,
+  bigImage: `${A}/katalog/big-webp/${tale.imageFile.replace(/\.jpg$/i, ".webp")}`,
+  description: tale.descCz,
+  minAge: tale.minAge,
+  maxAge: tale.maxAge,
+  supportsOriginal: tale.supportsOriginal,
+}));
 
 export default function CdPreviewPage() {
   const [screen, setScreen] = useState<"home" | "world" | "catalog" | "details" | "progress" | "createWorld" | "newCharacter" | "voice">("home");

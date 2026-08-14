@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@700;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes wave{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+@keyframes burst{0%{opacity:0;transform:scale(.2)}60%{opacity:1}100%{opacity:0;transform:scale(1.4)}}
+</style>
+</helmet>
+<div style="position:relative;width:100%;height:100vh;min-height:700px;background:#150826;font-family:'Nunito',sans-serif;display:flex;overflow:hidden">
+  <nav style="width:190px;flex:none;background:#0e0620;padding:16px 10px;box-sizing:border-box;overflow-y:auto;border-right:1px solid rgba(253,224,138,.15)">
+    <div style="font-family:'Alegreya',Georgia,serif;font-weight:800;color:#fdf3d7;font-size:15px;padding:4px 8px 12px">Obrazovky 11–21</div>
+    <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="11">
+      <button onClick="{{ item.onPick }}" style="{{ item.style }}">{{ item.label }}</button>
+    </sc-for>
+  </nav>
+  <div style="flex:1;position:relative;overflow:auto;display:flex;flex-direction:column">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;padding:14px 18px 0">
+      <sc-for list="{{ stateChips }}" as="chip" hint-placeholder-count="4">
+        <button onClick="{{ chip.onPick }}" style="{{ chip.style }}">{{ chip.label }}</button>
+      </sc-for>
+    </div>
+    <div style="flex:1;position:relative;display:flex;align-items:center;justify-content:center;padding:20px">
+      <div style="position:relative;width:390px;height:700px;border-radius:36px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);background:#241447">
+        {{ screenBody }}
+      </div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+
+const SCREENS = [
+  { id: 'progress', label: '11. Generation Progress', states: ['step1','step2','step3','error','cancelConfirm'] },
+  { id: 'resume', label: '14. Resume Banner', states: ['default'] },
+  { id: 'library', label: '15. Story Library', states: ['empty','loading','populated'] },
+  { id: 'end', label: '16. Story End', states: ['default'] },
+  { id: 'song', label: '17. Bonus Song', states: ['loading','playing','paused','error'] },
+  { id: 'share', label: '18. Share Sheet', states: ['default','generating','copied'] },
+  { id: 'credits', label: '19. Low Credits', states: ['default'] },
+  { id: 'forgot', label: '20. Forgot Password', states: ['request','sent','reset','resetSuccess'] },
+  { id: 'permCamera', label: '21a. Permission: Camera', states: ['default','denied'] },
+  { id: 'permMic', label: '21b. Permission: Mic', states: ['default','denied'] },
+  { id: 'permLocation', label: '21c. Permission: Location', states: ['default','denied'] },
+  { id: 'homeSettings', label: '22. Home Settings', states: ['default','pickerOpen','saved'] },
+  { id: 'pickChars', label: '23. Výběr postav', states: ['default'] },
+];
+
+const GOLD = 'linear-gradient(90deg,#f59e0b,#f97316)';
+const CARD = 'rgba(30,16,58,.65)';
+const BORDER = '1.5px solid rgba(253,224,138,.4)';
+
+function ctaObj(disabled) {
+  return { width: '100%', height: 56, border: '1.5px solid rgba(255,255,255,.9)', borderRadius: 999, color: '#fff', background: GOLD, boxShadow: '0 4px 24px rgba(245,158,11,.35)', fontFamily: "'Nunito',sans-serif", fontSize: 16, fontWeight: 800, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1 };
+}
+function secondaryObj() {
+  return { width: '100%', height: 44, border: BORDER, borderRadius: 999, background: 'transparent', color: '#fdf3d7', fontFamily: "'Nunito',sans-serif", fontSize: 13, fontWeight: 800, cursor: 'pointer' };
+}
+function textBtnObj() {
+  return { border: 'none', background: 'none', color: 'rgba(253,224,138,.85)', fontFamily: "'Nunito',sans-serif", fontSize: 13, fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', padding: 6 };
+}
+function inputObj() {
+  return { border: BORDER, borderRadius: 14, padding: '12px 14px', fontSize: 14, background: 'rgba(30,16,58,.7)', color: '#fdf3d7', fontFamily: "'Nunito',sans-serif" };
+}
+function h(text, size) {
+  return React.createElement('h2', { style: { margin: 0, fontFamily: "'Alegreya',Georgia,serif", fontSize: size || 24, fontWeight: 800, color: '#fdf3d7', textAlign: 'center', textShadow: '0 2px 10px rgba(20,8,40,.7)' } }, text);
+}
+function p(text) {
+  return React.createElement('p', { style: { margin: 0, fontSize: 13.5, lineHeight: 1.55, fontWeight: 600, color: 'rgba(253,243,215,.85)', textAlign: 'center' } }, text);
+}
+function frame(children, padTop) {
+  return React.createElement('div', { style: { position: 'relative', width: '100%', height: '100%', boxSizing: 'border-box', padding: (padTop || 60) + 'px 22px 26px', display: 'flex', flexDirection: 'column', gap: 14, color: '#fdf3d7', overflow: 'auto' } },
+    React.createElement('div', { style: { position: 'absolute', inset: 0, background: 'radial-gradient(circle at 30% 15%,#3a2344,#150826 72%)', zIndex: -1 } }),
+    ...children);
+}
+function spinner(size) {
+  return React.createElement('div', { style: { width: size || 46, height: size || 46, borderRadius: '50%', border: '3px solid rgba(253,224,138,.22)', borderTopColor: '#fde68a', animation: 'spin 900ms linear infinite', margin: '0 auto' } });
+}
+function icon(char, bgColor) {
+  return React.createElement('div', { style: { width: 54, height: 54, borderRadius: '50%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, background: bgColor || 'rgba(253,224,138,.15)', border: BORDER } }, char);
+}
+function btn(label, styleObj, key) {
+  return React.createElement('button', { key, style: styleObj }, label);
+}
+
+class Component extends DCLogic {
+  state = { screenId: 'progress', stateId: 'step1' };
+
+  pick(screenId) {
+    const s = SCREENS.find(x => x.id === screenId);
+    this.setState({ screenId, stateId: s.states[0] });
+  }
+  pickState(stateId) { this.setState({ stateId }); }
+
+  renderProgress(stateId) {
+    if (stateId === 'error') {
+      return frame([
+        icon('🕯️'),
+        h('Něco se nepovedlo', 21),
+        p('Vypravěč teď neodpovídá.'),
+        p('Nic jsme vám nestrhli.'),
+        React.createElement('div', { style: { marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 10 } },
+          btn('Zkusit znovu', ctaObj()),
+          btn('Zpět na úpravu pohádky', textBtnObj())),
+      ], 90);
+    }
+    if (stateId === 'cancelConfirm') {
+      return React.createElement('div', { style: { position: 'absolute', inset: 0 } },
+        React.createElement('div', { style: { position: 'absolute', inset: 0, background: 'rgba(8,3,20,.7)' } }),
+        React.createElement('div', { style: { position: 'absolute', left: '5%', right: '5%', top: '30%', padding: 20, borderRadius: 22, background: '#241447', border: BORDER, display: 'flex', flexDirection: 'column', gap: 12, boxShadow: '0 16px 44px rgba(6,2,18,.7)' } },
+          h('Opravdu chcete generování zrušit?', 18),
+          p('Rozpracovaná pohádka zůstane uložená, budete moci pokračovat později.'),
+          btn('Zrušit generování', { height: 48, border: '1.5px solid rgba(248,113,113,.5)', borderRadius: 999, background: 'rgba(80,20,30,.35)', color: '#fca5a5', fontFamily: "'Nunito',sans-serif", fontSize: 14, fontWeight: 800, cursor: 'pointer' }),
+          btn('Pokračovat v čekání', ctaObj())));
+    }
+    const steps = { step1: ['Píšu scénář…', 'Nicolásek si už obouvá botičky…', 1], step2: ['Kreslím ilustrace…', 'Míchám barvy pro kouzelný les…', 2], step3: ['Namlouvám vypravěče…', 'Hlas už zkouší první větu…', 3] };
+    const [title, sub, n] = steps[stateId] || steps.step1;
+    return frame([
+      spinner(56),
+      h(title, 20),
+      p(sub),
+      React.createElement('div', { style: { display: 'flex', gap: 6 } },
+        [1, 2, 3].map(i => React.createElement('div', { key: i, style: { flex: 1, height: 6, borderRadius: 4, background: i <= n ? GOLD : 'rgba(255,255,255,.15)' } }))),
+      React.createElement('div', { style: { marginTop: 'auto', textAlign: 'center' } }, btn('Zrušit', textBtnObj())),
+    ], 140);
+  }
+
+  renderResume() {
+    return frame([
+      React.createElement('div', { style: { padding: '14px 16px', borderRadius: 20, background: CARD, border: BORDER, display: 'flex', alignItems: 'center', gap: 12 } },
+        icon('⏳'),
+        React.createElement('div', { style: { flex: 1 } },
+          React.createElement('div', { style: { fontSize: 11, fontWeight: 800, color: 'rgba(253,224,138,.8)' } }, 'MÁTE ROZPRACOVANOU POHÁDKU'),
+          React.createElement('div', { style: { fontSize: 14, fontWeight: 800 } }, 'Perníková chaloupka')),
+        btn('Pokračovat', { height: 36, padding: '0 14px', border: 'none', borderRadius: 999, background: GOLD, color: '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer' })),
+      p('Banner se zobrazuje nahoře na Home i v knihovně, dokud generování nedokončíte nebo ho nesmažete.'),
+    ], 100);
+  }
+
+  renderLibrary(stateId) {
+    if (stateId === 'empty') {
+      return frame([
+        icon('📖'),
+        h('Zatím žádné pohádky', 19),
+        p('Vytvořte první pohádku a objeví se tady.'),
+        btn('Vytvořit první pohádku', ctaObj()),
+      ], 100);
+    }
+    if (stateId === 'loading') {
+      return frame([
+        h('Moje pohádky', 22),
+        React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } },
+          [1, 2, 3, 4].map(i => React.createElement('div', { key: i, style: { height: 140, borderRadius: 16, background: 'linear-gradient(90deg,rgba(253,224,138,.08),rgba(253,224,138,.18),rgba(253,224,138,.08))', backgroundSize: '200% 100%', animation: 'wave 1.4s ease-in-out infinite' } }))),
+      ], 70);
+    }
+    const covers = ['a-morskavila', 'c-popelka', 'c-pernikova', 'a-snehkralovna'];
+    return frame([
+      h('Moje pohádky', 22),
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, overflow: 'auto' } },
+        covers.map((c, i) => React.createElement('div', { key: i, style: { position: 'relative', height: 150, borderRadius: 16, overflow: 'hidden', backgroundImage: `linear-gradient(180deg,rgba(16,8,36,0) 40%,rgba(16,8,36,.85)), url(assets/katalog/${c}.jpg)`, backgroundSize: 'cover', backgroundPosition: 'center' } },
+          React.createElement('div', { style: { position: 'absolute', left: 10, right: 10, bottom: 8, fontSize: 12, fontWeight: 800 } }, 'Nicolásek — před ' + (i + 1) + ' dny'),
+          React.createElement('div', { style: { position: 'absolute', top: 6, right: 6, width: 24, height: 24, borderRadius: '50%', background: 'rgba(8,3,20,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 } }, '⋯')))),
+    ], 70);
+  }
+
+  renderEnd() {
+    return React.createElement('div', { style: { position: 'relative', width: '100%', height: '100%', boxSizing: 'border-box' } },
+      React.createElement('div', { style: { position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(0deg,rgba(20,10,5,.55),rgba(120,70,10,.35)), url(assets/katalog/c-pernikova.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' } }),
+      btn('×', { position: 'absolute', top: 16, right: 16, width: 40, height: 40, borderRadius: '50%', border: 'none', background: GOLD, color: '#fff', fontSize: 20, fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 14px rgba(0,0,0,.35)' }),
+      React.createElement('div', { style: { position: 'absolute', left: '8%', right: '8%', top: '50%', transform: 'translateY(-50%)', boxSizing: 'border-box', padding: 20, borderRadius: 26, background: 'rgba(30,16,58,.72)', border: BORDER, backdropFilter: 'blur(12px)', display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'center' } },
+        React.createElement('div', { style: { fontSize: 30, animation: 'burst 1.2s ease-in-out' } }, '✨'),
+        h('Konec', 30),
+        btn('Poslechnout bonusovou písničku', ctaObj()),
+        btn('Přečíst znovu', secondaryObj()),
+        btn('Zpět do knihovny', textBtnObj())));
+  }
+
+  renderSong(stateId) {
+    if (stateId === 'loading') return frame([spinner(50), h('Skládám písničku…', 18)], 160);
+    if (stateId === 'error') return frame([icon('🎵'), p('Písnička teď není k dispozici'), React.createElement('div', { style: { textAlign: 'center' } }, btn('Hotovo', textBtnObj()))], 160);
+    const playing = stateId === 'playing';
+    return frame([
+      React.createElement('div', { style: { width: 160, height: 160, margin: '0 auto', borderRadius: 20, backgroundImage: 'url(assets/svety/kouzelny-les.jpg)', backgroundSize: 'cover', backgroundPosition: 'center', border: '2px solid rgba(253,224,138,.5)' } }),
+      h('Píseň o kouzelném lese', 18),
+      React.createElement('div', { style: { display: 'flex', gap: 4, justifyContent: 'center', height: 30, alignItems: 'center' } },
+        [14, 24, 34, 24, 14].map((hgt, i) => React.createElement('span', { key: i, style: { width: 4, height: hgt, borderRadius: 2, background: '#f59e0b', animation: playing ? `wave ${0.9 + i * .15}s ease-in-out ${i * .12}s infinite` : 'none', transform: playing ? undefined : 'scaleY(.4)', display: 'block' } }))),
+      btn(playing ? '❚❚' : '►', { width: 58, height: 58, borderRadius: '50%', margin: '0 auto', border: 'none', background: GOLD, color: '#fff', fontSize: 22, cursor: 'pointer' }),
+      React.createElement('div', { style: { textAlign: 'center' } }, btn('Hotovo', textBtnObj())),
+    ], 120);
+  }
+
+  renderShare(stateId) {
+    const items = [
+      { label: 'Nativní sdílení', icon: '📤', loading: false },
+      { label: 'Kopírovat odkaz', icon: '🔗', loading: false },
+      { label: 'Stáhnout jako video', icon: '⬇️', loading: stateId === 'generating' },
+    ];
+    return React.createElement('div', { style: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' } },
+      React.createElement('div', { style: { position: 'absolute', inset: 0, background: 'rgba(8,3,20,.6)' } }),
+      React.createElement('div', { style: { position: 'relative', background: '#241447', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: '10px 20px 28px', display: 'flex', flexDirection: 'column', gap: 12, border: BORDER, borderBottom: 'none' } },
+        React.createElement('div', { style: { width: 40, height: 5, borderRadius: 3, background: 'rgba(255,255,255,.3)', margin: '0 auto' } }),
+        h('Sdílet pohádku', 19),
+        items.map((it, i) => React.createElement('button', { key: i, style: { display: 'flex', alignItems: 'center', gap: 12, height: 48, padding: '0 14px', borderRadius: 16, border: BORDER, background: 'rgba(16,8,36,.5)', color: '#fdf3d7', fontFamily: "'Nunito',sans-serif", fontSize: 14, fontWeight: 800, cursor: 'pointer' } },
+          it.loading ? spinner(18) : React.createElement('span', null, it.icon), it.label)),
+        stateId === 'copied' && React.createElement('div', { style: { textAlign: 'center', fontSize: 12, fontWeight: 800, color: '#fde68a' } }, 'Odkaz zkopírován'),
+        React.createElement('div', { style: { textAlign: 'center' } }, btn('Zrušit', textBtnObj()))));
+  }
+
+  renderCredits() {
+    return React.createElement('div', { style: { position: 'absolute', inset: 0, display: 'flex' } },
+      React.createElement('div', { style: { position: 'absolute', inset: 0, background: 'rgba(8,3,20,.65)' } }),
+      React.createElement('div', { style: { position: 'relative', margin: 'auto', width: '84%', padding: 22, borderRadius: 24, background: '#241447', border: BORDER, display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'center' } },
+        icon('🪙', 'linear-gradient(160deg,#fde68a,#d99a1b)'),
+        h('Nedostatek kreditů', 20),
+        p('Tato pohádka potřebuje 3 kredity, máte 1.'),
+        btn('Dobít kredity', ctaObj()),
+        btn('Zpět', textBtnObj())));
+  }
+
+  renderForgot(stateId) {
+    if (stateId === 'sent') {
+      return frame([icon('✉️'), h('Zkontrolujte e-mail', 19), p('Poslali jsme vám odkaz na obnovení hesla.'), btn('Zpět na přihlášení', secondaryObj())], 120);
+    }
+    if (stateId === 'reset') {
+      return frame([
+        h('Nové heslo', 21),
+        React.createElement('input', { placeholder: 'NOVÉ HESLO', type: 'password', style: inputObj() }),
+        React.createElement('input', { placeholder: 'POTVRDIT HESLO', type: 'password', style: inputObj() }),
+        btn('Nastavit nové heslo', ctaObj()),
+      ], 100);
+    }
+    if (stateId === 'resetSuccess') {
+      return frame([icon('✓', GOLD), h('Heslo změněno', 20), btn('Přihlásit se', ctaObj())], 140);
+    }
+    return frame([
+      h('Zapomenuté heslo', 21),
+      React.createElement('input', { placeholder: 'E-MAIL', style: inputObj() }),
+      p('Pošleme vám odkaz na obnovení hesla.'),
+      btn('Odeslat odkaz', ctaObj()),
+    ], 100);
+  }
+
+  renderPermission(kind, stateId) {
+    const copy = {
+      permCamera: ['📷', 'Potřebujeme přístup k fotoaparátu, abyste mohli vyfotit postavu nebo místo pro pohádku.'],
+      permMic: ['🎙️', 'Potřebujeme přístup k mikrofonu, abychom mohli nahrát váš hlas pro vypravěče.'],
+      permLocation: ['📍', 'Potřebujeme vaši polohu, abychom mohli pohádku zasadit do vašeho okolí. Polohu nikam neukládáme trvale.'],
+    }[kind];
+    const body = stateId === 'denied'
+      ? [h('Povolení bylo odmítnuto', 18), p('Povolení jste dříve odmítli — zapněte ho v Nastavení telefonu.'), btn('Otevřít Nastavení', ctaObj())]
+      : [p(copy[1]), btn('Povolit', ctaObj()), btn('Teď ne', textBtnObj())];
+    return React.createElement('div', { style: { position: 'absolute', inset: 0, display: 'flex' } },
+      React.createElement('div', { style: { position: 'absolute', inset: 0, background: 'rgba(8,3,20,.65)' } }),
+      React.createElement('div', { style: { position: 'relative', margin: 'auto', width: '84%', padding: 22, borderRadius: 24, background: '#241447', border: BORDER, display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'center' } },
+        icon(copy[0]), ...body));
+  }
+
+  renderHomeSettings(stateId) {
+    const BTN_VARIANTS = [
+      { k: 'Oranžová lesklá', sw: 'linear-gradient(135deg,#fde68a,#f97316)' },
+      { k: 'Švestková', sw: 'linear-gradient(135deg,#c084fc,#6d28d9)' },
+      { k: 'Ohnivá', sw: 'linear-gradient(135deg,#fca5a5,#dc2626)' },
+      { k: 'Noční obloha', sw: 'linear-gradient(135deg,#93c5fd,#1e3a8a)' },
+      { k: 'Akvarel', sw: 'linear-gradient(135deg,#a7f3d0,#0f766e)' },
+    ];
+    const LIGHT_VARIANTS = [
+      { k: 'Bez filtru', sw: '#8a8a8a' }, { k: 'Zlatý soumrak', sw: 'linear-gradient(135deg,#fde68a,#b45309)' },
+      { k: 'Hluboká noc', sw: 'linear-gradient(135deg,#312e81,#0b0620)' }, { k: 'Fialový samet', sw: 'linear-gradient(135deg,#c084fc,#4c1d95)' },
+      { k: 'Mléčná pohádka', sw: 'linear-gradient(135deg,#fef3c7,#fca5a5)' }, { k: 'Smaragdový les', sw: 'linear-gradient(135deg,#6ee7b7,#065f46)' },
+    ];
+    const chosenBtn = this.state.settingsBtn || 'Oranžová lesklá';
+    const chosenLight = this.state.settingsLight || 'Zlatý soumrak';
+    const row = (label, options, chosen, onPick) => React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+      React.createElement('div', { style: { fontSize: 11, fontWeight: 800, color: 'rgba(253,224,138,.8)', letterSpacing: '.04em' } }, label),
+      React.createElement('div', { style: { display: 'flex', gap: 10, flexWrap: 'wrap' } },
+        options.map(o => React.createElement('button', {
+          key: o.k, onClick: () => onPick(o.k),
+          style: { width: 44, height: 44, borderRadius: '50%', border: chosen === o.k ? '3px solid #fde68a' : '2px solid rgba(255,255,255,.25)', background: o.sw, cursor: 'pointer', boxShadow: chosen === o.k ? '0 0 0 3px rgba(253,224,138,.25)' : 'none' },
+        }))));
+    return frame([
+      h('Nastavení', 24),
+      p('Vzhled aplikace se ukládá do vašeho účtu a projeví se na všech zařízeních. Než se přihlásíte, ukládá se jen do tohoto telefonu.'),
+      row('BARVA TLAČÍTEK', BTN_VARIANTS, chosenBtn, (k) => this.setState({ settingsBtn: k, stateId2: 'saved' })),
+      row('SVĚTLOST A NÁLADA', LIGHT_VARIANTS, chosenLight, (k) => this.setState({ settingsLight: k, stateId2: 'saved' })),
+      stateId === 'saved' && React.createElement('div', { style: { textAlign: 'center', fontSize: 12, fontWeight: 800, color: '#fde68a' } }, '✓ Uloženo do účtu'),
+      React.createElement('div', { style: { marginTop: 'auto' } }, btn('Hotovo', ctaObj())),
+    ], 90);
+  }
+
+  renderPickChars() {
+    const chars = [
+      { id: 'nicolasek', name: 'Nicolásek', img: 'assets/postavy/avatar-nicolasek.png', on: true },
+      { id: 'valentynka', name: 'Vaju', img: 'assets/postavy/avatar-valentynka.png', on: true },
+      { id: 'james', name: 'James', img: 'assets/postavy/avatar-james.png', on: false },
+      { id: 'bella', name: 'Bella', img: 'assets/postavy/avatar-bella.png', on: false },
+    ];
+    return frame([
+      h('Kdo v pohádce vystupuje', 20),
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, overflow: 'auto' } },
+        chars.map(c => React.createElement('div', { key: c.id, style: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '14px 8px', borderRadius: 18, background: c.on ? 'rgba(253,224,138,.14)' : CARD, border: c.on ? '1.5px solid #fde68a' : BORDER } },
+          React.createElement('div', { style: { width: 64, height: 64, borderRadius: '50%', backgroundImage: `url(${c.img})`, backgroundSize: 'cover', backgroundPosition: 'center', border: c.on ? '2.5px solid #f97316' : '2px solid rgba(255,255,255,.25)' } }),
+          React.createElement('div', { style: { fontSize: 13, fontWeight: 800 } }, c.name),
+          c.on && React.createElement('div', { style: { position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: '50%', background: GOLD, color: '#fff', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 } }, '✓'))),
+        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '14px 8px', borderRadius: 18, border: '1.5px dashed rgba(253,224,138,.4)' } },
+          React.createElement('div', { style: { width: 64, height: 64, borderRadius: '50%', border: '1.5px dashed rgba(253,224,138,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, color: '#fde68a' } }, '+'),
+          React.createElement('div', { style: { fontSize: 12, fontWeight: 800, color: 'rgba(253,243,215,.75)' } }, 'Nová postava'))),
+      React.createElement('div', { style: { marginTop: 'auto' } }, btn('Hotovo', ctaObj())),
+    ], 90);
+  }
+
+  renderVals() {
+    const { screenId, stateId } = this.state;
+    const screen = SCREENS.find(s => s.id === screenId);
+    const navItems = SCREENS.map(s => ({
+      label: s.label,
+      onPick: () => this.pick(s.id),
+      style: `display:block;width:100%;text-align:left;padding:9px 10px;margin-bottom:4px;border-radius:10px;border:none;cursor:pointer;font-family:Nunito,sans-serif;font-size:12.5px;font-weight:800;background:${s.id === screenId ? 'rgba(253,224,138,.16)' : 'transparent'};color:${s.id === screenId ? '#fde68a' : 'rgba(253,243,215,.75)'}`,
+    }));
+    const stateChips = screen.states.map(st => ({
+      label: st,
+      onPick: () => this.pickState(st),
+      style: `height:30px;padding:0 12px;border-radius:999px;border:1.5px solid rgba(253,224,138,.3);cursor:pointer;font-size:11.5px;font-weight:800;font-family:Nunito,sans-serif;background:${st === stateId ? 'linear-gradient(90deg,#f59e0b,#f97316)' : 'rgba(30,16,58,.6)'};color:${st === stateId ? '#fff' : '#fdf3d7'}`,
+    }));
+
+    let body;
+    switch (screenId) {
+      case 'progress': body = this.renderProgress(stateId); break;
+      case 'resume': body = this.renderResume(); break;
+      case 'library': body = this.renderLibrary(stateId); break;
+      case 'end': body = this.renderEnd(); break;
+      case 'song': body = this.renderSong(stateId); break;
+      case 'share': body = this.renderShare(stateId); break;
+      case 'credits': body = this.renderCredits(); break;
+      case 'forgot': body = this.renderForgot(stateId); break;
+      case 'permCamera': case 'permMic': case 'permLocation': body = this.renderPermission(screenId, stateId); break;
+      case 'homeSettings': body = this.renderHomeSettings(stateId); break;
+      case 'pickChars': body = this.renderPickChars(); break;
+      default: body = null;
+    }
+    return { navItems, stateChips, screenBody: body };
+  }
+}
+
+</script>
+</body>
+</html>

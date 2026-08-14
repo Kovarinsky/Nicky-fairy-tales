@@ -7,7 +7,8 @@ export type IconName =
   | "close-x"
   | "lock"
   | "play"
-  | "pause";
+  | "pause"
+  | "settings";
 
 export default function Icon({ name, size = 24 }: { name: IconName; size?: number }) {
   return (

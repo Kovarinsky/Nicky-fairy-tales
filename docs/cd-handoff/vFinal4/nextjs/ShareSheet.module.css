@@ -1,0 +1,27 @@
+@import "./tokens.css";
+
+.overlay { position: fixed; inset: 0; z-index: 45; display: flex; flex-direction: column; justify-content: flex-end; font-family: var(--font-body); }
+.scrim { position: absolute; inset: 0; background: var(--scrim-heavy); }
+.sheet {
+  position: relative; background: var(--color-night-1); border-top-left-radius: 28px; border-top-right-radius: 28px;
+  padding: 10px 20px calc(env(safe-area-inset-bottom, 12px) + 20px); display: flex; flex-direction: column; gap: 12px;
+  border: 1.5px solid var(--glass-border); border-bottom: none; color: var(--color-cream);
+}
+.handle { width: 40px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.3); margin: 0 auto; }
+.title { margin: 0; font-family: var(--font-serif); font-size: 19px; font-weight: 800; text-align: center; }
+.item {
+  display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 14px; border-radius: 16px;
+  border: 1.5px solid var(--glass-border); background: rgba(16,8,36,.5); color: var(--color-cream);
+  font-family: inherit; font-size: 14px; font-weight: 800; cursor: pointer;
+}
+.item:disabled { opacity: .6; cursor: default; }
+.spinner {
+  width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(253,224,138,.25);
+  border-top-color: var(--color-gold-soft); animation: spin 900ms linear infinite; display: inline-block;
+}
+.toast { text-align: center; font-size: 12px; font-weight: 800; color: var(--color-gold-soft); }
+.textBtn {
+  border: none; background: none; color: rgba(253,224,138,.85); font-family: inherit; font-size: 13px;
+  font-weight: 800; text-decoration: underline; cursor: pointer; padding: 4px; align-self: center;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
