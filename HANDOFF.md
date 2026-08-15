@@ -6,7 +6,8 @@ Convert the Claude Design mobile product flow into the existing Next.js app whil
 
 ## Current state
 
-- Repository: `main`, remote `Kovarinsky/nicky-fairy-tales`.
+- Repository preview branch: `codex/cd-preview-vfinal4`, remote `Kovarinsky/Nicky-fairy-tales`.
+- Vercel Preview deployed on 2026-08-15: `https://nicky-fairy-tales-4ajh2y209-jk-advisory.vercel.app/cd-preview` (deployment `dpl_4ukZPPzGYoAPJ2ay6nnwiRG7CaGE`). It is protected by Vercel authentication; production was not changed.
 - Existing CD preview route: `/cd-preview` (isolated; main production wizard is not replaced).
 - Preview now includes Home, world selection, catalogue/detail, custom world, story details, dedicated character selection, new character, narrator selection, generation progress, reader, end, bonus song and library.
 - New CD package vFinal3 has been inspected and stored under `docs/cd-handoff/vFinal3/`.
@@ -35,6 +36,7 @@ Convert the Claude Design mobile product flow into the existing Next.js app whil
 - `npm run build` passed on 2026-08-15 (Next.js compile, lint/type check and 41-page static generation).
 - `npm test -- --runInBand` passed on 2026-08-15: 13/13 tests.
 - `node scripts/check-cd-preview.mjs` passed against a local production build on both 390×844 and 1920×1080. It exercises Home → world → catalogue → details → characters → narrator → progress → reader → end → song → library and writes reference screenshots to `test-results/`.
+- Vercel's remote build completed successfully and an authenticated `vercel curl /cd-preview` returned the deployed Home markup with HTTP 200. A public Playwright run correctly stopped at the Vercel login page because Deployment Protection is enabled; the remote browser flow therefore remains to be checked while signed into Vercel.
 - The app-frame rule is implemented in the CD preview: max-width 430px, centered on tablet/desktop.
 
 ## Important decisions
